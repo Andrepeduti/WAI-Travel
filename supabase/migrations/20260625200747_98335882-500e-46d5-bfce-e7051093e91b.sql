@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS goals text[] NOT NULL DEFAULT '{}'::text[];

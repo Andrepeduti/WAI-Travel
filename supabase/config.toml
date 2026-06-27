@@ -1,0 +1,4 @@
+project_id = "suurklnkvdorlydfwxzz"
+
+[functions.extract-video-places]
+verify_jwt = false
