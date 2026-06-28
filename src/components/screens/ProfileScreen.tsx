@@ -82,7 +82,7 @@ export function ProfileScreen({
   return (
     <div className="min-h-screen bg-background pb-24">
       {/* Top Navigation */}
-      <div className="flex items-center gap-3 px-4 pt-4 pb-2">
+      <div className="flex items-center gap-3 px-4 pb-2" style={{ paddingTop: 'max(16px, env(safe-area-inset-top))' }}>
         <BackButton onClick={onBack} />
         <h1
           className="text-foreground"

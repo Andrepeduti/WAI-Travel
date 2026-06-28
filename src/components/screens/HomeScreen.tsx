@@ -410,7 +410,7 @@ export function HomeScreen({
 
   return <div className="min-h-screen pb-24 bg-[#f2f2f2] w-full max-w-full overflow-x-hidden box-border" style={{ paddingLeft: 'max(16px, env(safe-area-inset-left))', paddingRight: 'max(16px, env(safe-area-inset-right))' }}>
       {/* Header */}
-      <header className="pt-4 bg-[#f2f2f2] pb-[24px] -mx-4" style={{ paddingLeft: 'max(16px, env(safe-area-inset-left))', paddingTop: '16px' }}>
+      <header className="pt-4 bg-[#f2f2f2] pb-[24px] -mx-4" style={{ paddingLeft: 'max(16px, env(safe-area-inset-left))', paddingTop: 'max(16px, env(safe-area-inset-top))' }}>
         <div className="flex items-center justify-between mb-4 pb-[16px] pr-4">
           <div className="flex items-center gap-3">
             <button onClick={onProfileClick} className="focus:outline-none">
