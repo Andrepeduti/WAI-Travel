@@ -17,9 +17,9 @@ dist-ssr
 .env.local
 .env.*.local
 
-# Capacitor native projects
-ios/
-android/
+# Capacitor native projects (agora sobem para o GitHub)
+# ios/
+# android/
 
 # Editor directories and files
 .vscode/*
