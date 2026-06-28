@@ -2,13 +2,10 @@ workflows:
   ios-workflow:
     name: iOS Capacitor Build to TestFlight
     integrations:
-      app_store_connect: "WAI-Travel" # IMPORTANTE: Substitua pelo nome exato que você deu para a chave da Apple no Codemagic
+      app_store_connect: "WAI-Travel"
     max_build_duration: 120
     instance_type: mac_mini_m1
     environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.waitravel.app
       vars:
         XCODE_WORKSPACE: "ios/App/App.xcworkspace"
         XCODE_SCHEME: "App"
@@ -27,6 +24,17 @@ workflows:
         script: npm run build
       - name: Update Capacitor iOS
         script: npx cap sync ios
+      - name: Inicializar Keychain
+        script: keychain initialize
+      - name: Buscar ou Criar Certificados e Perfis na Apple
+        script: |
+          app-store-connect fetch-signing-files "com.waitravel.app" \
+            --type IOS_APP_STORE \
+            --create
+      - name: Adicionar Certificados ao Keychain
+        script: keychain add-certificates
+      - name: Aplicar Perfis no Projeto do Xcode
+        script: xcode-project use-profiles
       - name: Build iOS IPA
         script: |
           xcode-project build-ipa \
