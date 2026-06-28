@@ -1,6 +1,8 @@
 workflows:
   ios-workflow:
     name: iOS Capacitor Build to TestFlight
+    integrations:
+      app_store_connect: "WAI-Travel" # IMPORTANTE: Substitua pelo nome exato que você deu para a chave da Apple no Codemagic
     max_build_duration: 120
     instance_type: mac_mini_m1
     environment:
@@ -41,10 +43,3 @@ workflows:
         submit_to_testflight: true
         # beta_groups: 
         #   - Tester Group
-      email:
-        recipients:
-          # Adicione o e-mail de quem deve ser notificado sobre o build
-          - seu-email@exemplo.com
-        notify:
-          success: true
-          failure: true
