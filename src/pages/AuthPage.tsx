@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Detecta se a URL atual contém um retorno de OAuth (Google, etc.) vindo do
- * broker do Lovable Cloud. Aceita os formatos comuns:
+ * Supabase Auth. Aceita os formatos comuns:
  * - hash com `access_token` + `refresh_token` (implicit / token response)
  * - query/hash com `code` (PKCE / authorization code)
  */
@@ -53,8 +53,8 @@ const AuthPage = () => {
   }, [location.search]);
 
   // 1. Consome retorno do OAuth (tokens ou code) e estabelece a sessão no Supabase.
-  // Necessário porque o SDK do Lovable Cloud faz um redirect top-level no site
-  // publicado e não há outro lugar do app que processe os tokens do callback.
+  // Necessário porque o fluxo OAuth faz um redirect top-level
+  // e não há outro lugar do app que processe os tokens do callback.
   useEffect(() => {
     const ret = readOAuthReturn();
     if (!ret) return;

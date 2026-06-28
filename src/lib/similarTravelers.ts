@@ -23,80 +23,7 @@ type MockTraveler = Omit<SimilarTraveler, 'username' | 'compatibility' | 'shared
   sharedTripsCount?: number;
 };
 
-const MOCK_TRAVELERS: MockTraveler[] = [
-  {
-    userId: 'mock-1',
-    name: 'Alessandra',
-    city: 'Uberlândia, MG',
-    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200',
-    interests: ['História', 'Paris', 'Night life', 'Clubs'],
-    sharedInterests: [],
-    isMock: true,
-  },
-  {
-    userId: 'mock-2',
-    name: 'Marina',
-    city: 'São Paulo, SP',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200',
-    interests: ['Praia', 'Bali', 'Yoga', 'Café'],
-    sharedInterests: [],
-    isMock: true,
-  },
-  {
-    userId: 'mock-3',
-    name: 'Camila',
-    city: 'Rio de Janeiro, RJ',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-    interests: ['Aventura', 'Patagônia', 'Trilhas', 'Fotografia'],
-    sharedInterests: [],
-    isMock: true,
-  },
-  {
-    userId: 'mock-4',
-    name: 'Beatriz',
-    city: 'Belo Horizonte, MG',
-    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200',
-    interests: ['Cultura', 'Tóquio', 'Museus', 'Gastronomia'],
-    sharedInterests: [],
-    isMock: true,
-  },
-  {
-    userId: 'mock-5',
-    name: 'Rafael',
-    city: 'Curitiba, PR',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200',
-    interests: ['História', 'Museus', 'Café'],
-    sharedInterests: [],
-    isMock: true,
-  },
-  {
-    userId: 'mock-6',
-    name: 'Juliana',
-    city: 'Florianópolis, SC',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200',
-    interests: ['Praia', 'Yoga', 'Fotografia'],
-    sharedInterests: [],
-    isMock: true,
-  },
-  {
-    userId: 'mock-7',
-    name: 'Lucas',
-    city: 'Salvador, BA',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200',
-    interests: ['Música', 'Gastronomia', 'Night life'],
-    sharedInterests: [],
-    isMock: true,
-  },
-  {
-    userId: 'mock-8',
-    name: 'Mariana',
-    city: 'Porto Alegre, RS',
-    avatar: 'https://images.unsplash.com/photo-1502323777036-f29e3972d82f?w=200',
-    interests: ['Aventura', 'Trilhas', 'Fotografia'],
-    sharedInterests: [],
-    isMock: true,
-  },
-];
+const MOCK_TRAVELERS: MockTraveler[] = [];
 
 const norm = (s: string) => s.trim().toLowerCase();
 
@@ -228,26 +155,7 @@ export async function fetchSimilarTravelers(minResults = 6): Promise<SimilarTrav
     ordered = real;
   }
 
-  // Completa com mocks se não houver perfis suficientes
-  if (ordered.length < minResults) {
-    const mocks: SimilarTraveler[] = MOCK_TRAVELERS.map((m, idx) => {
-      const shared = computeShared(myInterests, m.interests);
-      // Pseudo-determinístico para mocks: usa nº de interesses compartilhados como base
-      const baseTrips = shared.length > 0 ? shared.length + (idx % 2) : (idx % 3);
-      return {
-        ...m,
-        username: m.username || slugifyUsername(m.name, m.userId),
-        sharedInterests: shared,
-        compatibility: computeCompatibility(myInterests, m.interests, shared),
-        sharedTripsCount: m.sharedTripsCount ?? baseTrips,
-      };
-    });
-    if (myInterests.length > 0) {
-      mocks.sort((a, b) => b.sharedInterests.length - a.sharedInterests.length);
-    }
-    const needed = minResults - ordered.length;
-    ordered = [...ordered, ...mocks.slice(0, Math.max(needed, mocks.length))];
-  }
+  // Se não houver perfis reais suficientes, a lista retornada simplesmente será menor.
 
   return ordered;
 }

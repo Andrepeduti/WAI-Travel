@@ -50,7 +50,7 @@ export function UserProfileScreen({
   onChatClick,
   onPublicItineraryClick,
 }: UserProfileScreenProps) {
-  const { user, refresh } = useCurrentUser();
+  const { user, refresh, loading } = useCurrentUser();
   // Garante que o card sempre exibe os dados mais recentes ao voltar de outra tela
   useEffect(() => { refresh(); }, [refresh]);
   const { itineraries } = useMyItineraries();
@@ -99,47 +99,68 @@ export function UserProfileScreen({
 
       {/* Profile Card */}
       <div className="px-5 mt-3 mb-4">
-        <div className="card-base p-5">
-          <div className="flex items-center gap-4 mb-3">
-            <UserAvatar src={user.avatar} alt={displayName} size={64} className="flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <h2 className="text-foreground" style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-weight-bold)' }}>
-                {displayName}
-              </h2>
-              {displayUsername && (
-                <p className="text-muted-foreground text-xs" style={{ fontSize: 'var(--text-xs)' }}>{displayUsername}</p>
-              )}
-              <div className="flex items-center gap-1 mt-0.5">
-                <Icon name="location_on" size={12} className="text-muted-foreground text-xs" />
-                <span className="text-muted-foreground text-xs" style={{ fontSize: 'var(--text-xs)' }}>{displayLocation}</span>
-              </div>
-              <div className="flex items-center gap-1.5 mt-1">
-                <span className="text-foreground" style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-semibold)' }}>{user.following}</span>
-                <span className="text-muted-foreground text-xs" style={{ fontSize: 'var(--text-sm)' }}>seguindo</span>
-                <span className="text-muted-foreground text-xs" style={{ fontSize: 'var(--text-sm)' }}>·</span>
-                <span className="text-foreground" style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-semibold)' }}>{user.followers}</span>
-                <span className="text-muted-foreground text-xs" style={{ fontSize: 'var(--text-sm)' }}>seguidores</span>
+        {loading ? (
+          <div className="card-base p-5 animate-pulse bg-white border border-[#0A0A0A]/5">
+            <div className="flex items-center gap-4 mb-3">
+              <div className="w-16 h-16 bg-[#0A0A0A]/10 rounded-full flex-shrink-0" />
+              <div className="flex-1 min-w-0 space-y-2.5">
+                <div className="h-4 bg-[#0A0A0A]/10 rounded w-2/3" />
+                <div className="h-3 bg-[#0A0A0A]/10 rounded w-1/3" />
+                <div className="h-3 bg-[#0A0A0A]/10 rounded w-1/2" />
+                <div className="h-3 bg-[#0A0A0A]/10 rounded w-3/4" />
               </div>
             </div>
-          </div>
-          {user.interests.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-3">
-              {user.interests.slice(0, 6).map((interest) => (
-                <span
-                  key={interest}
-                  className="inline-flex items-center px-2.5 py-1 rounded-full bg-[#F2F2F2] text-foreground"
-                  style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-medium)' }}
-                >
-                  {interest}
-                </span>
-              ))}
+              <div className="h-5 bg-[#0A0A0A]/10 rounded-full w-14" />
+              <div className="h-5 bg-[#0A0A0A]/10 rounded-full w-16" />
+              <div className="h-5 bg-[#0A0A0A]/10 rounded-full w-12" />
             </div>
-          )}
-          <button onClick={onEditProfile} className="btn-outline w-full" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-semibold)', padding: '8px 14px' }}>
-            Editar perfil
-          </button>
-        </div>
+            <div className="h-9 bg-[#0A0A0A]/10 rounded-xl w-full" />
+          </div>
+        ) : (
+          <div className="card-base p-5">
+            <div className="flex items-center gap-4 mb-3">
+              <UserAvatar src={user.avatar} alt={displayName} size={64} className="flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <h2 className="text-foreground" style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-weight-bold)' }}>
+                  {displayName}
+                </h2>
+                {displayUsername && (
+                  <p className="text-muted-foreground text-xs" style={{ fontSize: 'var(--text-xs)' }}>{displayUsername}</p>
+                )}
+                <div className="flex items-center gap-1 mt-0.5">
+                  <Icon name="location_on" size={12} className="text-muted-foreground text-xs" />
+                  <span className="text-muted-foreground text-xs" style={{ fontSize: 'var(--text-xs)' }}>{displayLocation}</span>
+                </div>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span className="text-foreground" style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-semibold)' }}>{user.following}</span>
+                  <span className="text-muted-foreground text-xs" style={{ fontSize: 'var(--text-sm)' }}>seguindo</span>
+                  <span className="text-muted-foreground text-xs" style={{ fontSize: 'var(--text-sm)' }}>·</span>
+                  <span className="text-foreground" style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-semibold)' }}>{user.followers}</span>
+                  <span className="text-muted-foreground text-xs" style={{ fontSize: 'var(--text-sm)' }}>seguidores</span>
+                </div>
+              </div>
+            </div>
+            {user.interests.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {user.interests.slice(0, 6).map((interest) => (
+                  <span
+                    key={interest}
+                    className="inline-flex items-center px-2.5 py-1 rounded-full bg-[#F2F2F2] text-foreground"
+                    style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-medium)' }}
+                  >
+                    {interest}
+                  </span>
+                ))}
+              </div>
+            )}
+            <button onClick={onEditProfile} className="btn-outline w-full" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-semibold)', padding: '8px 14px' }}>
+              Editar perfil
+            </button>
+          </div>
+        )}
       </div>
+
 
 
       {/* Tabs */}

@@ -1,13 +1,11 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'app.lovable.06919f1357c645dc9f7d92f69d9c701b',
-  appName: 'waitravel',
+  appId: 'com.waitravel.app',
+  appName: 'WAI Travel',
   webDir: 'dist',
-  server: {
-    url: 'https://06919f13-57c6-45dc-9f7d-92f69d9c701b.lovableproject.com?forceHideBadge=true',
-    cleartext: true,
-  },
+  // In production, the app serves from the local bundle (dist/).
+  // Do NOT set server.url — that would make the app depend on a remote host.
   ios: {
     contentInset: 'always',
   },

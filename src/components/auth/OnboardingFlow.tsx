@@ -1440,16 +1440,150 @@ function CityScreen({
 }) {
   const [focused, setFocused] = useState(false);
   const [touched, setTouched] = useState(false);
-  const suggestions = value.trim().length > 0
-    ? CITIES.filter((c) => c.toLowerCase().includes(value.toLowerCase())).slice(0, 5)
-    : [];
-  const showSuggestions = focused && suggestions.length > 0 && !CITIES.includes(value);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [selectedFromList, setSelectedFromList] = useState(false);
+
+  // Geolocation and auto-detection states
+  const [detecting, setDetecting] = useState(true);
+  const [detectedCity, setDetectedCity] = useState('');
+  const [showManualInput, setShowManualInput] = useState(false);
+  const [geoError, setGeoError] = useState('');
+
+  useEffect(() => {
+    // If we already have a city value from parent (e.g. user went back/forward), don't auto-detect
+    if (value) {
+      setDetecting(false);
+      setShowManualInput(true);
+      setSelectedFromList(true);
+      return;
+    }
+
+    if (!navigator.geolocation) {
+      setGeoError('Geolocalização não suportada no seu navegador.');
+      setDetecting(false);
+      setShowManualInput(true);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        try {
+          // Fetch reverse geocoding from OpenStreetMap Nominatim
+          const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1&accept-language=pt-BR`;
+          const res = await fetch(url, {
+            headers: {
+              'User-Agent': 'waitravel-app-agent',
+            },
+          });
+          const data = await res.json();
+          const address = data.address || {};
+          
+          const cityName = address.city || address.town || address.village || address.municipality || address.suburb;
+          const stateName = address.state || address.region;
+          const countryName = address.country || '';
+
+          if (cityName) {
+            let formatted = cityName;
+            if (stateName) {
+              formatted += `, ${stateName}`;
+            } else if (countryName) {
+              formatted += `, ${countryName}`;
+            }
+            setDetectedCity(formatted);
+          } else {
+            // Geocoding succeeded but couldn't resolve a clear city name
+            setShowManualInput(true);
+          }
+        } catch (err) {
+          console.error('Erro na engenharia reversa de geolocalização:', err);
+          setShowManualInput(true);
+        } finally {
+          setDetecting(false);
+        }
+      },
+      (error) => {
+        console.warn('Erro ao obter geolocalização:', error);
+        setDetecting(false);
+        setShowManualInput(true);
+      },
+      { enableHighAccuracy: false, timeout: 6000, maximumAge: 600000 }
+    );
+  }, []);
+
+  useEffect(() => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    
+    const query = value.trim();
+    if (query.length < 2 || selectedFromList) {
+      if (!selectedFromList) {
+        setSuggestions([]);
+      }
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    searchTimer.current = setTimeout(async () => {
+      try {
+        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=10`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const features = data.features || [];
+
+        const cityTypes = new Set(['city', 'town', 'village', 'hamlet', 'suburb', 'municipality']);
+        const results: string[] = [];
+        const seen = new Set<string>();
+
+        for (const f of features) {
+          const props = f.properties || {};
+          const osmKey = props.osm_key || '';
+          const osmValue = props.osm_value || '';
+          
+          const isPlace = osmKey === 'place' && cityTypes.has(osmValue);
+          
+          if (isPlace && props.name) {
+            const cityName = props.name;
+            const state = props.state || '';
+            const country = props.country || '';
+            
+            let formatted = cityName;
+            if (state && state !== cityName) {
+              formatted += `, ${state}`;
+            }
+            if (country) {
+              formatted += `, ${country}`;
+            }
+
+            if (!seen.has(formatted.toLowerCase())) {
+              seen.add(formatted.toLowerCase());
+              results.push(formatted);
+            }
+          }
+        }
+        
+        setSuggestions(results.slice(0, 5));
+      } catch (err) {
+        console.error('Erro ao buscar cidades na API do Photon:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    }, 400);
+
+    return () => {
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+    };
+  }, [value, selectedFromList]);
+
+  const showSuggestions = focused && suggestions.length > 0 && value !== '';
 
   const trimmed = value.trim();
   const error =
-    touched && !focused && trimmed.length > 0 && !CITIES.includes(value)
+    touched && !focused && trimmed.length > 0 && !selectedFromList
       ? 'Selecione uma cidade da lista.'
-      : touched && trimmed.length === 0
+      : touched && trimmed.length === 0 && showManualInput
         ? 'Por favor, informe sua cidade.'
         : null;
 
@@ -1461,62 +1595,115 @@ function CityScreen({
         subtitle="Usamos isso para mostrar pessoas e experiências perto de você."
       />
       <div className="mt-6">
-        <Input
-          value={value}
-          onChange={(e) => {
-            onChange(e.target.value);
-            if (touched) setTouched(false);
-          }}
-          onFocus={() => setFocused(true)}
-          onBlur={() => {
-            setTimeout(() => setFocused(false), 150);
-            setTouched(true);
-          }}
-          placeholder="Buscar sua cidade"
-          autoFocus
-          className={cn(
-            'rounded-2xl bg-white px-5 text-[#0A0A0A] font-medium placeholder:text-[#0A0A0A]/35 focus-visible:ring-2 focus-visible:ring-offset-0 shadow-[0_2px_8px_-2px_rgba(10,10,10,0.06)]',
-            error
-              ? 'border border-[#E5484D] focus-visible:ring-[#E5484D]'
-              : 'border-0 focus-visible:ring-[#9DCC36]'
-          )}
-          style={{ fontSize: '16px', height: '56px' }}
-        />
-        <FieldError message={error} />
-        <AnimatePresence>
-          {showSuggestions && (
-            <motion.div
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.18 }}
-              className="mt-2 bg-white rounded-2xl shadow-[0_12px_28px_-8px_rgba(10,10,10,0.18)] overflow-hidden"
-            >
-              {suggestions.map((s) => (
-                <button
-                  key={s}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    onChange(s);
-                    setFocused(false);
-                    setTouched(false);
-                  }}
-                  className="w-full text-left px-5 py-3.5 text-[14px] text-[#0A0A0A] hover:bg-[#F5F5F1] transition-colors flex items-center gap-2.5 border-b border-[#0A0A0A]/5 last:border-0"
+        {detecting ? (
+          <div className="flex flex-col items-center justify-center py-8 gap-4 bg-white rounded-2xl p-6 shadow-[0_2px_8px_-2px_rgba(10,10,10,0.06)] border border-[#0A0A0A]/5">
+            <div className="w-8 h-8 border-3 border-[#9DCC36] border-t-transparent rounded-full animate-spin" />
+            <p className="text-[14px] font-medium text-[#0A0A0A]/70 animate-pulse">Detectando sua localização atual...</p>
+          </div>
+        ) : detectedCity && !showManualInput ? (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex flex-col bg-white rounded-2xl p-6 shadow-[0_2px_8px_-2px_rgba(10,10,10,0.06)] border border-[#0A0A0A]/5 gap-5"
+          >
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <MapPin className="text-[#9DCC36] flex-shrink-0" size={20} />
+                <p className="text-[12px] font-bold text-[#0A0A0A]/40 uppercase tracking-wider">Localização Detectada</p>
+              </div>
+              <p className="text-[18px] font-bold text-[#0A0A0A] ml-7">{detectedCity}</p>
+            </div>
+            <div className="flex flex-col gap-2.5">
+              <button
+                onClick={() => {
+                  onChange(detectedCity);
+                  setSelectedFromList(true);
+                  setTimeout(() => onNext(), 100);
+                }}
+                className="w-full h-12 rounded-xl bg-[#9DCC36] text-[#0A0A0A] font-bold text-[14px] hover:brightness-105 transition-all shadow-[0_4px_12px_-4px_rgba(157,204,54,0.4)]"
+              >
+                Confirmar
+              </button>
+              <button
+                onClick={() => {
+                  setShowManualInput(true);
+                }}
+                className="w-full h-12 rounded-xl bg-[#F4F5F7] text-[#0A0A0A]/70 font-semibold text-[13px] hover:bg-[#0A0A0A]/5 transition-all"
+              >
+                Não é minha cidade (digitar)
+              </button>
+            </div>
+          </motion.div>
+        ) : (
+          <div>
+            <div className="relative">
+              <Input
+                value={value}
+                onChange={(e) => {
+                  onChange(e.target.value);
+                  setSelectedFromList(false);
+                  if (touched) setTouched(false);
+                }}
+                onFocus={() => setFocused(true)}
+                onBlur={() => {
+                  setTimeout(() => setFocused(false), 200);
+                  setTouched(true);
+                }}
+                placeholder="Buscar sua cidade"
+                autoFocus
+                className={cn(
+                  'rounded-2xl bg-white px-5 pr-10 text-[#0A0A0A] font-medium placeholder:text-[#0A0A0A]/35 focus-visible:ring-2 focus-visible:ring-offset-0 shadow-[0_2px_8px_-2px_rgba(10,10,10,0.06)]',
+                  error
+                    ? 'border border-[#E5484D] focus-visible:ring-[#E5484D]'
+                    : 'border-0 focus-visible:ring-[#9DCC36]'
+                )}
+                style={{ fontSize: '16px', height: '56px' }}
+              />
+              {isLoading && (
+                <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                  <div className="w-4 h-4 border-2 border-[#9DCC36] border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+            </div>
+            <FieldError message={error} />
+            <AnimatePresence>
+              {showSuggestions && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18 }}
+                  className="mt-2 bg-white rounded-2xl shadow-[0_12px_28px_-8px_rgba(10,10,10,0.18)] overflow-hidden"
                 >
-                  <MapPin size={15} className="text-[#9DCC36] flex-shrink-0" />
-                  <span className="truncate">{s}</span>
-                </button>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
+                  {suggestions.map((s) => (
+                    <button
+                      key={s}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        onChange(s);
+                        setSelectedFromList(true);
+                        setFocused(false);
+                        setTouched(false);
+                      }}
+                      className="w-full text-left px-5 py-3.5 text-[14px] text-[#0A0A0A] hover:bg-[#F5F5F1] transition-colors flex items-center gap-2.5 border-b border-[#0A0A0A]/5 last:border-0"
+                    >
+                      <MapPin size={15} className="text-[#9DCC36] flex-shrink-0" />
+                      <span className="truncate">{s}</span>
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <FooterPrimary onClick={onNext} disabled={!canAdvance}>
+              Próximo
+            </FooterPrimary>
+          </div>
+        )}
       </div>
-      <FooterPrimary onClick={onNext} disabled={!canAdvance}>
-        Próximo
-      </FooterPrimary>
     </QuestionLayout>
   );
 }
+
 
 function BirthdateScreen({
   value,

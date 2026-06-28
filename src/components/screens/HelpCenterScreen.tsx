@@ -1,6 +1,7 @@
 import { Icon } from '@/components/ui/Icon';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { BackButton } from '@/components/ui/BackButton';
+import { useNavigate } from 'react-router-dom';
 
 interface HelpCenterScreenProps {
   onBack: () => void;
@@ -42,6 +43,8 @@ const faqSections = [
 ];
 
 export function HelpCenterScreen({ onBack }: HelpCenterScreenProps) {
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen bg-background pb-8">
       <div className="sticky top-0 z-20 bg-background">
@@ -55,7 +58,12 @@ export function HelpCenterScreen({ onBack }: HelpCenterScreenProps) {
 
       <div className="px-5 pt-2">
         <button
-          onClick={() => window.dispatchEvent(new CustomEvent('wai:restart-tour'))}
+          onClick={() => {
+            navigate('/home');
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent('wai:restart-tour'));
+            }, 100);
+          }}
           className="w-full flex items-center justify-between gap-3 p-4 rounded-2xl border border-border hover:bg-muted/50 transition-colors text-left mb-6"
         >
           <div className="flex items-center gap-3">

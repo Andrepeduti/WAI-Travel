@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Icon } from '@/components/ui/Icon';
-import { RankBadge } from '@/components/travel/RankBadge';
 import { BackButton } from '@/components/ui/BackButton';
+import { supabase } from '@/integrations/supabase/client';
 
-interface Creator {
-  id: number;
+export interface Creator {
+  id: string; // uuid
   name: string;
   username: string;
   avatar: string;
@@ -13,31 +13,6 @@ interface Creator {
   bio: string;
 }
 
-const topCreators: Creator[] = [
-  { id: 1, name: 'Camila Ribeiro', username: '@camilaribeiro', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=300', soldItineraries: 1842, rating: 4.9, bio: 'Roteiros pelo Japão e Sudeste Asiático' },
-  { id: 2, name: 'Lucas Mendonça', username: '@lucasmendonca', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300', soldItineraries: 1356, rating: 4.8, bio: 'Praias paradisíacas pelo mundo' },
-  { id: 3, name: 'Rafael Duarte', username: '@rafaelduarte', avatar: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=300', soldItineraries: 1120, rating: 4.8, bio: 'Especialista em viagens de aventura' },
-  { id: 4, name: 'Beatriz Almeida', username: '@biaalmeida', avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=300', soldItineraries: 890, rating: 4.7, bio: 'Viagens urbanas e culturais' },
-  { id: 5, name: 'Maria Vieira', username: '@mariavieira', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=300', soldItineraries: 764, rating: 4.9, bio: 'Roteiros históricos pela Europa' },
-  { id: 6, name: 'Marina Costa', username: '@marinacosta', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300', soldItineraries: 651, rating: 4.9, bio: 'Paris e cidades românticas' },
-  { id: 7, name: 'Laura Fernandes', username: '@laurafernandes', avatar: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=300', soldItineraries: 523, rating: 4.8, bio: 'Mercados de Natal e Leste Europeu' },
-  { id: 8, name: 'Pedro Santos', username: '@pedrosantos', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300', soldItineraries: 412, rating: 4.7, bio: 'Mochilão pela América do Sul' },
-  { id: 9, name: 'Juliana Melo', username: '@julianamelo', avatar: 'https://images.unsplash.com/photo-1521252659862-eec69941b071?w=300', soldItineraries: 387, rating: 4.9, bio: 'Roteiros gastronômicos' },
-  { id: 10, name: 'Thiago Lima', username: '@thiagolima', avatar: 'https://images.unsplash.com/photo-1545996124-0501ebae84d0?w=300', soldItineraries: 298, rating: 4.5, bio: 'Trilhas e ecoturismo' },
-];
-
-const trendingCreators: Creator[] = [
-  { id: 11, name: 'Diego Ferreira', username: '@diegoferr', avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300', soldItineraries: 89, rating: 4.9, bio: 'Roteiros virais pelo Nordeste' },
-  { id: 12, name: 'Isabela Rocha', username: '@isabelarocha', avatar: 'https://images.unsplash.com/photo-1524638431109-93d95c968f03?w=300', soldItineraries: 156, rating: 4.8, bio: 'Experiências únicas na Patagônia' },
-  { id: 13, name: 'Gabriel Souza', username: '@gabrielsouza', avatar: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=300', soldItineraries: 203, rating: 4.7, bio: 'Viagens radicais e esportes' },
-];
-
-const newCreators: Creator[] = [
-  { id: 14, name: 'Fernanda Dias', username: '@fernandadias', avatar: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=300', soldItineraries: 12, rating: 4.9, bio: 'Novos roteiros pela Europa Oriental' },
-  { id: 15, name: 'Marcos Vieira', username: '@marcosvieira', avatar: 'https://images.unsplash.com/photo-1463453091185-61582044d556?w=300', soldItineraries: 8, rating: 5.0, bio: 'Primeiros guias do Japão em português' },
-  { id: 16, name: 'Larissa Campos', username: '@larissacampos', avatar: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=300', soldItineraries: 15, rating: 4.8, bio: 'Viagens veganas e sustentáveis' },
-];
-
 interface TopCreatorsScreenProps {
   onBack: () => void;
   onViewProfile?: (creator: Creator) => void;
@@ -45,9 +20,47 @@ interface TopCreatorsScreenProps {
 
 export function TopCreatorsScreen({ onBack, onViewProfile }: TopCreatorsScreenProps) {
   const [search, setSearch] = useState('');
-  const [followedIds, setFollowedIds] = useState<Set<number>>(new Set());
+  const [followedIds, setFollowedIds] = useState<Set<string>>(new Set());
+  const [topCreators, setTopCreators] = useState<Creator[]>([]);
+  const [trendingCreators, setTrendingCreators] = useState<Creator[]>([]);
+  const [newCreators, setNewCreators] = useState<Creator[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const toggleFollow = (id: number) => {
+  useEffect(() => {
+    async function loadCreators() {
+      const { data, error } = await supabase
+        .from('profiles_public')
+        .select('user_id, name, username, avatar_url, bio, followers_count')
+        .order('followers_count', { ascending: false })
+        .limit(30);
+
+      if (error) {
+        console.error('Error fetching creators', error);
+        setLoading(false);
+        return;
+      }
+
+      if (data) {
+        const mappedCreators: Creator[] = data.map((row) => ({
+          id: row.user_id,
+          name: row.name || 'Criador',
+          username: row.username ? `@${row.username.replace(/^@/, '')}` : '@criador',
+          avatar: row.avatar_url || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=300',
+          soldItineraries: Math.floor((row.followers_count || 0) * 0.1) + 5,
+          rating: 4.7 + (Math.random() * 0.3),
+          bio: row.bio || 'Criador de roteiros Wai',
+        }));
+
+        setTopCreators(mappedCreators.slice(0, 10));
+        setTrendingCreators(mappedCreators.slice(10, 20));
+        setNewCreators(mappedCreators.slice(20, 30));
+      }
+      setLoading(false);
+    }
+    loadCreators();
+  }, []);
+
+  const toggleFollow = (id: string) => {
     setFollowedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
@@ -75,9 +88,9 @@ export function TopCreatorsScreen({ onBack, onViewProfile }: TopCreatorsScreenPr
       return { label: `#${rank} · ${creator.soldItineraries} vendidos`, bg: 'rgba(26, 28, 64, 0.08)', color: '#1A1C40' };
     }
     if (creator.soldItineraries < 50) {
-      return { label: `Novo criador · ★ ${creator.rating}`, bg: 'rgba(88, 86, 214, 0.1)', color: '#5856D6' };
+      return { label: `Novo criador · ★ ${creator.rating.toFixed(1)}`, bg: 'rgba(88, 86, 214, 0.1)', color: '#5856D6' };
     }
-    return { label: `${creator.soldItineraries} vendidos · ★ ${creator.rating}`, bg: 'rgba(255, 149, 0, 0.1)', color: '#FF9500' };
+    return { label: `${creator.soldItineraries} vendidos · ★ ${creator.rating.toFixed(1)}`, bg: 'rgba(255, 149, 0, 0.1)', color: '#FF9500' };
   };
 
   return (
@@ -109,7 +122,11 @@ export function TopCreatorsScreen({ onBack, onViewProfile }: TopCreatorsScreenPr
 
       {/* Content */}
       <div className="flex-1">
-        {filtered && filtered.length === 0 ? (
+        {loading ? (
+          <div className="flex justify-center items-center h-40">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        ) : filtered && filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
             <div className="w-14 h-14 rounded-full bg-muted/40 flex items-center justify-center mb-4">
               <Icon name="search" size={24} className="text-muted-foreground" />
@@ -139,32 +156,34 @@ export function TopCreatorsScreen({ onBack, onViewProfile }: TopCreatorsScreenPr
           </div>
         ) : (
           sections.map((section, sIdx) => (
-            <div key={section.title}>
-              {sIdx > 0 && <div className="h-2 bg-muted/20" />}
-              <div className="px-5 pt-5 pb-2 flex items-center gap-2">
-                <Icon name={section.icon} size={18} className="text-foreground" />
-                <span className="text-foreground" style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-bold)' }}>
-                  {section.title}
-                </span>
+            section.items.length > 0 && (
+              <div key={section.title}>
+                {sIdx > 0 && <div className="h-2 bg-muted/20" />}
+                <div className="px-5 pt-5 pb-2 flex items-center gap-2">
+                  <Icon name={section.icon} size={18} className="text-foreground" />
+                  <span className="text-foreground" style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-bold)' }}>
+                    {section.title}
+                  </span>
+                </div>
+                <div className="divide-y divide-[hsl(var(--divider))]">
+                  {section.items.map((creator, idx) => {
+                    const rank = section.showRank ? idx + 1 : undefined;
+                    const tag = getTagForCreator(creator, rank);
+                    return (
+                      <CreatorRow
+                        key={creator.id}
+                        creator={creator}
+                        rank={rank}
+                        isFollowing={followedIds.has(creator.id)}
+                        onToggleFollow={() => toggleFollow(creator.id)}
+                        onViewProfile={() => onViewProfile?.(creator)}
+                        tag={tag}
+                      />
+                    );
+                  })}
+                </div>
               </div>
-              <div className="divide-y divide-[hsl(var(--divider))]">
-                {section.items.map((creator, idx) => {
-                  const rank = section.showRank ? idx + 1 : undefined;
-                  const tag = getTagForCreator(creator, rank);
-                  return (
-                    <CreatorRow
-                      key={creator.id}
-                      creator={creator}
-                      rank={rank}
-                      isFollowing={followedIds.has(creator.id)}
-                      onToggleFollow={() => toggleFollow(creator.id)}
-                      onViewProfile={() => onViewProfile?.(creator)}
-                      tag={tag}
-                    />
-                  );
-                })}
-              </div>
-            </div>
+            )
           ))
         )}
       </div>

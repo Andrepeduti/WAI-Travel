@@ -150,21 +150,10 @@ interface FriendProfileScreenProps {
   variant?: ProfileVariant;
   onEditProfile?: () => void;
   onCreatorProgram?: () => void;
+  isLoading?: boolean;
 }
 
-const creatorItineraryMap: Record<string, number[]> = {
-  'Marina Costa': [106, 101],
-  'Rafael Duarte': [102, 100],
-  'Laura Fernandes': [100, 106],
-  'Camila Ribeiro': [109, 104],
-  'Lucas Mendonça': [108, 105],
-  'Beatriz Almeida': [107, 102],
-  'Pedro Santos': [105, 109],
-  'Ana Oliveira': [101, 107],
-  'Thiago Lima': [104, 108],
-  'Juliana Melo': [100, 102],
-};
-const defaultItineraryIds = [100, 101, 106, 109, 104];
+
 
 interface ProfileHighlight {
   id: string;
@@ -240,21 +229,7 @@ const DREAM_TRIP_PRESETS: { emoji: string; gradient: string; image: string }[] =
 ];
 
 
-const extraComments: Record<number, { user: string; text: string; avatar: string }[]> = {
-  100: [
-    { user: 'Maria Silva', text: 'Roteiro incrível! Seguimos à risca.', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100' },
-    { user: 'João Pedro', text: 'Dicas de restaurantes impecáveis.', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100' },
-  ],
-  101: [
-    { user: 'Ana Costa', text: 'Adorei as sugestões de pastel de nata!', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100' },
-  ],
-  106: [
-    { user: 'Ana Beatriz', text: 'Perfeito para lua de mel!', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100' },
-  ],
-  109: [
-    { user: 'Carlos Lima', text: 'Melhor roteiro de aventura que já usei!', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100' },
-  ],
-};
+
 
 // Traveler rank based on sales + reviews
 type TravelerRank = 'bronze' | 'prata' | 'ouro';
@@ -266,31 +241,7 @@ function getTravelerRank(totalSales: number, totalReviews: number): { rank: Trav
   return { rank: 'bronze', label: 'Viajante bronze', color: '#CD7F32' };
 }
 
-function buildPublicItineraries(friend: FriendProfileData): PublicItinerary[] {
-  const ids = creatorItineraryMap[friend.name] || defaultItineraryIds;
-  return ids.map(id => {
-    const ds = getItineraryById(id);
-    if (!ds) return null;
-    const totalDays = differenceInDays(ds.endDate, ds.startDate) + 1;
-    const uniqueCities = new Set(ds.destinations.map(d => d.split(',')[0].trim()));
-    return {
-      id: ds.id,
-      title: ds.title,
-      destination: ds.destinations[0],
-      image: ds.coverImage,
-      rating: ds.rating ?? 4.5,
-      reviewCount: ds.reviewCount ?? 0,
-      price: (ds.price && ds.price > 0) ? ds.price : null,
-      author: friend.name,
-      authorImage: friend.avatar,
-      duration: `${totalDays} dias`,
-      cities: uniqueCities.size,
-      places: ds.places.length,
-      comments: extraComments[id] || [],
-      theme: itineraryThemes[id],
-    };
-  }).filter(Boolean) as PublicItinerary[];
-}
+
 
 const walletItems: { icon: string; label: string; key: SettingsSubScreen }[] = [
   { icon: 'workspace_premium', label: 'Assinatura', key: 'subscription' },
@@ -314,7 +265,7 @@ const dangerItems = [
   { icon: 'logout', label: 'Sair', danger: true, action: 'signout' as const },
 ];
 
-export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, onDuplicateItinerary, variant = 'other', onEditProfile, onCreatorProgram }: FriendProfileScreenProps) {
+export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, onDuplicateItinerary, variant = 'other', onEditProfile, onCreatorProgram, isLoading }: FriendProfileScreenProps) {
   const isSelf = variant === 'self';
   const { signOut, user: authUser } = useAuth();
   const { user: currentUser } = useCurrentUser();
@@ -551,17 +502,12 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
     return () => { cancelled = true; };
   }, [isSelf, friend.userId, friend.name, friend.avatar]);
 
-  // Self profiles always start with no published itineraries — the user must
-  // publish/sell roteiros before any appear in their public profile. Other
-  // users' profiles use roteiros REAIS quando temos userId; fallback ao
-  // catálogo demo apenas para perfis legacy (sem userId real do banco).
-  const mockPublicItineraries = useMemo(
+  const publicItineraries = useMemo(
     () => {
       if (isSelf) return [];
-      if (friend.userId) return realPublicItineraries;
-      return buildPublicItineraries(friend);
+      return realPublicItineraries;
     },
-    [friend, isSelf, realPublicItineraries],
+    [isSelf, realPublicItineraries],
   );
 
   // Roteiros públicos reais do próprio usuário (vindos do banco)
@@ -782,12 +728,11 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
 
   // Compute rank
   const totalSales = parseInt(friend.followers.replace(/\D/g, '')) || 0;
-  const totalReviews = mockPublicItineraries.reduce((sum, it) => sum + it.reviewCount, 0);
+  const totalReviews = publicItineraries.reduce((sum, it) => sum + it.reviewCount, 0);
   const rankInfo = getTravelerRank(totalSales, totalReviews);
 
-  // All reviews across itineraries
   const allReviews = useMemo(() => {
-    return mockPublicItineraries.flatMap(it =>
+    return publicItineraries.flatMap(it =>
       it.comments.map((c, idx) => ({
         ...c,
         itineraryTitle: it.title,
@@ -796,7 +741,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
         rating: Math.max(1, Math.min(5, Math.round((it.rating + ((idx % 3) - 1) * 0.5) * 2) / 2)),
       }))
     );
-  }, [mockPublicItineraries]);
+  }, [publicItineraries]);
 
   // Determinar se o perfil tem conteúdo além dos interesses (para empty state divertido)
   const hasProfileContent = useMemo(() => {
@@ -804,10 +749,10 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
     const hasBio = !!friend.bio?.trim();
     const hasCountries = countries.length > 0;
     const hasDreamTrips = dreamTrips.length > 0;
-    const hasItineraries = mockPublicItineraries.length > 0;
-    const hasReviews = mockPublicItineraries.some(it => it.comments.length > 0);
+    const hasItineraries = publicItineraries.length > 0;
+    const hasReviews = publicItineraries.some(it => it.comments.length > 0);
     return hasBio || hasCountries || hasDreamTrips || hasItineraries || hasReviews;
-  }, [isSelf, friend, countries, dreamTrips, mockPublicItineraries]);
+  }, [isSelf, friend, countries, dreamTrips, publicItineraries]);
 
   if (showSalesSummary) {
     return <SalesSummaryScreen onBack={() => setShowSalesSummary(false)} />;
@@ -827,7 +772,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
     return (
       <CreatorItinerariesScreen
         creatorName={friend.name}
-        itineraries={mockPublicItineraries}
+        itineraries={publicItineraries}
         acquiredIds={duplicatedIds}
         onBack={() => setShowAllItineraries(false)}
         onItineraryClick={(id) => {
@@ -839,8 +784,8 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
   }
 
   if (showAllReviews) {
-    const avg = mockPublicItineraries.length > 0
-      ? mockPublicItineraries.reduce((s, it) => s + it.rating, 0) / mockPublicItineraries.length
+    const avg = publicItineraries.length > 0
+      ? publicItineraries.reduce((s, it) => s + it.rating, 0) / publicItineraries.length
       : 0;
     return (
       <AllReviewsScreen
@@ -959,6 +904,54 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
         </div>
 
         <ContactUsSheet isOpen={contactOpen} onClose={() => setContactOpen(false)} />
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#F2F2F2] pb-24 animate-pulse">
+        {/* Header */}
+        <div className="relative flex items-center justify-between px-4 pt-4 pb-2">
+          <div className="flex items-center">
+            <BackButton onClick={onBack} ariaLabel="Voltar" />
+          </div>
+          <div className="absolute left-1/2 -translate-x-1/2 h-6 bg-[#0A0A0A]/10 rounded w-24" />
+          <div className="w-11 h-11 bg-white rounded-full shadow-sm" />
+        </div>
+
+        {/* Profile Card Shimmer */}
+        <div className="px-5 mt-3 mb-4">
+          <div className="card-base p-5 bg-white border border-[#0A0A0A]/5 space-y-4">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-[#0A0A0A]/10 rounded-full flex-shrink-0" />
+              <div className="flex-1 min-w-0 space-y-2.5">
+                <div className="h-4 bg-[#0A0A0A]/10 rounded w-2/3" />
+                <div className="h-3 bg-[#0A0A0A]/10 rounded w-1/3" />
+                <div className="h-3 bg-[#0A0A0A]/10 rounded w-1/2" />
+              </div>
+            </div>
+            <div className="h-9 bg-[#0A0A0A]/10 rounded-xl w-full" />
+          </div>
+        </div>
+
+        {/* Highlights Shimmer */}
+        <div className="px-5 space-y-3">
+          <div className="h-20 bg-white rounded-2xl border border-[#0A0A0A]/5 p-4 flex gap-3">
+            <div className="w-10 h-10 bg-[#0A0A0A]/10 rounded-full flex-shrink-0" />
+            <div className="flex-1 space-y-2">
+              <div className="h-4 bg-[#0A0A0A]/10 rounded w-1/3" />
+              <div className="h-3 bg-[#0A0A0A]/10 rounded w-2/3" />
+            </div>
+          </div>
+          <div className="h-20 bg-white rounded-2xl border border-[#0A0A0A]/5 p-4 flex gap-3">
+            <div className="w-10 h-10 bg-[#0A0A0A]/10 rounded-full flex-shrink-0" />
+            <div className="flex-1 space-y-2">
+              <div className="h-4 bg-[#0A0A0A]/10 rounded w-1/4" />
+              <div className="h-3 bg-[#0A0A0A]/10 rounded w-1/2" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -1307,7 +1300,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
       )}
 
 
-      {(isSelf || mockPublicItineraries.length > 0) && (
+      {(isSelf || publicItineraries.length > 0) && (
         <div className="px-5 mb-4">
           <button
             type="button"
@@ -1330,18 +1323,18 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
         </div>
       )}
 
-      {(isSelf || mockPublicItineraries.length > 0) && (
+      {(isSelf || publicItineraries.length > 0) && (
 
       <div className="mb-8">
         <button
-          onClick={() => mockPublicItineraries.length > 0 && setShowAllItineraries(true)}
+          onClick={() => publicItineraries.length > 0 && setShowAllItineraries(true)}
           className="flex items-center gap-1 mb-3 px-5 active:opacity-70"
-          disabled={mockPublicItineraries.length === 0 && myPublicItineraries.length === 0}
+          disabled={publicItineraries.length === 0 && myPublicItineraries.length === 0}
         >
           <h3 className="text-foreground" style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-weight-bold)' }}>
             Roteiros à venda
           </h3>
-          {mockPublicItineraries.length > 0 && (
+          {publicItineraries.length > 0 && (
             <Icon name="chevron_right" size={18} style={{ color: '#1A1C40' }} />
           )}
         </button>
@@ -1405,7 +1398,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
               })}
             </HorizontalCarousel>
           </div>
-        ) : mockPublicItineraries.length === 0 ? (
+        ) : publicItineraries.length === 0 ? (
           <div className="px-5">
             {isSelf ? (
               <button
@@ -1448,7 +1441,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
         ) : (
           <div className="pl-5">
             <HorizontalCarousel showDots={false} itemClassName="w-[240px]">
-              {mockPublicItineraries.map(it => {
+              {publicItineraries.map(it => {
                 const isAcquired = duplicatedIds.has(it.id);
                 return (
                   <button

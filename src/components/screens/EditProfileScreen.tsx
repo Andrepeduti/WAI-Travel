@@ -693,12 +693,10 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
               {verifyStep === 0 && (
                 <>
                   <div className="flex flex-col items-center text-center py-4">
-                    <div
-                      className="w-16 h-16 rounded-full flex items-center justify-center mb-3"
-                      style={{ background: 'hsl(var(--primary))' }}
-                    >
-                      <Icon name="verified" size={32} style={{ color: 'hsl(var(--secondary))' }} />
-                    </div>
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" className="mb-3 flex-shrink-0">
+                      <circle cx="12" cy="12" r="10" fill="#1D9BF0"/>
+                      <path d="M9 12l2 2 4-4" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
                     <p
                       className="text-foreground"
                       style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-weight-semibold)' }}

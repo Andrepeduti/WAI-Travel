@@ -310,80 +310,7 @@ interface ProfileSearchRow {
   following_count: number;
 }
 
-const peopleSuggestions: PeopleSuggestion[] = [
-  {
-    id: 'p1', name: 'Laura Fernandes', handle: '@laurafernandes',
-    image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=300',
-    location: 'Lisboa, Portugal', followers: '12.4k', following: 318,
-    tags: ['europa', 'natal', 'cultural', 'leste europeu', 'portugal'],
-  },
-  {
-    id: 'p2', name: 'Lucas Mendonça', handle: '@lucasmendonca',
-    image: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300',
-    location: 'Florianópolis, Brasil', followers: '8.7k', following: 412,
-    tags: ['asia', 'praia', 'indonesia', 'bali', 'sudeste asiatico'],
-  },
-  {
-    id: 'p3', name: 'Marina Costa', handle: '@marinacosta',
-    image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300',
-    location: 'Paris, França', followers: '24.1k', following: 587,
-    tags: ['europa', 'romantico', 'franca', 'paris', 'cultural'],
-  },
-  {
-    id: 'p4', name: 'Beatriz Almeida', handle: '@beatrizalmeida',
-    image: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=300',
-    location: 'Nova York, EUA', followers: '18.9k', following: 296,
-    tags: ['america do norte', 'eua', 'urbano', 'nova york'],
-  },
-  {
-    id: 'p5', name: 'Rafael Duarte', handle: '@rafaelduarte',
-    image: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=300',
-    location: 'Bangkok, Tailândia', followers: '15.2k', following: 234,
-    tags: ['asia', 'praia', 'tailandia', 'aventura', 'sudeste asiatico'],
-  },
-  {
-    id: 'p6', name: 'Camila Ribeiro', handle: '@camilaribeiro',
-    image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=300',
-    location: 'Bariloche, Argentina', followers: '9.5k', following: 188,
-    tags: ['america do sul', 'patagonia', 'aventura', 'argentina', 'natureza'],
-  },
-  {
-    id: 'p7', name: 'Pedro Santos', handle: '@pedrosantos',
-    image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300',
-    location: 'Roma, Itália', followers: '11.3k', following: 405,
-    tags: ['europa', 'italia', 'mediterraneo', 'gastronomia', 'amalfi'],
-  },
-  {
-    id: 'p8', name: 'Ana Oliveira', handle: '@anaoliveira',
-    image: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300',
-    location: 'Porto, Portugal', followers: '7.8k', following: 152,
-    tags: ['europa', 'portugal', 'gastronomia', 'vinhos', 'iberia'],
-  },
-  {
-    id: 'p9', name: 'Thiago Lima', handle: '@thiagolima',
-    image: 'https://images.unsplash.com/photo-1545996124-0501ebae84d0?w=300',
-    location: 'Tóquio, Japão', followers: '21.6k', following: 379,
-    tags: ['asia', 'japao', 'cultural', 'toquio', 'kyoto'],
-  },
-  {
-    id: 'p10', name: 'Juliana Melo', handle: '@julianamelo',
-    image: 'https://images.unsplash.com/photo-1521252659862-eec69941b071?w=300',
-    location: 'Praga, República Tcheca', followers: '6.4k', following: 224,
-    tags: ['europa', 'leste europeu', 'natal', 'cultural', 'inverno'],
-  },
-  {
-    id: 'p11', name: 'Maria Vieira', handle: '@mariavieira',
-    image: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=300',
-    location: 'Atenas, Grécia', followers: '13.7k', following: 301,
-    tags: ['europa', 'grecia', 'mediterraneo', 'praia', 'cultural'],
-  },
-  {
-    id: 'p12', name: 'Carlos Santos', handle: '@carlossantos',
-    image: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=300',
-    location: 'Madrid, Espanha', followers: '10.2k', following: 267,
-    tags: ['europa', 'espanha', 'iberia', 'portugal', 'cultural', 'gastronomia'],
-  },
-];
+// Mocked people suggestions have been removed. Using real users from Supabase.
 
 type RecentType = 'lugar' | 'pessoa' | 'roteiro';
 interface RecentSearch {
@@ -634,10 +561,7 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
 
   const buildResults = (q: string) => {
     if (!q) return { places: [], people: [], itineraries: [] };
-    const peopleCatalog = [
-      ...realPeople,
-      ...peopleSuggestions.filter((mock) => !realPeople.some((real) => real.userId && real.name === mock.name)),
-    ];
+    const peopleCatalog = realPeople;
     return {
       places: trendingDestinations.filter((d) => {
         const haystack = [d.name, d.country, ...d.tags].map(norm).join(' ');
@@ -746,7 +670,7 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
       }
     }
     if (item.type === 'pessoa' && typeof item.refId === 'string') {
-      const person = [...realPeople, ...peopleSuggestions].find((p) => p.id === item.refId);
+      const person = realPeople.find((p) => p.id === item.refId);
       if (person) goToPersonProfile(person);
     }
     if (item.type === 'lugar' && typeof item.refId === 'number') {
@@ -777,11 +701,11 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
         ? base.people.length
         : base.places.length + base.itineraries.length
       : f.searchType === 'pessoas'
-        ? [...realPeople, ...peopleSuggestions].length
+        ? realPeople.length
         : mergedItineraries.length + trendingDestinations.length;
 
     if (f.searchType === 'pessoas') {
-      const peopleAll = baseQuery ? base.people : [...realPeople, ...peopleSuggestions];
+      const peopleAll = baseQuery ? base.people : realPeople;
       return peopleAll.filter((p) => {
         const hay = [p.name, p.handle, p.location, ...p.tags].map(norm).join(' ');
         if (f.regions.length && !f.regions.some((r) => hay.includes(norm(r)))) return false;

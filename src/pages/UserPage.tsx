@@ -77,6 +77,7 @@ const UserPage = () => {
         onBack={() => navigate('/home')}
         onEditProfile={() => setSubScreen('edit')}
         onCreatorProgram={() => setSubScreen('creator-program')}
+        isLoading={loading}
       />
     );
   })();
