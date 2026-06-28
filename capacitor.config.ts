@@ -7,8 +7,9 @@ const config: CapacitorConfig = {
   // In production, the app serves from the local bundle (dist/).
   // Do NOT set server.url — that would make the app depend on a remote host.
   ios: {
-    contentInset: 'always',
+    // contentInset removido para permitir que o app preencha a tela toda
   },
+  backgroundColor: '#FFFFFF'
 };
 
 export default config;
