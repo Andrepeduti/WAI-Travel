@@ -38,6 +38,9 @@ workflows:
         script: keychain add-certificates
       - name: Aplicar Perfis no Projeto do Xcode
         script: xcode-project use-profiles
+      - name: Incrementar Build Number
+        script: |
+          cd ios/App && agvtool new-version -all $BUILD_NUMBER
       - name: Build iOS IPA
         script: |
           xcode-project build-ipa \
