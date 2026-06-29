@@ -365,7 +365,7 @@ export function AddPlaceToCollectionSheetV2({
 
               {/* Add manually option at the bottom */}
               {onAddManually && (
-                <div className="pt-4 pb-2">
+                <div className="pt-safe-top pb-2">
                   <button
                     onClick={() => { handleClose(); onAddManually(); }}
                     className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-[13px] font-semibold text-muted-foreground border border-dashed border-border bg-transparent active:bg-secondary/40"

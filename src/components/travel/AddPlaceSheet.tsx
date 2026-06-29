@@ -612,7 +612,7 @@ export function AddPlaceSheet({ open, onClose, onSelect, onAddManually, dayNumbe
                           {/* Other destinations */}
                           {otherGroups.map(group => (
                             <div key={group.city}>
-                              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-1 pt-4 pb-2">
+                              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-1 pt-safe-top pb-2">
                                 ✈️ {group.city} <span className="normal-case font-normal">· outro destino</span>
                               </p>
                               {group.places.map(p => renderPlaceRow(p, true))}
@@ -629,7 +629,7 @@ export function AddPlaceSheet({ open, onClose, onSelect, onAddManually, dayNumbe
 
               {/* Add manually option at the bottom */}
               {onAddManually && (
-                <div className="pt-4 pb-2">
+                <div className="pt-safe-top pb-2">
                   <button
                     onClick={() => { handleClose(); onAddManually(); }}
                     className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-[13px] font-semibold text-muted-foreground border border-dashed border-border bg-transparent active:bg-secondary/40"

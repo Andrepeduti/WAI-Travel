@@ -2533,7 +2533,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
 
               {/* Sticky Day Header — bigger, bolder title */}
               <div
-                className="sticky z-10 pt-4 pb-2 -mx-4 px-4"
+                className="sticky z-10 pt-safe-top pb-2 -mx-4 px-4"
                 style={{ backgroundColor: 'hsl(var(--divider))', top: stickyTabsHeight }}
               >
                 <div className="flex items-baseline gap-2">

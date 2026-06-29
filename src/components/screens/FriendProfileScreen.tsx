@@ -825,7 +825,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
       <div className="min-h-screen bg-white pb-12">
         {/* Header */}
         <div className="sticky top-0 z-20 bg-white">
-          <div className="flex items-center gap-3 px-4 pt-4 pb-3">
+          <div className="flex items-center gap-3 px-4 pt-safe-top pb-3">
             <BackButton onClick={() => setShowSettings(false)} />
             <h1 className="text-foreground" style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--font-weight-bold)' }}>
               Configurações
@@ -1581,7 +1581,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
               <button
                 type="button"
                 onClick={() => setShowCountriesMap(true)}
-                className="w-full card-base flex items-center gap-3 px-4 transition-all active:scale-[0.98]"
+                className="w-full card-base flex items-center gap-3 px-4"
                 style={{ minHeight: 88 }}
               >
                 <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#F2F2F2' }}>
@@ -1728,7 +1728,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
             <button
               type="button"
               onClick={() => setDreamTripSheetOpen(true)}
-              className="w-full card-base flex items-center gap-3 px-4 transition-all active:scale-[0.98]"
+              className="w-full card-base flex items-center gap-3 px-4"
               style={{ minHeight: 88 }}
             >
               <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#F2F2F2' }}>

@@ -323,7 +323,7 @@ export function ItineraryMapScreen({ title, places, days, onMovePlaceToDay, onBa
       )}
 
       {/* Header */}
-      <header className="absolute top-0 left-0 right-0 z-[1000] px-4 pt-4 pb-3">
+      <header className="absolute top-0 left-0 right-0 z-[1000] px-4 pt-safe-top pb-3">
         <div className="flex items-center gap-3">
           <BackButton onClick={onBack} />
           <div className="bg-white rounded-full px-4 py-2.5 shadow-lg flex-1">

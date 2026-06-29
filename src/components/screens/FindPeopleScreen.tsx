@@ -130,7 +130,7 @@ export function FindPeopleScreen({ onBack, onViewProfile }: FindPeopleScreenProp
   return (
     <div className="min-h-screen bg-background flex flex-col pb-8">
       {/* Header */}
-      <header className="sticky top-0 z-20 bg-background px-4 pt-4 pb-3">
+      <header className="sticky top-0 z-20 bg-background px-4 pt-safe-top pb-3">
         <div className="flex items-center gap-3 mb-3">
           <BackButton onClick={onBack} />
           <h1 className="text-foreground" style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--font-weight-bold)' }}>

@@ -100,7 +100,7 @@ export function ReservasScreen({ onBack, reservas: externalReservas, onReservasC
           </p>
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto px-4 pt-4 pb-4 space-y-4">
+        <div className="flex-1 overflow-y-auto px-4 pt-safe-top pb-4 space-y-4">
           {reservas.map((r) => {
             const dateText = r.tipo === 'hospedagem'
               ? r.checkInDate

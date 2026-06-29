@@ -113,7 +113,7 @@ export function TransportesScreen({ onBack, transportes: externalTransportes, on
           </div>
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto px-4 pt-4 pb-4 space-y-4" style={{ paddingBottom: destination && startDate && endDate ? '260px' : '120px' }}>
+        <div className="flex-1 overflow-y-auto px-4 pt-safe-top pb-4 space-y-4" style={{ paddingBottom: destination && startDate && endDate ? '260px' : '120px' }}>
           {transportes.map((t) => {
             const TipoIcon = tipoIcons[t.tipo];
             const routeText = [t.origem, t.destino].filter(Boolean).join(' > ');

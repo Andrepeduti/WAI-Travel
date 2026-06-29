@@ -221,7 +221,7 @@ export function TravelRetrospective({ countries, open, onClose }: TravelRetrospe
   return (
     <div className="fixed inset-0 z-50 flex flex-col" style={{ background: slideGradients[currentSlide % slideGradients.length] }}>
       {/* Top bar */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-2 relative z-10">
+      <div className="flex items-center justify-between px-4 pt-safe-top pb-2 relative z-10">
         <button onClick={onClose} className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: 'hsla(0,0%,100%,0.1)' }}>
           <Icon name="close" size={20} style={{ color: 'white' }} />
         </button>

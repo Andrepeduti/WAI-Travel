@@ -37,7 +37,7 @@ const items = [
 export function PurchaseRulesScreen({ onBack, onAccept }: PurchaseRulesScreenProps) {
   return (
     <div className="min-h-screen bg-[#F2F2F2] flex flex-col">
-      <div className="flex items-center gap-3 px-4 pt-4 pb-2">
+      <div className="flex items-center gap-3 px-4 pt-safe-top pb-2">
         <BackButton onClick={onBack} />
       </div>
 

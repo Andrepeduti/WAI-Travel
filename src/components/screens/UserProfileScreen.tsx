@@ -84,7 +84,7 @@ export function UserProfileScreen({
   return (
     <div className="min-h-screen bg-background pb-24">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-2">
+      <div className="flex items-center justify-between px-4 pt-safe-top pb-2">
         <div className="flex items-center gap-3">
           <BackButton onClick={onBack} />
           <h1 className="text-foreground" style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--font-weight-bold)' }}>

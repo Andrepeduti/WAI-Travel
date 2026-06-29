@@ -261,7 +261,7 @@ export function DestinationItinerariesScreen({
 
       {/* Sort chips + filter */}
       <div
-        className="px-5 pt-4 pb-3 flex items-center gap-2 overflow-x-auto scrollbar-hide"
+        className="px-5 pt-safe-top pb-3 flex items-center gap-2 overflow-x-auto scrollbar-hide"
         style={{ scrollbarWidth: 'none' }}
       >
         <button

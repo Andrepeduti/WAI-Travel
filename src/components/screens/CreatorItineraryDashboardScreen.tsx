@@ -218,7 +218,7 @@ export function CreatorItineraryDashboardScreen({
     <div className="min-h-screen" style={{ background: '#F2F2F2' }}>
       {/* Sticky header */}
       <div className="sticky top-0 z-20" style={{ background: '#F2F2F2' }}>
-        <div className="flex items-center gap-3 px-4 pt-4 pb-3">
+        <div className="flex items-center gap-3 px-4 pt-safe-top pb-3">
           <BackButton onClick={onBack} />
           <h1
             className="text-foreground"

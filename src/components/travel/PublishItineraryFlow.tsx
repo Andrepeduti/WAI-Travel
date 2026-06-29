@@ -163,7 +163,7 @@ export function PublishItineraryFlow({
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[#F2F2F2]">
       <div className="relative w-full h-full max-w-[430px] mx-auto overflow-hidden font-sans">
         {/* Top bar — only back button */}
-        <div className={cn('absolute top-0 left-0 right-0 z-30', step <= 1 ? 'pt-[68px]' : 'pt-4 pb-3 bg-[#F2F2F2]')}>
+        <div className={cn('absolute top-0 left-0 right-0 z-30', step <= 1 ? 'pt-[68px]' : 'pt-safe-top pb-3 bg-[#F2F2F2]')}>
           <div className={step <= 1 ? 'px-3' : 'px-7'}>
             <div className={cn('flex items-center', step <= 1 && 'w-full max-w-[396px] mx-auto px-7')}>
               <button

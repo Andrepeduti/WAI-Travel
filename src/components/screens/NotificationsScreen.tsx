@@ -185,7 +185,7 @@ export function NotificationsScreen({ onBack, onNavigateToItinerary, onNavigateT
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="sticky top-0 z-20 bg-background px-5 pt-4 pb-3">
+      <header className="sticky top-0 z-20 bg-background px-5 pt-safe-top pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <BackButton onClick={onBack} />
@@ -205,7 +205,7 @@ export function NotificationsScreen({ onBack, onNavigateToItinerary, onNavigateT
             if (items.length === 0) return null;
             return (
               <div key={groupName}>
-                <div className="px-5 pt-4 pb-2">
+                <div className="px-5 pt-safe-top pb-2">
                   <span className="text-sm font-medium text-foreground">{groupName}</span>
                 </div>
                 <div className="divide-y divide-[hsl(var(--divider))]">

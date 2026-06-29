@@ -13,7 +13,7 @@ interface ManageCardsScreenProps {
 export function ManageCardsScreen({ cards, onBack, onEdit, onAddCard }: ManageCardsScreenProps) {
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="sticky top-0 z-20 bg-background px-5 pt-4 pb-3 border-b border-border">
+      <header className="sticky top-0 z-20 bg-background px-5 pt-safe-top pb-3 border-b border-border">
         <div className="flex items-center gap-3">
           <BackButton onClick={onBack} />
           <h1 className="text-xl font-bold text-foreground my-0 mt-[24px]">Gerenciar cartões</h1>

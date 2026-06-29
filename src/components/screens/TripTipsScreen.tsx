@@ -464,7 +464,7 @@ export function TripTipsScreen({ onBack, destination = 'Amsterdam' }: TripTipsSc
         <>
           <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setShowAddSheet(false)} />
           <div className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
-            <div className="sticky top-0 bg-card pt-4 pb-2 px-5 z-10">
+            <div className="sticky top-0 bg-card pt-safe-top pb-2 px-5 z-10">
               <div className="w-10 h-1 rounded-full bg-border mx-auto mb-4" />
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-bold text-foreground">

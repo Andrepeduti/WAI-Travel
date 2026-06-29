@@ -29,7 +29,7 @@ export function AIScreen() {
   return (
     <div className="min-h-screen bg-background pb-24">
       {/* Header */}
-      <header className="sticky top-0 z-20 bg-background px-5 pt-4 pb-4">
+      <header className="sticky top-0 z-20 bg-background px-5 pt-safe-top pb-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
             <Icon name="auto_awesome" size={20} className="text-white" />

@@ -80,7 +80,7 @@ export function AllReviewsScreen({ creatorName, reviews, averageRating, onBack }
     <div className="min-h-screen bg-[#F2F2F2] pb-24">
       {/* Sticky header */}
       <div className="sticky top-0 z-20 bg-[#F2F2F2]">
-        <div className="flex items-center gap-3 px-4 pt-4 pb-3">
+        <div className="flex items-center gap-3 px-4 pt-safe-top pb-3">
           <BackButton onClick={onBack} ariaLabel="Voltar" />
           <h1 className="text-foreground" style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--font-weight-bold)' }}>
             Avaliações
