@@ -1581,7 +1581,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
               <button
                 type="button"
                 onClick={() => setShowCountriesMap(true)}
-                className="w-full card-base flex items-center gap-3 px-4 transition-all active:scale-[0.98] hover:bg-muted/40"
+                className="w-full card-base flex items-center gap-3 px-4 transition-all active:scale-[0.98] active:bg-muted/40"
                 style={{ minHeight: 88 }}
               >
                 <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#F2F2F2' }}>
