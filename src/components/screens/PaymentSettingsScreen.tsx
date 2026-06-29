@@ -87,7 +87,7 @@ export function PaymentSettingsScreen({ onBack }: PaymentSettingsScreenProps) {
     <div className="min-h-screen bg-background pb-28">
       {/* Header */}
       <div className="sticky top-0 z-20 bg-background">
-        <div className="flex items-center gap-3 px-4 py-4">
+        <div className="flex items-center gap-3 px-4" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} ariaLabel="Voltar" />
           <h1
             className="text-foreground"

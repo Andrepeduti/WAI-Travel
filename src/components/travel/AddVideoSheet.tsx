@@ -52,7 +52,7 @@ export function AddVideoSheet({ isOpen, onClose, onOptionSelect }: AddVideoSheet
           </div>
           
           {/* Header with back button */}
-          <div className="px-6 pb-4">
+          <div className="px-6 pb-4" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
             <BackButton onClick={onClose} />
             <h2 className="text-xl font-bold text-foreground my-0 mt-[24px]">Adicionar vídeo</h2>
             <p className="text-sm text-muted-foreground mt-1">Usaremos o vídeo para identificar e extrair lugares da sua coleção

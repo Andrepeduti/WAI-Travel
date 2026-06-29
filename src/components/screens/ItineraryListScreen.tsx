@@ -43,8 +43,8 @@ export function ItineraryListScreen({ title, items, onBack, onItineraryClick, on
 
   return (
     <div className="min-h-screen flex flex-col pb-8" style={{ backgroundColor: '#F2F2F2' }}>
-      <header className="sticky top-0 z-20 px-4 pt-safe-top pb-3" style={{ backgroundColor: '#F2F2F2' }}>
-        <div className="flex items-center gap-3">
+ <header className="sticky top-0 z-20 px-4 pb-3" style={{ backgroundColor: '#F2F2F2' }}>
+        <div className="flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />
           <h1
             className="text-foreground"

@@ -56,7 +56,7 @@ export function SelectDaySheet({
           </div>
 
           {/* Header */}
-          <div className="px-6 pb-4">
+          <div className="px-6 pb-4" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
             <BackButton onClick={onBack} />
             <h2 className="text-xl font-bold text-foreground my-0 mt-[24px]">Selecionar dia</h2>
             <p className="text-sm text-muted-foreground mt-1">

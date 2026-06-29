@@ -96,8 +96,8 @@ export function TopCreatorsScreen({ onBack, onViewProfile }: TopCreatorsScreenPr
   return (
     <div className="min-h-screen bg-background flex flex-col pb-8">
       {/* Header */}
-      <header className="sticky top-0 z-20 bg-background px-4 pt-safe-top pb-3">
-        <div className="flex items-center gap-3 mb-3">
+ <header className="sticky top-0 z-20 bg-background px-4 pb-3">
+        <div className="flex items-center gap-3 mb-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />
           <h1 className="text-foreground" style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--font-weight-bold)' }}>
             Top Criadores

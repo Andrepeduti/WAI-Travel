@@ -196,7 +196,7 @@ export function SalesSummaryScreen({ onBack }: SalesSummaryScreenProps) {
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background border-b border-border">
         <div className="flex items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
             <BackButton onClick={onBack} />
             <div>
               <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 'var(--font-weight-bold)' }}>

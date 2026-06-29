@@ -130,7 +130,7 @@ export function ManageMembersScreen({ onBack, invitedFriends = [] }: ManageMembe
   return (
     <div className="min-h-screen pb-8" style={{ fontFamily: 'var(--font-family-primary)', background: '#F2F2F2' }}>
       {/* Header */}
-      <div className="px-4 pt-5 pb-4 flex items-center gap-3">
+      <div className="px-4 pb-4 flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
         <BackButton onClick={onBack} />
         <div className="flex-1">
           <h1 className="text-[20px] font-bold text-foreground">Participantes</h1>

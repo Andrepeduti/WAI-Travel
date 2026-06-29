@@ -93,7 +93,7 @@ export function TransportesScreen({ onBack, transportes: externalTransportes, on
     >
       {/* Header */}
       <header className="sticky top-0 z-20 bg-background px-4 pt-5 pb-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />
           <h1 className="text-xl font-bold text-foreground my-0 mt-[24px]">Transportes</h1>
         </div>
@@ -113,7 +113,7 @@ export function TransportesScreen({ onBack, transportes: externalTransportes, on
           </div>
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto px-4 pt-safe-top pb-4 space-y-4" style={{ paddingBottom: destination && startDate && endDate ? '260px' : '120px' }}>
+ <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-4" style={{ paddingBottom: destination && startDate && endDate ? '260px' : '120px' }}>
           {transportes.map((t) => {
             const TipoIcon = tipoIcons[t.tipo];
             const routeText = [t.origem, t.destino].filter(Boolean).join(' > ');

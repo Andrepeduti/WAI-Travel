@@ -2163,7 +2163,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/70" />
 
         {/* Nav buttons */}
-        <div className="absolute top-5 left-0 right-0 px-4 flex items-center justify-between z-10">
+        <div className="absolute top-0 left-0 right-0 px-4 flex items-center justify-between z-10" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />
           {!creatorEditMode && (
             <button onClick={() => setShowSettings(true)} className="w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-sm">

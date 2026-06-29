@@ -598,7 +598,7 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
     <div className="min-h-screen pb-24 bg-white relative">
       {/* Clean Header */}
       <header className="px-5 pt-5 pb-2 bg-zinc-100">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={selectionMode ? exitSelectionMode : onBack} />
 
           <div className="flex items-center gap-2">

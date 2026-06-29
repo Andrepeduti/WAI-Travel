@@ -90,7 +90,7 @@ export function EditItineraryDataScreen({
   return (
     <div className="min-h-screen pb-28 bg-background" style={{ fontFamily: 'var(--font-family-primary)' }}>
       {/* Header */}
-      <div className="px-4 pt-5 pb-4 flex items-center gap-3">
+      <div className="px-4 pb-4 flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
         <BackButton onClick={onBack} />
         <h1 className="text-[20px] font-bold text-foreground flex-1">Editar dados</h1>
       </div>

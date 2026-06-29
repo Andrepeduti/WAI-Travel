@@ -57,7 +57,7 @@ export function CreatorItinerariesScreen({
     <div className="min-h-screen bg-background pb-8">
       {/* Sticky header */}
       <div className="sticky top-0 z-20 bg-background">
-        <div className="flex items-center gap-3 px-4 pt-safe-top pb-3">
+        <div className="flex items-center gap-3 px-4 pb-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />
           <h1 className="text-foreground" style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-weight-bold)' }}>
             Roteiros à venda de {creatorName.split(' ')[0]}

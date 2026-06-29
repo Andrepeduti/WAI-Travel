@@ -48,7 +48,7 @@ export function TripNotesScreen({ onBack, destination, notes: externalNotes, onN
     <div className="min-h-screen bg-background flex flex-col" style={{ fontFamily: 'var(--font-family-primary)' }}>
       {/* Header */}
       <header className="sticky top-0 z-20 bg-background px-4 pt-5 pb-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />
           <h1 className="text-xl font-bold text-foreground my-0 mt-[24px]">Notas</h1>
         </div>

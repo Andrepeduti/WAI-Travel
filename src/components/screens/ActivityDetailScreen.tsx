@@ -122,7 +122,7 @@ export function ActivityDetailScreen({ activity, onBack }: ActivityDetailScreenP
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60" />
 
         {/* Back button */}
-        <div className="absolute top-12 left-4">
+        <div className="absolute top-0 left-4" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />
         </div>
 

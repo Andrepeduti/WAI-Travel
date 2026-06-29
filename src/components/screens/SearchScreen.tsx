@@ -757,8 +757,8 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
       )}
     <div className="min-h-screen pb-24" style={{ backgroundColor: '#F2F2F2' }}>
       {/* Header */}
-      <header className="sticky top-0 z-20 px-5 pt-safe-top pb-3" style={{ backgroundColor: '#F2F2F2' }}>
-        <div className="flex items-center gap-2 w-full min-w-0">
+ <header className="sticky top-0 z-20 px-5 pb-3" style={{ backgroundColor: '#F2F2F2' }}>
+        <div className="flex items-center gap-2 w-full min-w-0" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onClose} ariaLabel="Voltar" />
           <div className="flex-1 min-w-0 flex items-center gap-2.5 px-4 h-10 bg-card rounded-full border border-border">
             <Icon name="search" size={18} className="text-muted-foreground flex-shrink-0" />

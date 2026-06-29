@@ -125,8 +125,8 @@ export function CreatorDashboardScreen({ onBack, onEditProfile, onViewSales }: C
   return (
     <div className="min-h-screen bg-background pb-24">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 pt-safe-top pb-2">
-        <div className="flex items-center gap-3">
+ <div className="flex items-center justify-between px-4 pb-2">
+        <div className="flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />
           <h1 className="text-foreground" style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--font-weight-bold)' }}>
             Perfil do Criador

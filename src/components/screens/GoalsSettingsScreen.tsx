@@ -64,7 +64,7 @@ export function GoalsSettingsScreen({ onBack }: GoalsSettingsScreenProps) {
   return (
     <div className="min-h-screen bg-background pb-32">
       <div className="sticky top-0 z-20 bg-background">
-        <div className="flex items-center gap-3 px-4 py-4">
+        <div className="flex items-center gap-3 px-4" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />
           <h1 className="text-foreground" style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--font-weight-bold)' }}>
             Objetivos no WAI

@@ -271,7 +271,7 @@ export function ManageItineraryScreen({
   return (
     <div className="min-h-screen pb-28 bg-background" style={{ fontFamily: 'var(--font-family-primary)' }}>
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-background px-4 pt-5 pb-4 flex items-center gap-3">
+      <div className="sticky z-20 bg-background px-4 pb-4 flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
         <BackButton onClick={onBack} />
         <h1 className="text-[20px] font-bold text-foreground flex-1">Gerenciar roteiro</h1>
       </div>

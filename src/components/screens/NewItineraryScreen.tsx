@@ -202,7 +202,7 @@ export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales }
         <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/10 to-black/50" />
 
         {/* Nav buttons */}
-        <div className="absolute top-4 left-0 right-0 px-4 flex items-center justify-between z-10">
+        <div className="absolute top-0 left-0 right-0 px-4 flex items-center justify-between z-10" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />
           <button onClick={() => setShowSettings(true)} className="w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-sm">
             <Icon name="more_vert" size={20} className="text-foreground" />

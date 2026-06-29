@@ -83,7 +83,7 @@ export function ReservasScreen({ onBack, reservas: externalReservas, onReservasC
     >
       {/* Header */}
       <header className="sticky top-0 z-20 bg-background px-4 pt-5 pb-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />
           <h1 className="text-xl font-bold text-foreground my-0 mt-[24px]">Reservas</h1>
         </div>
@@ -100,7 +100,7 @@ export function ReservasScreen({ onBack, reservas: externalReservas, onReservasC
           </p>
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto px-4 pt-safe-top pb-4 space-y-4">
+ <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-4">
           {reservas.map((r) => {
             const dateText = r.tipo === 'hospedagem'
               ? r.checkInDate

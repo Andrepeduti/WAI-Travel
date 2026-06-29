@@ -97,7 +97,7 @@ export function ExperienceDetailScreen({ experienceId, onBack }: ExperienceDetai
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/10 to-black/60" />
 
         {/* Top navigation */}
-        <div className="absolute top-12 left-4 right-4 flex items-center justify-between">
+        <div className="absolute top-0 left-4 right-4 flex items-center justify-between" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />
           <div className="flex items-center gap-2.5">
             <button className="w-10 h-10 rounded-full bg-white/80 backdrop-blur-md flex items-center justify-center shadow-sm">

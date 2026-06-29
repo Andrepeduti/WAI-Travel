@@ -344,7 +344,7 @@ export function VisitedCountriesMapScreen({
       <div ref={mapContainerRef} className="absolute inset-0 z-0" />
 
       {/* Floating back button */}
-      <div className="absolute top-0 left-0 z-10 px-4 pt-4">
+      <div className="absolute top-0 left-0 z-10 px-4" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
         <BackButton onClick={onBack} ariaLabel="Voltar" />
       </div>
 

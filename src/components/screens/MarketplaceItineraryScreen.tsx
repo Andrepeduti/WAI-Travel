@@ -498,7 +498,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
         />
         
         {/* Navigation buttons */}
-        <div className="absolute top-4 left-0 right-0 px-4 flex items-center justify-between z-10">
+        <div className="absolute top-0 left-0 right-0 px-4 flex items-center justify-between z-10" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />
           <div className="flex gap-2">
             {isOwner ? (

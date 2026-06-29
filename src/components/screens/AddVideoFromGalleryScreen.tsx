@@ -52,7 +52,7 @@ export function AddVideoFromGalleryScreen({ onBack, onSubmit }: AddVideoFromGall
       style={{ fontFamily: 'var(--font-family-primary)' }}
     >
       {/* Header */}
-      <div className="px-6 pt-14 pb-6">
+      <div className="px-6 pb-6" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
         <BackButton onClick={onBack} />
         <h1 className="text-2xl font-bold text-foreground">Escolher da galeria</h1>
         <p className="text-sm text-muted-foreground mt-2">

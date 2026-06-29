@@ -183,7 +183,7 @@ export function PlaceMapScreen({ place, onBack }: PlaceMapScreenProps) {
 
       {/* Top bar — back only */}
       <header className="relative z-10 px-5 pt-5 flex items-center justify-between pointer-events-none">
-        <div className="pointer-events-auto">
+        <div className="pointer-events-auto" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />
         </div>
       </header>

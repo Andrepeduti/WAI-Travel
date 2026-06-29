@@ -276,9 +276,9 @@ function InboxView({
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="sticky top-0 z-20 bg-background px-5 pt-safe-top pb-3">
+ <header className="sticky top-0 z-20 bg-background px-5 pb-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
             <BackButton onClick={onBack} />
             <h1 className="text-xl font-bold text-foreground my-0 mt-[24px]">Mensagens</h1>
           </div>
@@ -409,7 +409,7 @@ function NewConversationView({
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="sticky top-0 z-20 bg-background px-4 pt-safe-top pb-3">
+ <header className="sticky top-0 z-20 bg-background px-4 pb-3">
         <div className="flex items-center gap-3 mb-3">
           <BackButton onClick={onBack} />
           <h1 className="text-lg font-bold text-foreground">Nova mensagem</h1>
@@ -518,7 +518,7 @@ function CreateGroupView({
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="sticky top-0 z-20 bg-background px-4 pt-safe-top pb-3">
+ <header className="sticky top-0 z-20 bg-background px-4 pb-3">
         <div className="flex items-center gap-3 mb-3">
           <BackButton onClick={onBack} />
           <h1 className="text-lg font-bold text-foreground">Criar grupo</h1>

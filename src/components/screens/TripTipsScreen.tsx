@@ -276,7 +276,7 @@ export function TripTipsScreen({ onBack, destination = 'Amsterdam' }: TripTipsSc
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-20 bg-background px-4 pt-5 pb-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />
           <h1 className="text-xl font-bold text-foreground my-0 mt-[24px] flex-1">Dicas de viagem</h1>
         </div>
@@ -464,7 +464,7 @@ export function TripTipsScreen({ onBack, destination = 'Amsterdam' }: TripTipsSc
         <>
           <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setShowAddSheet(false)} />
           <div className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
-            <div className="sticky top-0 bg-card pt-safe-top pb-2 px-5 z-10">
+ <div className="sticky top-0 bg-card pb-2 px-5 z-10">
               <div className="w-10 h-1 rounded-full bg-border mx-auto mb-4" />
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-bold text-foreground">
