@@ -912,7 +912,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
     return (
       <div className="min-h-screen bg-[#F2F2F2] pb-24 animate-pulse">
         {/* Header */}
-        <div className="relative flex items-center justify-between px-4 pt-4 pb-2">
+        <div className="relative flex items-center justify-between px-4 pb-2" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <div className="flex items-center">
             <BackButton onClick={onBack} ariaLabel="Voltar" />
           </div>
@@ -959,7 +959,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
   return (
     <div className="min-h-screen bg-[#F2F2F2] pb-24">
       {/* Header */}
-      <div className="relative flex items-center justify-between px-4 pt-4 pb-2">
+      <div className="relative flex items-center justify-between px-4 pb-2" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
         <div className="flex items-center">
           <BackButton onClick={onBack} ariaLabel="Voltar" />
         </div>
@@ -1581,7 +1581,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
               <button
                 type="button"
                 onClick={() => setShowCountriesMap(true)}
-                className="w-full card-base flex items-center gap-3 px-4 transition-all active:scale-[0.98] active:bg-muted/40"
+                className="w-full card-base flex items-center gap-3 px-4 transition-all active:scale-[0.98]"
                 style={{ minHeight: 88 }}
               >
                 <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#F2F2F2' }}>
@@ -1728,7 +1728,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
             <button
               type="button"
               onClick={() => setDreamTripSheetOpen(true)}
-              className="w-full card-base flex items-center gap-3 px-4 transition-all active:scale-[0.98] hover:bg-muted/40"
+              className="w-full card-base flex items-center gap-3 px-4 transition-all active:scale-[0.98]"
               style={{ minHeight: 88 }}
             >
               <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#F2F2F2' }}>
