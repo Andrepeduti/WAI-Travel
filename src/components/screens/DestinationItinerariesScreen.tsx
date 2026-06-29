@@ -247,8 +247,10 @@ export function DestinationItinerariesScreen({
         {coverImage && (
           <img src={coverImage} alt={country} className="absolute inset-0 w-full h-full object-cover" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/30" / style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
-        <BackButton onClick={onBack} ariaLabel="Voltar" className="absolute top-4 left-4 z-10" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/30" />
+        <div className="absolute top-0 left-4 z-10" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
+          <BackButton onClick={onBack} ariaLabel="Voltar" />
+        </div>
         <div className="absolute bottom-4 left-5 right-5 text-white">
           <h1 className="text-[26px] font-bold leading-tight drop-shadow-md">
             Roteiros à venda em {country}
