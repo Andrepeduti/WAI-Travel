@@ -25,7 +25,8 @@ export function AuthFlow({ onLoginSuccess, onSignupSuccess }: AuthFlowProps) {
         redirect_uri: `${window.location.origin}/login`,
       });
       if (result.error) {
-        toast.error('Não foi possível entrar com o Google. Tente novamente.');
+        console.error('Google Auth Error:', result.error);
+        toast.error(`Erro Google: ${result.error.message || 'Tente novamente.'}`);
         return;
       }
       // If redirected, browser is leaving; otherwise tokens were set inline
@@ -45,7 +46,8 @@ export function AuthFlow({ onLoginSuccess, onSignupSuccess }: AuthFlowProps) {
         redirect_uri: `${window.location.origin}/login`,
       });
       if (result.error) {
-        toast.error('Não foi possível entrar com a Apple. Tente novamente.');
+        console.error('Apple Auth Error:', result.error);
+        toast.error(`Erro Apple: ${result.error.message || 'Tente novamente.'}`);
         return;
       }
       if (!result.redirected) {
