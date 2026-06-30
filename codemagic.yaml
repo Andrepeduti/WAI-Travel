@@ -26,6 +26,10 @@ workflows:
         script: npm run build
       - name: Update Capacitor iOS
         script: npx cap sync ios
+      - name: Install CocoaPods
+        script: |
+          cd ios/App
+          pod install
       - name: Inicializar Keychain
         script: keychain initialize
       - name: Buscar ou Criar Certificados e Perfis na Apple
