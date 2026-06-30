@@ -9,7 +9,14 @@ const config: CapacitorConfig = {
   ios: {
     // contentInset removido para permitir que o app preencha a tela toda
   },
-  backgroundColor: '#FFFFFF'
+  backgroundColor: '#FFFFFF',
+  plugins: {
+    GoogleAuth: {
+      scopes: ['profile', 'email'],
+      serverClientId: '617657830623-57hvjngsel4rl20gef74ek9csrrasau6.apps.googleusercontent.com', // Preencher depois
+      forceCodeForRefreshToken: true,
+    },
+  }
 };
 
 export default config;

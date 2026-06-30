@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { lovable } from '@/integrations/lovable';
+import { getRedirectUrl } from '@/lib/utils';
 import heroImage from '@/assets/auth-welcome-hero.jpg';
 
 type Mode = 'welcome' | 'login' | 'signup' | 'forgot';
@@ -376,7 +377,7 @@ function SignupCard({
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: `${window.location.origin}/` },
+      options: { emailRedirectTo: getRedirectUrl() },
     });
     setSubmitting(false);
     if (error) {
@@ -527,7 +528,7 @@ function ForgotPasswordCard({ onBack }: { onBack: () => void }) {
     if (!canSubmit) return;
     setSubmitting(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: getRedirectUrl('reset-password'),
     });
     setSubmitting(false);
     if (error) {
