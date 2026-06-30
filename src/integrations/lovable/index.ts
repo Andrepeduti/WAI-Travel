@@ -1,5 +1,5 @@
 import { Capacitor } from '@capacitor/core';
-import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
+import { GoogleAuth } from '@daniele-rolli/capacitor-google-auth';
 import { SignInWithApple } from '@capacitor-community/apple-sign-in';
 import { supabase } from "../supabase/client";
 import { getRedirectUrl } from '../../lib/utils';
