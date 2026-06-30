@@ -21,7 +21,7 @@ workflows:
           source: true
     scripts:
       - name: Install dependencies
-        script: npm install
+        script: npm install --legacy-peer-deps
       - name: Build Web App
         script: npm run build
       - name: Update Capacitor iOS
