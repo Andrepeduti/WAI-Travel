@@ -174,7 +174,6 @@ function WelcomeCard({ onSignup, onLogin, onGoogle, onApple }: { onSignup: () =>
           <div className="flex-1 h-px bg-[#0A0A0A]/10" />
         </div>
 
-        <GoogleButton onClick={onGoogle} />
         <AppleButton onClick={onApple} />
       </div>
 
@@ -333,7 +332,6 @@ function LoginCard({
       </form>
 
       <Divider />
-      <GoogleButton onClick={onGoogle} />
       <AppleButton onClick={onApple} />
 
       <p className="text-center text-[13px] text-[#0A0A0A]/65 mt-6">
@@ -502,7 +500,6 @@ function SignupCard({
       </form>
 
       <Divider />
-      <GoogleButton onClick={onGoogle} />
       <AppleButton onClick={onApple} />
 
       <p className="text-center text-[13px] text-[#0A0A0A]/65 mt-6">
@@ -688,8 +685,8 @@ function AppleButton({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       className="w-full h-12 mt-2.5 rounded-2xl bg-[#000000] flex items-center justify-center gap-2.5 text-white text-[14px] font-semibold hover:bg-[#1a1a1a] transition-colors active:scale-[0.99]"
     >
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-        <path d="M12.35 3.32c.04-.47-.35-.88-.82-.93-.48-.05-.9.29-.99.75-.04.48.34.9.81.95.48.05.91-.3 1-.77zm-.44 1.58c-.67-.08-1.24.3-1.57.3-.33 0-.82-.29-1.38-.28-.71.01-1.37.41-1.73 1.04-.74 1.28-.19 3.18.53 4.22.35.51.77 1.09 1.32 1.07.52-.02.73-.34 1.37-.34.63 0 .82.34 1.37.33.57-.02.93-.52 1.28-1.03.4-.59.57-1.16.58-1.19-.01-.01-1.11-.43-1.12-1.71-.01-1.07.86-1.58.9-1.61-.49-.72-1.25-.8-1.51-.83-.02 0-.04 0-.04 0z" fill="white"/>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="white">
+        <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.68.727-1.338 2.208-1.143 3.61 1.35.105 2.623-.624 3.43-1.598z"/>
       </svg>
       Continuar com Apple
     </button>
