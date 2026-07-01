@@ -1,13 +1,72 @@
+diff --git a/node_modules/@daniele-rolli/capacitor-google-auth/DanieleRolliCapacitorGoogleAuth.podspec b/node_modules/@daniele-rolli/capacitor-google-auth/DanieleRolliCapacitorGoogleAuth.podspec
+index 6d0a3c3..a09c0e3 100644
+--- a/node_modules/@daniele-rolli/capacitor-google-auth/DanieleRolliCapacitorGoogleAuth.podspec
++++ b/node_modules/@daniele-rolli/capacitor-google-auth/DanieleRolliCapacitorGoogleAuth.podspec
+@@ -11,5 +11,4 @@
+     s.ios.deployment_target = '14.0'
+     s.dependency 'Capacitor'
+     s.dependency 'GoogleSignIn', '~> 7.0'
+-    s.static_framework = true
+   end
 diff --git a/node_modules/@daniele-rolli/capacitor-google-auth/ios/Plugin/Plugin.swift b/node_modules/@daniele-rolli/capacitor-google-auth/ios/Plugin/Plugin.swift
-index 5e39832..d1789e4 100644
+index 5e39832..2092c66 100644
 --- a/node_modules/@daniele-rolli/capacitor-google-auth/ios/Plugin/Plugin.swift
 +++ b/node_modules/@daniele-rolli/capacitor-google-auth/ios/Plugin/Plugin.swift
-@@ -14,7 +14,7 @@ public class GoogleAuth: CAPPlugin {
+@@ -14,27 +14,7 @@ public class GoogleAuth: CAPPlugin {
      var forceAuthCode: Bool = false;
      var additionalScopes: [String]!;
  
 -    func loadSignInClient (
-+    private func loadSignInClient (
-         customClientId: String,
-         customScopes: [String]
-     ) {
+-        customClientId: String,
+-        customScopes: [String]
+-    ) {
+-        googleSignIn = GIDSignIn.sharedInstance;
+-        
+-        let serverClientId = getServerClientIdValue();
+-
+-        googleSignInConfiguration = GIDConfiguration.init(clientID: customClientId, serverClientID: serverClientId)
+-        
+-        // these are scopes granted by default by the signIn method
+-        let defaultGrantedScopes = ["email", "profile", "openid"];
+-        // these are scopes we will need to request after sign in
+-        additionalScopes = customScopes.filter {
+-            return !defaultGrantedScopes.contains($0);
+-        };
+-
+-        forceAuthCode = getConfig().getBoolean("forceCodeForRefreshToken", false)
+ 
+-        NotificationCenter.default.addObserver(self, selector: #selector(handleOpenUrl(_ :)), name: Notification.Name(Notification.Name.capacitorOpenURL.rawValue), object: nil);
+-    }
+ 
+     
+     public override func load() {
+@@ -59,11 +39,24 @@ public class GoogleAuth: CAPPlugin {
+             getConfigValue("forceCodeForRefreshToken") as? Bool ?? false
+         );
+         
+-        // load client
+-        self.loadSignInClient(
+-            customClientId: clientId,
+-            customScopes: customScopes
+-        )
++        // load client (inlined)
++        googleSignIn = GIDSignIn.sharedInstance;
++        
++        let serverClientId = getServerClientIdValue();
++
++        googleSignInConfiguration = GIDConfiguration.init(clientID: clientId, serverClientID: serverClientId)
++        
++        // these are scopes granted by default by the signIn method
++        let defaultGrantedScopes = ["email", "profile", "openid"];
++        // these are scopes we will need to request after sign in
++        additionalScopes = customScopes.filter {
++            return !defaultGrantedScopes.contains($0);
++        };
++
++        forceAuthCode = getConfig().getBoolean("forceCodeForRefreshToken", false)
++
++        NotificationCenter.default.addObserver(self, selector: #selector(handleOpenUrl(_ :)), name: Notification.Name(Notification.Name.capacitorOpenURL.rawValue), object: nil);
++
+         call.resolve();
+     }
+ 
