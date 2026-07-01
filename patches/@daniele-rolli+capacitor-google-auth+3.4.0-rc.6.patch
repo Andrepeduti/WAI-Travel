@@ -1,0 +1,13 @@
+diff --git a/node_modules/@daniele-rolli/capacitor-google-auth/ios/Plugin/Plugin.swift b/node_modules/@daniele-rolli/capacitor-google-auth/ios/Plugin/Plugin.swift
+index 5e39832..d1789e4 100644
+--- a/node_modules/@daniele-rolli/capacitor-google-auth/ios/Plugin/Plugin.swift
++++ b/node_modules/@daniele-rolli/capacitor-google-auth/ios/Plugin/Plugin.swift
+@@ -14,7 +14,7 @@ public class GoogleAuth: CAPPlugin {
+     var forceAuthCode: Bool = false;
+     var additionalScopes: [String]!;
+ 
+-    func loadSignInClient (
++    private func loadSignInClient (
+         customClientId: String,
+         customScopes: [String]
+     ) {
