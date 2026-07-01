@@ -1218,7 +1218,6 @@ function UsernameScreen({
             }}
             onBlur={() => setTouched(true)}
             placeholder="seunome"
-            autoFocus
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
@@ -1408,7 +1407,6 @@ function NameScreen({
           }}
           onBlur={() => setTouched(true)}
           placeholder="Digite seu nome"
-          autoFocus
           autoCapitalize="words"
           className={cn(
             'rounded-2xl bg-white px-5 text-[#0A0A0A] font-medium placeholder:text-[#0A0A0A]/35 focus-visible:ring-2 focus-visible:ring-offset-0 shadow-[0_2px_8px_-2px_rgba(10,10,10,0.06)]',
@@ -1649,8 +1647,7 @@ function CityScreen({
                   setTimeout(() => setFocused(false), 200);
                   setTouched(true);
                 }}
-                placeholder="Buscar sua cidade"
-                autoFocus
+                placeholder="Onde você mora?"
                 className={cn(
                   'rounded-2xl bg-white px-5 pr-10 text-[#0A0A0A] font-medium placeholder:text-[#0A0A0A]/35 focus-visible:ring-2 focus-visible:ring-offset-0 shadow-[0_2px_8px_-2px_rgba(10,10,10,0.06)]',
                   error
@@ -1759,7 +1756,6 @@ function BirthdateScreen({
           onChange={handleChange}
           onBlur={() => setTouched(true)}
           placeholder="DD / MM / AAAA"
-          autoFocus
           inputMode="numeric"
           className={cn(
             'rounded-2xl bg-white px-5 text-[#0A0A0A] font-medium placeholder:text-[#0A0A0A]/35 focus-visible:ring-2 focus-visible:ring-offset-0 shadow-[0_2px_8px_-2px_rgba(10,10,10,0.06)] tracking-[0.05em]',
