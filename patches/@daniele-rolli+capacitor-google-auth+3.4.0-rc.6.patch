@@ -9,7 +9,7 @@ index 6d0a3c3..a09c0e3 100644
 -    s.static_framework = true
    end
 diff --git a/node_modules/@daniele-rolli/capacitor-google-auth/ios/Plugin/Plugin.swift b/node_modules/@daniele-rolli/capacitor-google-auth/ios/Plugin/Plugin.swift
-index 5e39832..e159a32 100644
+index 5e39832..70ea84c 100644
 --- a/node_modules/@daniele-rolli/capacitor-google-auth/ios/Plugin/Plugin.swift
 +++ b/node_modules/@daniele-rolli/capacitor-google-auth/ios/Plugin/Plugin.swift
 @@ -14,27 +14,7 @@ public class GoogleAuth: CAPPlugin {
@@ -21,7 +21,7 @@ index 5e39832..e159a32 100644
 -        customScopes: [String]
 -    ) {
 -        googleSignIn = GIDSignIn.sharedInstance;
--        
+ 
 -        let serverClientId = getServerClientIdValue();
 -
 -        googleSignInConfiguration = GIDConfiguration.init(clientID: customClientId, serverClientID: serverClientId)
@@ -34,7 +34,7 @@ index 5e39832..e159a32 100644
 -        };
 -
 -        forceAuthCode = getConfig().getBoolean("forceCodeForRefreshToken", false)
- 
+-
 -        NotificationCenter.default.addObserver(self, selector: #selector(handleOpenUrl(_ :)), name: Notification.Name(Notification.Name.capacitorOpenURL.rawValue), object: nil);
 -    }
  
@@ -66,7 +66,7 @@ index 5e39832..e159a32 100644
 +
 +        forceAuthCode = getConfig().getBoolean("forceCodeForRefreshToken", false)
 +
-+        NotificationCenter.default.addObserver(self, selector: #selector(handleOpenUrl(_ :)), name: Notification.Name(Notification.Name.capacitorOpenURL.rawValue), object: nil);
++        NotificationCenter.default.addObserver(self, selector: #selector(handleOpenUrl(_ :)), name: Notification.Name(rawValue: "CapacitorOpenURLNotification"), object: nil);
 +
          call.resolve();
      }
