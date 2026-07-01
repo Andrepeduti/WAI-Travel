@@ -57,11 +57,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    // 2. Then read existing session
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+    // 2. Then read existing session and verify it
+    const verifySession = async () => {
+      const { data } = await supabase.auth.getSession();
+      let activeSession = data.session;
+
+      if (activeSession) {
+        // Validate user against the auth server
+        const { error } = await supabase.auth.getUser();
+        
+        if (error) {
+          console.warn('[Auth] User validation failed. Session invalid or user deleted.', error);
+          // Force logout if user is deleted or token is invalid
+          try { await supabase.auth.signOut(); } catch { /* noop */ }
+          try {
+            Object.keys(localStorage)
+              .filter((k) => k.startsWith('sb-') || k.includes('supabase.auth'))
+              .forEach((k) => localStorage.removeItem(k));
+          } catch { /* noop */ }
+          activeSession = null;
+        }
+      }
+
+      setSession(activeSession);
       setLoading(false);
-    });
+    };
+
+    verifySession();
 
     return () => {
       sub.subscription.unsubscribe();
