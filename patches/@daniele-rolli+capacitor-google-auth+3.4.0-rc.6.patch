@@ -9,7 +9,7 @@ index 6d0a3c3..a09c0e3 100644
 -    s.static_framework = true
    end
 diff --git a/node_modules/@daniele-rolli/capacitor-google-auth/ios/Plugin/Plugin.swift b/node_modules/@daniele-rolli/capacitor-google-auth/ios/Plugin/Plugin.swift
-index 5e39832..2092c66 100644
+index 5e39832..e159a32 100644
 --- a/node_modules/@daniele-rolli/capacitor-google-auth/ios/Plugin/Plugin.swift
 +++ b/node_modules/@daniele-rolli/capacitor-google-auth/ios/Plugin/Plugin.swift
 @@ -14,27 +14,7 @@ public class GoogleAuth: CAPPlugin {
@@ -40,7 +40,7 @@ index 5e39832..2092c66 100644
  
      
      public override func load() {
-@@ -59,11 +39,24 @@ public class GoogleAuth: CAPPlugin {
+@@ -59,11 +39,25 @@ public class GoogleAuth: CAPPlugin {
              getConfigValue("forceCodeForRefreshToken") as? Bool ?? false
          );
          
@@ -55,6 +55,7 @@ index 5e39832..2092c66 100644
 +        let serverClientId = getServerClientIdValue();
 +
 +        googleSignInConfiguration = GIDConfiguration.init(clientID: clientId, serverClientID: serverClientId)
++        googleSignIn.configuration = googleSignInConfiguration
 +        
 +        // these are scopes granted by default by the signIn method
 +        let defaultGrantedScopes = ["email", "profile", "openid"];
