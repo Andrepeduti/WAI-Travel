@@ -376,7 +376,7 @@ const Index = () => {
     navigatedFromFriendProfile, navigatedFromPurchases, returnToCollections, returnToPublic, chatInitialContact,
   ]);
 
-  const { wrapBack } = useNavStack(navSignature, captureRestore());
+  const { wrapBack, resetStack } = useNavStack(navSignature, captureRestore());
 
   // Reset return flags when leaving the trips tab so subsequent visits start clean.
   useEffect(() => {
@@ -513,7 +513,6 @@ const Index = () => {
   };
 
   const handleItinerarySubmit = async (data: ItineraryFormData) => {
-    setShowItinerarySheet(false);
     const title = data.tripName?.trim() || (data.destinations.length > 0 ? `${data.destinations[0].split(',')[0]} trip` : 'Novo roteiro');
     const placesFromVideo = pendingVideoPlaces;
     const input = {
@@ -529,21 +528,35 @@ const Index = () => {
     if (session?.user?.id) {
       addOptimisticItinerary(buildOptimisticItinerary(input, session.user.id, tempId));
     }
-    setActiveUserItineraryId(tempId);
-    setNewItineraryData(data);
-    setShowSuccessToast(true);
+
     const created = await createItinerary(input);
     if (!created) {
       console.error('Failed to create itinerary');
       removeOptimisticItinerary(tempId);
       return;
     }
+
+    try {
+      const { fetchPlacesForCity } = await import('@/lib/placesApi');
+      await Promise.allSettled(
+        data.destinations.map(dest => fetchPlacesForCity(dest))
+      );
+    } catch (e) {
+      console.error('Error prefetching places:', e);
+    }
+
+    setShowItinerarySheet(false);
+    setShowSuccessToast(true);
+
     replaceOptimisticItinerary(tempId, created);
     if (placesFromVideo) {
       console.log('Adding', placesFromVideo.length, 'places from video to new itinerary:', created.id);
       setPendingVideoPlaces(null);
     }
-    setActiveUserItineraryId(prev => prev === tempId ? created.id : prev);
+    
+    setNewItineraryData(data);
+    resetStack();
+    setActiveUserItineraryId(created.id);
   };
 
   const handleUserItineraryClick = (userItinerary: UserItinerary) => {
@@ -1141,6 +1154,9 @@ const Index = () => {
 
             onNavigateToAI={() => { setSelectedItinerary(null); setPurchasedItineraryId(null); setShowAIAssistant(true); }}
             onNavigateToSales={() => { setSelectedItinerary(null); setPurchasedItineraryId(null); setReturnToPublic(true); setActiveTab('trips'); }}
+            onOpenItinerary={(dataset) => {
+              setSelectedItinerary(dataset);
+            }}
           />
         </div>
       </div>

@@ -11,14 +11,8 @@ interface SignInResult {
   redirected?: boolean;
 }
 
-// Inicializa o GoogleAuth na web (no mobile é inicializado via capacitor.config.ts)
-if (!Capacitor.isNativePlatform()) {
-  GoogleAuth.initialize({
-    clientId: 'SEU_WEB_CLIENT_ID_AQUI.apps.googleusercontent.com',
-    scopes: ['profile', 'email'],
-    grantOfflineAccess: true,
-  });
-}
+// Inicialização do GoogleAuth na web removida pois o fluxo web usa Supabase signInWithOAuth.
+// (no mobile é inicializado via capacitor.config.ts)
 
 async function signInWithOAuth(
   provider: OAuthProvider,
