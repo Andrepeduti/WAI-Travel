@@ -40,12 +40,13 @@ interface AddReservaSheetProps {
   onClose: () => void;
   onAdd: (reserva: Reserva) => void;
   editingReserva?: Reserva | null;
+  initialTipo?: ReservaTipo;
 }
 
 type TimePickerTarget = 'checkIn' | 'checkOut' | 'atividade' | null;
 
-export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva }: AddReservaSheetProps) {
-  const [tipo, setTipo] = useState<ReservaTipo>(editingReserva?.tipo || 'hospedagem');
+export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva, initialTipo }: AddReservaSheetProps) {
+  const [tipo, setTipo] = useState<ReservaTipo>(editingReserva?.tipo || initialTipo || 'hospedagem');
   const [isLoading, setIsLoading] = useState(false);
   const [nome, setNome] = useState(editingReserva?.nome || '');
   const [localizacao, setLocalizacao] = useState(editingReserva?.localizacao || '');
@@ -87,7 +88,7 @@ export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva }: AddR
       setCodigo(editingReserva.codigo || '');
       setValor(editingReserva.valor || '');
     } else {
-      setTipo('hospedagem');
+      setTipo(initialTipo || 'hospedagem');
       setNome('');
       setLocalizacao('');
       setCheckInDate(undefined);
@@ -102,7 +103,7 @@ export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva }: AddR
       setCodigo('');
       setValor('');
     }
-  }, [editingReserva]);
+  }, [editingReserva, initialTipo]);
 
   const searchAddress = useCallback((query: string) => {
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
@@ -179,7 +180,7 @@ export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva }: AddR
     onAdd(reserva);
     setNome(''); setLocalizacao(''); setCheckInDate(undefined); setCheckOutDate(undefined);
     setAtividadeDate(undefined); setCodigo(''); setValor('');
-    setTipo('hospedagem');
+    setTipo(initialTipo || 'hospedagem');
     setPdfFile(null);
   };
 
@@ -269,32 +270,12 @@ export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva }: AddR
           </div>
 
           <div className="px-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-foreground">{editingReserva ? 'Editar reserva' : 'Nova reserva'}</h2>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-foreground">
+                {editingReserva ? 'Editar reserva' : `Adicionar ${tipo === 'hospedagem' ? 'Hospedagem' : 'Atividade'}`}
+              </h3>
               <button onClick={onClose} className="w-8 h-8 flex items-center justify-center">
                 <Icon name="close" size={20} className="text-muted-foreground" />
-              </button>
-            </div>
-
-            <label className="text-sm font-medium text-foreground mb-2 block">Tipo</label>
-            <div className="flex gap-3 mb-5">
-              <button
-                onClick={() => setTipo('hospedagem')}
-                className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 transition-colors ${
-                  tipo === 'hospedagem' ? 'border-primary-official bg-primary-official/10' : 'border-border bg-background'
-                }`}
-              >
-                <Icon name="hotel" size={22} className={tipo === 'hospedagem' ? 'text-primary-official' : 'text-muted-foreground'} />
-                <span className={`text-xs font-medium ${tipo === 'hospedagem' ? 'text-foreground' : 'text-muted-foreground'}`}>Hospedagem</span>
-              </button>
-              <button
-                onClick={() => setTipo('atividade')}
-                className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 transition-colors ${
-                  tipo === 'atividade' ? 'border-primary-official bg-primary-official/10' : 'border-border bg-background'
-                }`}
-              >
-                <TicketCheck size={22} strokeWidth={1.5} className={tipo === 'atividade' ? 'text-primary-official' : 'text-muted-foreground'} />
-                <span className={`text-xs font-medium ${tipo === 'atividade' ? 'text-foreground' : 'text-muted-foreground'}`}>Atividade</span>
               </button>
             </div>
 

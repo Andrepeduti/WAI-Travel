@@ -43,6 +43,7 @@ export function TripNotesScreen({ onBack, destination, notes: externalNotes, onN
   const [selectedNote, setSelectedNote] = useState<TripNote | null>(null);
   const [showActions, setShowActions] = useState(false);
   const [showAddNote, setShowAddNote] = useState(false);
+  const [editingNote, setEditingNote] = useState<TripNote | null>(null);
 
   return (
     <div className="min-h-screen bg-background flex flex-col" style={{ fontFamily: 'var(--font-family-primary)' }}>
@@ -138,9 +139,22 @@ export function TripNotesScreen({ onBack, destination, notes: externalNotes, onN
                   action.destructive ? 'text-destructive' : 'text-foreground'
                 }`}
                 onClick={() => {
-                  if (action.destructive && selectedNote) {
+                  if (!selectedNote) return;
+
+                  if (action.icon === 'edit') {
+                    setEditingNote(selectedNote);
+                    setShowAddNote(true);
+                    setShowActions(false);
+                    return; // keep selectedNote so we know which one to update
+                  }
+
+                  if (action.icon === 'content_copy') {
+                    const newNote = { ...selectedNote, id: Date.now().toString(), title: `${selectedNote.title} (Cópia)` };
+                    setNotes(prev => [newNote, ...prev]);
+                  } else if (action.destructive) {
                     setNotes(prev => prev.filter(n => n.id !== selectedNote.id));
                   }
+                  
                   setShowActions(false);
                   setSelectedNote(null);
                 }}
@@ -160,16 +174,25 @@ export function TripNotesScreen({ onBack, destination, notes: externalNotes, onN
       {/* Add Note Sheet */}
       <AddTripNoteSheet
         open={showAddNote}
-        onClose={() => setShowAddNote(false)}
+        onClose={() => {
+          setShowAddNote(false);
+          setEditingNote(null);
+          setSelectedNote(null);
+        }}
+        editingNote={editingNote ? { title: editingNote.title, content: editingNote.summary } : null}
         onSave={(note) => {
-          const newNote: TripNote = {
-            id: Date.now().toString(),
-            author: 'Você',
-            authorImage: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
-            title: note.title || 'Sem título',
-            summary: note.content || '',
-          };
-          setNotes(prev => [newNote, ...prev]);
+          if (editingNote) {
+            setNotes(prev => prev.map(n => n.id === editingNote.id ? { ...n, title: note.title, summary: note.content } : n));
+          } else {
+            const newNote: TripNote = {
+              id: Date.now().toString(),
+              author: 'Você',
+              authorImage: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
+              title: note.title || 'Sem título',
+              summary: note.content || '',
+            };
+            setNotes(prev => [newNote, ...prev]);
+          }
         }}
       />
     </div>

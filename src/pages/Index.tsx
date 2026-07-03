@@ -67,7 +67,7 @@ import { addOptimisticItinerary, buildOptimisticItinerary, removeOptimisticItine
 // mas como TripsScreen agora é lazy, importamos somente o que precisamos de forma estática (os helpers
 // são leves; o componente em si só é avaliado quando referenciado).
 import { saveUserCollection, deleteUserCollection, type UserItinerary } from '@/components/screens/TripsScreen';
-import { createItinerary, updateItinerary, deleteItinerary } from '@/lib/itinerariesApi';
+import { createItinerary, updateItinerary, deleteItinerary, getUserItineraryById } from '@/lib/itinerariesApi';
 import { loadPlannerActivities, loadPlannerTransports } from '@/lib/plannerActivitiesStore';
 import { mockPeople } from '@/components/travel/ShareCollectionSheet';
 import { getItineraryById, getItinerariesByAuthor, setItineraryAuthorOverride, ItineraryDataset } from '@/data/itineraries';
@@ -155,10 +155,20 @@ const Index = () => {
 
   // Abre o sheet de criar roteiro quando navegado com state { openCreateItinerary: true }
   useEffect(() => {
-    const state = location.state as { openCreateItinerary?: boolean; openMarketplaceItineraryId?: number; openCreatorDashboardItinerary?: UserItinerary; openItineraryForPublish?: UserItinerary } | null;
+    const state = location.state as { openCreateItinerary?: boolean; openMarketplaceItineraryId?: number; openCreatorDashboardItinerary?: UserItinerary; openItineraryForPublish?: UserItinerary; openCollaboratorItineraryId?: string } | null;
     if (state?.openCreateItinerary) {
       tryOpenItinerarySheet();
       // Limpa o state para não reabrir em re-renderizações
+      navigate(location.pathname, { replace: true, state: {} });
+      return;
+    }
+    // Deep link: abre roteiro colaborativo a partir do convite aceito.
+    if (state?.openCollaboratorItineraryId) {
+      getUserItineraryById(state.openCollaboratorItineraryId).then(dataset => {
+        if (dataset) {
+          handleUserItineraryClick(dataset);
+        }
+      });
       navigate(location.pathname, { replace: true, state: {} });
       return;
     }
@@ -1315,7 +1325,34 @@ const Index = () => {
         <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
           <NotificationsScreen
             onBack={wrapBack(() => setShowNotifications(false))}
-            onNavigateToItinerary={(id) => { setShowNotifications(false); handleItineraryClick(id); setNavigatedFromNotifications(true); }}
+            onNavigateToItinerary={(id) => { 
+              setShowNotifications(false); 
+              if (typeof id === 'string') {
+                const found = myItinerariesForLimit.find(it => it.id === id);
+                if (found) {
+                  handleUserItineraryClick(found);
+                } else {
+                  const fallbackFormData: ItineraryFormData = {
+                    destinations: ['Carregando...'],
+                    startDate: new Date(),
+                    endDate: new Date(),
+                    invitedFriends: [],
+                    tripName: 'Roteiro Compartilhado',
+                    coverImage: '',
+                    isPublic: false,
+                    priceCents: 0
+                  };
+                  setActiveUserItineraryId(id);
+                  setNewItineraryData(fallbackFormData);
+                  setActiveUserItineraryDataset(null);
+                  setActiveUserItineraryIsPurchased(false);
+                  setCreatorEditingItinerary(null);
+                }
+              } else {
+                handleItineraryClick(id);
+              }
+              setNavigatedFromNotifications(true); 
+            }}
             onNavigateToSales={() => { setShowNotifications(false); setProfileSubScreen('sales'); setNavigatedFromNotifications(true); }}
             onNavigateToAI={() => { setShowNotifications(false); setShowAIAssistant(true); setNavigatedFromNotifications(true); }}
             onNavigateToTripReminders={() => { setShowNotifications(false); setShowTripReminders(true); setNavigatedFromNotifications(true); }}

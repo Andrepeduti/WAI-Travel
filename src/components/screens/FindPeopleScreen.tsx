@@ -71,7 +71,7 @@ export function FindPeopleScreen({ onBack, onViewProfile }: FindPeopleScreenProp
   }, []);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = search.trim().toLowerCase().replace(/^@/, '');
     if (!q) return people;
     return people.filter(p =>
       p.name.toLowerCase().includes(q) ||

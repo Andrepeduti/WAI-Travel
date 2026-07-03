@@ -322,19 +322,18 @@ export function ItineraryMapScreen({ title, places, days, onMovePlaceToDay, onBa
         </div>
       )}
 
-      {/* Header */}
- <header className="absolute top-0 left-0 right-0 z-[1000] px-4 pb-3">
-        <div className="flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
+      {/* Top Controls Overlay */}
+      <div className="absolute top-0 left-0 right-0 z-[1000] flex flex-col gap-3 px-4 pb-3 pointer-events-none" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
+        {/* Header */}
+        <div className="flex items-center gap-3 pointer-events-auto">
           <BackButton onClick={onBack} />
           <div className="bg-white rounded-full px-4 py-2.5 shadow-lg flex-1">
             <h1 className="text-[15px] font-semibold text-foreground truncate">{title}</h1>
           </div>
         </div>
-      </header>
 
-      {/* Day filter tabs — calendar style */}
-      <div className="absolute top-[72px] left-0 right-0 z-[1000] px-4">
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+        {/* Day filter tabs — calendar style */}
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1 pointer-events-auto">
           <button
             onClick={() => setSelectedDay(null)}
             className={`flex flex-col items-center justify-center min-w-[52px] h-[52px] rounded-[22px] text-center shadow-md transition-all ${
