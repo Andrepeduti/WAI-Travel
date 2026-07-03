@@ -147,7 +147,7 @@ export function CreateItinerarySheet({ isOpen, onClose, onSubmit, initialDestina
     return String.fromCodePoint(...cc.split('').map(c => 0x1f1e6 - 65 + c.charCodeAt(0)));
   };
 
-  // Busca cidades/países do mundo inteiro via Nominatim (OpenStreetMap) com debounce
+  // Busca cidades do mundo inteiro via Photon (Komoot) com debounce
   useEffect(() => {
     const query = destinationInput.trim();
     if (query.length < 2) {
@@ -159,51 +159,57 @@ export function CreateItinerarySheet({ isOpen, onClose, onSubmit, initialDestina
     const ctrl = new AbortController();
     const timeout = setTimeout(async () => {
       try {
-        // Apenas cidades (city/town/village/municipality) — exclui países e estados
-        const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&accept-language=pt-BR&limit=10&q=${encodeURIComponent(query)}`;
-        const res = await fetch(url, {
-          signal: ctrl.signal,
-          headers: { 'Accept': 'application/json' },
-        });
+        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=15`;
+        const res = await fetch(url, { signal: ctrl.signal });
         const data = await res.json();
+        const features = data.features || [];
+
+        const cityTypes = new Set(['city', 'town', 'village', 'hamlet', 'suburb', 'municipality']);
         const seen = new Set<string>();
-        const mapped = (Array.isArray(data) ? data : [])
-          .filter((item: any) => {
-            const addr = item.address || {};
-            // Precisa ter cidade reconhecível E país. Bloqueia resultados que
-            // são apenas país/estado/região administrativa.
-            const cityField = addr.city || addr.town || addr.village || addr.municipality || addr.hamlet;
-            if (!cityField || !addr.country) return false;
-            // Bloqueia explicitamente tipos que não são cidades
-            if (item.type === 'country' || item.type === 'state' || item.type === 'region') return false;
-            return true;
+        
+        const mapped = features
+          .filter((f: any) => {
+            const props = f.properties || {};
+            const osmKey = props.osm_key || '';
+            const osmValue = props.osm_value || '';
+            return osmKey === 'place' && cityTypes.has(osmValue) && props.name && props.country;
           })
-          .map((item: any) => {
-            const addr = item.address || {};
-            const city = addr.city || addr.town || addr.village || addr.municipality || addr.hamlet;
-            const country = addr.country;
+          .map((f: any) => {
+            const props = f.properties || {};
+            const cityName = props.name;
+            const state = props.state || '';
+            const country = props.country || '';
+            const countryCode = props.countrycode || '';
+            
+            let sub = country;
+            if (state && state !== cityName && state !== country) {
+               sub = `${state}, ${country}`;
+            }
+
+            const full = `${cityName}, ${sub}`;
             return {
-              label: city,
-              sub: country,
-              full: `${city}, ${country}`,
-              emoji: countryCodeToEmoji(addr.country_code),
+              label: cityName,
+              sub: sub,
+              full: full,
+              emoji: countryCodeToEmoji(countryCode),
             };
           })
           .filter((r: any) => {
-            if (!r.label || destinations.includes(r.full)) return false;
+            if (destinations.includes(r.full)) return false;
             const key = r.full.toLowerCase();
             if (seen.has(key)) return false;
             seen.add(key);
             return true;
           })
           .slice(0, 8);
+          
         setRemoteResults(mapped);
       } catch (err) {
         if ((err as Error).name !== 'AbortError') setRemoteResults([]);
       } finally {
         setIsSearching(false);
       }
-    }, 300);
+    }, 400);
     return () => {
       clearTimeout(timeout);
       ctrl.abort();
@@ -267,32 +273,53 @@ export function CreateItinerarySheet({ isOpen, onClose, onSubmit, initialDestina
       setIsSearchingFriends(false);
       return;
     }
+    
     setIsSearchingFriends(true);
     let active = true;
+    
     const timeout = setTimeout(async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        const meId = user?.id;
-        const pattern = `%${query}%`;
+        const { data: authData } = await supabase.auth.getUser();
+        const meId = authData?.user?.id;
+        
+        // Fetch users similar to FindPeopleScreen, filtering locally to avoid .or() syntax errors with special chars
         const { data, error } = await supabase
           .from('profiles_public')
           .select('user_id, name, username, avatar_url')
-          .or(`name.ilike.${pattern},username.ilike.${pattern}`)
-          .limit(8);
+          .limit(100);
+          
         if (!active) return;
-        if (error) {
+        
+        if (error || !data) {
+          console.error('Error fetching profiles:', error);
           setFriendSuggestions([]);
         } else {
-          const filtered = (data || []).filter((p: any) =>
-            p.user_id !== meId && !invitedFriends.some(f => f.id === p.user_id)
-          );
+          const q = query.toLowerCase();
+          const filtered = data
+            .filter((p: any) => {
+              if (p.user_id === meId) return false;
+              if (invitedFriends.some(f => f.id === p.user_id)) return false;
+              
+              const nameMatch = p.name && p.name.toLowerCase().includes(q);
+              const userMatch = p.username && p.username.toLowerCase().includes(q);
+              return nameMatch || userMatch;
+            })
+            .slice(0, 8);
+            
           setFriendSuggestions(filtered as FriendSuggestion[]);
         }
+      } catch (err) {
+        console.error('Exception during friend search:', err);
+        if (active) setFriendSuggestions([]);
       } finally {
         if (active) setIsSearchingFriends(false);
       }
     }, 250);
-    return () => { active = false; clearTimeout(timeout); };
+    
+    return () => { 
+      active = false; 
+      clearTimeout(timeout); 
+    };
   }, [friendInput, invitedFriends]);
 
   useEffect(() => {
@@ -320,7 +347,6 @@ export function CreateItinerarySheet({ isOpen, onClose, onSubmit, initialDestina
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
       await onSubmit({
         destinations,
         startDate,

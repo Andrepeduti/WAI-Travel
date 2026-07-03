@@ -940,7 +940,7 @@ export function TripsScreen({
   }, [videosTick, userCollections]);
   return <div className="min-h-screen pb-24 bg-[#F2F2F2]">
     {/* Header — fixed title */}
-      <header className="px-6 pt-6 pb-4">
+      <header className="px-6 pt-safe-top pb-4">
         <div className="flex items-center justify-between gap-3 mb-2">
           <h1 className="text-[22px] font-bold text-foreground">Roteiros e coleções</h1>
           <button

@@ -50,7 +50,7 @@ import { toast } from 'sonner';
 import { BackButton } from '@/components/ui/BackButton';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useAuth } from '@/contexts/AuthContext';
-import { updateItinerary as updateItineraryRow, publishItineraryAsCopy, leaveItinerary, type UserItinerary } from '@/lib/itinerariesApi';
+import { updateItinerary as updateItineraryRow, publishItineraryAsCopy, leaveItinerary, createItinerary, type UserItinerary } from '@/lib/itinerariesApi';
 import { loadPlannerData, savePlannerData } from '@/lib/plannerApi';
 import { formatBRL } from '@/lib/utils';
 import { loadItineraryDocs, saveItineraryDocs } from '@/lib/itineraryDocsApi';
@@ -124,6 +124,7 @@ export interface PlannerItineraryScreenProps {
   onNavigateToAI?: () => void;
   onSaveCreatorEdit?: () => void;
   onNavigateToSales?: () => void;
+  onOpenItinerary?: (dataset: UserItinerary) => void;
 }
 
 // ─── Persistence helpers ─────────────────────────────────────────────────────
@@ -390,13 +391,13 @@ async function getRouteInfo(
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, isPurchased, creatorEditMode, autoOpenPublishFlow, onBack, onDelete, onUpdate, onNavigateToAI, onSaveCreatorEdit, onNavigateToSales }: PlannerItineraryScreenProps) {
+export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, isPurchased, creatorEditMode, autoOpenPublishFlow, onBack, onDelete, onUpdate, onNavigateToAI, onSaveCreatorEdit, onNavigateToSales, onOpenItinerary }: PlannerItineraryScreenProps) {
   const { user: currentUser } = useCurrentUser();
   const { session } = useAuth();
   const ownerAvatar = currentUser.avatar || '';
   const ownerName = currentUser.name || 'Você';
   // Use dataset days/suggestions when available, generate from dates, or fall back to mocks
-  const daysData: DayData[] = itineraryDataset ?
+  const daysData: DayData[] = useMemo(() => itineraryDataset ?
   itineraryDataset.days.map((d) => ({
     day: d.day,
     title: d.title,
@@ -427,7 +428,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     activities: [] as Activity[],
     transports: [] as TransportBetween[]
   })) :
-  mockDays;
+  mockDays, [itineraryDataset, data.startDate, data.endDate]);
 
   const fallbackSuggestions = itineraryDataset?.suggestions ?? suggestions;
 
@@ -596,14 +597,17 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   const isUuidId = typeof itineraryId === 'string'
     && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(itineraryId);
   const hasHydratedRef = useRef(false);
-  const skipNextPlannerRemoteRef = useRef(false);
+  const lastSaveTimeRef = useRef(0);
 
   const reloadPlanner = useCallback(async () => {
     if (!isUuidId || typeof itineraryId !== 'string') return;
-    if (skipNextPlannerRemoteRef.current) {
-      skipNextPlannerRemoteRef.current = false;
+    
+    // Ignorar eventos Realtime se salvamos há menos de 2.5s (eco do próprio save)
+    // Isso evita o loop infinito de requisições de rede
+    if (Date.now() - lastSaveTimeRef.current < 2500) {
       return;
     }
+
     const remote = await loadPlannerData(itineraryId);
     if (!remote) return;
     const hasRemoteActivities = Object.values(remote.activities).some((arr) => arr.length > 0);
@@ -632,8 +636,8 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   useEffect(() => {
     if (!isUuidId || typeof itineraryId !== 'string') return;
     const handle = setTimeout(() => {
-      // Sinaliza que o próximo evento Realtime foi causado pelo próprio user
-      skipNextPlannerRemoteRef.current = true;
+      // Atualiza o timer para sinalizar que os próximos eventos Realtime são nossos
+      lastSaveTimeRef.current = Date.now();
       void savePlannerData(itineraryId, {
         activities: dayActivities,
         transports: dayTransports,
@@ -778,16 +782,34 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       .eq('id', itineraryId)
       .maybeSingle();
     if (error || !data) return;
-    setItineraryData((prev) => ({
-      ...prev,
-      tripName: data.title ?? prev.tripName,
-      destinations: Array.isArray(data.destinations) && data.destinations.length > 0
+    setItineraryData((prev) => {
+      const tripName = data.title ?? prev.tripName;
+      const destinations = Array.isArray(data.destinations) && data.destinations.length > 0
         ? data.destinations
-        : prev.destinations,
-      startDate: data.start_date ? parseLocalDate(data.start_date) : prev.startDate,
-      endDate: data.end_date ? parseLocalDate(data.end_date) : prev.endDate,
-      coverImage: Array.isArray(data.images) && data.images[0] ? data.images[0] : prev.coverImage,
-    }));
+        : prev.destinations;
+      const startDate = data.start_date ? parseLocalDate(data.start_date) : prev.startDate;
+      const endDate = data.end_date ? parseLocalDate(data.end_date) : prev.endDate;
+      const coverImage = Array.isArray(data.images) && data.images[0] ? data.images[0] : prev.coverImage;
+
+      if (
+        prev.tripName === tripName &&
+        prev.startDate?.getTime() === startDate?.getTime() &&
+        prev.endDate?.getTime() === endDate?.getTime() &&
+        prev.coverImage === coverImage &&
+        JSON.stringify(prev.destinations) === JSON.stringify(destinations)
+      ) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        tripName,
+        destinations,
+        startDate,
+        endDate,
+        coverImage,
+      };
+    });
     if (Array.isArray(data.images) && data.images[0]) {
       setManualCover(data.images[0]);
     }
@@ -819,9 +841,9 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     if (tabsRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = tabsRef.current;
       const hasOverflow = scrollWidth > clientWidth + 5;
-      setNeedsScroll(hasOverflow);
-      setCanScrollLeft(scrollLeft > 5);
-      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 5);
+      setNeedsScroll(prev => prev !== hasOverflow ? hasOverflow : prev);
+      setCanScrollLeft(prev => prev !== (scrollLeft > 5) ? (scrollLeft > 5) : prev);
+      setCanScrollRight(prev => prev !== (scrollLeft < scrollWidth - clientWidth - 5) ? (scrollLeft < scrollWidth - clientWidth - 5) : prev);
     }
   }, []);
 
@@ -1078,46 +1100,49 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       itineraryData.destinations?.length ? itineraryData.destinations : ['paris']
     );
 
-    setDayActivities(prev => {
-      const patched = { ...prev };
-      let changed = false;
-      let coordsChanged = false;
-      for (const day of Object.keys(patched)) {
-        patched[Number(day)] = patched[Number(day)].map(a => {
-          let updated = a;
-          // Backfill category
-          if (!a.category) {
-            const match = suggestionsData.find(s => s.name.toLowerCase() === a.name.toLowerCase());
-            if (match?.category) {
-              changed = true;
-              updated = { ...updated, category: match.category, categoryColor: match.categoryColor || a.categoryColor };
-            }
+    const patched = { ...dayActivities };
+    let changed = false;
+    let coordsChanged = false;
+
+    for (const day of Object.keys(patched)) {
+      patched[Number(day)] = patched[Number(day)].map(a => {
+        let updated = a;
+        // Backfill category
+        if (!a.category) {
+          const match = suggestionsData.find(s => s.name.toLowerCase() === a.name.toLowerCase());
+          if (match?.category) {
+            changed = true;
+            updated = { ...updated, category: match.category, categoryColor: match.categoryColor || a.categoryColor };
           }
-          // Backfill lat/lng
-          if (!a.lat || !a.lng) {
-            const placeMatch = allCityPlaces.find(p => p.name.toLowerCase() === a.name.toLowerCase());
-            if (placeMatch?.lat && placeMatch?.lng) {
+        }
+        // Backfill lat/lng
+        if (!a.lat || !a.lng) {
+          const placeMatch = allCityPlaces.find(p => p.name.toLowerCase() === a.name.toLowerCase());
+          if (placeMatch?.lat && placeMatch?.lng) {
+            coordsChanged = true;
+            updated = { ...updated, lat: placeMatch.lat, lng: placeMatch.lng };
+          } else {
+            // Try in suggestions
+            const sugMatch = suggestionsData.find(s => s.name.toLowerCase() === a.name.toLowerCase());
+            if (sugMatch && (sugMatch as any).lat && (sugMatch as any).lng) {
               coordsChanged = true;
-              updated = { ...updated, lat: placeMatch.lat, lng: placeMatch.lng };
-            } else {
-              // Try in suggestions
-              const sugMatch = suggestionsData.find(s => s.name.toLowerCase() === a.name.toLowerCase());
-              if (sugMatch && (sugMatch as any).lat && (sugMatch as any).lng) {
-                coordsChanged = true;
-                updated = { ...updated, lat: (sugMatch as any).lat, lng: (sugMatch as any).lng };
-              }
+              updated = { ...updated, lat: (sugMatch as any).lat, lng: (sugMatch as any).lng };
             }
           }
-          return updated;
-        });
-      }
-      // If coords were backfilled, clear transports to force recalculation
-      if (coordsChanged) {
-        setDayTransports({});
-      }
-      return (changed || coordsChanged) ? patched : prev;
-    });
-  }, [suggestionsData, itineraryData.destinations]);
+        }
+        return updated;
+      });
+    }
+
+    if (changed || coordsChanged) {
+      setDayActivities(patched);
+    }
+    
+    // If coords were backfilled, clear transports to force recalculation
+    if (coordsChanged) {
+      setDayTransports({});
+    }
+  }, [dayActivities, suggestionsData, itineraryData.destinations]);
 
 
   const getAllActivities = useCallback((day: number): Activity[] => {
@@ -1262,7 +1287,17 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         const existing = prev.find((e) => e.id === ae.id);
         return existing ? { ...ae, assignedTo: existing.assignedTo } : ae;
       });
-      return [...manual, ...merged];
+      const next = [...manual, ...merged];
+      
+      const isSame = prev.length === next.length && next.every((n, i) => {
+        const p = prev[i];
+        return p && n.id === p.id && n.name === p.name && Math.abs(n.amountBRL - p.amountBRL) < 0.01 && JSON.stringify(n.assignedTo) === JSON.stringify(p.assignedTo);
+      });
+
+      if (isSame) {
+        return prev;
+      }
+      return next;
     });
   }, [transportes, reservas, dayActivities, dayTransports, effectiveDaysData, tripDays, getAllActivities, getAllTransports, parseValor]);
 
@@ -2386,7 +2421,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
 
         <div
           ref={stickyTabsRef}
-          className="-mx-4 px-4 sticky top-0 z-30"
+          className="-mx-4 px-4 sticky top-0 z-30 pt-safe-top"
           style={{ backgroundColor: '#ECECEC' }}
         >
         <div
@@ -3211,10 +3246,46 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         title="Roteiro duplicado!"
         description="Uma cópia do roteiro foi criada com sucesso"
         actionLabel="Abrir roteiro"
-        onAction={() => {
+        onAction={async () => {
           setDuplicateToast(false);
           setIsOpeningDuplicate(true);
 
+          if (isUuidId && typeof itineraryId === 'string') {
+            try {
+              const firstDestination = itineraryData.destinations[0] ?? 'Paris, França';
+              const [city, ...rest] = firstDestination.split(',');
+              const duplicatedFirst = `Cópia de ${city.trim()}${rest.length ? `,${rest.join(',')}` : ''}`;
+              
+              const newTitle = itineraryData.tripName ? `Cópia de ${itineraryData.tripName}` : duplicatedFirst;
+              
+              const newItinerary = await createItinerary({
+                title: newTitle,
+                destinations: itineraryData.destinations.length > 0 ? [duplicatedFirst, ...itineraryData.destinations.slice(1)] : ['Cópia de Paris, França'],
+                startDate: itineraryData.startDate ? itineraryData.startDate.toISOString() : null,
+                endDate: itineraryData.endDate ? itineraryData.endDate.toISOString() : null,
+              });
+
+              if (newItinerary) {
+                // Save data to new itinerary
+                await savePlannerData(newItinerary.id, { activities: dayActivities, transports: dayTransports });
+                await saveItineraryDocs(newItinerary.id, { reservas, transportes });
+                await saveBudget(newItinerary.id, expenses);
+                
+                setIsOpeningDuplicate(false);
+                if (onOpenItinerary) {
+                  onOpenItinerary(newItinerary);
+                } else if (onBack) {
+                  onBack();
+                }
+                return;
+              }
+            } catch (e) {
+              console.error(e);
+              toast.error("Erro ao duplicar roteiro.");
+            }
+          }
+          
+          // Fallback (for local/new itinerary without DB ID)
           setTimeout(() => {
             setSelectedDay(1);
             setReservas([]);
