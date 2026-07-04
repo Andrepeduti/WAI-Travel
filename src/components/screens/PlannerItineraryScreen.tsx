@@ -62,6 +62,8 @@ import { loadBudget, saveBudget } from '@/lib/budgetApi';
 import { listItineraryMembers, getMyRole, getItineraryOwnerProfile, type ItineraryMember, type ItineraryRole } from '@/lib/itineraryMembersApi';
 import { ShareItinerarySheet } from '@/components/travel/ShareItinerarySheet';
 import { useItineraryRealtime } from '@/hooks/use-itinerary-realtime';
+import { useMyItineraries } from '@/hooks/use-my-itineraries';
+import { PlanLimitReachedSheet } from '@/components/travel/PlanLimitReachedSheet';
 const LazyItineraryMapScreen = lazy(() => import('./ItineraryMapScreen').then((m) => ({ default: m.ItineraryMapScreen })));
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -129,6 +131,7 @@ export interface PlannerItineraryScreenProps {
   onSaveCreatorEdit?: () => void;
   onNavigateToSales?: () => void;
   onOpenItinerary?: (dataset: UserItinerary) => void;
+  onUpgrade?: () => void;
 }
 
 // ─── Persistence helpers ─────────────────────────────────────────────────────
@@ -485,6 +488,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   const [editObservation, setEditObservation] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [showShareSheet, setShowShareSheet] = useState(false);
+  const [showPlanLimitSheet, setShowPlanLimitSheet] = useState(false);
   const [showPublishFlow, setShowPublishFlow] = useState(!!autoOpenPublishFlow);
   const [showEditPublish, setShowEditPublish] = useState(false);
   const [isItineraryPublic, setIsItineraryPublic] = useState(data.isPublic ?? false);
@@ -520,6 +524,13 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
 
   const [showManageItinerary, setShowManageItinerary] = useState(false);
   const [showParticipantsSheet, setShowParticipantsSheet] = useState(false);
+  
+  const { itineraries: myItinerariesForLimit } = useMyItineraries();
+  const FREE_PLAN_ITINERARY_LIMIT = 3;
+  const ownCreatedCount = myItinerariesForLimit.filter(
+    (it) => it.userId === session?.user?.id && it.sourceDatasetId == null && !it.isPublic
+  ).length;
+
   const [itineraryData, setItineraryData] = useState(data);
   const [manualCover, setManualCover] = useState<string | null>(data.coverImage ?? null);
   const isFirstRender = useRef(true);
@@ -709,12 +720,11 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   // ─── Documentos (reservas + transportes-doc) sync com Lovable Cloud ───
   const docsHydratedRef = useRef(false);
   const skipNextDocsSaveRef = useRef(false);
-  const skipNextDocsRemoteRef = useRef(false);
+  const lastDocsSaveTimeRef = useRef(0);
 
   const reloadDocs = useCallback(async () => {
     if (!isUuidId || typeof itineraryId !== 'string') return;
-    if (skipNextDocsRemoteRef.current) {
-      skipNextDocsRemoteRef.current = false;
+    if (Date.now() - lastDocsSaveTimeRef.current < 2500) {
       return;
     }
     const remote = await loadItineraryDocs(itineraryId);
@@ -744,7 +754,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       return;
     }
     const handle = setTimeout(async () => {
-      skipNextDocsRemoteRef.current = true;
+      lastDocsSaveTimeRef.current = Date.now();
       const result = await saveItineraryDocs(itineraryId, { reservas, transportes });
       if (!result) return;
       const hasPendingResv = reservas.some((r) => r._pendingFile);
@@ -761,12 +771,11 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   // ─── Notas (notes) sync com Lovable Cloud ──────────────────────────────
   const notesHydratedRef = useRef(false);
   const skipNextNotesSaveRef = useRef(false);
-  const skipNextNotesRemoteRef = useRef(false);
+  const lastNotesSaveTimeRef = useRef(0);
 
   const reloadNotes = useCallback(async () => {
     if (!isUuidId || typeof itineraryId !== 'string') return;
-    if (skipNextNotesRemoteRef.current) {
-      skipNextNotesRemoteRef.current = false;
+    if (Date.now() - lastNotesSaveTimeRef.current < 2500) {
       return;
     }
     const remote = await loadItineraryNotes(itineraryId);
@@ -793,19 +802,18 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       skipNextNotesSaveRef.current = false;
       return;
     }
-    skipNextNotesRemoteRef.current = true;
+    lastNotesSaveTimeRef.current = Date.now();
     void saveItineraryNotes(itineraryId, tripNotes);
   }, [tripNotes, isUuidId, itineraryId, isViewer]);
 
   // ─── Orçamento (expenses) sync com Lovable Cloud ──────────────────────
   const budgetHydratedRef = useRef(false);
   const skipNextBudgetSaveRef = useRef(false);
-  const skipNextBudgetRemoteRef = useRef(false);
+  const lastBudgetSaveTimeRef = useRef(0);
 
   const reloadBudget = useCallback(async () => {
     if (!isUuidId || typeof itineraryId !== 'string') return;
-    if (skipNextBudgetRemoteRef.current) {
-      skipNextBudgetRemoteRef.current = false;
+    if (Date.now() - lastBudgetSaveTimeRef.current < 2500) {
       return;
     }
     const remote = await loadBudget(itineraryId);
@@ -831,7 +839,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       return;
     }
     const handle = setTimeout(() => {
-      skipNextBudgetRemoteRef.current = true;
+      lastBudgetSaveTimeRef.current = Date.now();
       void saveBudget(itineraryId, expenses);
     }, 600);
     return () => clearTimeout(handle);
@@ -2249,18 +2257,18 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
 
       {/* Hero Header */}
       <div
-        className="relative bg-cover bg-center"
+        className="relative bg-cover bg-center flex flex-col justify-between"
         style={{
-          height: '26vh',
-          minHeight: '200px',
-          maxHeight: '260px',
+          minHeight: '280px',
+          paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)',
+          paddingBottom: '40px',
           backgroundImage: `url(${coverImage})`
         }}>
         
         <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/70" />
 
         {/* Nav buttons */}
-        <div className="absolute top-0 left-0 right-0 px-4 flex items-center justify-between z-10" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
+        <div className="relative px-4 flex items-center justify-between z-10">
           <BackButton onClick={onBack} />
           {!creatorEditMode && (
             <button onClick={() => setShowSettings(true)} className="w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-sm">
@@ -2270,7 +2278,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         </div>
 
         {/* Title + metadata on image */}
-        <div className="absolute bottom-20 left-4 right-4 z-10">
+        <div className="relative px-4 z-10 mt-auto">
           <h1 className="text-[24px] font-bold text-white leading-tight mb-2">
             {itineraryData.tripName || itineraryDataset?.title || (itineraryData.destinations.length > 0 ? `${itineraryData.destinations[0].split(',')[0]} trip` : 'Paris trip')}
           </h1>
@@ -2863,10 +2871,6 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
 
               {dayActs.length > 0 && optimizingDays.has(dayItem.day) ? (
                 <div className="space-y-3 mb-4 animate-fade-in" aria-busy="true" aria-live="polite">
-                  <div className="flex items-center gap-2 text-[12px] font-semibold text-[#2563EB]">
-                    <Icon name="autorenew" size={14} className="animate-spin text-[#2563EB]" />
-                    Otimizando rota…
-                  </div>
                   {Array.from({ length: Math.max(3, dayActs.length) }).map((_, i) => (
                     <div key={i}>
                       <div
@@ -3184,7 +3188,13 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         tripName={itineraryData.tripName?.trim() || itineraryDataset?.title || (itineraryData.destinations.length > 0 ? `${itineraryData.destinations[0].split(',')[0]} trip` : 'Paris trip')}
         onManageItinerary={() => setShowManageItinerary(true)}
         onShare={isUuidId ? () => setShowShareSheet(true) : undefined}
-        onDuplicate={() => setDuplicateToast(true)}
+        onDuplicate={() => {
+          if (ownCreatedCount >= FREE_PLAN_ITINERARY_LIMIT) {
+            setShowPlanLimitSheet(true);
+          } else {
+            setDuplicateToast(true);
+          }
+        }}
         onDelete={onDelete ?? onBack}
         isParticipant={!!(typeof itineraryId === 'string' && session?.user?.id && ownerProfile && ownerProfile.userId !== session.user.id)}
         onLeave={async () => {
@@ -3908,6 +3918,17 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         </p>
       </div>
     </BottomSheet>
+
+    <PlanLimitReachedSheet
+      isOpen={showPlanLimitSheet}
+      onClose={() => setShowPlanLimitSheet(false)}
+      onUpgrade={() => {
+        setShowPlanLimitSheet(false);
+        onUpgrade?.();
+      }}
+      currentCount={ownCreatedCount}
+      limit={FREE_PLAN_ITINERARY_LIMIT}
+    />
     </>);
 
 }

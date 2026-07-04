@@ -3,6 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Icon } from '@/components/ui/Icon';
 import { BackButton } from '@/components/ui/BackButton';
+import { searchGooglePlacesText } from '@/lib/googlePlacesApi';
 
 interface PlaceMapPlace {
   id: number;
@@ -52,24 +53,15 @@ function createPinIcon(color: string = '#9DCC36') {
 }
 
 async function geocodePlace(name: string, address?: string): Promise<{ lat: number; lng: number } | null> {
-  const queries = [
-    [name, address].filter(Boolean).join(', '),
-    name,
-  ].filter(q => q && q.trim().length > 0);
-  for (const q of queries) {
-    try {
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&accept-language=pt`;
-      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-      if (!res.ok) continue;
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        const lat = parseFloat(data[0].lat);
-        const lng = parseFloat(data[0].lon);
-        if (!Number.isNaN(lat) && !Number.isNaN(lng)) return { lat, lng };
-      }
-    } catch {
-      // try next
+  const query = [name, address].filter(Boolean).join(', ');
+  if (!query) return null;
+  try {
+    const results = await searchGooglePlacesText(query);
+    if (results && results.length > 0) {
+      return { lat: results[0].lat, lng: results[0].lng };
     }
+  } catch {
+    // ignore
   }
   return null;
 }
@@ -109,16 +101,12 @@ export function PlaceMapScreen({ place, onBack }: PlaceMapScreenProps) {
       maxBoundsViscosity: 1.0,
     });
 
-    // Carto Voyager: light basemap with great street/landmark context (same family used elsewhere in the app)
-    // OSM padrão usa a tag `name` (idioma local): "Brasil", "España", etc.
-    // É a melhor opção gratuita sem chave de API para evitar rótulos em inglês.
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
+    L.tileLayer('https://mt0.google.com/vt/lyrs=m&hl=pt-BR&x={x}&y={y}&z={z}', {
+      maxZoom: 20,
       minZoom: 2,
-      subdomains: 'abc',
       noWrap: true,
       bounds: L.latLngBounds([-85, -180], [85, 180]),
-      attribution: '© OpenStreetMap',
+      attribution: '© Google',
     }).addTo(map);
 
     const fitMinZoom = () => {

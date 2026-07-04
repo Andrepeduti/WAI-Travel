@@ -22,16 +22,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cx}`
-      + `&searchType=image&num=3&safe=active&q=${encodeURIComponent(q)}`;
+    const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cx}&searchType=image&num=3&safe=active&q=${encodeURIComponent(q)}`;
     const r = await fetch(url);
+    const j = await r.json();
     if (!r.ok) {
-      return new Response(JSON.stringify({ image: null, status: r.status }), {
+      return new Response(JSON.stringify({ image: null, status: r.status, google_error: j }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });
     }
-    const j = await r.json();
     const items = Array.isArray(j?.items) ? j.items : [];
     const first = items.find((it: any) => typeof it?.link === 'string' && /^https?:\/\//.test(it.link));
     return new Response(JSON.stringify({ image: first?.link ?? null }), {

@@ -8,6 +8,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { TimePickerSheet } from '@/components/travel/TimePickerSheet';
 import { cn } from '@/lib/utils';
+import { searchGooglePlacesAutocomplete } from '@/lib/googlePlacesApi';
 
 export type TransporteTipo = 'voo' | 'trem' | 'onibus' | 'carro';
 
@@ -67,6 +68,8 @@ export function AddTransporteSheet({ isOpen, onClose, onAdd, editingTransporte }
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const [timePickerTarget, setTimePickerTarget] = useState<TimePickerTarget>(null);
+  const [isPartidaCalendarOpen, setIsPartidaCalendarOpen] = useState(false);
+  const [isChegadaCalendarOpen, setIsChegadaCalendarOpen] = useState(false);
 
   // Address search state
   const [searchField, setSearchField] = useState<'origem' | 'destino' | null>(null);
@@ -115,21 +118,27 @@ export function AddTransporteSheet({ isOpen, onClose, onAdd, editingTransporte }
       return;
     }
     setIsSearching(true);
+    let active = true;
     searchTimeout.current = setTimeout(async () => {
       try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`,
-          { headers: { 'Accept-Language': 'pt-BR' } }
-        );
-        const data = await res.json();
-        setAddressResults(data.map((item: any) => ({ display_name: item.display_name, place_id: item.place_id })));
-        setShowAddressDropdown(data.length > 0);
+        const predictions = await searchGooglePlacesAutocomplete(query);
+        const mapped = predictions.map(p => ({
+            display_name: p.location ? `${p.name}, ${p.location}` : p.name,
+            place_id: parseInt(p.placeId.replace(/\D/g, '').substring(0, 8)) || Math.floor(Math.random() * 1000000)
+        }));
+        if (active) {
+          setAddressResults(mapped as any);
+          setShowAddressDropdown(mapped.length > 0);
+        }
       } catch {
-        setAddressResults([]);
+        if (active) setAddressResults([]);
       } finally {
-        setIsSearching(false);
+        if (active) setIsSearching(false);
       }
-    }, 400);
+    }, 1000);
+    return () => {
+      active = false;
+    };
   }, []);
 
   const handleAddressChange = (field: 'origem' | 'destino', value: string) => {
@@ -300,7 +309,7 @@ export function AddTransporteSheet({ isOpen, onClose, onAdd, editingTransporte }
             <div className="mb-2">
               <label className="text-sm font-medium text-foreground mb-1.5 block">Partida</label>
               <div className="flex gap-2">
-                <Popover>
+                <Popover open={isPartidaCalendarOpen} onOpenChange={setIsPartidaCalendarOpen}>
                   <PopoverTrigger asChild>
                     <button className={cn("flex-1 px-4 py-3 rounded-xl border border-border bg-background text-sm text-left flex items-center gap-2 transition-colors hover:border-muted-foreground", !partidaDate && "text-muted-foreground")}>
                       <CalendarIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -308,7 +317,7 @@ export function AddTransporteSheet({ isOpen, onClose, onAdd, editingTransporte }
                     </button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0 z-[60]" align="start">
-                    <Calendar mode="single" selected={partidaDate} onSelect={setPartidaDate} initialFocus className="p-3 pointer-events-auto" />
+                    <Calendar mode="single" selected={partidaDate} onSelect={(date) => { setPartidaDate(date); setIsPartidaCalendarOpen(false); }} initialFocus className="p-3 pointer-events-auto" />
                   </PopoverContent>
                 </Popover>
                 <button onClick={() => setTimePickerTarget('partida')} className={timeButtonClass}>
@@ -347,7 +356,7 @@ export function AddTransporteSheet({ isOpen, onClose, onAdd, editingTransporte }
                   </button>
                 </div>
                 <div className="flex gap-2">
-                  <Popover>
+                  <Popover open={isChegadaCalendarOpen} onOpenChange={setIsChegadaCalendarOpen}>
                     <PopoverTrigger asChild>
                       <button className={cn("flex-1 px-4 py-3 rounded-xl border border-border bg-background text-sm text-left flex items-center gap-2 transition-colors hover:border-muted-foreground", !chegadaDate && "text-muted-foreground")}>
                         <CalendarIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -355,7 +364,7 @@ export function AddTransporteSheet({ isOpen, onClose, onAdd, editingTransporte }
                       </button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0 z-[60]" align="start">
-                      <Calendar mode="single" selected={chegadaDate} onSelect={setChegadaDate} initialFocus className="p-3 pointer-events-auto" />
+                      <Calendar mode="single" selected={chegadaDate} onSelect={(date) => { setChegadaDate(date); setIsChegadaCalendarOpen(false); }} initialFocus className="p-3 pointer-events-auto" />
                     </PopoverContent>
                   </Popover>
                   <button onClick={() => setTimePickerTarget('chegada')} className={timeButtonClass}>

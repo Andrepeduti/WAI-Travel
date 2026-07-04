@@ -13,6 +13,7 @@ import notificationImage from '@/assets/onboarding-notification.png';
 import people1 from '@/assets/onboarding-people-1.png';
 import people2 from '@/assets/onboarding-people-2.png';
 import people3 from '@/assets/onboarding-people-3.png';
+import { searchGooglePlacesAutocomplete, reverseGeocodeGoogle } from '@/lib/googlePlacesApi';
 
 interface OnboardingFlowProps {
   onComplete: (data: { name: string; username: string; city: string; birthdate: string; interests: string[]; goals: string[] }) => void;
@@ -1469,30 +1470,14 @@ function CityScreen({
       async (position) => {
         const { latitude, longitude } = position.coords;
         try {
-          // Fetch reverse geocoding from OpenStreetMap Nominatim
-          const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1&accept-language=pt-BR`;
-          const res = await fetch(url, {
-            headers: {
-              'User-Agent': 'waitravel-app-agent',
-            },
-          });
-          const data = await res.json();
-          const address = data.address || {};
-          
-          const cityName = address.city || address.town || address.village || address.municipality || address.suburb;
-          const stateName = address.state || address.region;
-          const countryName = address.country || '';
-
-          if (cityName) {
-            let formatted = cityName;
-            if (stateName) {
-              formatted += `, ${stateName}`;
-            } else if (countryName) {
-              formatted += `, ${countryName}`;
+          const result = await reverseGeocodeGoogle(latitude, longitude);
+          if (result && result.city) {
+            let formatted = result.city;
+            if (result.state) {
+              formatted += `, ${result.state}`;
             }
             setDetectedCity(formatted);
           } else {
-            // Geocoding succeeded but couldn't resolve a clear city name
             setShowManualInput(true);
           }
         } catch (err) {
@@ -1526,39 +1511,19 @@ function CityScreen({
     setIsLoading(true);
     searchTimer.current = setTimeout(async () => {
       try {
-        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=10`;
-        const res = await fetch(url);
-        const data = await res.json();
-        const features = data.features || [];
-
-        const cityTypes = new Set(['city', 'town', 'village', 'hamlet', 'suburb', 'municipality']);
+        const predictions = await searchGooglePlacesAutocomplete(query, ['(cities)']);
+        
         const results: string[] = [];
         const seen = new Set<string>();
 
-        for (const f of features) {
-          const props = f.properties || {};
-          const osmKey = props.osm_key || '';
-          const osmValue = props.osm_value || '';
+        for (const p of predictions) {
+          const name = p.name;
+          const loc = p.location;
+          const formatted = loc ? `${name}, ${loc}` : name;
           
-          const isPlace = osmKey === 'place' && cityTypes.has(osmValue);
-          
-          if (isPlace && props.name) {
-            const cityName = props.name;
-            const state = props.state || '';
-            const country = props.country || '';
-            
-            let formatted = cityName;
-            if (state && state !== cityName) {
-              formatted += `, ${state}`;
-            }
-            if (country) {
-              formatted += `, ${country}`;
-            }
-
-            if (!seen.has(formatted.toLowerCase())) {
-              seen.add(formatted.toLowerCase());
-              results.push(formatted);
-            }
+          if (!seen.has(formatted.toLowerCase())) {
+            seen.add(formatted.toLowerCase());
+            results.push(formatted);
           }
         }
         

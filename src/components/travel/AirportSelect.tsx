@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { Plane, ChevronDown, X } from 'lucide-react';
-import { searchAirports, type Airport } from '@/data/airports';
+import { Plane, ChevronDown, X, Loader2 } from 'lucide-react';
+import { searchAirports, loadAirportsAsync, type Airport } from '@/data/airports';
 
 interface AirportSelectProps {
   value: string;
@@ -11,8 +11,21 @@ interface AirportSelectProps {
 export function AirportSelect({ value, onChange, placeholder = 'Buscar aeroporto' }: AirportSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [loaded, setLoaded] = useState(false);
+  const [loading, setLoading] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    if (open && !loaded) {
+      setLoading(true);
+      loadAirportsAsync().finally(() => {
+        setLoaded(true);
+        setLoading(false);
+      });
+    }
+  }, [open, loaded]);
+
+  // Pass loaded as a dependency so it re-renders the search
   const results = searchAirports(query, 8);
 
   useEffect(() => {
@@ -27,7 +40,7 @@ export function AirportSelect({ value, onChange, placeholder = 'Buscar aeroporto
   }, [open]);
 
   const handleSelect = (a: Airport) => {
-    onChange(`${a.iata} - ${a.city}`);
+    onChange(`${a.name} (${a.iata}) - ${a.city}`);
     setQuery('');
     setOpen(false);
   };
@@ -69,7 +82,12 @@ export function AirportSelect({ value, onChange, placeholder = 'Buscar aeroporto
             />
           </div>
           <div className="max-h-[240px] overflow-y-auto">
-            {results.length === 0 ? (
+            {loading ? (
+              <div className="px-4 py-8 flex flex-col items-center justify-center text-muted-foreground gap-2">
+                <Loader2 size={24} className="animate-spin" />
+                <span className="text-[12px]">Carregando aeroportos...</span>
+              </div>
+            ) : results.length === 0 ? (
               <div className="px-4 py-3 text-[12px] text-muted-foreground">Nenhum aeroporto encontrado</div>
             ) : (
               results.map((a) => (

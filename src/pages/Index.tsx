@@ -140,6 +140,14 @@ const Index = () => {
   const ownCreatedCount = myItinerariesForLimit.filter(
     (it) => it.userId === session?.user?.id && it.sourceDatasetId == null && !it.isPublic
   ).length;
+
+  // Listen for the custom event to show the plan limit sheet (e.g. from duplicating an itinerary)
+  useEffect(() => {
+    const handler = () => setShowPlanLimitSheet(true);
+    window.addEventListener('wai:plan-limit-reached', handler);
+    return () => window.removeEventListener('wai:plan-limit-reached', handler);
+  }, []);
+
   /**
    * Opens the create itinerary sheet, but if the user is on the free plan
    * and already has the maximum number of itineraries, shows the upgrade
@@ -1218,6 +1226,16 @@ const Index = () => {
             onUpdate={handleItineraryUpdate}
             onNavigateToAI={() => { setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryIsPurchased(false); setShowAIAssistant(true); }}
             onNavigateToSales={() => { setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryIsPurchased(false); setCreatorEditingItinerary(null); setReturnToPublic(true); setActiveTab('trips'); }}
+            onUpgrade={() => {
+              setNewItineraryData(null); 
+              setActiveUserItineraryId(null); 
+              setActiveUserItineraryDataset(null); 
+              setActiveUserItineraryIsPurchased(false); 
+              setCreatorEditingItinerary(null);
+              setSubscriptionOrigin('trips');
+              setActiveTab('home');
+              setProfileSubScreen('subscription');
+            }}
           />
         </div>
         <SuccessToast 

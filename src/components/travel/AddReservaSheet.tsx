@@ -8,6 +8,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { TimePickerSheet } from '@/components/travel/TimePickerSheet';
 import { cn } from '@/lib/utils';
+import { searchGooglePlacesAutocomplete } from '@/lib/googlePlacesApi';
 
 type ReservaTipo = 'hospedagem' | 'atividade';
 
@@ -69,6 +70,9 @@ export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva, initia
   const [isSearching, setIsSearching] = useState(false);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const addressInputRef = useRef<HTMLInputElement>(null);
+  const [isCheckInCalendarOpen, setIsCheckInCalendarOpen] = useState(false);
+  const [isCheckOutCalendarOpen, setIsCheckOutCalendarOpen] = useState(false);
+  const [isAtividadeCalendarOpen, setIsAtividadeCalendarOpen] = useState(false);
 
   // Sync form state when editingReserva changes
   useEffect(() => {
@@ -113,21 +117,27 @@ export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva, initia
       return;
     }
     setIsSearching(true);
+    let active = true;
     searchTimeout.current = setTimeout(async () => {
       try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`,
-          { headers: { 'Accept-Language': 'pt-BR' } }
-        );
-        const data = await res.json();
-        setAddressResults(data.map((item: any) => ({ display_name: item.display_name, place_id: item.place_id })));
-        setShowAddressDropdown(data.length > 0);
+        const predictions = await searchGooglePlacesAutocomplete(query);
+        const mapped = predictions.map(p => ({
+            display_name: p.location ? `${p.name}, ${p.location}` : p.name,
+            place_id: parseInt(p.placeId.replace(/\D/g, '').substring(0, 8)) || Math.floor(Math.random() * 1000000)
+        }));
+        if (active) {
+          setAddressResults(mapped as any);
+          setShowAddressDropdown(mapped.length > 0);
+        }
       } catch {
-        setAddressResults([]);
+        if (active) setAddressResults([]);
       } finally {
-        setIsSearching(false);
+        if (active) setIsSearching(false);
       }
-    }, 400);
+    }, 1000);
+    return () => {
+      active = false;
+    }
   }, []);
 
   const handleLocalizacaoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -326,7 +336,7 @@ export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva, initia
                 <div className="mb-4">
                   <label className="text-sm font-medium text-foreground mb-1.5 block">Check-in</label>
                   <div className="flex gap-2">
-                    <Popover>
+                    <Popover open={isCheckInCalendarOpen} onOpenChange={setIsCheckInCalendarOpen}>
                       <PopoverTrigger asChild>
                         <button className={cn("flex-1 px-4 py-3 rounded-xl border border-border bg-background text-sm text-left flex items-center gap-2 transition-colors hover:border-muted-foreground", !checkInDate && "text-muted-foreground")}>
                           <CalendarIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -334,7 +344,7 @@ export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva, initia
                         </button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0 z-[60]" align="start">
-                        <Calendar mode="single" selected={checkInDate} onSelect={setCheckInDate} initialFocus className="p-3 pointer-events-auto" />
+                        <Calendar mode="single" selected={checkInDate} onSelect={(date) => { setCheckInDate(date); setIsCheckInCalendarOpen(false); }} initialFocus className="p-3 pointer-events-auto" />
                       </PopoverContent>
                     </Popover>
                     <button onClick={() => setTimePickerTarget('checkIn')} className={timeButtonClass}>
@@ -347,7 +357,7 @@ export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva, initia
                 <div className="mb-4">
                   <label className="text-sm font-medium text-foreground mb-1.5 block">Check-out</label>
                   <div className="flex gap-2">
-                    <Popover>
+                    <Popover open={isCheckOutCalendarOpen} onOpenChange={setIsCheckOutCalendarOpen}>
                       <PopoverTrigger asChild>
                         <button className={cn("flex-1 px-4 py-3 rounded-xl border border-border bg-background text-sm text-left flex items-center gap-2 transition-colors hover:border-muted-foreground", !checkOutDate && "text-muted-foreground")}>
                           <CalendarIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -355,7 +365,7 @@ export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva, initia
                         </button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0 z-[60]" align="start">
-                        <Calendar mode="single" selected={checkOutDate} onSelect={setCheckOutDate} initialFocus className="p-3 pointer-events-auto" />
+                        <Calendar mode="single" selected={checkOutDate} onSelect={(date) => { setCheckOutDate(date); setIsCheckOutCalendarOpen(false); }} initialFocus className="p-3 pointer-events-auto" />
                       </PopoverContent>
                     </Popover>
                     <button onClick={() => setTimePickerTarget('checkOut')} className={timeButtonClass}>
@@ -425,7 +435,7 @@ export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva, initia
 
                 <div className="mb-4">
                   <label className="text-sm font-medium text-foreground mb-1.5 block">Data</label>
-                  <Popover>
+                  <Popover open={isAtividadeCalendarOpen} onOpenChange={setIsAtividadeCalendarOpen}>
                     <PopoverTrigger asChild>
                       <button className={cn("w-full px-4 py-3 rounded-xl border border-border bg-background text-sm text-left flex items-center gap-2 transition-colors hover:border-muted-foreground", !atividadeDate && "text-muted-foreground")}>
                         <CalendarIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -433,7 +443,7 @@ export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva, initia
                       </button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0 z-[60]" align="start">
-                      <Calendar mode="single" selected={atividadeDate} onSelect={setAtividadeDate} initialFocus className="p-3 pointer-events-auto" />
+                      <Calendar mode="single" selected={atividadeDate} onSelect={(date) => { setAtividadeDate(date); setIsAtividadeCalendarOpen(false); }} initialFocus className="p-3 pointer-events-auto" />
                     </PopoverContent>
                   </Popover>
                 </div>

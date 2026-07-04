@@ -61,6 +61,7 @@ export function EditItineraryDataScreen({
   const [dateRange, setDateRange] = useState<DateRange | undefined>(
     initialStart ? { from: initialStart, to: initialEnd } : undefined
   );
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [currency, setCurrency] = useState(initialCurrency);
   const [description, setDescription] = useState(initialDescription);
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
@@ -150,7 +151,7 @@ export function EditItineraryDataScreen({
       {/* Dates */}
       <div className="px-4 mb-6">
         <label className="text-[13px] font-medium text-foreground block mb-1.5">Datas da viagem</label>
-        <Popover>
+        <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
           <PopoverTrigger asChild>
             <button className="w-full px-4 py-3 rounded-xl border border-border bg-background text-[14px] text-left flex items-center justify-between">
               <span className={dateRange?.from ? 'text-foreground' : 'text-muted-foreground'}>
@@ -166,8 +167,9 @@ export function EditItineraryDataScreen({
               mode="range"
               selected={dateRange}
               onSelect={(range, day) => {
-                const { range: next } = resolveNextRange(dateRange, range, day);
+                const { range: next, isComplete } = resolveNextRange(dateRange, range, day);
                 setDateRange(next);
+                if (isComplete) setIsCalendarOpen(false);
               }}
               locale={ptBR}
               scrollable

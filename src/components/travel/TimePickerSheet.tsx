@@ -11,103 +11,7 @@ interface TimePickerSheetProps {
   label?: string;
 }
 
-const ITEM_HEIGHT = 44;
-const VISIBLE_ITEMS = 5;
-const CENTER_INDEX = Math.floor(VISIBLE_ITEMS / 2);
 
-const horas = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
-const minutos = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
-
-function WheelColumn({
-  items,
-  selectedValue,
-  onChange,
-}: {
-  items: string[];
-  selectedValue: string;
-  onChange: (val: string) => void;
-}) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const isScrollingRef = useRef(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
-
-  const selectedIndex = items.indexOf(selectedValue);
-
-  useEffect(() => {
-    if (containerRef.current && !isScrollingRef.current) {
-      containerRef.current.scrollTop = selectedIndex * ITEM_HEIGHT;
-    }
-  }, [selectedIndex]);
-
-  const handleScroll = useCallback(() => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    isScrollingRef.current = true;
-
-    timeoutRef.current = setTimeout(() => {
-      if (!containerRef.current) return;
-      const scrollTop = containerRef.current.scrollTop;
-      const index = Math.round(scrollTop / ITEM_HEIGHT);
-      const clampedIndex = Math.max(0, Math.min(items.length - 1, index));
-
-      containerRef.current.scrollTo({
-        top: clampedIndex * ITEM_HEIGHT,
-        behavior: 'smooth',
-      });
-
-      onChange(items[clampedIndex]);
-      isScrollingRef.current = false;
-    }, 80);
-  }, [items, onChange]);
-
-  return (
-    <div className="relative h-[220px] w-20 overflow-hidden">
-      {/* Selection highlight */}
-      <div
-        className="absolute left-0 right-0 rounded-xl bg-muted/60 pointer-events-none z-10"
-        style={{
-          top: CENTER_INDEX * ITEM_HEIGHT,
-          height: ITEM_HEIGHT,
-        }}
-      />
-      {/* Fade top */}
-      <div className="absolute top-0 left-0 right-0 h-[88px] bg-gradient-to-b from-background to-transparent z-20 pointer-events-none" />
-      {/* Fade bottom */}
-      <div className="absolute bottom-0 left-0 right-0 h-[88px] bg-gradient-to-t from-background to-transparent z-20 pointer-events-none" />
-
-      <div
-        ref={containerRef}
-        className="h-full overflow-y-auto scrollbar-hide"
-        onScroll={handleScroll}
-        style={{
-          scrollSnapType: 'y mandatory',
-          paddingTop: CENTER_INDEX * ITEM_HEIGHT,
-          paddingBottom: CENTER_INDEX * ITEM_HEIGHT,
-        }}
-      >
-        {items.map((item, i) => {
-          const isSelected = item === selectedValue;
-          return (
-            <div
-              key={`${item}-${i}`}
-              className={cn(
-                'flex items-center justify-center transition-all duration-150',
-                isSelected
-                  ? 'text-foreground font-bold text-xl'
-                  : 'text-muted-foreground/60 text-lg font-medium'
-              )}
-              style={{
-                height: ITEM_HEIGHT,
-                scrollSnapAlign: 'start',
-              }}
-            >
-              {item}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 export function TimePickerSheet({
   isOpen,
@@ -131,9 +35,9 @@ export function TimePickerSheet({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/40 z-[70] transition-opacity" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/40 z-[200] transition-opacity" onClick={onClose} />
       <div
-        className="fixed bottom-0 left-0 right-0 z-[80] flex justify-center"
+        className="fixed bottom-0 left-0 right-0 z-[210] flex justify-center"
         style={{ fontFamily: 'var(--font-family-primary)' }}
       >
         <div className="bg-background rounded-t-3xl w-full max-w-[430px] pb-8 animate-in slide-in-from-bottom duration-300">
@@ -151,11 +55,49 @@ export function TimePickerSheet({
               </button>
             </div>
 
-            {/* Wheels */}
-            <div className="flex items-center justify-center gap-2 mb-6">
-              <WheelColumn items={horas} selectedValue={hora} onChange={setHora} />
-              <span className="text-2xl font-bold text-foreground">:</span>
-              <WheelColumn items={minutos} selectedValue={minuto} onChange={setMinuto} />
+            {/* Inputs */}
+            <div className="flex items-center justify-center gap-4 mb-6">
+              <div className="flex flex-col items-center gap-2">
+                <label className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Hora</label>
+                <input 
+                  type="text" 
+                  inputMode="numeric"
+                  value={hora} 
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '');
+                    if (val.length > 2) setHora(val.slice(-2));
+                    else setHora(val);
+                  }}
+                  onBlur={(e) => {
+                    let val = parseInt(e.target.value || '0', 10);
+                    if (isNaN(val)) val = 0;
+                    if (val > 23) val = 23;
+                    setHora(String(val).padStart(2, '0'));
+                  }}
+                  className="w-24 h-20 text-center text-4xl font-bold bg-muted/30 border border-border rounded-2xl focus:outline-none focus:border-primary-official focus:bg-background transition-colors"
+                />
+              </div>
+              <span className="text-4xl font-bold text-muted-foreground mt-6">:</span>
+              <div className="flex flex-col items-center gap-2">
+                <label className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Minuto</label>
+                <input 
+                  type="text" 
+                  inputMode="numeric"
+                  value={minuto} 
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '');
+                    if (val.length > 2) setMinuto(val.slice(-2));
+                    else setMinuto(val);
+                  }}
+                  onBlur={(e) => {
+                    let val = parseInt(e.target.value || '0', 10);
+                    if (isNaN(val)) val = 0;
+                    if (val > 59) val = 59;
+                    setMinuto(String(val).padStart(2, '0'));
+                  }}
+                  className="w-24 h-20 text-center text-4xl font-bold bg-muted/30 border border-border rounded-2xl focus:outline-none focus:border-primary-official focus:bg-background transition-colors"
+                />
+              </div>
             </div>
 
             {/* Confirm */}

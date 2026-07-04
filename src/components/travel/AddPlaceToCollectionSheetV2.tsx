@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { searchPlaces, type CityPlace } from '@/data/cityRecommendations';
-import { fetchPlacesForCity, mergePlaces, searchNominatim } from '@/lib/placesApi';
+import { fetchPlacesForCity, mergePlaces, searchGoogleFallback } from '@/lib/placesApi';
 import type { CollectionPlaceResult } from './AddPlaceToCollectionSheet';
 
 interface AddPlaceToCollectionSheetV2Props {
@@ -39,7 +39,7 @@ export function AddPlaceToCollectionSheetV2({
   // Debounced search
   const [debouncedSearch, setDebouncedSearch] = useState('');
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    const t = setTimeout(() => setDebouncedSearch(search), 1000);
     return () => clearTimeout(t);
   }, [search]);
 
@@ -49,7 +49,7 @@ export function AddPlaceToCollectionSheetV2({
       setSearch('');
       setSelectedIds(new Set());
       setSelectedPlaces(new Map());
-      setNominatimResults([]);
+      setGoogleResults([]);
       setApiPlaces({});
       setFetchedCities(new Set());
       setDetectedCity('');
@@ -71,7 +71,7 @@ export function AddPlaceToCollectionSheetV2({
   const [apiPlaces, setApiPlaces] = useState<Record<string, CityPlace[]>>({});
   const [loadingApi, setLoadingApi] = useState(false);
   const [fetchedCities, setFetchedCities] = useState<Set<string>>(new Set());
-  // City detected from Nominatim (e.g. user types "tokyo" -> we fetch Tokyo places)
+  // City detected from Google Places (e.g. user types "tokyo" -> we fetch Tokyo places)
   const [detectedCity, setDetectedCity] = useState<string>('');
 
   const fetchApiPlaces = useCallback(async (cityName: string) => {
@@ -112,29 +112,29 @@ export function AddPlaceToCollectionSheetV2({
     fetchApiPlaces(target);
   }, [open, inferredCity, detectedCity, fetchApiPlaces]);
 
-  // Nominatim fallback for global search + city detection
-  const [nominatimResults, setNominatimResults] = useState<CityPlace[]>([]);
+  // Google Places fallback for global search + city detection
+  const [googleResults, setGoogleResults] = useState<CityPlace[]>([]);
 
   useEffect(() => {
     const q = debouncedSearch.trim();
     if (!q) {
-      setNominatimResults([]);
+      setGoogleResults([]);
       setDetectedCity('');
       return;
     }
 
     let cancelled = false;
     const t = setTimeout(async () => {
-      const results = await searchNominatim(q, inferredCity || '');
+      const results = await searchGoogleFallback(q, inferredCity || '');
       if (cancelled) return;
-      setNominatimResults(results);
+      setGoogleResults(results);
 
       // If the top result is a populated place (city/town/village/municipality),
       // assume the user typed a city name and load that city's places.
       const top = results[0] as (CityPlace & { _osmCategory?: string }) | undefined;
       const topCity = top?.city?.trim();
       const looksLikeCity = !!topCity && (
-        // category 'place' is set for city/town/village in nominatimCategoryMap
+        // category 'place' is set for city/town/village in category map
         top?.category === 'Bairro' ||
         topCity === q.toLowerCase() ||
         q.toLowerCase().includes(topCity)
@@ -182,11 +182,11 @@ export function AddPlaceToCollectionSheetV2({
       if (cityStatic.length > 0) combined = mergePlaces(combined, cityStatic);
     }
 
-    // Nominatim fallback
-    if (nominatimResults.length > 0) combined = mergePlaces(combined, nominatimResults);
+    // Google fallback
+    if (googleResults.length > 0) combined = mergePlaces(combined, googleResults);
 
     return combined;
-  }, [debouncedSearch, inferredCity, detectedCity, apiPlaces, nominatimResults]);
+  }, [debouncedSearch, inferredCity, detectedCity, apiPlaces, googleResults]);
 
   // Track selected places (from current results + previously selected ones)
   useEffect(() => {

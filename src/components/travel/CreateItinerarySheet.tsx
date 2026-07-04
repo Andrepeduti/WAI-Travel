@@ -9,6 +9,7 @@ import type { DateRange } from 'react-day-picker';
 import { resolveNextRange } from '@/lib/dateRangeSelection';
 import { BackButton } from '@/components/ui/BackButton';
 import { supabase } from '@/integrations/supabase/client';
+import { searchGooglePlacesAutocomplete } from '@/lib/googlePlacesApi';
 
 export interface ItineraryFormData {
   destinations: string[];
@@ -99,6 +100,7 @@ export function CreateItinerarySheet({ isOpen, onClose, onSubmit, initialDestina
   const [isSearchingFriends, setIsSearchingFriends] = useState(false);
   const [showFriendSuggestions, setShowFriendSuggestions] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
@@ -147,7 +149,7 @@ export function CreateItinerarySheet({ isOpen, onClose, onSubmit, initialDestina
     return String.fromCodePoint(...cc.split('').map(c => 0x1f1e6 - 65 + c.charCodeAt(0)));
   };
 
-  // Busca cidades do mundo inteiro via Photon (Komoot) com debounce
+  // Busca cidades do mundo inteiro via Google Places com debounce
   useEffect(() => {
     const query = destinationInput.trim();
     if (query.length < 2) {
@@ -156,45 +158,26 @@ export function CreateItinerarySheet({ isOpen, onClose, onSubmit, initialDestina
       return;
     }
     setIsSearching(true);
-    const ctrl = new AbortController();
+    let active = true;
     const timeout = setTimeout(async () => {
       try {
-        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=15`;
-        const res = await fetch(url, { signal: ctrl.signal });
-        const data = await res.json();
-        const features = data.features || [];
-
-        const cityTypes = new Set(['city', 'town', 'village', 'hamlet', 'suburb', 'municipality']);
+        const predictions = await searchGooglePlacesAutocomplete(query, ['(cities)']);
+        
         const seen = new Set<string>();
         
-        const mapped = features
-          .filter((f: any) => {
-            const props = f.properties || {};
-            const osmKey = props.osm_key || '';
-            const osmValue = props.osm_value || '';
-            return osmKey === 'place' && cityTypes.has(osmValue) && props.name && props.country;
-          })
-          .map((f: any) => {
-            const props = f.properties || {};
-            const cityName = props.name;
-            const state = props.state || '';
-            const country = props.country || '';
-            const countryCode = props.countrycode || '';
-            
-            let sub = country;
-            if (state && state !== cityName && state !== country) {
-               sub = `${state}, ${country}`;
-            }
-
-            const full = `${cityName}, ${sub}`;
+        const mapped = predictions
+          .map((p) => {
+            const cityName = p.name;
+            const sub = p.location || '';
+            const full = sub ? `${cityName}, ${sub}` : cityName;
             return {
               label: cityName,
               sub: sub,
               full: full,
-              emoji: countryCodeToEmoji(countryCode),
+              emoji: '📍',
             };
           })
-          .filter((r: any) => {
+          .filter((r) => {
             if (destinations.includes(r.full)) return false;
             const key = r.full.toLowerCase();
             if (seen.has(key)) return false;
@@ -203,16 +186,16 @@ export function CreateItinerarySheet({ isOpen, onClose, onSubmit, initialDestina
           })
           .slice(0, 8);
           
-        setRemoteResults(mapped);
+        if (active) setRemoteResults(mapped);
       } catch (err) {
-        if ((err as Error).name !== 'AbortError') setRemoteResults([]);
+        if (active) setRemoteResults([]);
       } finally {
-        setIsSearching(false);
+        if (active) setIsSearching(false);
       }
-    }, 400);
+    }, 1000);
     return () => {
+      active = false;
       clearTimeout(timeout);
-      ctrl.abort();
     };
   }, [destinationInput, destinations]);
 
@@ -228,7 +211,7 @@ export function CreateItinerarySheet({ isOpen, onClose, onSubmit, initialDestina
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && destinationInput.trim()) {
       e.preventDefault();
-      // Apenas cidades: aceita sugestão remota (Nominatim) ou item da lista popular.
+      // Apenas cidades: aceita sugestão remota (Google) ou item da lista popular.
       // Não aceita texto livre para evitar destinos genéricos (ex: "Japão").
       if (remoteResults.length > 0) {
         handleAddDestination(remoteResults[0].full);
@@ -338,9 +321,12 @@ export function CreateItinerarySheet({ isOpen, onClose, onSubmit, initialDestina
 
   const handleDateSelect = (range: DateRange | undefined, day: Date) => {
     const currentRange: DateRange | undefined = startDate ? { from: startDate, to: endDate } : undefined;
-    const { range: next } = resolveNextRange(currentRange, range, day);
+    const { range: next, isComplete } = resolveNextRange(currentRange, range, day);
     setStartDate(next?.from);
     setEndDate(next?.to);
+    if (isComplete) {
+      setIsCalendarOpen(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -463,7 +449,7 @@ export function CreateItinerarySheet({ isOpen, onClose, onSubmit, initialDestina
                   ref={suggestionsRef}
                   className="absolute left-0 right-0 mt-2 bg-background border border-border rounded-xl shadow-lg z-50 max-h-[260px] overflow-y-auto"
                 >
-                  {/* Resultados globais via Nominatim quando há texto */}
+                  {/* Resultados globais via Google quando há texto */}
                   {destinationInput.trim().length >= 2 && remoteResults.length > 0 && (
                     remoteResults.map((dest, idx) => (
                       <button
@@ -515,7 +501,7 @@ export function CreateItinerarySheet({ isOpen, onClose, onSubmit, initialDestina
             {/* Date */}
             <div>
               <label className="text-sm font-semibold text-foreground mb-2 block">Data da viagem</label>
-              <Popover>
+              <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                 <PopoverTrigger asChild>
                   <button className="w-full flex items-center gap-2 px-4 py-3 border border-border rounded-2xl text-left">
                     <Icon name="calendar_today" size={20} className="text-muted-foreground flex-shrink-0" />

@@ -421,6 +421,7 @@ export function DraggableActivityList({
               <span className="text-[14px] font-medium text-foreground flex-1 text-left">Ver no mapa</span>
               <Icon name="chevron_right" size={18} className="text-muted-foreground" />
             </button>
+            {/* 
             <button
               className="w-full flex items-center gap-3 py-3.5 px-4 rounded-xl hover:bg-destructive/10 transition-colors"
               onClick={() => {
@@ -435,6 +436,7 @@ export function DraggableActivityList({
               </div>
               <span className="text-[14px] font-medium text-destructive flex-1 text-left">Excluir</span>
             </button>
+            */}
           </div>
         </SheetContent>
       </Sheet>

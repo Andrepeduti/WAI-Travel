@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Icon } from '@/components/ui/Icon';
 import { toast } from '@/hooks/use-toast';
+import { useCurrentUser } from '@/hooks/use-current-user';
 
 interface ContactUsSheetProps {
   isOpen: boolean;
@@ -17,11 +18,19 @@ const questionTypes = [
 ];
 
 export function ContactUsSheet({ isOpen, onClose }: ContactUsSheetProps) {
-  const [name, setName] = useState('Alessandra Rabelo');
-  const [email, setEmail] = useState('alessandra@email.com');
+  const { user } = useCurrentUser();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [type, setType] = useState('');
   const [message, setMessage] = useState('');
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && user) {
+      setName((prev) => prev || user.name || '');
+      setEmail((prev) => prev || user.email || '');
+    }
+  }, [isOpen, user]);
 
   const canSubmit = name.trim() && email.trim() && type && message.trim();
 

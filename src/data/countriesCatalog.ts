@@ -179,13 +179,25 @@ export function getCountryInfo(
  * Full catalog of countries with a known Portuguese name.
  * Sorted alphabetically by name. Used by the "Add visited countries" search sheet.
  */
-export const ALL_COUNTRIES: CountryInfo[] = Object.keys(PT_NAME_BY_ISO3)
+const regionNames = new Intl.DisplayNames(['pt-BR'], { type: 'region' });
+
+export const ALL_COUNTRIES: CountryInfo[] = Object.keys(CONTINENT_BY_ISO3)
   .map(iso3 => {
     const iso2 = (ISO3_TO_ISO2[iso3] || NAME_TO_ISO2_FALLBACK[iso3] || '').toUpperCase();
+    
+    let name = PT_NAME_BY_ISO3[iso3];
+    if (!name && iso2) {
+      try {
+        name = regionNames.of(iso2) || iso3;
+      } catch {
+        name = iso3;
+      }
+    }
+
     return {
       code: iso2 || iso3,
       iso3,
-      name: PT_NAME_BY_ISO3[iso3],
+      name: name || iso3,
       continent: CONTINENT_BY_ISO3[iso3] || 'Mundo',
       flag: iso2 ? iso2ToFlag(iso2) : '🏳️',
     } as CountryInfo;

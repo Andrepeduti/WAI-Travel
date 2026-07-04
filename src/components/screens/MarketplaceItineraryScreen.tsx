@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { BackButton } from '@/components/ui/BackButton';
 import { OwnerPublishedSheet } from '@/components/travel/OwnerPublishedSheet';
 import { recordPurchase } from '@/lib/purchasesApi';
+import { getInterestIcon } from '@/lib/interestIcons';
 import { ReportSheet } from '@/components/social/ReportSheet';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -694,14 +695,25 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
                   : ordered;
                 return withSeason.map((tag) => {
                   const isMain = tag === itineraryData.mainTag;
+                  if (isMain) {
+                    return (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center h-7 rounded-full px-3"
+                        style={{ background: '#1A1C40', fontSize: 12, fontWeight: 600, color: '#FFFFFF' }}
+                      >
+                        {tag}
+                      </span>
+                    );
+                  }
+                  
                   return (
                     <span
                       key={tag}
-                      className="inline-flex items-center h-7 rounded-full px-3"
-                      style={isMain
-                        ? { background: '#1A1C40', fontSize: 12, fontWeight: 600, color: '#FFFFFF' }
-                        : { background: '#E5E7EB', fontSize: 12, fontWeight: 500, color: '#1A1C40' }}
+                      className="inline-flex items-center gap-1.5 h-7 rounded-2xl px-3"
+                      style={{ background: '#FFFFFF', fontSize: 12, fontWeight: 500, color: '#1A1C40' }}
                     >
+                      <Icon name={getInterestIcon(tag)} size={14} style={{ color: '#1A1C40' }} />
                       {tag}
                     </span>
                   );
