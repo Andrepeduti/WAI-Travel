@@ -9,6 +9,7 @@ interface Handlers {
   onDocTransportsChange?: (payload: any) => void;
   onMembersChange?: (payload: any) => void;
   onExpensesChange?: (payload: any) => void;
+  onNotesChange?: (payload: any) => void;
 }
 
 const isUuid = (id: string) =>
@@ -68,6 +69,11 @@ export function useItineraryRealtime(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'itinerary_expenses', filter },
         (p) => handlersRef.current.onExpensesChange?.(p),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'itinerary_notes', filter },
+        (p) => handlersRef.current.onNotesChange?.(p),
       )
       .subscribe();
 

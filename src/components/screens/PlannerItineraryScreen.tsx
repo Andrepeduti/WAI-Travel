@@ -14,7 +14,9 @@ import { DocumentosScreen } from './DocumentosScreen';
 import { BudgetScreen, Expense } from './BudgetScreen';
 import { estimatedPriceFor } from '@/lib/paidAttractions';
 
-import { AddReservaSheet, Reserva } from '@/components/travel/AddReservaSheet';
+import { Reserva } from '@/components/travel/AddReservaSheet';
+import { DocTypePickerSheet, type DocType } from '@/components/travel/DocTypePickerSheet';
+import { AddDocumentoSheet } from '@/components/travel/AddDocumentoSheet';
 import { TripTipsScreen } from './TripTipsScreen';
 import { TripNotesScreen, TripNote } from './TripNotesScreen';
 import { TripChecklistScreen } from './TripChecklistScreen';
@@ -22,6 +24,7 @@ import { AddTransporteSheet, Transporte } from '@/components/travel/AddTransport
 import { AddActionSheet } from '@/components/travel/AddActionSheet';
 import { AddPlaceSheet, PlaceResult } from '@/components/travel/AddPlaceSheet';
 import { AddNoteSheet } from '@/components/travel/AddNoteSheet';
+import { AddTripNoteSheet } from '@/components/travel/AddTripNoteSheet';
 import { AddDeslocamentoSheet, DeslocamentoData } from '@/components/travel/AddDeslocamentoSheet';
 import { AddBudgetExpenseSheet } from '@/components/travel/AddBudgetExpenseSheet';
 import { AddManualActivitySheet, ManualActivityData } from '@/components/travel/AddManualActivitySheet';
@@ -54,6 +57,7 @@ import { updateItinerary as updateItineraryRow, publishItineraryAsCopy, leaveIti
 import { loadPlannerData, savePlannerData } from '@/lib/plannerApi';
 import { formatBRL } from '@/lib/utils';
 import { loadItineraryDocs, saveItineraryDocs } from '@/lib/itineraryDocsApi';
+import { loadItineraryNotes, saveItineraryNotes } from '@/lib/itineraryNotesApi';
 import { loadBudget, saveBudget } from '@/lib/budgetApi';
 import { listItineraryMembers, getMyRole, getItineraryOwnerProfile, type ItineraryMember, type ItineraryRole } from '@/lib/itineraryMembersApi';
 import { ShareItinerarySheet } from '@/components/travel/ShareItinerarySheet';
@@ -182,6 +186,17 @@ function loadPersistedActivities(id: string, currentVersion?: number): Record<nu
 
 function savePersistedActivities(id: string, data: Record<number, Activity[]>, currentVersion?: number) {
   writeVersionedEntry(ACTIVITIES_STORAGE_KEY, id, data, currentVersion);
+}
+
+const NOTES_STORAGE_KEY = 'wai_planner_notes_v1';
+
+function loadPersistedNotes(id: string, currentVersion?: number): TripNote[] {
+  const parsed = readVersionedEntry<TripNote[]>(NOTES_STORAGE_KEY, id, currentVersion);
+  return parsed || [];
+}
+
+function savePersistedNotes(id: string, data: TripNote[], currentVersion?: number) {
+  writeVersionedEntry(NOTES_STORAGE_KEY, id, data, currentVersion);
 }
 
 function loadPersistedTransports(id: string, currentVersion?: number): Record<number, TransportBetween[]> {
@@ -439,7 +454,10 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   const [showViewModeSheet, setShowViewModeSheet] = useState(false);
   const [showDocumentos, setShowDocumentos] = useState(false);
   const [showBudget, setShowBudget] = useState(false);
-  const [tripNotes, setTripNotes] = useState<TripNote[]>([]);
+  // Inicializa tripNotes localmente primeiro
+  const [tripNotes, setTripNotes] = useState<TripNote[]>(() => {
+    return loadPersistedNotes(itineraryId);
+  });
   const [reservas, setReservas] = useState<Reserva[]>((isPurchased || !itineraryDataset) ? [] : [
   { id: '1', tipo: 'hospedagem', nome: 'Hotel Le Marais', localizacao: 'Rue de Rivoli, Paris', checkInDate: new Date(2026, 5, 14), checkInHora: '14', checkInMinuto: '00', checkOutDate: new Date(2026, 5, 18), checkOutHora: '11', checkOutMinuto: '00', valor: '€ 480,00' },
   { id: '2', tipo: 'atividade', nome: 'Cruzeiro no Sena', localizacao: 'Port de la Bourdonnais', atividadeDate: new Date(2026, 5, 16), atividadeHora: '19', atividadeMinuto: '30', valor: '€ 35,00' }]
@@ -538,10 +556,13 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   const [showAddAction, setShowAddAction] = useState(false);
   const [showAddPlace, setShowAddPlace] = useState(false);
   const [showAddNote, setShowAddNote] = useState(false);
+  const [showAddTripNote, setShowAddTripNote] = useState(false);
   const [showAddDayTransport, setShowAddDayTransport] = useState(false);
   const [budgetAutoAdd, setBudgetAutoAdd] = useState(false);
   const [showAddExpense, setShowAddExpense] = useState(false);
-  const [showAddReservation, setShowAddReservation] = useState(false);
+  const [showDocTypePicker, setShowDocTypePicker] = useState(false);
+  const [showAddDocumento, setShowAddDocumento] = useState(false);
+  const [documentoTypeToOpen, setDocumentoTypeToOpen] = useState<DocType>('hospedagem');
   const [showAddDeslocamento, setShowAddDeslocamento] = useState(false);
   const [showTips, setShowTips] = useState(false);
   const [showChecklist, setShowChecklist] = useState(false);
@@ -588,7 +609,8 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
 
   useEffect(() => {
     savePersistedTransports(persistKey, dayTransports, dataVersion);
-  }, [dayTransports, persistKey, dataVersion]);
+    savePersistedNotes(persistKey, tripNotes, dataVersion);
+  }, [dayTransports, tripNotes, persistKey, dataVersion]);
 
   // ─── Backend sync (Lovable Cloud) ──────────────────────────────────────
   // O `localStorage` acima é cache de leitura imediata; o servidor é a
@@ -651,29 +673,37 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   const [myRole, setMyRole] = useState<ItineraryRole | null>(null);
   const [ownerProfile, setOwnerProfile] = useState<{ userId: string; name: string; avatar?: string } | null>(null);
   const isViewer = myRole === 'viewer';
-  useEffect(() => {
+  const reloadMembers = useCallback(async () => {
     if (!isUuidId || typeof itineraryId !== 'string') return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const m = await listItineraryMembers(itineraryId);
-        if (!cancelled) setSharedMembers(m);
-      } catch {
-        /* silencioso: usuário pode não ser dono/membro */
-      }
-      try {
-        const owner = await getItineraryOwnerProfile(itineraryId);
-        if (!cancelled) setOwnerProfile(owner);
-      } catch {
-        /* silencioso */
-      }
-      if (session?.user?.id) {
-        const role = await getMyRole(itineraryId, session.user.id);
-        if (!cancelled) setMyRole(role);
-      }
-    })();
-    return () => { cancelled = true; };
+    try {
+      const m = await listItineraryMembers(itineraryId);
+      setSharedMembers(m);
+    } catch {
+      /* silencioso */
+    }
+    try {
+      const owner = await getItineraryOwnerProfile(itineraryId);
+      setOwnerProfile(owner);
+    } catch {
+      /* silencioso */
+    }
+    if (session?.user?.id) {
+      const role = await getMyRole(itineraryId, session.user.id);
+      setMyRole(role);
+    }
   }, [isUuidId, itineraryId, session?.user?.id]);
+
+  useEffect(() => {
+    reloadMembers();
+
+    // Notes cache refresh se necessário
+    if (typeof itineraryId === 'string') {
+      const cachedNotes = loadPersistedNotes(itineraryId, dataVersion);
+      if (cachedNotes.length > 0) {
+        setTripNotes(cachedNotes);
+      }
+    }
+  }, [reloadMembers, itineraryId, dataVersion]);
 
 
   // ─── Documentos (reservas + transportes-doc) sync com Lovable Cloud ───
@@ -727,6 +757,45 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     }, 600);
     return () => clearTimeout(handle);
   }, [isUuidId, itineraryId, reservas, transportes]);
+
+  // ─── Notas (notes) sync com Lovable Cloud ──────────────────────────────
+  const notesHydratedRef = useRef(false);
+  const skipNextNotesSaveRef = useRef(false);
+  const skipNextNotesRemoteRef = useRef(false);
+
+  const reloadNotes = useCallback(async () => {
+    if (!isUuidId || typeof itineraryId !== 'string') return;
+    if (skipNextNotesRemoteRef.current) {
+      skipNextNotesRemoteRef.current = false;
+      return;
+    }
+    const remote = await loadItineraryNotes(itineraryId);
+    if (!remote) return;
+    if (notesHydratedRef.current) {
+      skipNextNotesSaveRef.current = true;
+      setTripNotes(remote);
+    } else {
+      if (remote.length > 0) {
+        skipNextNotesSaveRef.current = true;
+        setTripNotes(remote);
+      }
+    }
+    notesHydratedRef.current = true;
+  }, [itineraryId, isUuidId]);
+
+  useEffect(() => { void reloadNotes(); }, [reloadNotes]);
+
+  useEffect(() => {
+    if (!isUuidId || isViewer) return;
+    if (!notesHydratedRef.current) return;
+    
+    if (skipNextNotesSaveRef.current) {
+      skipNextNotesSaveRef.current = false;
+      return;
+    }
+    skipNextNotesRemoteRef.current = true;
+    void saveItineraryNotes(itineraryId, tripNotes);
+  }, [tripNotes, isUuidId, itineraryId, isViewer]);
 
   // ─── Orçamento (expenses) sync com Lovable Cloud ──────────────────────
   const budgetHydratedRef = useRef(false);
@@ -823,15 +892,8 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     onReservationsChange: () => { void reloadDocs(); },
     onDocTransportsChange: () => { void reloadDocs(); },
     onExpensesChange: () => { void reloadBudget(); },
-    onMembersChange: () => {
-      if (!isUuidId || typeof itineraryId !== 'string') return;
-      void (async () => {
-        try {
-          const m = await listItineraryMembers(itineraryId);
-          setSharedMembers(m);
-        } catch { /* silencioso */ }
-      })();
-    },
+    onNotesChange: () => { void reloadNotes(); },
+    onMembersChange: () => { void reloadMembers(); },
   });
 
 
@@ -2137,7 +2199,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                   <span className="text-[14px] font-semibold text-foreground">Gasto</span>
                 </button>
                 <button
-                onClick={() => {setShowAddAction(false);setShowAddReservation(true);}}
+                onClick={() => {setShowAddAction(false);setShowDocTypePicker(true);}}
                 className="flex items-center gap-2 h-12 px-5 rounded-full bg-card shadow-lg active:scale-95 transition-transform">
                   <div className="flex items-center -space-x-1">
                     <Icon name="hotel" size={18} className="text-foreground" />
@@ -2146,7 +2208,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                   <span className="text-[14px] font-semibold text-foreground">Reserva</span>
                 </button>
                 <button
-                onClick={() => {setShowAddAction(false);setShowTips(true);}}
+                onClick={() => {setShowAddAction(false);setShowAddTripNote(true);}}
                 className="flex items-center gap-2 h-12 px-5 rounded-full bg-card shadow-lg active:scale-95 transition-transform">
                 
                   <Icon name="edit_note" size={20} className="text-foreground" />
@@ -3194,7 +3256,14 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       {isUuidId && typeof itineraryId === 'string' && (
         <ParticipantsSheet
           open={showParticipantsSheet}
-          onClose={() => setShowParticipantsSheet(false)}
+          onClose={() => {
+            setShowParticipantsSheet(false);
+            if (isUuidId && typeof itineraryId === 'string') {
+              listItineraryMembers(itineraryId)
+                .then(setSharedMembers)
+                .catch((e) => console.error('[PlannerItineraryScreen] Failed to reload members', e));
+            }
+          }}
           itineraryId={itineraryId}
           currentUserId={session?.user?.id}
           onInvite={() => setShowShareSheet(true)}
@@ -3357,12 +3426,36 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
           toast.success('Deslocamento adicionado');
         }} />
       
-      <AddReservaSheet
-        isOpen={showAddReservation}
-        onClose={() => setShowAddReservation(false)}
-        onAdd={(reserva) => {
+      <DocTypePickerSheet
+        isOpen={showDocTypePicker}
+        onClose={() => setShowDocTypePicker(false)}
+        onSelect={(type) => {
+          setShowDocTypePicker(false);
+          setDocumentoTypeToOpen(type);
+          setShowAddDocumento(true);
+        }}
+      />
+
+      <AddDocumentoSheet
+        isOpen={showAddDocumento}
+        onClose={() => setShowAddDocumento(false)}
+        preSelectedType={documentoTypeToOpen}
+        splitPeople={splitPeopleList}
+        onAddReserva={(reserva) => {
           setReservas(prev => [...prev, reserva]);
-          toast.success('Reserva adicionada');
+          toast.success('Documento adicionado!');
+        }}
+        onAddReservas={(rs) => {
+          setReservas(prev => [...prev, ...rs]);
+          toast.success(`${rs.length} documentos adicionados!`);
+        }}
+        onAddTransporte={(transporte) => {
+          setTransportes(prev => [...prev, transporte]);
+          toast.success('Documento adicionado!');
+        }}
+        onAddTransportes={(ts) => {
+          setTransportes(prev => [...prev, ...ts]);
+          toast.success(`${ts.length} documentos adicionados!`);
         }}
       />
       
@@ -3653,12 +3746,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
           setExpenses(prev => [...prev, expense]);
           toast.success('Gasto adicionado');
         }}
-        people={[
-          { id: '1', initials: 'AS', name: 'Ana', color: '#3B82F6' },
-          { id: '2', initials: 'BC', name: 'Bruno', color: '#10B981' },
-          { id: '3', initials: 'CD', name: 'Carla', color: '#F59E0B' },
-          { id: '4', initials: 'DL', name: 'Daniel', color: '#8B5CF6' },
-        ]}
+        people={splitPeopleList}
       />
 
       {/* Move to Day Sheet */}
@@ -3753,6 +3841,21 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         />
       </div>
     )}
+
+    <AddTripNoteSheet
+      open={showAddTripNote}
+      onClose={() => setShowAddTripNote(false)}
+      onSave={(note) => {
+        const newNote: TripNote = {
+          id: Date.now().toString(),
+          author: 'Você',
+          authorImage: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
+          title: note.title || 'Sem título',
+          summary: note.content || '',
+        };
+        setTripNotes(prev => [newNote, ...prev]);
+      }}
+    />
 
     {showChecklist && (
       <div className="fixed inset-0 z-50 bg-background overflow-y-auto">

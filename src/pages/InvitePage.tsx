@@ -24,7 +24,7 @@ export default function InvitePage() {
       try {
         const itineraryId = await acceptInviteByToken(token, session.user.id);
         toast.success('Convite aceito!');
-        navigate(`/home?itinerary=${itineraryId}`);
+        navigate(`/home`, { state: { openCollaboratorItineraryId: itineraryId } });
       } catch (e: any) {
         setError(e?.message || 'Erro ao aceitar convite');
         setStatus('error');

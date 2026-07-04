@@ -134,6 +134,20 @@ export async function listMyItineraries(): Promise<UserItinerary[]> {
   return merged;
 }
 
+export async function getUserItineraryById(id: string): Promise<UserItinerary | null> {
+  const { data, error } = await supabase
+    .from('itineraries')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) {
+    console.error('[itinerariesApi] getUserItineraryById failed', error);
+    return null;
+  }
+  if (!data) return null;
+  return rowToItinerary(data);
+}
+
 export async function createItinerary(input: CreateItineraryInput): Promise<UserItinerary | null> {
   const { data: userData } = await supabase.auth.getUser();
   const userId = userData.user?.id;

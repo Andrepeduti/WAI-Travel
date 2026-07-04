@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { acceptInvite, declineInvite } from '@/lib/itineraryMembersApi';
 import { toast } from 'sonner';
 import { NotificationListSkeleton } from '@/components/ui/LoadingShimmers';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Notification {
   id: number | string;
@@ -21,6 +22,7 @@ interface Notification {
   read: boolean;
   group: 'Hoje' | 'Ontem' | 'Esta semana' | 'Mais antigas';
   itineraryId?: number | string;
+  collabStatus?: 'accepted' | 'declined';
 }
 
 // No mocked notifications: only real user-specific notifications are shown.
@@ -28,7 +30,7 @@ const baseNotifications: Notification[] = [];
 
 interface NotificationsScreenProps {
   onBack: () => void;
-  onNavigateToItinerary?: (id: number) => void;
+  onNavigateToItinerary?: (id: number | string) => void;
   onNavigateToSales?: () => void;
   onNavigateToAI?: () => void;
   onNavigateToTripReminders?: () => void;
@@ -64,6 +66,8 @@ const dbNotificationToItem = (item: AppNotification): Notification => {
   const itineraryId = typeof item.metadata?.itineraryId === 'string' || typeof item.metadata?.itineraryId === 'number'
     ? (item.metadata.itineraryId as string | number)
     : undefined;
+  const status = item.metadata?.status as 'accepted' | 'declined' | undefined;
+
   return {
     id: item.id,
     type: isInvite || isInviteAccepted
@@ -81,6 +85,7 @@ const dbNotificationToItem = (item: AppNotification): Notification => {
     read: Boolean(item.read_at),
     group: getNotificationGroup(item.created_at),
     itineraryId,
+    collabStatus: status,
   };
 };
 
@@ -112,8 +117,7 @@ export function NotificationsScreen({ onBack, onNavigateToItinerary, onNavigateT
       });
     }
 
-
-    return [...savedNotifications.map(dbNotificationToItem), ...dynamic, ...baseNotifications].map((n) => ({
+    return [...savedNotifications.map(dbNotificationToItem), ...dynamic].map((n) => ({
       ...n,
       read: readMap[String(n.id)] ?? n.read,
     }));
@@ -130,14 +134,20 @@ export function NotificationsScreen({ onBack, onNavigateToItinerary, onNavigateT
     if (notif.actionType === 'read-only') return;
 
     switch (notif.type) {
-      case 'collab':
-        onNavigateToItinerary?.(2);
+      case 'collab': {
+        const currentStatus = collabResponded[String(notif.id)] || notif.collabStatus;
+        if (currentStatus === 'accepted' && notif.itineraryId != null) {
+          onNavigateToItinerary?.(notif.itineraryId);
+        } else if (!currentStatus) {
+          toast('Aceite o convite antes de acessar o roteiro!');
+        }
         break;
+      }
       case 'new_sale':
-        if (notif.itineraryId != null) onNavigateToItinerary?.(Number(notif.itineraryId));
+        if (notif.itineraryId != null) onNavigateToItinerary?.(notif.itineraryId);
         break;
       case 'comment':
-        onNavigateToItinerary?.(1);
+        if (notif.itineraryId != null) onNavigateToItinerary?.(notif.itineraryId);
         break;
       case 'purchase':
         onNavigateToSales?.();
@@ -175,8 +185,44 @@ export function NotificationsScreen({ onBack, onNavigateToItinerary, onNavigateT
       } else {
         await declineInvite(inviteId);
       }
+      
+      // Update notification metadata in database so it persists
+      if (dbNotif) {
+        const { error: updateError } = await supabase
+          .from('notifications')
+          .update({
+            metadata: {
+              ...(dbNotif.metadata as Record<string, unknown> || {}),
+              status: action
+            }
+          })
+          .eq('id', id);
+          
+        if (updateError) {
+          console.error("Failed to update notification metadata:", updateError);
+        }
+      }
     } catch (e: any) {
-      toast.error(e?.message || 'Erro ao processar convite');
+      console.error("Error in handleCollabAction:", e);
+      const isAlreadyProcessed = e?.message?.includes('já processado') || e?.message?.includes('já utilizado');
+      
+      if (isAlreadyProcessed) {
+        // If it was already processed, just update the local notification to reflect it
+        toast('O convite já havia sido processado.');
+        if (dbNotif) {
+          await supabase.from('notifications').update({
+            metadata: { ...(dbNotif.metadata as Record<string, unknown> || {}), status: 'accepted' }
+          }).eq('id', id);
+        }
+      } else {
+        toast.error(e?.message || 'Erro ao processar convite');
+        // Revert optimistic update on error only if it's a real error
+        setCollabResponded(prev => {
+          const next = { ...prev };
+          delete next[String(id)];
+          return next;
+        });
+      }
     }
   };
 
@@ -211,7 +257,7 @@ export function NotificationsScreen({ onBack, onNavigateToItinerary, onNavigateT
                 <div className="divide-y divide-[hsl(var(--divider))]">
                   {items.map((notif) => {
                     const isCollab = notif.actionType === 'collab-action';
-                    const collabStatus = collabResponded[notif.id];
+                    const collabStatus = collabResponded[notif.id] || notif.collabStatus;
 
                     return (
                       <button

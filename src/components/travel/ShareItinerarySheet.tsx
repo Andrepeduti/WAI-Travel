@@ -36,8 +36,6 @@ export function ShareItinerarySheet({
   const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(null);
   const [sending, setSending] = useState(false);
   const [copying, setCopying] = useState(false);
-  const [mutualIds, setMutualIds] = useState<string[] | null>(null);
-
   // Reset state when sheet opens
   useEffect(() => {
     if (open) {
@@ -48,66 +46,29 @@ export function ShareItinerarySheet({
     }
   }, [open]);
 
-  // Carrega contatos em comum (mútuos: eu sigo e me seguem de volta)
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { if (!cancelled) setMutualIds([]); return; }
-        const [{ data: following }, { data: followers }] = await Promise.all([
-          supabase.from('profile_follows').select('following_id').eq('follower_id', user.id),
-          supabase.from('profile_follows').select('follower_id').eq('following_id', user.id),
-        ]);
-        const followingSet = new Set((following || []).map((r: any) => r.following_id));
-        const mutual = (followers || [])
-          .map((r: any) => r.follower_id)
-          .filter((id: string) => followingSet.has(id));
-        if (!cancelled) setMutualIds(mutual);
-      } catch {
-        if (!cancelled) setMutualIds([]);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [open]);
-
-  // Busca usuários: e-mail busca direta; nome/@username restringe aos mútuos
+  // Busca usuários por nome/@username
   useEffect(() => {
     if (!open || selectedUser) return;
     const q = query.trim();
-    if (q.length < 2 || mutualIds === null) { setResults([]); return; }
+    if (q.length < 2) { setResults([]); return; }
     let cancelled = false;
     setSearching(true);
     const handle = setTimeout(async () => {
       try {
-        const isEmailQ = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(q) || q.includes('@') && !q.startsWith('@');
-        let req = supabase
+        const { data } = await supabase
           .from('profiles_public')
           .select('user_id, name, username, avatar_url')
           .neq('user_id', ownerId)
+          .or(`name.ilike.%${q}%,username.ilike.%${q}%`)
           .limit(10);
 
-        if (isEmailQ) {
-          req = req.ilike('email', `%${q}%`);
-        } else {
-          if (mutualIds.length === 0) {
-            if (!cancelled) { setResults([]); setSearching(false); }
-            return;
-          }
-          req = req
-            .in('user_id', mutualIds)
-            .or(`name.ilike.%${q}%,username.ilike.%${q}%`);
-        }
-
-        const { data } = await req;
         if (!cancelled) setResults((data || []) as UserSearchResult[]);
       } finally {
         if (!cancelled) setSearching(false);
       }
     }, 300);
     return () => { cancelled = true; clearTimeout(handle); };
-  }, [query, open, ownerId, selectedUser, mutualIds]);
+  }, [query, open, ownerId, selectedUser]);
 
   const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(query.trim());
   const canSend = !!selectedUser; // só envia para usuário existente

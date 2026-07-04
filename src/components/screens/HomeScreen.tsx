@@ -557,9 +557,9 @@ export function HomeScreen({
                       <span className="text-[11px] font-semibold text-foreground">{item.category}</span>
                     </div>
                   )}
-                  <button onClick={e => toggleSave(item, e)} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm">
+                  <div role="button" tabIndex={0} onClick={e => toggleSave(item, e)} onKeyDown={e => e.key === 'Enter' && toggleSave(item, e)} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm cursor-pointer z-10">
                     <Icon name="favorite" size={18} filled={isFavorite(item.id)} className={isFavorite(item.id) ? 'text-florida' : ''} style={!isFavorite(item.id) ? { color: '#1E293B' } : undefined} />
-                  </button>
+                  </div>
                 </div>
                 <div className="px-4 pt-1 pb-4 flex flex-col gap-2">
                   <h3 className="font-bold text-[15px] text-foreground leading-tight">{item.title}</h3>
@@ -690,9 +690,9 @@ export function HomeScreen({
                       <span className="text-[11px] font-semibold text-foreground">{item.category}</span>
                     </div>
                   )}
-                  <button onClick={e => toggleSave(item, e)} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm">
+                  <div role="button" tabIndex={0} onClick={e => toggleSave(item, e)} onKeyDown={e => e.key === 'Enter' && toggleSave(item, e)} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm cursor-pointer z-10">
                     <Icon name="favorite" size={18} filled={isFavorite(item.id)} className={isFavorite(item.id) ? 'text-florida' : ''} style={!isFavorite(item.id) ? { color: '#1E293B' } : undefined} />
-                  </button>
+                  </div>
                 </div>
                 <div className="px-4 pt-1 pb-4 flex flex-col gap-2">
                   <h3 className="font-bold text-[15px] text-foreground leading-tight">{item.title}</h3>

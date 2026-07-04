@@ -24,6 +24,8 @@ export function ReservasScreen({ onBack, reservas: externalReservas, onReservasC
     else setInternalReservas(newVal);
   };
   const [showSheet, setShowSheet] = useState(false);
+  const [showTypeSelector, setShowTypeSelector] = useState(false);
+  const [initialTipo, setInitialTipo] = useState<'hospedagem' | 'atividade'>('hospedagem');
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState({ title: '', description: '' });
   const [editingReserva, setEditingReserva] = useState<Reserva | null>(null);
@@ -225,7 +227,7 @@ export function ReservasScreen({ onBack, reservas: externalReservas, onReservasC
       {/* Footer Button */}
       <div className="px-5 pb-8 pt-4 border-t border-border safe-bottom">
         <button
-          onClick={() => { setEditingReserva(null); setShowSheet(true); }}
+          onClick={() => { setEditingReserva(null); setShowTypeSelector(true); }}
           className="w-full py-4 rounded-2xl text-base font-semibold flex items-center justify-center gap-2"
           style={{ background: '#9DCC36', color: '#1A1C40' }}
         >
@@ -234,11 +236,47 @@ export function ReservasScreen({ onBack, reservas: externalReservas, onReservasC
         </button>
       </div>
 
+      {showTypeSelector && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-[100]" onClick={() => setShowTypeSelector(false)} />
+          <div
+            className="fixed bottom-0 left-0 right-0 z-[110] flex justify-center"
+            style={{ fontFamily: 'var(--font-family-primary)' }}
+          >
+            <div className="bg-background rounded-t-3xl w-full max-w-[430px] pb-8 animate-in slide-in-from-bottom duration-300">
+              <div className="flex justify-center py-3">
+                <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
+              </div>
+              <div className="px-6">
+                <h3 className="text-lg font-bold text-foreground mb-4">Qual tipo de reserva?</h3>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => { setInitialTipo('hospedagem'); setShowTypeSelector(false); setShowSheet(true); }}
+                    className="flex-1 flex flex-col items-center gap-2 py-4 rounded-xl border border-border bg-background transition-colors"
+                  >
+                    <Icon name="hotel" size={24} className="text-foreground" />
+                    <span className="text-sm font-medium text-foreground">Hospedagem</span>
+                  </button>
+                  <button
+                    onClick={() => { setInitialTipo('atividade'); setShowTypeSelector(false); setShowSheet(true); }}
+                    className="flex-1 flex flex-col items-center gap-2 py-4 rounded-xl border border-border bg-background transition-colors"
+                  >
+                    <TicketCheck size={24} strokeWidth={1.5} className="text-foreground" />
+                    <span className="text-sm font-medium text-foreground">Atividade</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
       <AddReservaSheet
         isOpen={showSheet}
         onClose={handleCloseSheet}
         onAdd={handleAdd}
         editingReserva={editingReserva}
+        initialTipo={initialTipo}
       />
 
       {/* Delete Confirmation Bottom Sheet */}
