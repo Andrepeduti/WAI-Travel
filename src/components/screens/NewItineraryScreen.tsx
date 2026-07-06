@@ -89,7 +89,7 @@ export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales, 
   const { itineraries: myItinerariesForLimit } = useMyItineraries();
   const FREE_PLAN_ITINERARY_LIMIT = 3;
   const ownCreatedCount = myItinerariesForLimit.filter(
-    (it) => it.userId === session?.user?.id && it.sourceDatasetId == null && !it.isPublic
+    (it) => it.userId === session?.user?.id && it.sourceDatasetId == null
   ).length;
 
   const [selectedDay, setSelectedDay] = useState(1);
@@ -620,14 +620,12 @@ export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales, 
             setSelectedActivity(null);
             setItineraryData(prev => {
               const firstDestination = prev.destinations[0] ?? 'Paris, França';
-              const [city, ...rest] = firstDestination.split(',');
-              const duplicatedFirst = `Cópia de ${city.trim()}${rest.length ? `,${rest.join(',')}` : ''}`;
+              const [city] = firstDestination.split(',');
+              const newTitle = prev.tripName ? `Cópia de ${prev.tripName}` : `Cópia de ${city.trim()}`;
 
               return {
                 ...prev,
-                destinations: prev.destinations.length > 0
-                  ? [duplicatedFirst, ...prev.destinations.slice(1)]
-                  : ['Cópia de Paris, França'],
+                tripName: newTitle,
               };
             });
             setIsOpeningDuplicate(false);

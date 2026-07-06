@@ -10,6 +10,7 @@ export interface CountryInfo {
   name: string; // Portuguese name
   continent: string; // matches visitedCountries continents
   flag: string; // emoji flag
+  aliases?: string[]; // Alternative names or common terms (e.g. "Holanda" for "Países Baixos")
 }
 
 /** Convert ISO-2 country code (e.g. "BR") to flag emoji 🇧🇷 */
@@ -176,6 +177,23 @@ export function getCountryInfo(
 }
 
 /**
+ * Common aliases used by users when searching for countries.
+ */
+const ALIASES_BY_ISO3: Record<string, string[]> = {
+  NLD: ['Holanda', 'Netherlands'],
+  GBR: ['Inglaterra', 'Escócia', 'País de Gales', 'Irlanda do Norte', 'Grã-Bretanha', 'UK', 'United Kingdom'],
+  USA: ['EUA', 'Estados Unidos da América', 'US'],
+  ARE: ['Dubai', 'Abu Dhabi', 'UAE'],
+  DEU: ['Germany'],
+  ESP: ['Spain'],
+  FRA: ['France'],
+  ITA: ['Italy'],
+  KOR: ['Coreia'],
+  PRK: ['Coreia'],
+  ZAF: ['Africa do Sul'],
+};
+
+/**
  * Full catalog of countries with a known Portuguese name.
  * Sorted alphabetically by name. Used by the "Add visited countries" search sheet.
  */
@@ -200,6 +218,7 @@ export const ALL_COUNTRIES: CountryInfo[] = Object.keys(CONTINENT_BY_ISO3)
       name: name || iso3,
       continent: CONTINENT_BY_ISO3[iso3] || 'Mundo',
       flag: iso2 ? iso2ToFlag(iso2) : '🏳️',
+      aliases: ALIASES_BY_ISO3[iso3] || [],
     } as CountryInfo;
   })
   .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));

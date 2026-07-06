@@ -54,6 +54,7 @@ export async function searchGooglePlacesAutocomplete(
     const body: any = {
       input: query,
       languageCode: 'pt-BR',
+      regionCode: 'BR',
     };
     if (includedPrimaryTypes && includedPrimaryTypes.length > 0) {
       body.includedPrimaryTypes = includedPrimaryTypes;
@@ -71,7 +72,7 @@ export async function searchGooglePlacesAutocomplete(
     if (!res.ok) throw new Error('Falha na API do Google Places');
 
     const data = await res.json();
-    return (data.suggestions || []).map((s: any) => {
+    const suggestions = (data.suggestions || []).map((s: any) => {
       const placePrediction = s.placePrediction;
       return {
         placeId: placePrediction.place,
@@ -151,7 +152,7 @@ export async function searchGooglePlacesText(query: string, city?: string): Prom
     if (!res.ok) return [];
     const data = await res.json();
     
-    return (data.places || []).map((p: any) => ({
+    const results = (data.places || []).map((p: any) => ({
       id: p.id,
       name: p.displayName?.text || '',
       address: p.formattedAddress || '',

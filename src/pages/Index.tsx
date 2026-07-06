@@ -134,11 +134,11 @@ const Index = () => {
   const [showPlanLimitSheet, setShowPlanLimitSheet] = useState(false);
   const { itineraries: myItinerariesForLimit } = useMyItineraries();
   const FREE_PLAN_ITINERARY_LIMIT = 3;
-  // Conta apenas roteiros criados pelo próprio usuário e disponíveis em "Meus roteiros".
-  // Exclui: comprados (sourceDatasetId != null), compartilhados (userId != auth user)
-  // e publicados (is_public = true, ficam na aba "Públicos").
+  // Conta apenas roteiros originais criados pelo próprio usuário.
+  // Exclui: comprados (sourceDatasetId != null) e compartilhados (userId != auth user).
+  // Não excluímos os publicados, pois eles também contam no limite do plano free.
   const ownCreatedCount = myItinerariesForLimit.filter(
-    (it) => it.userId === session?.user?.id && it.sourceDatasetId == null && !it.isPublic
+    (it) => it.userId === session?.user?.id && it.sourceDatasetId == null
   ).length;
 
   // Listen for the custom event to show the plan limit sheet (e.g. from duplicating an itinerary)

@@ -528,7 +528,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   const { itineraries: myItinerariesForLimit } = useMyItineraries();
   const FREE_PLAN_ITINERARY_LIMIT = 3;
   const ownCreatedCount = myItinerariesForLimit.filter(
-    (it) => it.userId === session?.user?.id && it.sourceDatasetId == null && !it.isPublic
+    (it) => it.userId === session?.user?.id && it.sourceDatasetId == null
   ).length;
 
   const [itineraryData, setItineraryData] = useState(data);
@@ -2829,7 +2829,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                         className="flex items-center gap-1 text-[13px] font-semibold text-[#7C3AED] active:opacity-70 transition-opacity"
                       >
                         <Icon name="auto_awesome" size={14} className="text-[#7C3AED]" />
-                        Preencher com IA
+                        <span>Preencher com IA</span>
                       </button>
                     )}
                     {dayActs.length >= 2 && (
@@ -2842,12 +2842,12 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                         {optimizingDays.has(dayItem.day) ? (
                           <>
                             <Icon name="autorenew" size={14} className="animate-spin text-[#2563EB]" />
-                            Otimizando…
+                            <span>Otimizando…</span>
                           </>
                         ) : (
                           <>
                             <Icon name="route" size={14} className="text-[#2563EB]" />
-                            Otimizar rota
+                            <span>Otimizar rota</span>
                           </>
                         )}
                       </button>
@@ -3332,14 +3332,12 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
           if (isUuidId && typeof itineraryId === 'string') {
             try {
               const firstDestination = itineraryData.destinations[0] ?? 'Paris, França';
-              const [city, ...rest] = firstDestination.split(',');
-              const duplicatedFirst = `Cópia de ${city.trim()}${rest.length ? `,${rest.join(',')}` : ''}`;
-              
-              const newTitle = itineraryData.tripName ? `Cópia de ${itineraryData.tripName}` : duplicatedFirst;
+              const [city] = firstDestination.split(',');
+              const newTitle = itineraryData.tripName ? `Cópia de ${itineraryData.tripName}` : `Cópia de ${city.trim()}`;
               
               const newItinerary = await createItinerary({
                 title: newTitle,
-                destinations: itineraryData.destinations.length > 0 ? [duplicatedFirst, ...itineraryData.destinations.slice(1)] : ['Cópia de Paris, França'],
+                destinations: itineraryData.destinations.length > 0 ? [...itineraryData.destinations] : ['Paris, França'],
                 startDate: itineraryData.startDate ? itineraryData.startDate.toISOString() : null,
                 endDate: itineraryData.endDate ? itineraryData.endDate.toISOString() : null,
               });
@@ -3374,14 +3372,12 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
             setSelectedActivity(null);
             setItineraryData((prev) => {
               const firstDestination = prev.destinations[0] ?? 'Paris, França';
-              const [city, ...rest] = firstDestination.split(',');
-              const duplicatedFirst = `Cópia de ${city.trim()}${rest.length ? `,${rest.join(',')}` : ''}`;
+              const [city] = firstDestination.split(',');
+              const newTitle = prev.tripName ? `Cópia de ${prev.tripName}` : `Cópia de ${city.trim()}`;
 
               return {
                 ...prev,
-                destinations: prev.destinations.length > 0 ?
-                [duplicatedFirst, ...prev.destinations.slice(1)] :
-                ['Cópia de Paris, França']
+                tripName: newTitle,
               };
             });
             setIsOpeningDuplicate(false);

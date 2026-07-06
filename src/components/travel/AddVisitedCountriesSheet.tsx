@@ -43,7 +43,10 @@ export function AddVisitedCountriesSheet({
     const q = normalize(query.trim());
     if (!q) return ALL_COUNTRIES;
     return ALL_COUNTRIES.filter(
-      c => normalize(c.name).includes(q) || normalize(c.continent).includes(q),
+      c => 
+        normalize(c.name).includes(q) || 
+        normalize(c.continent).includes(q) ||
+        (c.aliases && c.aliases.some(alias => normalize(alias).includes(q)))
     );
   }, [query]);
 
@@ -144,6 +147,7 @@ export function AddVisitedCountriesSheet({
                           style={{ fontSize: 14, fontWeight: 600 }}
                         >
                           {country.name}
+                          {query.trim() && !normalize(country.name).includes(normalize(query.trim())) && country.aliases?.some(a => normalize(a).includes(normalize(query.trim()))) ? ` (${country.aliases.find(a => normalize(a).includes(normalize(query.trim())))})` : ''}
                         </p>
                         <p
                           className="text-muted-foreground truncate"
