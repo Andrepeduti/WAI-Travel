@@ -2839,17 +2839,14 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                         onClick={() => setConfirmOptimizeDay(dayItem.day)}
                         className="flex items-center gap-1 text-[13px] font-semibold text-[#2563EB] active:opacity-70 transition-opacity disabled:opacity-60"
                       >
-                        {optimizingDays.has(dayItem.day) ? (
-                          <>
-                            <Icon name="autorenew" size={14} className="animate-spin text-[#2563EB]" />
-                            <span>Otimizando…</span>
-                          </>
-                        ) : (
-                          <>
-                            <Icon name="route" size={14} className="text-[#2563EB]" />
-                            <span>Otimizar rota</span>
-                          </>
-                        )}
+                        <Icon 
+                          name={optimizingDays.has(dayItem.day) ? "autorenew" : "route"} 
+                          size={14} 
+                          className={cn("text-[#2563EB]", optimizingDays.has(dayItem.day) && "animate-spin")} 
+                        />
+                        <span key={optimizingDays.has(dayItem.day) ? 'optimizing' : 'idle'}>
+                          {optimizingDays.has(dayItem.day) ? 'Otimizando rota...' : 'Otimizar rota'}
+                        </span>
                       </button>
                     )}
                   </div>
