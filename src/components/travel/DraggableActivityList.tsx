@@ -143,7 +143,7 @@ export function DraggableActivityList({
           const transport = transports[index];
 
           return (
-            <React.Fragment key={activity.id}>
+            <React.Fragment key={`${activity.id}-${index}`}>
               {/* Activity row: timeline left + card right */}
               <div className="flex gap-3">
                 {/* Timeline left column - times only */}

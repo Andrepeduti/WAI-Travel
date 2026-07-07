@@ -2842,7 +2842,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                         <Icon 
                           name={optimizingDays.has(dayItem.day) ? "autorenew" : "route"} 
                           size={14} 
-                          className={cn("text-[#2563EB]", optimizingDays.has(dayItem.day) && "animate-spin")} 
+                          className={`text-[#2563EB] ${optimizingDays.has(dayItem.day) ? 'animate-spin' : ''}`}
                         />
                         <span key={optimizingDays.has(dayItem.day) ? 'optimizing' : 'idle'}>
                           {optimizingDays.has(dayItem.day) ? 'Otimizando rota...' : 'Otimizar rota'}

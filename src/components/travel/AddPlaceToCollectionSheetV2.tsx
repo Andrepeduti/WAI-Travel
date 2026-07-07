@@ -85,20 +85,9 @@ export function AddPlaceToCollectionSheetV2({
       const places = await fetchPlacesForCity(cityName);
       if (places.length > 0) {
         setApiPlaces(prev => ({ ...prev, [key]: places }));
-      } else {
-        setFetchedCities(prev => {
-          const next = new Set(prev);
-          next.delete(key);
-          return next;
-        });
       }
     } catch (e) {
       console.error('Failed to fetch places for', cityName, e);
-      setFetchedCities(prev => {
-        const next = new Set(prev);
-        next.delete(key);
-        return next;
-      });
     } finally {
       setLoadingApi(false);
     }
