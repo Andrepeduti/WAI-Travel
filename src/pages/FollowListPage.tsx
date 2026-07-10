@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { FollowListScreen } from '@/components/screens/FollowListScreen';
+import { BackButton } from '@/components/ui/BackButton';
 import { getProfileByUsername, getProfileByUserId } from '@/lib/profilesApi';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -13,10 +14,18 @@ const FollowListPage = ({ initialTab }: FollowListPageProps) => {
   const location = useLocation();
   const { user } = useAuth();
   const params = useParams<{ username?: string }>();
-  const passed = (location.state as { friend?: { userId?: string; username?: string; name?: string } } | null)?.friend;
+  const passed = (location.state as { friend?: { userId?: string; username?: string; name?: string; followers?: string | number; following?: number } } | null)?.friend;
+
+  const formatLabel = (val: string) => {
+    if (!val || val === 'Perfil' || val.includes(' ')) return val;
+    return val.startsWith('@') ? val : `@${val}`;
+  };
 
   const [resolved, setResolved] = useState<{ userId: string; label: string } | null>(() => {
-    if (passed?.userId) return { userId: passed.userId, label: passed.username || passed.name || 'Perfil' };
+    if (passed?.userId) {
+      const label = passed.username ? formatLabel(passed.username) : (passed.name || 'Perfil');
+      return { userId: passed.userId, label };
+    }
     return null;
   });
   const [loading, setLoading] = useState(!resolved);
@@ -48,9 +57,17 @@ const FollowListPage = ({ initialTab }: FollowListPageProps) => {
 
   if (loading && !resolved) {
     return (
-      <div className="min-h-screen bg-muted flex items-center justify-center">
-        <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl flex items-center justify-center">
-          <span className="text-sm text-muted-foreground">Carregando…</span>
+      <div className="min-h-screen bg-muted flex items-start justify-center">
+        <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl flex flex-col" style={{ minHeight: '100dvh' }}>
+          <div className="sticky z-20 bg-background border-b border-border px-4 flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
+            <BackButton onClick={() => navigate(-1)} />
+            <div className="flex-1 min-w-0">
+              <p className="text-foreground truncate" style={{ fontSize: 15, fontWeight: 700 }}></p>
+            </div>
+          </div>
+          <div className="flex-1 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
         </div>
       </div>
     );
@@ -72,6 +89,8 @@ const FollowListPage = ({ initialTab }: FollowListPageProps) => {
       profileUserId={resolved.userId}
       profileLabel={resolved.label}
       initialTab={initialTab}
+      initialFollowersCount={passed?.followers}
+      initialFollowingCount={passed?.following}
       onBack={() => navigate(-1)}
     />
   );

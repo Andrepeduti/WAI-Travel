@@ -4,6 +4,7 @@ import {
   GENERIC_TRAVEL_PLACEHOLDER,
   type CoverImageResult,
 } from '@/lib/coverImageResolver';
+import { searchGooglePlacesText } from '@/lib/googlePlacesApi';
 
 const wikiCache = new Map<string, string>();
 
@@ -72,6 +73,19 @@ export function useDestinationCover(destinations: string[]): CoverImageResult {
       ].filter(Boolean) as string[];
 
       for (const candidate of candidates) {
+        // Tenta Google Places primeiro para fotos mais turísticas e bonitas
+        try {
+          const places = await searchGooglePlacesText(`${candidate} tourist destination`);
+          if (places && places.length > 0 && places[0].photoUrl) {
+            if (ctrl.signal.aborted) return;
+            setCover({ url: places[0].photoUrl, isAutoSelected: true });
+            return;
+          }
+        } catch (err) {
+          // Fallback silencioso
+        }
+
+        // Fallback para Wikipedia se Google Places falhar
         const img = await fetchWikipediaImage(candidate, ctrl.signal);
         if (ctrl.signal.aborted) return;
         if (img) {

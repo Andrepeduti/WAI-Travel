@@ -508,7 +508,8 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
           </div>
         </div>
 
-        {/* Verificação de identidade */}
+        {/* TODO: Temporariamente oculto — reativar quando fluxo de verificação estiver pronto */}
+        {false && (
         <div className="mt-8">
           <h2
             className="text-foreground mb-3"
@@ -577,6 +578,7 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
             </div>
           </button>
         </div>
+        )}
 
       </div>
 

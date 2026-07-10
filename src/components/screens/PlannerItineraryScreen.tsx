@@ -343,27 +343,31 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
 
 /** Pick best transport mode & estimate duration based on straight-line distance */
 function smartTransport(distanceKm: number): TransportBetween {
+  if (distanceKm < 0.01) {
+    return { type: 'walk', duration: '0 min', distance: '0 m' };
+  }
   // Apply a 1.3x factor to approximate real road distance from straight-line
   const roadKm = distanceKm * 1.3;
+  const distStr = roadKm < 1 ? `${Math.round(roadKm * 1000)} m` : `${roadKm.toFixed(1)} km`;
 
   if (roadKm <= 1.2) {
     // Walk: avg 5 km/h
-    const mins = Math.max(5, Math.round((roadKm / 5) * 60));
-    return { type: 'walk', duration: `${mins} min` };
+    const mins = Math.max(3, Math.round((roadKm / 5) * 60));
+    return { type: 'walk', duration: `${mins} min`, distance: distStr };
   }
   if (roadKm <= 5) {
     // Bus/Tram: avg 18 km/h (urban, with stops)
     const mins = Math.max(8, Math.round((roadKm / 18) * 60));
-    return { type: 'bus', duration: `${mins} min` };
+    return { type: 'bus', duration: `${mins} min`, distance: distStr };
   }
   if (roadKm <= 15) {
     // Metro: avg 30 km/h
     const mins = Math.max(10, Math.round((roadKm / 30) * 60));
-    return { type: 'metro', duration: `${mins} min` };
+    return { type: 'metro', duration: `${mins} min`, distance: distStr };
   }
   // Car/Taxi: avg 40 km/h (urban)
   const mins = Math.max(10, Math.round((roadKm / 40) * 60));
-  return { type: 'car', duration: `${mins} min` };
+  return { type: 'car', duration: `${mins} min`, distance: distStr };
 }
 
 function getTransportIcon(type: TransportBetween['type']) {
@@ -389,12 +393,12 @@ async function getRouteInfo(
     const { data, error } = await supabase.functions.invoke('get-route', {
       body: { origin: [lng1, lat1], destination: [lng2, lat2] },
     });
-    if (error || !data?.duration_min) throw new Error(error?.message || 'no data');
+    if (error || data?.duration_min == null) throw new Error(error?.message || 'no data');
 
     const result: TransportBetween = {
       type: (data.transport_type === 'walk' ? 'walk' : data.transport_type === 'bus' ? 'bus' : data.transport_type === 'metro' ? 'metro' : 'car') as TransportBetween['type'],
       duration: `${data.duration_min} min`,
-      distance: data.distance_km ? `${data.distance_km} km` : undefined,
+      distance: data.distance_km != null ? `${data.distance_km} km` : (Number(data.duration_min) === 0 ? '0 m' : undefined),
     };
     routeCache.set(key, result);
     return result;
@@ -1419,14 +1423,24 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
 
     const missingIndices: number[] = [];
     for (let i = 0; i < needed; i++) {
-      if (!transports[i] || transports[i].duration === '0 min') {
+      const isPlaceholder = !transports[i] || (transports[i].duration === '0 min' && transports[i].distance === undefined);
+      if (isPlaceholder) {
         const from = activities[i];
         const to = activities[i + 1];
         if (from?.lat && from?.lng && to?.lat && to?.lng) {
           missingIndices.push(i);
+        } else {
+          console.log('[DEBUG] Transport', i, 'isPlaceholder but missing lat/lng. from:', from, 'to:', to);
         }
+      } else {
+        // console.log('[DEBUG] Transport', i, 'is NOT placeholder.', transports[i]);
       }
     }
+    
+    if (missingIndices.length > 0) {
+      console.log('[DEBUG] INFINITE LOOP TRIGGERED! missingIndices:', missingIndices, 'Transports:', transports.map(t => t ? `${t.duration} - ${t.distance}` : 'null'));
+    }
+
     if (missingIndices.length === 0) return;
 
     // Async fill

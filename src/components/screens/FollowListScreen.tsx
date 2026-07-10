@@ -26,6 +26,8 @@ interface FollowListScreenProps {
   profileLabel: string;
   /** Aba inicial. */
   initialTab: Tab;
+  initialFollowersCount?: string | number;
+  initialFollowingCount?: string | number;
   onBack: () => void;
 }
 
@@ -40,7 +42,7 @@ type ModerateSheet =
   | { kind: 'confirm-report'; entry: FollowListEntry }
   | null;
 
-export function FollowListScreen({ profileUserId, profileLabel, initialTab, onBack }: FollowListScreenProps) {
+export function FollowListScreen({ profileUserId, profileLabel, initialTab, initialFollowersCount, initialFollowingCount, onBack }: FollowListScreenProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const myId = user?.id || null;
@@ -234,11 +236,24 @@ export function FollowListScreen({ profileUserId, profileLabel, initialTab, onBa
           </div>
         </div>
 
-        {/* Tabs */}
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        ) : (
+          <>
+            {/* Tabs */}
         <div className="flex border-b border-border bg-background sticky top-[57px] z-10">
           {(['followers', 'following'] as Tab[]).map(t => {
             const active = tab === t;
-            const count = t === 'followers' ? followers.length : following.length;
+            let count: string | number = '-';
+            if (!loading) {
+              count = t === 'followers' ? followers.length : following.length;
+            } else if (t === 'followers' && initialFollowersCount !== undefined) {
+              count = initialFollowersCount;
+            } else if (t === 'following' && initialFollowingCount !== undefined) {
+              count = initialFollowingCount;
+            }
             const label = t === 'followers' ? 'Seguidores' : 'Seguindo';
             return (
               <button
@@ -272,9 +287,7 @@ export function FollowListScreen({ profileUserId, profileLabel, initialTab, onBa
 
         {/* List */}
         <div className="flex-1 px-2 pb-8">
-          {loading ? (
-            <div className="px-4 py-10 text-center text-sm text-muted-foreground">Carregando…</div>
-          ) : filtered.length === 0 ? (
+          {filtered.length === 0 ? (
             <div className="px-4 py-10 flex flex-col items-center gap-2">
               <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: '#F2F2F2' }}>
                 <Icon name="group" size={22} className="text-muted-foreground" />
@@ -330,6 +343,8 @@ export function FollowListScreen({ profileUserId, profileLabel, initialTab, onBa
             </ul>
           )}
         </div>
+        </>
+        )}
 
         {/* Bottom sheet: ações de follow (remover seguidor / deixar de seguir) */}
         {followSheet && (

@@ -20,7 +20,6 @@ export function LoginSecurityScreen({ onBack }: LoginSecurityScreenProps) {
   const [deleteStep, setDeleteStep] = useState<'choose' | 'confirm-delete'>('choose');
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
   const closeDeleteSheet = () => { setShowDeleteSheet(false); setDeleteStep('choose'); setDeleteConfirmed(false); };
-  const [twoFactor, setTwoFactor] = useState(false);
   const [passwords, setPasswords] = useState({ current: '', newPwd: '', confirm: '' });
   const [blocked, setBlocked] = useState(blockedUsers);
 
@@ -83,19 +82,6 @@ export function LoginSecurityScreen({ onBack }: LoginSecurityScreenProps) {
 
             {/* Divider */}
             <div className="h-px mb-6" style={{ background: 'hsl(var(--divider))' }} />
-
-            {/* 2FA */}
-            <h2 className="text-foreground mb-3" style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-weight-bold)' }}>Autenticação em dois fatores</h2>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-foreground" style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)' }}>Ativar 2FA</span>
-              <Switch checked={twoFactor} onCheckedChange={setTwoFactor} />
-            </div>
-            <p className="text-muted-foreground mb-8" style={{ fontSize: 'var(--text-xs)' }}>
-              Adicione uma camada extra de segurança à sua conta usando um código de verificação.
-            </p>
-
-            {/* Divider */}
-            <div className="h-px mb-3" style={{ background: 'hsl(var(--divider))' }} />
 
             {/* Blocked users */}
             <button

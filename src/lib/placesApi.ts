@@ -13,14 +13,14 @@ import { searchGooglePlacesAutocomplete, getGooglePlaceDetails } from '@/lib/goo
 const osmCategoryMap: Record<string, { category: string; categoryColor: string; image: string }> = {
   // Tourism
   museum:          { category: 'Museu',            categoryColor: '#6366F1', image: 'https://images.unsplash.com/photo-1554907984-15263bfd63bd?w=300' },
-  attraction:      { category: 'Ponto Turístico',  categoryColor: '#10B981', image: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=300' },
+  attraction:      { category: 'Ponto Turístico',  categoryColor: '#10B981', image: 'https://images.unsplash.com/photo-1503220317375-aaad61436b1b?w=300' },
   viewpoint:       { category: 'Mirante',           categoryColor: '#0EA5E9', image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=300' },
   gallery:         { category: 'Galeria',           categoryColor: '#6366F1', image: 'https://images.unsplash.com/photo-1531243269054-5ebf6f34081e?w=300' },
   zoo:             { category: 'Zoológico',         categoryColor: '#22C55E', image: 'https://images.unsplash.com/photo-1534567153574-2b12153a87f0?w=300' },
   aquarium:        { category: 'Aquário',           categoryColor: '#0EA5E9', image: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=300' },
   artwork:         { category: 'Arte',              categoryColor: '#8B5CF6', image: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=300' },
   theme_park:      { category: 'Parque Temático',   categoryColor: '#EC4899', image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=300' },
-  information:     { category: 'Informação',        categoryColor: '#6B7280', image: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=300' },
+  information:     { category: 'Informação',        categoryColor: '#6B7280', image: 'https://images.unsplash.com/photo-1503220317375-aaad61436b1b?w=300' },
   // Amenity
   restaurant:      { category: 'Restaurante',       categoryColor: '#F59E0B', image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=300' },
   cafe:            { category: 'Cafeteria',          categoryColor: '#92400E', image: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=300' },
@@ -63,7 +63,7 @@ const osmCategoryMap: Record<string, { category: string; categoryColor: string; 
   pedestrian:      { category: 'Calçadão',           categoryColor: '#10B981', image: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=300' },
 };
 
-const defaultCategory = { category: 'Local', categoryColor: '#6B7280', image: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=300' };
+const defaultCategory = { category: 'Local', categoryColor: '#6B7280', image: 'https://images.unsplash.com/photo-1503220317375-aaad61436b1b?w=300' };
 
 function getOsmCategory(tags: Record<string, string>) {
   if (tags.tourism && osmCategoryMap[tags.tourism]) return osmCategoryMap[tags.tourism];
@@ -605,24 +605,101 @@ function interleaveByCategory(places: CityPlace[]): CityPlace[] {
 }
 
 export function mergePlaces(staticPlaces: CityPlace[], apiPlaces: CityPlace[]): CityPlace[] {
-  const staticNames = new Set(staticPlaces.map(p => p.name.toLowerCase().trim()));
-  const merged = [...staticPlaces];
+  const merged: CityPlace[] = [];
+  const allPlaces = [...staticPlaces, ...apiPlaces];
+  
+  const isGoogleImage = (url: string) => url.includes('googleapis.com');
+  const normalize = (name: string) => name.toLowerCase().trim();
 
-  for (const apiPlace of apiPlaces) {
-    const name = apiPlace.name.toLowerCase().trim();
-    // Skip if we already have a similar-name static place
-    if (staticNames.has(name)) continue;
-    // Also check partial match (e.g. "Museu do Louvre" vs "Louvre")
+  for (const place of allPlaces) {
+    const name = normalize(place.name);
     let isDuplicate = false;
-    for (const sn of staticNames) {
-      if (sn.includes(name) || name.includes(sn)) {
+
+    for (const existing of merged) {
+      const existingName = normalize(existing.name);
+
+      // 1. Same exact name
+      if (existingName === name) {
         isDuplicate = true;
         break;
       }
+
+      // 2. Substring match for sufficiently long names
+      if (existingName.length >= 6 && name.length >= 6 && Math.abs(existingName.length - name.length) <= 5) {
+        if (existingName.includes(name) || name.includes(existingName)) {
+          isDuplicate = true;
+          break;
+        }
+      }
+
+      // 3. Same Google Places photo URL
+      if (place.image && isGoogleImage(place.image) && place.image === existing.image) {
+        isDuplicate = true;
+        break;
+      }
+      
+      // 4. Geographic + Fuzzy name match
+      if (place.lat && place.lng && existing.lat && existing.lng) {
+        const distSq = Math.pow(place.lat - existing.lat, 2) + Math.pow(place.lng - existing.lng, 2);
+        
+        // If distance is practically zero (exact same coordinates from Google Places), it's a duplicate
+        if (distSq < 1e-10) {
+          isDuplicate = true;
+          break;
+        }
+
+        // If distance is within ~110m (0.000001 distSq)
+        if (distSq < 0.000001) {
+          const levenshtein = (a: string, b: string) => {
+            const matrix = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
+            for (let i = 0; i <= a.length; i++) matrix[i][0] = i;
+            for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
+            for (let i = 1; i <= a.length; i++) {
+              for (let j = 1; j <= b.length; j++) {
+                if (a[i - 1] === b[j - 1]) matrix[i][j] = matrix[i - 1][j - 1];
+                else matrix[i][j] = Math.min(matrix[i - 1][j - 1], matrix[i][j - 1], matrix[i - 1][j]) + 1;
+              }
+            }
+            return matrix[a.length][b.length];
+          };
+
+          const name1 = name.replace(/[^a-z0-9\s]/g, '');
+          const name2 = existingName.replace(/[^a-z0-9\s]/g, '');
+          const maxLen = Math.max(name1.replace(/\s/g,'').length, name2.replace(/\s/g,'').length);
+          const dist = levenshtein(name1.replace(/\s/g,''), name2.replace(/\s/g,''));
+          
+          // If the names as a whole are at least 50% similar (ignoring spaces), it's a duplicate
+          if (maxLen > 0 && dist / maxLen <= 0.5) {
+            isDuplicate = true;
+            break;
+          }
+          
+          // Fallback to fuzzy word sharing if they are very close
+          const words1 = name1.split(/\s+/).filter(w => w.length >= 4);
+          const words2 = name2.split(/\s+/).filter(w => w.length >= 4);
+          
+          let hasFuzzyMatch = false;
+          for (const w1 of words1) {
+            for (const w2 of words2) {
+              const maxL = Math.max(w1.length, w2.length);
+              if (maxL > 0 && levenshtein(w1, w2) / maxL <= 0.35) {
+                hasFuzzyMatch = true;
+                break;
+              }
+            }
+            if (hasFuzzyMatch) break;
+          }
+          
+          if (hasFuzzyMatch) {
+            isDuplicate = true;
+            break;
+          }
+        }
+      }
     }
+
     if (!isDuplicate) {
-      merged.push(apiPlace);
-      staticNames.add(name);
+      merged.push(place);
     }
   }
 
@@ -634,11 +711,11 @@ export function mergePlaces(staticPlaces: CityPlace[], apiPlaces: CityPlace[]): 
 import { searchGooglePlacesText } from './googlePlacesApi';
 
 const googleCategoryMap: Record<string, { category: string; categoryColor: string; image: string }> = {
-  tourist_attraction: { category: 'Ponto Turístico', categoryColor: '#10B981', image: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=300' },
+  tourist_attraction: { category: 'Ponto Turístico', categoryColor: '#10B981', image: 'https://images.unsplash.com/photo-1503220317375-aaad61436b1b?w=300' },
   museum:             { category: 'Museu',       categoryColor: '#10B981', image: 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=300' },
   park:               { category: 'Parque',           categoryColor: '#22C55E', image: 'https://images.unsplash.com/photo-1534430480872-3498386e7856?w=300' },
   restaurant:         { category: 'Restaurante',            categoryColor: '#F59E0B', image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=300' },
-  default:            { category: 'Local',           categoryColor: '#6B7280', image: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=300' },
+  default:            { category: 'Local',           categoryColor: '#6B7280', image: 'https://images.unsplash.com/photo-1503220317375-aaad61436b1b?w=300' },
 };
 
 const googleSearchCache = new Map<string, CityPlace[]>();

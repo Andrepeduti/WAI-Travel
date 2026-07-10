@@ -262,31 +262,8 @@ export function EditPublishSheet({
               </div>
             </button>
 
-            {/* 2) Editar itinerário */}
-            {onEditItinerary && (
-              <button
-                onClick={onEditItinerary}
-                className="mt-4 w-full text-left rounded-2xl bg-card p-4 flex items-center gap-3.5 active:scale-[0.99] transition-transform shadow-sm"
-              >
-                <div className="w-10 h-10 rounded-full bg-[#F2F2F2] flex items-center justify-center shrink-0">
-                  <Map size={18} className="text-foreground" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[14px] font-semibold text-foreground">Editar itinerário</p>
-                  <p className="text-[12px] text-muted-foreground truncate">
-                    {days > 0 ? `${days} ${days === 1 ? 'dia' : 'dias'}` : 'Sem datas'}
-                    {activitiesCount !== null && (
-                      <>
-                        {' · '}
-                        {activitiesCount} {activitiesCount === 1 ? 'atividade' : 'atividades'}
-                        {avgPerDay && days > 1 ? ` · ~${avgPerDay}/dia` : ''}
-                      </>
-                    )}
-                  </p>
-                </div>
-                <ChevronRight size={18} className="text-muted-foreground shrink-0" />
-              </button>
-            )}
+
+
 
             {/* 3) Informações da publicação + Status */}
             <div className="mt-4 rounded-2xl bg-card divide-y divide-border/50 overflow-hidden shadow-sm">

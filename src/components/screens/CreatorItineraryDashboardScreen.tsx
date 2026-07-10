@@ -335,18 +335,6 @@ export function CreatorItineraryDashboardScreen({
               value={formatBRL(totals.net)}
               tint="#1A1C40"
             />
-            <KpiCard
-              icon="trending_up"
-              label="Receita bruta"
-              value={formatBRL(totals.gross)}
-              tint="#3B82F6"
-            />
-            <KpiCard
-              icon="percent"
-              label="Taxa (10%)"
-              value={formatBRL(totals.fee)}
-              tint="#DA501F"
-            />
           </div>
         </div>
 

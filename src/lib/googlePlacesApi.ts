@@ -23,6 +23,7 @@ export interface GooglePlaceResult {
   lat: number;
   lng: number;
   primaryType: string;
+  photoUrl?: string;
 }
 
 function getApiKey(): string {
@@ -98,7 +99,8 @@ export async function getGooglePlaceDetails(placeId: string): Promise<GooglePlac
   if (!apiKey || !placeId) return null;
 
   try {
-    const res = await fetch(`https://places.googleapis.com/v1/places/${placeId}?languageCode=pt-BR`, {
+    const cleanPlaceId = placeId.split('/').pop() || placeId;
+    const res = await fetch(`https://places.googleapis.com/v1/places/${cleanPlaceId}?languageCode=pt-BR`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -141,7 +143,7 @@ export async function searchGooglePlacesText(query: string, city?: string): Prom
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': apiKey,
-        'X-Goog-FieldMask': 'places.id,places.displayName,places.location,places.formattedAddress,places.primaryType',
+        'X-Goog-FieldMask': 'places.id,places.displayName,places.location,places.formattedAddress,places.primaryType,places.photos',
       },
       body: JSON.stringify({
         textQuery: fullQuery,
@@ -152,14 +154,21 @@ export async function searchGooglePlacesText(query: string, city?: string): Prom
     if (!res.ok) return [];
     const data = await res.json();
     
-    const results = (data.places || []).map((p: any) => ({
-      id: p.id,
-      name: p.displayName?.text || '',
-      address: p.formattedAddress || '',
-      lat: p.location?.latitude || 0,
-      lng: p.location?.longitude || 0,
-      primaryType: p.primaryType || '',
-    }));
+    const results = (data.places || []).map((p: any) => {
+      let photoUrl: string | undefined;
+      if (p.photos && p.photos.length > 0) {
+        photoUrl = `https://places.googleapis.com/v1/${p.photos[0].name}/media?maxHeightPx=600&maxWidthPx=600&key=${apiKey}`;
+      }
+      return {
+        id: p.id,
+        name: p.displayName?.text || '',
+        address: p.formattedAddress || '',
+        lat: p.location?.latitude || 0,
+        lng: p.location?.longitude || 0,
+        primaryType: p.primaryType || '',
+        photoUrl,
+      };
+    });
     
     textSearchCache.set(cacheKey, results);
     return results;

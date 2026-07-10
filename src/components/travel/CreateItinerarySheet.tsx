@@ -100,7 +100,29 @@ export function CreateItinerarySheet({ isOpen, onClose, onSubmit, initialDestina
   const [isSearchingFriends, setIsSearchingFriends] = useState(false);
   const [showFriendSuggestions, setShowFriendSuggestions] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loadingTextIndex, setLoadingTextIndex] = useState(0);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  
+  const loadingPhrases = [
+    'Criando roteiro...',
+    'Buscando melhores locais...',
+    'Organizando os dias...',
+    'Preparando sugestões de IA...',
+    'Quase pronto...'
+  ];
+
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    if (isSubmitting) {
+      setLoadingTextIndex(0);
+      interval = setInterval(() => {
+        setLoadingTextIndex((prev) => (prev + 1) % loadingPhrases.length);
+      }, 5000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isSubmitting]);
   
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
@@ -633,7 +655,7 @@ export function CreateItinerarySheet({ isOpen, onClose, onSubmit, initialDestina
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
-                  Criando...
+                  {loadingPhrases[loadingTextIndex]}
                 </>
               ) : (
                 'Criar Roteiro'

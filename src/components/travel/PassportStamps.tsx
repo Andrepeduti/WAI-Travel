@@ -173,7 +173,7 @@ export function PassportStamps({ countries, onCountryClick }: PassportStampsProp
         <div className="overflow-hidden rounded-b-xl">
           <div style={getPageStyle()}>
             {/* Stamps grid */}
-            <div className="px-4 pb-5 pt-2" style={{ aspectRatio: '1', overflow: 'hidden' }}>
+            <div className="px-4 pb-5 pt-2" style={{ overflow: 'hidden' }}>
               <div className="grid grid-cols-3 gap-2.5">
                 {pageCountries.map((country, index) => {
                   const globalIndex = displayPage * STAMPS_PER_PAGE + index;

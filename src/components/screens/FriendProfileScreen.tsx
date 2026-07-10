@@ -35,6 +35,7 @@ import { blockProfile, followProfile, getProfileSocialState, reportProfile, unbl
 import { ReportSheet } from '@/components/social/ReportSheet';
 import { supabase } from '@/integrations/supabase/client';
 import { getPublicItinerariesByUserId } from '@/lib/profilesApi';
+import { searchGooglePlacesText } from '@/lib/googlePlacesApi';
 import { ALL_COUNTRIES } from '@/data/countriesCatalog';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -604,11 +605,18 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
     let placeImage = resolveCoverImage([destination]).url; // fallback
     
     try {
-      const { data, error } = await supabase.functions.invoke('google-image-search', {
-        body: { query: `turismo ${destination} landmark travel` }
-      });
-      if (data?.image && !error) {
-        placeImage = data.image;
+      // Usa Google Places diretamente para buscar a melhor foto do lugar escolhido
+      const places = await searchGooglePlacesText(`${destination} tourist destination`);
+      if (places && places.length > 0 && places[0].photoUrl) {
+        placeImage = places[0].photoUrl;
+      } else {
+        // Fallback para a function caso o Places não retorne nada (raro)
+        const { data, error } = await supabase.functions.invoke('google-image-search', {
+          body: { query: `turismo ${destination} landmark travel` }
+        });
+        if (data?.image && !error) {
+          placeImage = data.image;
+        }
       }
     } catch (e) {
       console.error('Error fetching image:', e);
@@ -1089,7 +1097,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
                   type="button"
                   onClick={() => {
                     const handle = friend.username?.replace(/^@/, '');
-                    if (isSelf) navigate('/me/seguindo');
+                    if (isSelf) navigate('/me/seguindo', { state: { friend } });
                     else if (handle) navigate(`/u/${handle}/seguindo`, { state: { friend } });
                   }}
                   className="flex items-center gap-1 active:opacity-70"
@@ -1101,7 +1109,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
                   type="button"
                   onClick={() => {
                     const handle = friend.username?.replace(/^@/, '');
-                    if (isSelf) navigate('/me/seguidores');
+                    if (isSelf) navigate('/me/seguidores', { state: { friend } });
                     else if (handle) navigate(`/u/${handle}/seguidores`, { state: { friend } });
                   }}
                   className="flex items-center gap-1 ml-2 active:opacity-70"
