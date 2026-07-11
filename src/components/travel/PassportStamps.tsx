@@ -118,6 +118,10 @@ export function PassportStamps({ countries, onCountryClick }: PassportStampsProp
         style={{
           background: 'linear-gradient(170deg, hsl(32 22% 93%) 0%, hsl(28 18% 87%) 50%, hsl(25 15% 83%) 100%)',
           boxShadow: '0 2px 8px hsla(30, 15%, 30%, 0.12), 0 8px 24px hsla(30, 10%, 20%, 0.08), inset 0 1px 0 hsla(40, 30%, 95%, 0.6)',
+          overflow: 'hidden',
+          touchAction: 'pan-x',
+          overscrollBehavior: 'none',
+          WebkitOverflowScrolling: 'auto' as any,
         }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -170,10 +174,10 @@ export function PassportStamps({ countries, onCountryClick }: PassportStampsProp
         </div>
 
         {/* Flippable page content */}
-        <div className="overflow-hidden rounded-b-xl">
+        <div className="overflow-hidden rounded-b-xl" style={{ touchAction: 'pan-x', overscrollBehavior: 'none' }}>
           <div style={getPageStyle()}>
             {/* Stamps grid */}
-            <div className="px-4 pb-5 pt-2" style={{ overflow: 'hidden' }}>
+            <div className="px-4 pb-5 pt-2" style={{ overflow: 'hidden', touchAction: 'manipulation' }}>
               <div className="grid grid-cols-3 gap-2.5">
                 {pageCountries.map((country, index) => {
                   const globalIndex = displayPage * STAMPS_PER_PAGE + index;
