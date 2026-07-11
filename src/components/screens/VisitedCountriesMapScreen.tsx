@@ -107,6 +107,7 @@ export function VisitedCountriesMapScreen({
 }: VisitedCountriesMapScreenProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const mapReadyRef = useRef(false);
   const markersRef = useRef<L.Marker[]>([]);
   const geoLayerRef = useRef<L.GeoJSON | null>(null);
   const [region, setRegion] = useState<Region>('Mundo');
@@ -132,14 +133,17 @@ export function VisitedCountriesMapScreen({
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
-    const map = L.map(mapContainerRef.current, {
+    const container = mapContainerRef.current;
+    const worldBounds = L.latLngBounds([-85, -180], [85, 180]);
+
+    const map = L.map(container, {
       center: [20, 0],
-      zoom: 2,
-      minZoom: 2,
+      zoom: 1,
+      minZoom: 1,
       zoomControl: false,
       attributionControl: false,
       worldCopyJump: true,
-      maxBounds: L.latLngBounds([-85, -180], [85, 180]),
+      maxBounds: worldBounds,
       maxBoundsViscosity: 1.0,
     });
 
@@ -151,19 +155,38 @@ export function VisitedCountriesMapScreen({
     // Recalcula o zoom mínimo para garantir que o mapa sempre preencha o container,
     // independentemente do tamanho da viewport.
     const fitMinZoom = () => {
-      const bounds = L.latLngBounds([-85, -180], [85, 180]);
-      const z = map.getBoundsZoom(bounds, true);
+      const z = map.getBoundsZoom(worldBounds, false);
       map.setMinZoom(z);
       if (map.getZoom() < z) map.setZoom(z);
     };
-    fitMinZoom();
-    map.on('resize', fitMinZoom);
 
     mapRef.current = map;
 
+    // Usa ResizeObserver para detectar quando o container realmente tem
+    // dimensões finais (crucial no mobile, onde o layout pode demorar um
+    // frame para estabilizar).
+    const observer = new ResizeObserver(() => {
+      if (!container.offsetWidth || !container.offsetHeight) return;
+      // Dá um frame extra para o Leaflet recalcular internamente
+      requestAnimationFrame(() => {
+        map.invalidateSize({ animate: false });
+        fitMinZoom();
+        // Fit na visão mundo na inicialização
+        if (!mapReadyRef.current) {
+          mapReadyRef.current = true;
+          map.fitBounds(worldBounds, { animate: false });
+        }
+      });
+    });
+    observer.observe(container);
+
+    map.on('resize', fitMinZoom);
+
     return () => {
+      observer.disconnect();
       map.remove();
       mapRef.current = null;
+      mapReadyRef.current = false;
     };
   }, []);
 
@@ -314,8 +337,9 @@ export function VisitedCountriesMapScreen({
   // Fit bounds when region changes
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !mapReadyRef.current) return;
 
+    const worldBounds = L.latLngBounds([-85, -180], [85, 180]);
     const target = regions.find(r => r.key === region);
     if (target?.bounds) {
       map.flyToBounds(target.bounds, { duration: 0.6, padding: [40, 40] });
@@ -326,14 +350,16 @@ export function VisitedCountriesMapScreen({
         const bounds = L.latLngBounds(latlngs).pad(0.4);
         map.flyToBounds(bounds, { duration: 0.6, padding: [40, 40], maxZoom: 4 });
       } else {
-        map.flyTo([20, 0], 2, { duration: 0.6 });
+        map.flyToBounds(worldBounds, { duration: 0.6 });
       }
     }
   }, [region, countries]);
 
   // Invalidate size after mount/region change to avoid grey tiles
   useEffect(() => {
-    const t = setTimeout(() => mapRef.current?.invalidateSize(), 100);
+    const t = setTimeout(() => {
+      mapRef.current?.invalidateSize();
+    }, 150);
     return () => clearTimeout(t);
   }, [region]);
 

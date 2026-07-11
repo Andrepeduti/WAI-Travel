@@ -74,7 +74,9 @@ export function AddVisitedCountriesSheet({
 
   const filtered = useMemo(() => {
     const q = normalize(query.trim());
-    if (!q) return ALL_COUNTRIES;
+    // Só mostra países depois que o usuário começa a digitar.
+    // Assim o sheet fica curto no mobile e o teclado não oculta o input.
+    if (!q) return [];
     return ALL_COUNTRIES.filter(
       c => 
         normalize(c.name).includes(q) || 
@@ -82,6 +84,8 @@ export function AddVisitedCountriesSheet({
         (c.aliases && c.aliases.some(alias => normalize(alias).includes(q)))
     );
   }, [query]);
+
+  const hasQuery = query.trim().length > 0;
 
   const toggle = (code: string) => {
     setSelected(prev => {
@@ -156,6 +160,9 @@ export function AddVisitedCountriesSheet({
               placeholder="Buscar país ou continente"
               className="flex-1 bg-transparent outline-none text-foreground"
               style={{ fontSize: 16, fontWeight: 500 }}
+              autoFocus={false}
+              autoComplete="off"
+              enterKeyHint="search"
             />
             {query && (
               <button onClick={() => setQuery('')} aria-label="Limpar">
@@ -167,7 +174,23 @@ export function AddVisitedCountriesSheet({
 
         {/* List */}
         <div ref={listRef} className="flex-1 overflow-y-auto px-2">
-          {filtered.length === 0 ? (
+          {!hasQuery ? (
+            /* Estado inicial: sem busca → convida o usuário a digitar */
+            <div className="flex flex-col items-center justify-center py-12">
+              <div
+                className="w-14 h-14 rounded-full flex items-center justify-center mb-3"
+                style={{ background: '#F2F2F2' }}
+              >
+                <Icon name="travel_explore" size={26} className="text-muted-foreground" />
+              </div>
+              <p className="text-muted-foreground text-center" style={{ fontSize: 14, fontWeight: 600 }}>
+                Busque um país para adicionar
+              </p>
+              <p className="text-muted-foreground text-center mt-1" style={{ fontSize: 12 }}>
+                Digite o nome do país ou continente
+              </p>
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
               <div
                 className="w-14 h-14 rounded-full flex items-center justify-center mb-3"
