@@ -79,9 +79,9 @@ export function HorizontalCarousel({
     });
     return () => container.removeEventListener('scroll', handleScroll);
   }, [handleScroll]);
-  return <div className="relative min-w-0 w-full">
+  return <div className="relative min-w-0 w-full overflow-hidden">
       {/* Scrollable Container - bleeds right */}
-      <div ref={scrollRef} className={cn("w-full min-w-0 flex overflow-x-auto scrollbar-hide snap-x snap-mandatory cursor-grab", className)} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseLeave}>
+      <div ref={scrollRef} className={cn("w-full min-w-0 flex overflow-x-auto overflow-y-hidden scrollbar-hide snap-x snap-mandatory cursor-grab", className)} style={{ WebkitOverflowScrolling: 'touch' } as any} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseLeave}>
         {children.map((child, index) => <div key={index} className={cn('snap-start flex-shrink-0', itemClassName)} style={{ marginRight: index < children.length - 1 ? 12 : 16 }}>
             {child}
           </div>)}

@@ -136,6 +136,7 @@ export function AddVisitedCountriesSheet({
         side="bottom"
         className="rounded-t-2xl px-0 pb-0 pt-3 overflow-hidden flex flex-col"
         style={{ maxHeight: sheetMaxHeight, transition: 'max-height 0.15s ease-out' }}
+        onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <div className="w-10 h-1 rounded-full mx-auto mb-3" style={{ background: 'hsl(var(--muted))' }} />
 

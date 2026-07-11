@@ -161,29 +161,25 @@ export function VisitedCountriesMapScreen({
     };
 
     mapRef.current = map;
-
-    // Usa ResizeObserver para detectar quando o container realmente tem
-    // dimensões finais (crucial no mobile, onde o layout pode demorar um
-    // frame para estabilizar).
-    const observer = new ResizeObserver(() => {
-      if (!container.offsetWidth || !container.offsetHeight) return;
-      // Dá um frame extra para o Leaflet recalcular internamente
-      requestAnimationFrame(() => {
-        map.invalidateSize({ animate: false });
-        fitMinZoom();
-        // Fit na visão mundo na inicialização
-        if (!mapReadyRef.current) {
-          mapReadyRef.current = true;
-          map.fitBounds(worldBounds, { animate: false });
-        }
-      });
-    });
-    observer.observe(container);
-
     map.on('resize', fitMinZoom);
 
+    // Usa múltiplos timeouts escalonados para garantir que o container
+    // tenha dimensões finais em qualquer browser/mobile.
+    // O Leaflet precisa de invalidateSize antes de fitBounds.
+    const timers = [50, 150, 400].map(ms =>
+      setTimeout(() => {
+        if (!mapRef.current) return;
+        map.invalidateSize({ animate: false });
+        fitMinZoom();
+        if (!mapReadyRef.current) {
+          mapReadyRef.current = true;
+          map.fitBounds(worldBounds, { animate: false, padding: [0, 0] });
+        }
+      }, ms)
+    );
+
     return () => {
-      observer.disconnect();
+      timers.forEach(clearTimeout);
       map.remove();
       mapRef.current = null;
       mapReadyRef.current = false;

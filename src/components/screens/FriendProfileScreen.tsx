@@ -1637,7 +1637,8 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
             )}
           </div>
         ) : (
-          <div className="px-5 w-full min-w-0">
+          <div className="px-5 w-full min-w-0" style={{ overflow: 'hidden' }}>
+            <div style={{ padding: '8px 0', overflow: 'hidden' }}>
             <HorizontalCarousel
               showDots={false}
               itemClassName="w-[100px]"
@@ -1710,6 +1711,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
                 );
               })}
             </HorizontalCarousel>
+            </div>
           </div>
         )}
       </div>
