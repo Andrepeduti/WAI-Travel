@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect, lazy, Suspense, useCallback, useMemo } from 'react';
+import { MapPin, Calendar, Users, DollarSign, Clock, LayoutGrid, Heart, Eye, HandCoins, ExternalLink, Settings, MoreVertical, X, Share2, UploadCloud, Edit3, Trash2, Home, Bus, Train, Plane, Car, Plus, AlignLeft, Info, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { COUNTRY_TO_TAGS } from '@/data/countriesCatalog';
 import { SuccessToast } from '@/components/travel/SuccessToast';
 import { ItinerarySettingsSheet } from '@/components/travel/ItinerarySettingsSheet';
 import { downloadItineraryPdf } from '@/lib/itineraryPdf';
@@ -40,7 +42,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Check } from 'lucide-react';
-import { Plane, MapPin } from 'lucide-react';
+
 import { format, differenceInDays, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ItineraryFormData } from '@/components/travel/CreateItinerarySheet';
@@ -3302,10 +3304,20 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         initialTags={publishedTags}
         initialMainTag={publishedMainTag}
         onPublished={(result) => {
+          let enhancedTags = [...result.tags];
+          itineraryData.destinations.forEach((dest) => {
+            const parts = dest.split(',').map((s) => s.trim().toLowerCase());
+            const country = parts[parts.length - 1]; // e.g. "frança"
+            if (country && COUNTRY_TO_TAGS[country]) {
+              enhancedTags = [...enhancedTags, ...COUNTRY_TO_TAGS[country]];
+            }
+          });
+          enhancedTags = Array.from(new Set(enhancedTags));
+
           const extras = {
             priceCents: Math.round((result.price || 0) * 100),
             description: result.description,
-            tags: result.tags,
+            tags: enhancedTags,
             mainTag: result.mainTag,
           };
           if (isItineraryPublic) {

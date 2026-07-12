@@ -9,69 +9,13 @@ import { visitedCountries } from '@/data/visitedCountries';
 import { BackButton } from '@/components/ui/BackButton';
 import { supabase } from '@/integrations/supabase/client';
 import { listPublicItineraries, type UserItinerary } from '@/lib/itinerariesApi';
+import { COUNTRY_TO_TAGS } from '@/data/countriesCatalog';
 import { toast } from 'sonner';
 
 const formatBRL = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-/**
- * Map of country -> continent / region keywords used to enrich tags so a
- * search like "europa" surfaces every European itinerary even when the title
- * doesn't literally contain the word.
- */
-const COUNTRY_TO_TAGS: Record<string, string[]> = {
-  // Europa
-  'portugal': ['europa', 'iberia'],
-  'espanha': ['europa', 'iberia'],
-  'frança': ['europa'],
-  'franca': ['europa'],
-  'itália': ['europa', 'mediterraneo'],
-  'italia': ['europa', 'mediterraneo'],
-  'grécia': ['europa', 'mediterraneo'],
-  'grecia': ['europa', 'mediterraneo'],
-  'holanda': ['europa'],
-  'países baixos': ['europa'],
-  'reino unido': ['europa'],
-  'inglaterra': ['europa', 'reino unido'],
-  'escócia': ['europa', 'reino unido'],
-  'escocia': ['europa', 'reino unido'],
-  'alemanha': ['europa'],
-  'suíça': ['europa', 'alpes'],
-  'suica': ['europa', 'alpes'],
-  'bélgica': ['europa'],
-  'belgica': ['europa'],
-  'república tcheca': ['europa', 'leste europeu'],
-  'republica tcheca': ['europa', 'leste europeu'],
-  'hungria': ['europa', 'leste europeu'],
-  'áustria': ['europa', 'leste europeu'],
-  'austria': ['europa', 'leste europeu'],
-  // Ásia
-  'japão': ['asia'],
-  'japao': ['asia'],
-  'tailândia': ['asia', 'sudeste asiatico'],
-  'tailandia': ['asia', 'sudeste asiatico'],
-  'indonésia': ['asia', 'sudeste asiatico'],
-  'indonesia': ['asia', 'sudeste asiatico'],
-  'china': ['asia'],
-  'vietnã': ['asia', 'sudeste asiatico'],
-  'vietna': ['asia', 'sudeste asiatico'],
-  // Américas
-  'brasil': ['america do sul', 'america latina'],
-  'argentina': ['america do sul', 'america latina'],
-  'chile': ['america do sul', 'america latina'],
-  'peru': ['america do sul', 'america latina'],
-  'eua': ['america do norte'],
-  'estados unidos': ['america do norte'],
-  'canadá': ['america do norte'],
-  'canada': ['america do norte'],
-  'méxico': ['america do norte', 'america latina'],
-  'mexico': ['america do norte', 'america latina'],
-  // África
-  'marrocos': ['africa'],
-  'egito': ['africa'],
-  'áfrica do sul': ['africa'],
-  'africa do sul': ['africa'],
-};
+
 
 const norm = (s: string) =>
   s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -138,147 +82,7 @@ interface SearchItinerary {
   userItinerary?: UserItinerary;
 }
 
-const buildSearchItineraries = (): SearchItinerary[] => {
-  const datasets = getItinerariesByType('marketplace');
-  return datasets.map((d: ItineraryDataset) => {
-    const cities = new Set(
-      d.destinations
-        .map(dest => dest.split(',')[0]?.trim())
-        .filter(Boolean) as string[],
-    );
-    const tagSet = new Set<string>();
-    // Title words
-    const normTitle = norm(d.title);
-    normTitle.split(/\s+/).forEach(w => w && tagSet.add(w));
-    CITY_ALIASES.forEach(group => {
-      if (group.some(alias => normTitle.includes(alias))) {
-        group.forEach(a => tagSet.add(a));
-      }
-    });
-    // Destinations split into city + country
-    d.destinations.forEach(dest => {
-      const [city, country] = dest.split(',').map(s => s?.trim() ?? '');
-      if (city) {
-        tagSet.add(norm(city));
-        getCityAliases(city).forEach(a => tagSet.add(a));
-      }
-      if (country) {
-        const nc = norm(country);
-        tagSet.add(nc);
-        const extras = COUNTRY_TO_TAGS[country.toLowerCase()] ?? COUNTRY_TO_TAGS[nc];
-        extras?.forEach(t => tagSet.add(t));
-      }
-    });
-    const days = Math.max(d.days.length, differenceInDays(d.endDate, d.startDate) + 1);
-    return {
-      id: d.id,
-      title: d.title,
-      image: d.coverImage,
-      rating: d.rating ?? 4.7,
-      days,
-      cities: cities.size,
-      author: d.author ?? 'WaiTravel',
-      authorImage: d.authorImage ?? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
-      price: d.price ?? 0,
-      tags: Array.from(tagSet),
-    };
-  });
-};
-
-/**
- * Each destination carries a list of `tags` (continent, country, region) so a
- * query like "europa" or "asia" surfaces several places — not just the literal
- * city/country name.
- */
-const trendingDestinations: {
-  id: number;
-  name: string;
-  country: string;
-  image: string;
-  itineraryCount: number;
-  rating: number;
-  tags: string[];
-}[] = [
-  {
-    id: 1, name: 'Praga', country: 'República Tcheca',
-    image: 'https://images.unsplash.com/photo-1541849546-216549ae216d?w=800',
-    itineraryCount: 45, rating: 4.8,
-    tags: ['europa', 'leste europeu', 'republica tcheca'],
-  },
-  {
-    id: 2, name: 'Bali', country: 'Indonésia',
-    image: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=800',
-    itineraryCount: 67, rating: 4.9,
-    tags: ['asia', 'indonesia', 'sudeste asiatico'],
-  },
-  {
-    id: 3, name: 'Tóquio', country: 'Japão',
-    image: 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=800',
-    itineraryCount: 89, rating: 4.9,
-    tags: ['asia', 'japao'],
-  },
-  {
-    id: 4, name: 'Santorini', country: 'Grécia',
-    image: 'https://images.unsplash.com/photo-1613395877344-13d4a8e0d49e?w=800',
-    itineraryCount: 52, rating: 4.8,
-    tags: ['europa', 'grecia', 'mediterraneo'],
-  },
-  {
-    id: 5, name: 'Barcelona', country: 'Espanha',
-    image: 'https://images.unsplash.com/photo-1583422409516-2895a77efded?w=800',
-    itineraryCount: 73, rating: 4.7,
-    tags: ['europa', 'espanha', 'iberia', 'catalunha'],
-  },
-  {
-    id: 6, name: 'Madrid', country: 'Espanha',
-    image: 'https://images.unsplash.com/photo-1543783207-ec64e4d95325?w=800',
-    itineraryCount: 41, rating: 4.6,
-    tags: ['europa', 'espanha', 'iberia'],
-  },
-  {
-    id: 7, name: 'Sevilha', country: 'Espanha',
-    image: 'https://images.unsplash.com/photo-1559564484-0d8b4ec7ef84?w=800',
-    itineraryCount: 22, rating: 4.8,
-    tags: ['europa', 'espanha', 'andaluzia', 'iberia'],
-  },
-  {
-    id: 8, name: 'Roma', country: 'Itália',
-    image: 'https://images.unsplash.com/photo-1525874684015-58379d421a52?w=800',
-    itineraryCount: 86, rating: 4.9,
-    tags: ['europa', 'italia', 'mediterraneo'],
-  },
-  {
-    id: 9, name: 'Paris', country: 'França',
-    image: 'https://images.unsplash.com/photo-1431274172761-fca41d930114?w=800',
-    itineraryCount: 102, rating: 4.7,
-    tags: ['europa', 'franca'],
-  },
-  {
-    id: 10, name: 'Lisboa', country: 'Portugal',
-    image: 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?w=800',
-    itineraryCount: 64, rating: 4.7,
-    tags: ['europa', 'portugal', 'iberia'],
-  },
-  {
-    id: 11, name: 'Buenos Aires', country: 'Argentina',
-    image: 'https://images.unsplash.com/photo-1589909202802-8f4aadce1849?w=800',
-    itineraryCount: 38, rating: 4.6,
-    tags: ['america do sul', 'argentina'],
-  },
-  {
-    id: 12, name: 'Nova York', country: 'Estados Unidos',
-    image: 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=800',
-    itineraryCount: 95, rating: 4.8,
-    tags: ['america do norte', 'eua', 'estados unidos'],
-  },
-];
-
-/**
- * Mock catalog used by the search screen. Derived from the canonical
- * itinerary dataset so each search hit opens the real itinerary
- * (correct id, days, destinations, author).
- */
-const allItineraries: SearchItinerary[] = buildSearchItineraries();
+// Mocked search itineraries and destinations removed in favor of Supabase fetching.
 
 /**
  * Catálogo de pessoas mostrado na busca. Os nomes batem com os autores reais
@@ -365,13 +169,33 @@ const profileRowToPerson = (row: ProfileSearchRow): PeopleSuggestion => ({
 
 export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryClick, onPlaceClick }: SearchScreenProps) {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [submittedQuery, setSubmittedQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(() => sessionStorage.getItem('wai_searchQuery') || '');
+  const [submittedQuery, setSubmittedQuery] = useState(() => sessionStorage.getItem('wai_submittedQuery') || '');
   const [recent, setRecent] = useState<RecentSearch[]>(() => loadRecent());
   const [showFilters, setShowFilters] = useState(false);
-  const [appliedFilters, setAppliedFilters] = useState<ExploreFilters>(DEFAULT_FILTERS);
+  const [appliedFilters, setAppliedFilters] = useState<ExploreFilters>(() => {
+    try {
+      const saved = sessionStorage.getItem('wai_appliedFilters');
+      return saved ? JSON.parse(saved) : DEFAULT_FILTERS;
+    } catch {
+      return DEFAULT_FILTERS;
+    }
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem('wai_searchQuery', searchQuery);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    sessionStorage.setItem('wai_submittedQuery', submittedQuery);
+  }, [submittedQuery]);
+
+  useEffect(() => {
+    sessionStorage.setItem('wai_appliedFilters', JSON.stringify(appliedFilters));
+  }, [appliedFilters]);
   const [realPeople, setRealPeople] = useState<PeopleSuggestion[]>([]);
   const [publicItineraries, setPublicItineraries] = useState<SearchItinerary[]>([]);
+  const [destinations, setDestinations] = useState<{id: string; name: string; country: string; continent: string; image: string; itineraryCount: number; tags: string[]; rating: number}[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const lastReloadAtRef = useRef<number>(0);
 
@@ -385,7 +209,7 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
       else others.push(it);
     }
     const merged: SearchItinerary[] = [];
-    for (const it of [...own, ...others, ...allItineraries]) {
+    for (const it of [...own, ...others]) {
       if (seen.has(it.id)) continue;
       seen.add(it.id);
       merged.push(it);
@@ -498,6 +322,7 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
   };
 
   const activeFiltersCount =
+    (appliedFilters.searchType !== 'todos' ? 1 : 0) +
     appliedFilters.regions.length +
     appliedFilters.tripTypes.length +
     appliedFilters.seasons.length +
@@ -524,6 +349,7 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
       const { data, error } = await supabase
         .from('profiles_public')
         .select('user_id, name, username, location, avatar_url, bio, interests, followers_count, following_count')
+        .not('username', 'is', null)
         .limit(50);
       if (error) {
         console.error('[SearchScreen] profiles search failed', error);
@@ -538,6 +364,27 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
   // Carrega no mount.
   useEffect(() => {
     void reloadPublic();
+    
+    // Load destinations
+    let cancelled = false;
+    const loadDestinations = async () => {
+      const { data, error } = await supabase.from('destinations').select('*').order('created_at', { ascending: false });
+      if (!cancelled && !error && data) {
+        setDestinations(data.map(d => ({
+          id: d.id,
+          name: d.name,
+          country: d.country,
+          continent: d.continent,
+          image: d.image_url,
+          itineraryCount: d.itinerary_count ?? 0,
+          tags: d.hashtags ?? [],
+          rating: d.rating ?? 4.7
+        })));
+      }
+    };
+    loadDestinations();
+
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -559,37 +406,64 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
   const query = norm(searchQuery.trim());
   const resultsQuery = norm(submittedQuery.trim());
 
-  const buildResults = (q: string) => {
-    if (!q) return { places: [], people: [], itineraries: [] };
+  const hasAnyFilter = (f: ExploreFilters) => {
+    return f.searchType !== 'todos' || f.regions.length > 0 || f.tripTypes.length > 0 || f.seasons.length > 0 || f.creatorType.length > 0 || 
+      f.priceRange[0] !== 0 || f.priceRange[1] !== 1000 || 
+      f.durationRange[0] !== 1 || f.durationRange[1] !== 30;
+  };
+
+  const buildResults = (q: string, f: ExploreFilters) => {
+    if (!q && !hasAnyFilter(f)) return { places: [], people: [], itineraries: [] };
     const peopleCatalog = realPeople;
+    
     return {
-      places: trendingDestinations.filter((d) => {
-        const haystack = [d.name, d.country, ...d.tags].map(norm).join(' ');
-        return haystack.includes(q);
+      places: f.searchType === 'pessoas' ? [] : destinations.filter((d) => {
+        const haystack = [d.name, d.country, d.continent, ...d.tags].map(norm).join(' ');
+        if (q && !haystack.includes(q)) return false;
+        if (f.regions.length && !f.regions.some((r) => haystack.includes(norm(r)))) return false;
+        if (f.tripTypes.length && !f.tripTypes.some((t) => haystack.includes(norm(t)))) return false;
+        if (f.seasons.length && !f.seasons.some((s) => haystack.includes(norm(s)))) return false;
+        return true;
       }),
-      people: peopleCatalog.filter((p) => {
+      people: f.searchType === 'roteiros' ? [] : peopleCatalog.filter((p) => {
         const haystack = [p.name, p.handle, p.location, ...p.tags].map(norm).join(' ');
-        return haystack.includes(q);
+        if (q && !haystack.includes(q)) return false;
+        if (f.regions.length && !f.regions.some((r) => haystack.includes(norm(r)))) return false;
+        if (f.creatorType.length && !f.creatorType.some((c) => haystack.includes(norm(c)))) return false;
+        return true;
       }),
-      itineraries: mergedItineraries
+      itineraries: f.searchType === 'pessoas' ? [] : mergedItineraries
         .filter((i) => {
+          const tags = (i.tags ?? []).map(norm);
           const haystack = [
             i.title,
             i.author,
-            ...i.tags,
+            ...tags,
             ...(i.destinationsRaw ?? []),
             i.descriptionRaw ?? '',
           ].map(norm).join(' ');
-          return haystack.includes(q);
+          if (q && !haystack.includes(q)) return false;
+          if (f.regions.length && !f.regions.some((r) => haystack.includes(norm(r)))) return false;
+          if (f.tripTypes.length && !f.tripTypes.some((t) => haystack.includes(norm(t)))) return false;
+          if (f.seasons.length && !f.seasons.some((s) => haystack.includes(norm(s)))) return false;
+          if (typeof i.price === 'number') {
+            if (i.price < f.priceRange[0]) return false;
+            if (f.priceRange[1] < 1000 && i.price > f.priceRange[1]) return false;
+          }
+          if (typeof i.days === 'number') {
+            if (i.days < f.durationRange[0]) return false;
+            if (f.durationRange[1] < 30 && i.days > f.durationRange[1]) return false;
+          }
+          return true;
         })
         .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)),
     };
   };
 
-  const suggestions = useMemo(() => buildResults(query), [query, realPeople, mergedItineraries]);
-  const results = useMemo(() => buildResults(resultsQuery), [resultsQuery, realPeople, mergedItineraries]);
+  const suggestions = useMemo(() => buildResults(query, appliedFilters), [query, realPeople, mergedItineraries, appliedFilters]);
+  const results = useMemo(() => buildResults(resultsQuery, appliedFilters), [resultsQuery, realPeople, mergedItineraries, appliedFilters]);
 
-  const handlePlaceClick = (dest: typeof trendingDestinations[number]) => {
+  const handlePlaceClick = (dest: typeof destinations[number]) => {
     addRecent({
       id: `place-${dest.id}`,
       type: 'lugar',
@@ -673,8 +547,8 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
       const person = realPeople.find((p) => p.id === item.refId);
       if (person) goToPersonProfile(person);
     }
-    if (item.type === 'lugar' && typeof item.refId === 'number') {
-      const dest = trendingDestinations.find((d) => d.id === item.refId);
+    if (item.type === 'lugar' && item.refId !== undefined) {
+      const dest = destinations.find((d) => String(d.id) === String(item.refId));
       if (dest && onPlaceClick) {
         onPlaceClick({ country: dest.name, continent: dest.country, image: dest.image });
       }
@@ -695,53 +569,13 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
    */
   const countFilteredResults = (f: ExploreFilters): number => {
     const baseQuery = resultsQuery || query;
-    const base = buildResults(baseQuery);
-    const baseList = baseQuery
-      ? f.searchType === 'pessoas'
-        ? base.people.length
-        : base.places.length + base.itineraries.length
-      : f.searchType === 'pessoas'
-        ? realPeople.length
-        : mergedItineraries.length + trendingDestinations.length;
+    const base = buildResults(baseQuery, f);
 
-    if (f.searchType === 'pessoas') {
-      const peopleAll = baseQuery ? base.people : realPeople;
-      return peopleAll.filter((p) => {
-        const hay = [p.name, p.handle, p.location, ...p.tags].map(norm).join(' ');
-        if (f.regions.length && !f.regions.some((r) => hay.includes(norm(r)))) return false;
-        if (f.creatorType.length && !f.creatorType.some((c) => hay.includes(norm(c)))) return false;
-        return true;
-      }).length;
+    if (!baseQuery && !hasAnyFilter(f)) {
+      return mergedItineraries.length + destinations.length + realPeople.length;
     }
 
-    // Roteiros (+ lugares contam)
-    const itineraries = baseQuery ? base.itineraries : mergedItineraries;
-    const places = baseQuery ? base.places : trendingDestinations;
-    const matchItin = itineraries.filter((i) => {
-      const tags = (i.tags ?? []).map(norm);
-      const hay = [i.title, i.author, ...(i.destinationsRaw ?? []), i.descriptionRaw ?? '']
-        .map(norm).join(' ') + ' ' + tags.join(' ');
-      if (f.regions.length && !f.regions.some((r) => hay.includes(norm(r)))) return false;
-      if (f.tripTypes.length && !f.tripTypes.some((t) => hay.includes(norm(t)))) return false;
-      if (f.seasons.length && !f.seasons.some((s) => hay.includes(norm(s)))) return false;
-      if (typeof i.price === 'number') {
-        if (i.price < f.priceRange[0]) return false;
-        if (f.priceRange[1] < 1000 && i.price > f.priceRange[1]) return false;
-      }
-      if (typeof i.days === 'number') {
-        if (i.days < f.durationRange[0]) return false;
-        if (f.durationRange[1] < 30 && i.days > f.durationRange[1]) return false;
-      }
-      return true;
-    }).length;
-    const matchPlaces = places.filter((p) => {
-      const hay = [p.name, p.country, ...(p.tags ?? [])].map(norm).join(' ');
-      if (f.regions.length && !f.regions.some((r) => hay.includes(norm(r)))) return false;
-      if (f.tripTypes.length && !f.tripTypes.some((t) => hay.includes(norm(t)))) return false;
-      if (f.seasons.length && !f.seasons.some((s) => hay.includes(norm(s)))) return false;
-      return true;
-    }).length;
-    return matchItin + matchPlaces;
+    return base.itineraries.length + base.places.length + base.people.length;
   };
 
 
@@ -809,8 +643,8 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
       </header>
 
       <main className="px-5 pt-2">
-        {/* Empty query: recent searches */}
-        {!displayQuery && (
+        {/* Empty query and no filters: recent searches */}
+        {!(displayQuery || hasAnyFilter(appliedFilters)) && (
           <section>
             <div className="flex items-center justify-between mb-3 mt-2">
               <h2 className="text-[18px] font-bold text-foreground">Buscas recentes</h2>
@@ -874,8 +708,8 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
           </section>
         )}
 
-        {/* Active query: results */}
-        {displayQuery && (
+        {/* Active query or active filters: results */}
+        {(displayQuery || hasAnyFilter(appliedFilters)) && (
           <div className="space-y-6 pt-2">
             <div className="flex items-center justify-between mb-1 mt-2">
               <h2 className="text-[18px] font-bold text-foreground">Resultados</h2>
@@ -886,7 +720,7 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
                   <Icon name="search" size={24} className="text-muted-foreground" />
                 </div>
                 <p className="text-[14px] text-muted-foreground text-center">
-                  Nenhum resultado para "{searchQuery}"
+                  {searchQuery ? `Nenhum resultado para "${searchQuery}"` : 'Nenhum resultado encontrado.'}
                 </p>
               </div>
             )}

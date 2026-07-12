@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { BackButton } from '@/components/ui/BackButton';
 
 export interface ExploreFilters {
-  searchType: 'roteiros' | 'pessoas';
+  searchType: 'todos' | 'roteiros' | 'pessoas';
   regions: string[];
   tripTypes: string[];
   seasons: string[];
@@ -17,7 +17,7 @@ export interface ExploreFilters {
 }
 
 export const DEFAULT_FILTERS: ExploreFilters = {
-  searchType: 'roteiros',
+  searchType: 'todos',
   regions: [],
   tripTypes: [],
   seasons: [],
@@ -36,7 +36,7 @@ const REGIONS = [
   { id: 'oceania', label: 'Oceania' },
 ];
 
-const TRIP_TYPES = [
+export const TRIP_TYPES = [
   { id: 'praia', label: 'Praia', emoji: '🏖️' },
   { id: 'montanha', label: 'Montanha', emoji: '⛰️' },
   { id: 'urbano', label: 'Urbano', emoji: '🏙️' },
@@ -47,6 +47,10 @@ const TRIP_TYPES = [
   { id: 'vida-noturna', label: 'Vida noturna', emoji: '🌃' },
   { id: 'natureza', label: 'Natureza', emoji: '🌿' },
   { id: 'romance', label: 'Romance', emoji: '💕' },
+  { id: 'familia', label: 'Família', emoji: '👨‍👩‍👧‍👦' },
+  { id: 'mochilao', label: 'Mochilão', emoji: '🎒' },
+  { id: 'luxo', label: 'Luxo', emoji: '💎' },
+  { id: 'compras', label: 'Compras', emoji: '🛍️' },
 ];
 
 const SEASONS = [
@@ -74,6 +78,7 @@ const CREATOR_TYPES = [
 ];
 
 const SEARCH_TYPES: { id: ExploreFilters['searchType']; label: string }[] = [
+  { id: 'todos', label: 'Todos' },
   { id: 'roteiros', label: 'Roteiros à venda' },
   { id: 'pessoas', label: 'Pessoas' },
 ];
@@ -116,15 +121,15 @@ export function FiltersScreen({ onClose, initial = DEFAULT_FILTERS, onApply, cou
 
   // Count active filters (excl. defaults)
   const activeCount =
-    (filters.regions.length) +
-    (filters.tripTypes.length) +
-    (filters.seasons.length) +
+    (filters.searchType !== 'todos' ? 1 : 0) +
+    filters.regions.length +
+    filters.tripTypes.length +
+    filters.seasons.length +
     (filters.priceRange[0] !== 0 || filters.priceRange[1] !== 1000 ? 1 : 0) +
     (filters.durationRange[0] !== 1 || filters.durationRange[1] !== 30 ? 1 : 0) +
-    (filters.minRating > 0 ? 1 : 0) +
-    (filters.language !== 'todos' ? 1 : 0) +
-    (filters.creatorType.length);
+    filters.creatorType.length;
 
+  const isDefault = JSON.stringify(filters) === JSON.stringify(DEFAULT_FILTERS);
   const isPeople = filters.searchType === 'pessoas';
 
   return (
@@ -151,7 +156,7 @@ export function FiltersScreen({ onClose, initial = DEFAULT_FILTERS, onApply, cou
       <div className="flex-1 overflow-y-auto px-5 pb-32">
         {/* Tipo de busca */}
         <Section title="O que você procura">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {SEARCH_TYPES.map((t) => {
               const active = filters.searchType === t.id;
               return (
@@ -229,7 +234,7 @@ export function FiltersScreen({ onClose, initial = DEFAULT_FILTERS, onApply, cou
         )}
 
         {/* Faixa de preço (apenas roteiros) */}
-        {filters.searchType === 'roteiros' && (
+        {filters.searchType !== 'pessoas' && (
           <Section
             title="Faixa de preço"
             subtitle={`${formatBRL(filters.priceRange[0])} – ${
@@ -286,7 +291,9 @@ export function FiltersScreen({ onClose, initial = DEFAULT_FILTERS, onApply, cou
             className="w-full h-12 rounded-full font-semibold text-[15px] transition-transform active:scale-[0.99]"
             style={{ backgroundColor: '#9DCC36', color: '#1A1C40' }}
           >
-            {countResults
+            {isDefault
+              ? 'Fechar'
+              : countResults
               ? (() => {
                   const n = countResults(filters);
                   if (n === 0) return 'Nenhum resultado';

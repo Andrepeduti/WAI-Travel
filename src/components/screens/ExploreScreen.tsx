@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Flame } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
-// ─── Mock data ───────────────────────────────────────────────────────────────
+// ─── Quick Filters ───────────────────────────────────────────────────────────────
 
 interface QuickFilter {
   id: string;
@@ -36,117 +37,11 @@ interface DestinationStory {
   totalVisitors: number;
 }
 
-const destinationStories: DestinationStory[] = [
-  {
-    id: 'maldivas',
-    country: 'Maldivas',
-    continent: 'Ásia',
-    image: 'https://images.unsplash.com/photo-1514282401047-d79a71a590e8?w=1600',
-    itineraryCount: 87,
-    category: 'praia',
-    status: 'Popular',
-    hashtags: ['praia', 'luademel'],
-    visitors: [
-      { id: 1, avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100', name: 'Marina' },
-      { id: 2, avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100', name: 'Alessandra' },
-      { id: 3, avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100', name: 'Camila' },
-    ],
-    totalVisitors: 11,
-  },
-  {
-    id: 'japao',
-    country: 'Japão',
-    continent: 'Ásia',
-    image: 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=1600',
-    itineraryCount: 132,
-    category: 'cultural',
-    status: 'Trending',
-    hashtags: ['cultura', 'tóquio'],
-    visitors: [
-      { id: 1, avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100', name: 'Beatriz' },
-      { id: 2, avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100', name: 'Alex' },
-      { id: 3, avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100', name: 'Carlos' },
-    ],
-    totalVisitors: 17,
-  },
-  {
-    id: 'franca',
-    country: 'França',
-    continent: 'Europa',
-    image: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=1600',
-    itineraryCount: 198,
-    category: 'cultural',
-    status: 'Popular',
-    hashtags: ['paris', 'romântico'],
-    visitors: [
-      { id: 1, avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100', name: 'Ana' },
-      { id: 2, avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100', name: 'Marina' },
-    ],
-    totalVisitors: 23,
-  },
-  {
-    id: 'argentina',
-    country: 'Argentina',
-    continent: 'América do Sul',
-    image: 'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?w=1600',
-    itineraryCount: 64,
-    category: 'montanha',
-    status: 'Em alta',
-    hashtags: ['patagônia', 'aventura'],
-    visitors: [
-      { id: 1, avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100', name: 'Camila' },
-      { id: 2, avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100', name: 'Beatriz' },
-      { id: 3, avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100', name: 'Alex' },
-    ],
-    totalVisitors: 9,
-  },
-  {
-    id: 'indonesia',
-    country: 'Indonésia',
-    continent: 'Ásia',
-    image: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=1600',
-    itineraryCount: 89,
-    category: 'praia',
-    status: 'Trending',
-    hashtags: ['bali', 'surf'],
-    visitors: [
-      { id: 1, avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100', name: 'Marina' },
-      { id: 2, avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100', name: 'Carlos' },
-    ],
-    totalVisitors: 14,
-  },
-  {
-    id: 'eua',
-    country: 'Estados Unidos',
-    continent: 'América do Norte',
-    image: 'https://images.unsplash.com/photo-1551582045-6ec9c11d8697?w=1600',
-    itineraryCount: 156,
-    category: 'neve',
-    status: 'Popular',
-    hashtags: ['aspen', 'ski'],
-    visitors: [
-      { id: 1, avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100', name: 'Alessandra' },
-      { id: 2, avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100', name: 'Beatriz' },
-      { id: 3, avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100', name: 'Alex' },
-    ],
-    totalVisitors: 19,
-  },
-  {
-    id: 'italia',
-    country: 'Itália',
-    continent: 'Europa',
-    image: 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=1600',
-    itineraryCount: 167,
-    category: 'gastronomia',
-    status: 'Em alta',
-    hashtags: ['roma', 'gastronomia'],
-    visitors: [
-      { id: 1, avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100', name: 'Marina' },
-      { id: 2, avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100', name: 'Alessandra' },
-      { id: 3, avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100', name: 'Camila' },
-    ],
-    totalVisitors: 26,
-  },
+// ─── Mock Visitors (enquanto não criamos a relação completa no BD)
+const getMockVisitors = (country: string) => [
+  { id: 1, avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100', name: 'Marina' },
+  { id: 2, avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100', name: 'Alessandra' },
+  { id: 3, avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100', name: 'Camila' },
 ];
 
 interface ExploreScreenProps {
@@ -250,6 +145,36 @@ function DestinationContent({ dest, onSeeItineraries }: DestinationContentProps)
 export function ExploreScreen({ onSearchClick, onSeeDestinationItineraries }: ExploreScreenProps) {
   const [activeFilter, setActiveFilter] = useState<string>('todos');
   const [activeStoryId, setActiveStoryId] = useState<string | null>(null);
+  const [destinationStories, setDestinationStories] = useState<DestinationStory[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchDestinations = async () => {
+      setLoading(true);
+      const { data, error } = await supabase.from('destinations').select('*').order('created_at', { ascending: false });
+      if (cancelled) return;
+      if (error) {
+        console.error('Failed to load destinations:', error);
+      } else if (data) {
+        setDestinationStories(data.map(d => ({
+          id: d.id,
+          country: d.country,
+          continent: d.continent,
+          image: d.image_url,
+          itineraryCount: d.itinerary_count ?? 0,
+          category: d.category || '',
+          status: d.status as StatusTag,
+          hashtags: d.hashtags ?? [],
+          visitors: getMockVisitors(d.country),
+          totalVisitors: d.total_visitors ?? 0,
+        })));
+      }
+      setLoading(false);
+    };
+    fetchDestinations();
+    return () => { cancelled = true; };
+  }, []);
 
   const filteredStories =
     activeFilter === 'todos'
@@ -369,7 +294,16 @@ export function ExploreScreen({ onSearchClick, onSeeDestinationItineraries }: Ex
         }}
       >
         <div className="flex flex-col gap-4">
-          {filteredStories.map((dest) => (
+          {loading ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <div
+                key={`skel-${i}`}
+                className="w-full bg-[#E5E5EA] animate-pulse rounded-3xl"
+                style={{ aspectRatio: '4 / 5' }}
+              />
+            ))
+          ) : (
+            filteredStories.map((dest) => (
             <div
               key={dest.id}
               className="relative w-full overflow-hidden rounded-3xl"
@@ -380,7 +314,7 @@ export function ExploreScreen({ onSearchClick, onSeeDestinationItineraries }: Ex
             >
               <DestinationContent dest={dest} onSeeItineraries={() => openDestinationList(dest)} />
             </div>
-          ))}
+          )))}
         </div>
       </div>
     </div>

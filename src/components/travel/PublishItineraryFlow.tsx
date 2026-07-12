@@ -28,13 +28,17 @@ interface PublishItineraryFlowProps {
   onNavigateToSales?: () => void;
 }
 
-export const ITINERARY_TAG_OPTIONS = [
-  'Praia', 'Natureza', 'Aventura', 'Gastronomia', 'Cultura', 'História',
-  'Romance', 'Família', 'Mochilão', 'Luxo', 'Vida noturna', 'Compras',
-  'Relaxamento', 'Esportes', 'Arquitetura', 'Arte', 'Festivais', 'Pet friendly',
+import { TRIP_TYPES } from '../screens/FiltersScreen';
+
+export const SEASONS_OPTIONS = [
+  { id: 'verao', label: 'Verão', emoji: '☀️' },
+  { id: 'inverno', label: 'Inverno', emoji: '❄️' },
+  { id: 'primavera', label: 'Primavera', emoji: '🌸' },
+  { id: 'outono', label: 'Outono', emoji: '🍂' },
+  { id: 'qualquer', label: 'Qualquer época', emoji: '📅' },
 ];
 
-const TOTAL_QUESTION_STEPS = 5; // Price, Description, Tags, MainTag, Review
+const TOTAL_QUESTION_STEPS = 6; // Price, Description, Season, Tags, MainTag, Review
 
 function StepDots({ current, total }: { current: number; total: number }) {
   return (
@@ -71,6 +75,7 @@ export function PublishItineraryFlow({
   const [isFree, setIsFree] = useState(false);
   const [touched, setTouched] = useState(false);
   const [description, setDescription] = useState(initialDescription);
+  const [season, setSeason] = useState<string>('');
   const [tags, setTags] = useState<string[]>(initialTags);
   const [mainTag, setMainTag] = useState<string>(initialMainTag);
 
@@ -112,8 +117,9 @@ export function PublishItineraryFlow({
   const descriptionValid = description.trim().length >= 20;
   const tagsValid = tags.length >= 1 && tags.length <= 5;
   const mainTagValid = !!mainTag && tags.includes(mainTag);
+  const seasonValid = !!season;
 
-  const LAST_STEP = 6;
+  const LAST_STEP = 7;
 
   const next = () => {
     if (step < LAST_STEP) {
@@ -122,7 +128,7 @@ export function PublishItineraryFlow({
       onPublished?.({
         price: numericPrice,
         description: description.trim(),
-        tags,
+        tags: season ? [...tags, season] : tags, // Temporada vai como uma tag
         mainTag,
       });
       toast.success('Roteiro publicado!', {
@@ -147,6 +153,7 @@ export function PublishItineraryFlow({
     setIsFree(false);
     setTouched(false);
     setDescription(initialDescription);
+    setSeason('');
     setTags(initialTags);
     setMainTag(initialMainTag);
     onClose();
@@ -165,8 +172,9 @@ export function PublishItineraryFlow({
   const canAdvance =
     step === 2 ? priceValid :
     step === 3 ? descriptionValid :
-    step === 4 ? tagsValid :
-    step === 5 ? mainTagValid :
+    step === 4 ? seasonValid :
+    step === 5 ? tagsValid :
+    step === 6 ? mainTagValid :
     true;
 
   return (
@@ -227,6 +235,15 @@ export function PublishItineraryFlow({
             />
           )}
           {step === 4 && (
+            <SeasonScreen
+              key="season"
+              value={season}
+              onSelect={setSeason}
+              onNext={next}
+              canAdvance={canAdvance}
+            />
+          )}
+          {step === 5 && (
             <TagsScreen
               key="tags"
               selected={tags}
@@ -235,7 +252,7 @@ export function PublishItineraryFlow({
               canAdvance={canAdvance}
             />
           )}
-          {step === 5 && (
+          {step === 6 && (
             <MainTagScreen
               key="mainTag"
               tags={tags}
@@ -245,7 +262,7 @@ export function PublishItineraryFlow({
               canAdvance={canAdvance}
             />
           )}
-          {step === 6 && (
+          {step === 7 && (
             <ReviewScreen
               key="review"
               tripName={tripName}
@@ -256,7 +273,7 @@ export function PublishItineraryFlow({
               numericPrice={numericPrice}
               earning={earning}
               description={description}
-              tags={tags}
+              tags={season ? [...tags, season] : tags}
               formatBRL={formatBRL}
               onPublish={next}
             />
@@ -837,26 +854,90 @@ function TagsScreen({
   onNext: () => void;
   canAdvance: boolean;
 }) {
-  const [customInput, setCustomInput] = useState('');
   const limitReached = selected.length >= 5;
 
-  const customSelected = selected.filter((t) => !ITINERARY_TAG_OPTIONS.includes(t));
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 24 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -24 }}
+      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      className="absolute inset-0 flex flex-col bg-[#F2F2F2]"
+    >
+      <div className="flex-1" />
+      <div className="px-7 pb-40">
+        <StepDots current={3} total={TOTAL_QUESTION_STEPS} />
+        <h1
+          className="text-[#0A0A0A] leading-[1.1] tracking-[-0.02em]"
+          style={{ fontSize: '28px', fontWeight: 800 }}
+        >
+          Sobre o que é<br />seu roteiro?
+        </h1>
+        <p className="mt-2 text-[#6B6B6B] text-[13px] leading-snug max-w-[320px]">
+          Selecione até 5 tags que descrevam a experiência.
+        </p>
 
-  const addCustom = () => {
-    const value = customInput.trim().slice(0, 24);
-    if (!value) return;
-    if (limitReached) {
-      toast.error('Você já atingiu o limite de 5 tags.');
-      return;
-    }
-    if (selected.some((t) => t.toLowerCase() === value.toLowerCase())) {
-      toast.error('Essa tag já foi adicionada.');
-      return;
-    }
-    onToggle(value);
-    setCustomInput('');
-  };
+        <div className="mt-6 flex flex-wrap gap-2">
+          {TRIP_TYPES.map((t) => {
+            const isSelected = selected.includes(t.label);
+            const disabled = !isSelected && limitReached;
+            return (
+              <button
+                key={t.id}
+                onClick={() => onToggle(t.label)}
+                disabled={disabled}
+                className={cn(
+                  'px-4 h-10 rounded-full text-[13px] font-semibold transition-all border flex items-center gap-1.5',
+                  isSelected
+                    ? 'bg-[#1A1C40] text-white border-[#1A1C40]'
+                    : disabled
+                      ? 'bg-white text-[#0A0A0A]/30 border-[#0A0A0A]/5 cursor-not-allowed'
+                      : 'bg-white text-[#1A1C40] border-[#0A0A0A]/8 hover:border-[#9DCC36]'
+                )}
+              >
+                <span>{t.emoji}</span>
+                <span>{t.label}</span>
+              </button>
+            );
+          })}
+        </div>
 
+        <p className="mt-6 text-[12px] text-[#6B6B6B]">
+          {selected.length}/5 selecionadas
+        </p>
+      </div>
+
+      <div className="absolute left-0 right-0 bottom-0 px-6 pb-8 pt-4 bg-gradient-to-t from-[#F2F2F2] via-[#F2F2F2] to-transparent">
+        <button
+          onClick={onNext}
+          disabled={!canAdvance}
+          className={cn(
+            'w-full h-14 rounded-2xl font-bold text-[15px] tracking-[-0.01em] transition-all',
+            !canAdvance
+              ? 'bg-[#E5E7DD] text-[#0A0A0A]/25 cursor-not-allowed opacity-60 pointer-events-none shadow-none'
+              : 'bg-[#9DCC36] text-[#0A0A0A] hover:brightness-105 active:scale-[0.99] shadow-[0_8px_22px_-8px_rgba(157,204,54,0.5)]'
+          )}
+        >
+          Próximo
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
+/* ---------------- Season ---------------- */
+
+function SeasonScreen({
+  value,
+  onSelect,
+  onNext,
+  canAdvance,
+}: {
+  value: string;
+  onSelect: (v: string) => void;
+  onNext: () => void;
+  canAdvance: boolean;
+}) {
   return (
     <motion.div
       initial={{ opacity: 0, x: 24 }}
@@ -872,79 +953,40 @@ function TagsScreen({
           className="text-[#0A0A0A] leading-[1.1] tracking-[-0.02em]"
           style={{ fontSize: '28px', fontWeight: 800 }}
         >
-          Sobre o que é<br />seu roteiro?
+          Qual a melhor<br />época?
         </h1>
         <p className="mt-2 text-[#6B6B6B] text-[13px] leading-snug max-w-[320px]">
-          Selecione até 5 tags que descrevam a experiência.
+          Ajude os viajantes a saberem quando é a melhor época para fazer essa viagem.
         </p>
 
-        <div className="mt-6 flex flex-wrap gap-2">
-          {ITINERARY_TAG_OPTIONS.map((t) => {
-            const isSelected = selected.includes(t);
-            const disabled = !isSelected && limitReached;
+        <div className="mt-6 flex flex-col gap-2.5">
+          {SEASONS_OPTIONS.map((s) => {
+            const isSelected = value === s.label;
             return (
               <button
-                key={t}
-                onClick={() => onToggle(t)}
-                disabled={disabled}
+                key={s.id}
+                onClick={() => onSelect(s.label)}
                 className={cn(
-                  'px-4 h-10 rounded-full text-[13px] font-semibold transition-all border',
+                  'h-14 rounded-2xl px-5 flex items-center gap-3 transition-all border-2 text-[15px] font-semibold text-left',
                   isSelected
-                    ? 'bg-[#1A1C40] text-white border-[#1A1C40]'
-                    : disabled
-                      ? 'bg-white text-[#0A0A0A]/30 border-[#0A0A0A]/5 cursor-not-allowed'
-                      : 'bg-white text-[#1A1C40] border-[#0A0A0A]/8 hover:border-[#9DCC36]'
+                    ? 'border-[#9DCC36] bg-[#9DCC36]/10 text-[#0A0A0A]'
+                    : 'border-transparent bg-white text-[#0A0A0A] hover:border-[#0A0A0A]/10 shadow-[0_2px_8px_-2px_rgba(10,10,10,0.04)]'
                 )}
               >
-                {t}
+                <span className="text-[18px]">{s.emoji}</span>
+                <span className="flex-1">{s.label}</span>
+                <div
+                  className={cn(
+                    'w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-colors border-2',
+                    isSelected ? 'bg-[#9DCC36] border-[#9DCC36]' : 'border-[#0A0A0A]/25 bg-transparent'
+                  )}
+                >
+                  {isSelected && <div className="w-2 h-2 rounded-full bg-[#0A0A0A]" />}
+                </div>
               </button>
             );
           })}
-          {customSelected.map((t) => (
-            <button
-              key={t}
-              onClick={() => onToggle(t)}
-              className="px-4 h-10 rounded-full text-[13px] font-semibold transition-all border bg-[#1A1C40] text-white border-[#1A1C40]"
-            >
-              {t}
-            </button>
-          ))}
         </div>
-
-        {/* Adicionar tag personalizada */}
-        <div className="mt-4 flex items-center gap-2">
-          <Input
-            value={customInput}
-            onChange={(e) => setCustomInput(e.target.value.slice(0, 24))}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                addCustom();
-              }
-            }}
-            placeholder="Criar tag personalizada"
-            disabled={limitReached}
-            className="rounded-full bg-white border-0 h-10 px-4 text-[#0A0A0A] placeholder:text-[#0A0A0A]/30 focus-visible:ring-2 focus-visible:ring-[#9DCC36]"
-            style={{ fontSize: '16px' }}
-          />
-          <button
-            type="button"
-            onClick={addCustom}
-            disabled={!customInput.trim() || limitReached}
-            className={cn(
-              'h-10 px-4 rounded-full text-[13px] font-semibold transition-all shrink-0',
-              !customInput.trim() || limitReached
-                ? 'bg-[#E5E7DD] text-[#0A0A0A]/30 cursor-not-allowed'
-                : 'bg-[#1A1C40] text-white active:scale-[0.98]'
-            )}
-          >
-            Adicionar
-          </button>
-        </div>
-
-        <p className="mt-4 text-[12px] text-[#6B6B6B]">
-          {selected.length}/5 selecionadas
-        </p>
       </div>
 
       <div className="absolute left-0 right-0 bottom-0 px-6 pb-8 pt-4 bg-gradient-to-t from-[#F2F2F2] via-[#F2F2F2] to-transparent">
@@ -990,7 +1032,7 @@ function MainTagScreen({
     >
       <div className="flex-1" />
       <div className="px-7 pb-40">
-        <StepDots current={3} total={TOTAL_QUESTION_STEPS} />
+        <StepDots current={4} total={TOTAL_QUESTION_STEPS} />
         <h1
           className="text-[#0A0A0A] leading-[1.1] tracking-[-0.02em]"
           style={{ fontSize: '28px', fontWeight: 800 }}

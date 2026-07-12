@@ -3,7 +3,7 @@ import { Globe, Map, ChevronRight, ChevronLeft, ImagePlus, Trash2 } from 'lucide
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { ITINERARY_TAG_OPTIONS } from '@/components/travel/PublishItineraryFlow';
+import { TRIP_TYPES } from '@/components/screens/FiltersScreen';
 import { toast } from 'sonner';
 import { loadPlannerData } from '@/lib/plannerApi';
 
@@ -384,16 +384,17 @@ export function EditPublishSheet({
                 Tags ({tags.length}/5)
               </label>
               <div className="flex flex-wrap gap-2">
-                {ITINERARY_TAG_OPTIONS.map((t) => {
+                {TRIP_TYPES.map((tItem) => {
+                  const t = tItem.label;
                   const isSelected = tags.includes(t);
                   const disabled = !isSelected && tags.length >= 5;
                   return (
                     <button
-                      key={t}
+                      key={tItem.id}
                       onClick={() => toggleTag(t)}
                       disabled={disabled}
                       className={cn(
-                        'px-3.5 h-9 rounded-full text-[12.5px] font-semibold transition-all border',
+                        'px-3.5 h-9 rounded-full text-[12.5px] font-semibold transition-all border flex items-center gap-1.5',
                         isSelected
                           ? 'bg-[#1A1C40] text-white border-[#1A1C40]'
                           : disabled
@@ -401,7 +402,8 @@ export function EditPublishSheet({
                             : 'bg-white text-foreground border-foreground/10'
                       )}
                     >
-                      {t}
+                      <span>{tItem.emoji}</span>
+                      <span>{t}</span>
                     </button>
                   );
                 })}
