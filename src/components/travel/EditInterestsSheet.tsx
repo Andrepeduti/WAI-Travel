@@ -10,36 +10,61 @@ export interface Interest {
 }
 
 export const INTEREST_CATALOG: Interest[] = [
+  // Regiões
   { label: 'Europa', icon: 'public' },
   { label: 'Ásia', icon: 'public' },
   { label: 'América Latina', icon: 'public' },
+  { label: 'América do Norte', icon: 'public' },
+  { label: 'África', icon: 'public' },
+  { label: 'Oceania', icon: 'public' },
+  { label: 'Oriente Médio', icon: 'public' },
+  
+  // Cultura e História
   { label: 'Cultura', icon: 'auto_stories' },
   { label: 'História', icon: 'history_edu' },
   { label: 'Museus', icon: 'museum' },
   { label: 'Arte', icon: 'palette' },
-  { label: 'Música', icon: 'music_note' },
-  { label: 'Gastronomia', icon: 'restaurant' },
-  { label: 'Café', icon: 'local_cafe' },
-  { label: 'Vinhos', icon: 'local_bar' },
-  { label: 'Street Food', icon: 'lunch_dining' },
-  { label: 'Fotografia', icon: 'photo_camera' },
-  { label: 'Aventura', icon: 'explore' },
-  { label: 'Trilhas', icon: 'hiking' },
-  { label: 'Praia', icon: 'beach_access' },
-  { label: 'Montanha', icon: 'landscape' },
-  { label: 'Natureza', icon: 'park' },
-  { label: 'Surf', icon: 'surfing' },
-  { label: 'Mergulho', icon: 'scuba_diving' },
-  { label: 'Esqui', icon: 'downhill_skiing' },
-  { label: 'Bem-estar', icon: 'spa' },
-  { label: 'Vida noturna', icon: 'nightlife' },
-  { label: 'Compras', icon: 'shopping_bag' },
   { label: 'Arquitetura', icon: 'apartment' },
   { label: 'Religião', icon: 'church' },
   { label: 'Festivais', icon: 'celebration' },
-  { label: 'Roadtrip', icon: 'directions_car' },
+  { label: 'Teatro', icon: 'theater_comedy' },
+  
+  // Gastronomia
+  { label: 'Gastronomia', icon: 'restaurant' },
+  { label: 'Culinária Local', icon: 'set_meal' },
+  { label: 'Café', icon: 'local_cafe' },
+  { label: 'Vinhos', icon: 'local_bar' },
+  { label: 'Cervejarias', icon: 'sports_bar' },
+  { label: 'Bares', icon: 'liquor' },
+  { label: 'Street Food', icon: 'lunch_dining' },
+  
+  // Natureza e Aventura
+  { label: 'Aventura', icon: 'explore' },
+  { label: 'Natureza', icon: 'park' },
+  { label: 'Praia', icon: 'beach_access' },
+  { label: 'Montanha', icon: 'landscape' },
+  { label: 'Trilhas', icon: 'hiking' },
+  { label: 'Surf', icon: 'surfing' },
+  { label: 'Mergulho', icon: 'scuba_diving' },
+  { label: 'Esqui', icon: 'downhill_skiing' },
+  { label: 'Neve', icon: 'ac_unit' },
+  { label: 'Escalada', icon: 'terrain' },
+  { label: 'Camping', icon: 'tent' },
+  { label: 'Safari', icon: 'pets' },
+  { label: 'Ecoturismo', icon: 'eco' },
+  
+  // Estilo de Viagem e Outros
+  { label: 'Música', icon: 'music_note' },
+  { label: 'Vida noturna', icon: 'nightlife' },
+  { label: 'Bem-estar', icon: 'spa' },
+  { label: 'Compras', icon: 'shopping_bag' },
   { label: 'Mochilão', icon: 'backpack' },
   { label: 'Luxo', icon: 'diamond' },
+  { label: 'Cruzeiros', icon: 'directions_boat' },
+  { label: 'Roadtrip', icon: 'directions_car' },
+  { label: 'Fotografia', icon: 'photo_camera' },
+  { label: 'Viagem Solo', icon: 'person' },
+  { label: 'Nômade Digital', icon: 'laptop_mac' },
 ];
 
 interface EditInterestsSheetProps {
@@ -69,25 +94,11 @@ export function EditInterestsSheet({
 
   const draftLabels = useMemo(() => new Set(draft.map(d => d.label.toLowerCase())), [draft]);
 
-  // Catalog merged with any already-selected custom labels (so they remain visible/toggleable).
-  const fullCatalog = useMemo<Interest[]>(() => {
-    const catalogLabels = new Set(INTEREST_CATALOG.map(i => i.label.toLowerCase()));
-    const customs = [...selected, ...draft].filter(s => !catalogLabels.has(s.label.toLowerCase()));
-    const merged = [...INTEREST_CATALOG, ...customs];
-    const seen = new Set<string>();
-    return merged.filter(i => {
-      const key = i.label.toLowerCase();
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }, [selected, draft]);
-
   const filteredCatalog = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return fullCatalog;
-    return fullCatalog.filter(i => i.label.toLowerCase().includes(q));
-  }, [fullCatalog, search]);
+    if (!q) return INTEREST_CATALOG;
+    return INTEREST_CATALOG.filter(i => i.label.toLowerCase().includes(q));
+  }, [search]);
 
   const toggle = (interest: Interest) => {
     const isOn = draftLabels.has(interest.label.toLowerCase());
@@ -102,21 +113,6 @@ export function EditInterestsSheet({
     }
   };
 
-  const addCustom = () => {
-    const value = search.trim();
-    if (!value) return;
-    if (draftLabels.has(value.toLowerCase())) {
-      toast.message('Este interesse já está selecionado.');
-      setSearch('');
-      return;
-    }
-    if (draft.length >= maxItems) {
-      toast.error(`Máximo de ${maxItems} interesses.`);
-      return;
-    }
-    setDraft([...draft, { label: value, icon: 'tag' }]);
-    setSearch('');
-  };
 
   const handleSave = () => {
     onSave(draft);
@@ -169,26 +165,10 @@ export function EditInterestsSheet({
             <Input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  addCustom();
-                }
-              }}
-              placeholder="Buscar ou criar um interesse"
-              className="pl-9 pr-20 h-11 rounded-xl border-0"
+              placeholder="Buscar interesse"
+              className="pl-9 pr-4 h-11 rounded-xl border-0"
               style={{ background: '#F2F2F7', fontSize: 14, color: '#1A1C40' }}
             />
-            {search.trim() &&
-              !fullCatalog.some(i => i.label.toLowerCase() === search.trim().toLowerCase()) && (
-                <button
-                  onClick={addCustom}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 px-3 h-8 rounded-lg"
-                  style={{ background: '#9DCC36', color: '#FFFFFF', fontSize: 12, fontWeight: 700 }}
-                >
-                  Criar
-                </button>
-              )}
           </div>
         </div>
 
@@ -220,7 +200,7 @@ export function EditInterestsSheet({
             })}
             {filteredCatalog.length === 0 && (
               <p className="text-sm w-full text-center py-6" style={{ color: '#8E8E93' }}>
-                Nenhum resultado. Toque em "Criar" para adicionar.
+                Nenhum resultado encontrado.
               </p>
             )}
           </div>

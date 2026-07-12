@@ -87,8 +87,6 @@ export function VisitedCountriesMapScreen({
 
   const canMarkCountries = !!onMarkVisited || !!onMarkWantToVisit;
 
-  const [isMaximized, setIsMaximized] = useState(false);
-
   const regionCounts = useMemo(() => {
     const counts = new Map<Region, number>();
     countries.forEach(c => {
@@ -205,8 +203,7 @@ export function VisitedCountriesMapScreen({
       <div
         className={`absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#0a0a0a] transition-opacity duration-1000 ease-in-out ${isMapLoaded ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
       >
-        <div className="w-12 h-12 border-4 border-[#1A1C40] border-t-blue-500 rounded-full animate-spin mb-4 shadow-lg shadow-blue-500/20"></div>
-        <p className="text-white text-[15px] font-semibold font-inter animate-pulse">Carregando a Terra...</p>
+        <div className="w-12 h-12 border-4 border-[#1A1C40] border-t-blue-500 rounded-full animate-spin"></div>
       </div>
 
       <style>{`
@@ -264,49 +261,21 @@ export function VisitedCountriesMapScreen({
         </MapGL>
       </div>
 
-      {/* Top Bar - Hidden when maximized */}
+      {/* Top Bar */}
       <div
-        className="absolute top-0 left-0 z-10 px-4 transition-opacity duration-300"
+        className="absolute top-0 left-0 z-10 px-4"
         style={{
-          paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)',
-          opacity: isMaximized ? 0 : 1,
-          pointerEvents: isMaximized ? 'none' : 'auto'
+          paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)'
         }}
       >
         <BackButton onClick={onBack} ariaLabel="Voltar" />
       </div>
 
-      {/* Maximize Toggle Button */}
+      {/* Bottom Regions Bar */}
       <div
-        className="absolute z-10"
+        className="absolute left-0 right-0 z-10"
         style={{
-          top: 'calc(max(16px, env(safe-area-inset-top)) + 12px)',
-          right: 16
-        }}
-      >
-        <button
-          onClick={() => setIsMaximized(!isMaximized)}
-          className="w-10 h-10 rounded-full bg-white/90 backdrop-blur flex items-center justify-center shadow-lg transition-transform active:scale-95"
-          aria-label={isMaximized ? "Restaurar mapa" : "Maximizar mapa"}
-        >
-          {isMaximized ? (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A1C40" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
-            </svg>
-          ) : (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A1C40" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
-            </svg>
-          )}
-        </button>
-      </div>
-
-      {/* Bottom Regions Bar - Hidden when maximized */}
-      <div
-        className="absolute left-0 right-0 z-10 transition-transform duration-500 ease-in-out"
-        style={{
-          bottom: onMarkVisited ? 84 : 24,
-          transform: isMaximized ? 'translateY(150%)' : 'translateY(0)'
+          bottom: onMarkVisited ? 84 : 24
         }}
       >
         <div className="px-4 overflow-x-auto no-scrollbar">
