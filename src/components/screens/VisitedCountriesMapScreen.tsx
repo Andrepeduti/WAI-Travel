@@ -72,7 +72,11 @@ export function VisitedCountriesMapScreen({
   const containerRef = useRef<HTMLDivElement>(null);
   const globeRef = useRef<any>(null);
   
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [dimensions, setDimensions] = useState({ 
+    width: typeof window !== 'undefined' ? window.innerWidth : 0, 
+    height: typeof window !== 'undefined' ? window.innerHeight : 0 
+  });
+  
   const [geoData, setGeoData] = useState<any[]>([]);
   const [region, setRegion] = useState<Region>('Mundo');
   const [hoveredPolygon, setHoveredPolygon] = useState<any | null>(null);
@@ -126,17 +130,16 @@ export function VisitedCountriesMapScreen({
   }, [countries]);
 
   useEffect(() => {
-    if (!containerRef.current) return;
-    const observer = new ResizeObserver(entries => {
-      if (entries[0]) {
-        setDimensions({
-          width: entries[0].contentRect.width,
-          height: entries[0].contentRect.height,
-        });
-      }
-    });
-    observer.observe(containerRef.current);
-    return () => observer.disconnect();
+    const handleResize = () => {
+      setDimensions({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+    window.addEventListener('resize', handleResize);
+    // Trigger once on mount just in case
+    handleResize();
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   useEffect(() => {
