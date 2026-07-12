@@ -467,12 +467,16 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
   // Roteiros públicos REAIS de outro usuário (vindos do banco). Só
   // entram em ação quando o perfil tem userId real (perfil do banco).
   const [realPublicItineraries, setRealPublicItineraries] = useState<PublicItinerary[]>([]);
+  const [isFetchingPublicItineraries, setIsFetchingPublicItineraries] = useState(!isSelf && !!friend.userId);
+
   useEffect(() => {
     if (isSelf || !friend.userId) {
       setRealPublicItineraries([]);
+      setIsFetchingPublicItineraries(false);
       return;
     }
     let cancelled = false;
+    setIsFetchingPublicItineraries(true);
     (async () => {
       const rows = await getPublicItinerariesByUserId(friend.userId!);
       if (cancelled) return;
@@ -499,6 +503,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
         };
       });
       setRealPublicItineraries(mapped);
+      setIsFetchingPublicItineraries(false);
     })();
     return () => { cancelled = true; };
   }, [isSelf, friend.userId, friend.name, friend.avatar]);
@@ -512,7 +517,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
   );
 
   // Roteiros públicos reais do próprio usuário (vindos do banco)
-  const { itineraries: myItineraries } = useMyItineraries();
+  const { itineraries: myItineraries, loading: myItinerariesLoading } = useMyItineraries();
   const myPublicItineraries = useMemo(
     () => (isSelf ? myItineraries.filter(it => it.isPublic) : []),
     [isSelf, myItineraries],
@@ -932,7 +937,9 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
     );
   }
 
-  if (isLoading) {
+  const isScreenLoading = isLoading || isFetchingPublicItineraries || (isSelf && myItinerariesLoading);
+
+  if (isScreenLoading) {
     return (
       <div className="min-h-screen bg-[#F2F2F2] pb-24 animate-pulse">
         {/* Header */}
