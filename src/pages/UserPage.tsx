@@ -25,7 +25,7 @@ const UserPage = () => {
   const currentUser: FriendProfileData = {
     userId: session?.user.id,
     name: user.name || 'Adicione seu nome',
-    username: user.username || '@viajante',
+    username: user.username ? `@${user.username}` : '@viajante',
     location: user.location || '',
     avatar: user.avatar || '',
     bio: user.bio || '',

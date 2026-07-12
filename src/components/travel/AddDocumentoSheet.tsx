@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import type { Transporte, TransporteTipo } from './AddTransporteSheet';
 import type { Reserva } from './AddReservaSheet';
 import type { DocType } from './DocTypePickerSheet';
+import { searchGooglePlacesAutocomplete } from '@/lib/googlePlacesApi';
 
 interface ExtractedFlight {
   airline: string;
@@ -198,6 +199,12 @@ export function AddDocumentoSheet({
   const [atividadeDate, setAtividadeDate] = useState<Date | undefined>();
   const [atividadeHora, setAtividadeHora] = useState('');
   const [atividadeMinuto, setAtividadeMinuto] = useState('');
+  
+  // Calendar states
+  const [isPartidaCalendarOpen, setIsPartidaCalendarOpen] = useState(false);
+  const [isChegadaCalendarOpen, setIsChegadaCalendarOpen] = useState(false);
+  const [isHospedagemCalendarOpen, setIsHospedagemCalendarOpen] = useState(false);
+  const [isAtividadeCalendarOpen, setIsAtividadeCalendarOpen] = useState(false);
 
   // Split / division
   const [splitType, setSplitType] = useState<'none' | 'equal' | 'custom'>('none');
@@ -225,6 +232,17 @@ export function AddDocumentoSheet({
   const [isSearchingHotels, setIsSearchingHotels] = useState(false);
   const [hotelSelectedFromList, setHotelSelectedFromList] = useState(false);
   const hotelSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node)) {
+        setShowHotelSuggestions(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const searchHotels = useCallback((query: string) => {
     if (hotelSearchTimer.current) clearTimeout(hotelSearchTimer.current);
@@ -237,64 +255,15 @@ export function AddDocumentoSheet({
     setShowHotelSuggestions(true);
     hotelSearchTimer.current = setTimeout(async () => {
       try {
-        // Use Photon API with accommodation tag filtering for better fuzzy search
-        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=8&lang=pt`;
-        const res = await fetch(url);
-        const data = await res.json();
-        const features = data.features || [];
-
-        const accommodationTypes = new Set([
-          'hotel', 'hostel', 'guest_house', 'motel', 'apartment',
-          'resort', 'camp_site', 'chalet', 'bed_and_breakfast',
-        ]);
-
-        const results: HotelSuggestion[] = [];
-        const seen = new Set<string>();
-
-        for (const f of features) {
-          const props = f.properties || {};
-          const osmValue = props.osm_value || '';
-          const osmKey = props.osm_key || '';
-          const name = props.name || '';
-          const nameLower = name.toLowerCase();
-
-          // Accept if OSM tourism accommodation type, or name contains accommodation keywords
-          const isAccommodation =
-            (osmKey === 'tourism' && accommodationTypes.has(osmValue)) ||
-            (osmKey === 'building' && (osmValue === 'hotel' || osmValue === 'hostel')) ||
-            nameLower.includes('hotel') ||
-            nameLower.includes('hostel') ||
-            nameLower.includes('pousada') ||
-            nameLower.includes('resort') ||
-            nameLower.includes('inn') ||
-            nameLower.includes('motel') ||
-            nameLower.includes('airbnb') ||
-            nameLower.includes('guest house') ||
-            nameLower.includes('b&b');
-
-          if (!isAccommodation || !name) continue;
-
-          const key = nameLower;
-          if (seen.has(key)) continue;
-          seen.add(key);
-
-          const city = props.city || props.town || props.village || '';
-          const country = props.country || '';
-          const state = props.state || '';
-          const locationParts = [city, state, country].filter(Boolean);
-          const location = locationParts.join(', ');
-
-          results.push({ name, location });
-          if (results.length >= 6) break;
-        }
-
-        setHotelSuggestions(results);
-      } catch {
+        const suggestions = await searchGooglePlacesAutocomplete(query);
+        setHotelSuggestions(suggestions.map(s => ({ name: s.name, location: s.location })));
+      } catch (e) {
+        console.error('Google Places API erro:', e);
         setHotelSuggestions([]);
       } finally {
         setIsSearchingHotels(false);
       }
-    }, 400);
+    }, 1000);
   }, []);
 
   // Reset on open
@@ -740,7 +709,7 @@ export function AddDocumentoSheet({
             {/* ─── Fields per type ─── */}
             <div className="space-y-3">
               {/* Name field */}
-              <div className="relative">
+              <div className="relative" ref={suggestionsRef}>
                 <label className="text-[12px] font-semibold text-muted-foreground mb-1 block">
                   {docType === 'transporte' ? 'Como deseja chamar este documento?' : docType === 'hospedagem' ? 'Nome da acomodação' : 'Nome do ingresso'}
                 </label>
@@ -848,7 +817,7 @@ export function AddDocumentoSheet({
                   <div>
                     <label className="text-[12px] font-semibold text-muted-foreground mb-1 block">Ida</label>
                     <div className="grid grid-cols-2 gap-3">
-                      <Popover>
+                      <Popover open={isPartidaCalendarOpen} onOpenChange={setIsPartidaCalendarOpen}>
                         <PopoverTrigger asChild>
                           <button className="w-full h-12 rounded-xl border border-border bg-card px-4 text-left text-[14px] flex items-center gap-2">
                             <Icon name="calendar_today" size={16} className="text-muted-foreground" />
@@ -858,7 +827,7 @@ export function AddDocumentoSheet({
                           </button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0 z-[200]" align="start">
-                          <Calendar mode="single" selected={partidaDate} onSelect={setPartidaDate} locale={ptBR} className="p-3 pointer-events-auto" />
+                          <Calendar mode="single" selected={partidaDate} onSelect={(date) => { setPartidaDate(date); setIsPartidaCalendarOpen(false); }} locale={ptBR} className="p-3 pointer-events-auto" />
                         </PopoverContent>
                       </Popover>
                       <button
@@ -902,7 +871,7 @@ export function AddDocumentoSheet({
                         </button>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
-                        <Popover>
+                        <Popover open={isChegadaCalendarOpen} onOpenChange={setIsChegadaCalendarOpen}>
                           <PopoverTrigger asChild>
                             <button className="w-full h-12 rounded-xl border border-border bg-card px-4 text-left text-[14px] flex items-center gap-2">
                               <Icon name="calendar_today" size={16} className="text-muted-foreground" />
@@ -912,7 +881,7 @@ export function AddDocumentoSheet({
                             </button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0 z-[200]" align="start">
-                            <Calendar mode="single" selected={chegadaDate} onSelect={setChegadaDate} locale={ptBR} className="p-3 pointer-events-auto" />
+                            <Calendar mode="single" selected={chegadaDate} onSelect={(date) => { setChegadaDate(date); setIsChegadaCalendarOpen(false); }} locale={ptBR} className="p-3 pointer-events-auto" />
                           </PopoverContent>
                         </Popover>
                         <button
@@ -963,7 +932,7 @@ export function AddDocumentoSheet({
 
                   <div>
                     <label className="text-[12px] font-semibold text-muted-foreground mb-1 block">Datas</label>
-                    <Popover>
+                    <Popover open={isHospedagemCalendarOpen} onOpenChange={setIsHospedagemCalendarOpen}>
                       <PopoverTrigger asChild>
                         <button className="w-full h-12 rounded-xl border border-border bg-card px-4 text-left text-[14px] flex items-center gap-2">
                           <Icon name="calendar_today" size={16} className="text-muted-foreground" />
@@ -983,6 +952,7 @@ export function AddDocumentoSheet({
                           onSelect={(range) => {
                             setCheckInDate(range?.from || undefined);
                             setCheckOutDate(range?.to || undefined);
+                            if (range?.from && range?.to) setIsHospedagemCalendarOpen(false);
                           }}
                           locale={ptBR}
                           numberOfMonths={1}
@@ -1008,7 +978,7 @@ export function AddDocumentoSheet({
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-[12px] font-semibold text-muted-foreground mb-1 block">Data</label>
-                      <Popover>
+                      <Popover open={isAtividadeCalendarOpen} onOpenChange={setIsAtividadeCalendarOpen}>
                         <PopoverTrigger asChild>
                           <button className="w-full h-12 rounded-xl border border-border bg-card px-4 text-left text-[14px] flex items-center gap-2">
                             <Icon name="calendar_today" size={16} className="text-muted-foreground" />
@@ -1018,7 +988,7 @@ export function AddDocumentoSheet({
                           </button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0 z-[200]" align="start">
-                          <Calendar mode="single" selected={atividadeDate} onSelect={setAtividadeDate} locale={ptBR} />
+                          <Calendar mode="single" selected={atividadeDate} onSelect={(date) => { setAtividadeDate(date); setIsAtividadeCalendarOpen(false); }} locale={ptBR} />
                         </PopoverContent>
                       </Popover>
                     </div>

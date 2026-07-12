@@ -10,6 +10,7 @@ export interface CountryInfo {
   name: string; // Portuguese name
   continent: string; // matches visitedCountries continents
   flag: string; // emoji flag
+  aliases?: string[]; // Alternative names or common terms (e.g. "Holanda" for "Países Baixos")
 }
 
 /** Convert ISO-2 country code (e.g. "BR") to flag emoji 🇧🇷 */
@@ -41,7 +42,9 @@ const CONTINENT_BY_ISO3: Record<string, string> = {
   // América Central / Caribe
   BLZ: 'América Central', CRI: 'América Central', SLV: 'América Central', GTM: 'América Central',
   HND: 'América Central', NIC: 'América Central', PAN: 'América Central', CUB: 'América Central',
-  DOM: 'América Central', HTI: 'América Central', JAM: 'América Central',
+  DOM: 'América Central', HTI: 'América Central', JAM: 'América Central', CUW: 'América Central',
+  ABW: 'América Central', BHS: 'América Central', PRI: 'América Central', TTO: 'América Central',
+  SXM: 'América Central', BRB: 'América Central',
   // Europa
   ALB: 'Europa', AND: 'Europa', AUT: 'Europa', BEL: 'Europa', BGR: 'Europa', BIH: 'Europa',
   BLR: 'Europa', CHE: 'Europa', CZE: 'Europa', DEU: 'Europa', DNK: 'Europa', ESP: 'Europa',
@@ -83,7 +86,9 @@ const PT_NAME_BY_ISO3: Record<string, string> = {
   CAN: 'Canadá', USA: 'Estados Unidos', MEX: 'México',
   BLZ: 'Belize', CRI: 'Costa Rica', SLV: 'El Salvador', GTM: 'Guatemala',
   HND: 'Honduras', NIC: 'Nicarágua', PAN: 'Panamá', CUB: 'Cuba',
-  DOM: 'República Dominicana', HTI: 'Haiti', JAM: 'Jamaica',
+  DOM: 'República Dominicana', HTI: 'Haiti', JAM: 'Jamaica', CUW: 'Curaçao',
+  ABW: 'Aruba', BHS: 'Bahamas', PRI: 'Porto Rico', TTO: 'Trinidad e Tobago',
+  SXM: 'Sint Maarten', BRB: 'Barbados',
   AUT: 'Áustria', BEL: 'Bélgica', BGR: 'Bulgária', CHE: 'Suíça', CZE: 'Tchéquia',
   DEU: 'Alemanha', DNK: 'Dinamarca', ESP: 'Espanha', EST: 'Estônia', FIN: 'Finlândia',
   FRA: 'França', GBR: 'Reino Unido', GRC: 'Grécia', HRV: 'Croácia', HUN: 'Hungria',
@@ -106,7 +111,8 @@ const ISO3_TO_ISO2: Record<string, string> = {
   PER: 'PE', SUR: 'SR', URY: 'UY', VEN: 'VE',
   CAN: 'CA', USA: 'US', MEX: 'MX',
   BLZ: 'BZ', CRI: 'CR', SLV: 'SV', GTM: 'GT', HND: 'HN', NIC: 'NI', PAN: 'PA', CUB: 'CU',
-  DOM: 'DO', HTI: 'HT', JAM: 'JM',
+  DOM: 'DO', HTI: 'HT', JAM: 'JM', CUW: 'CW', ABW: 'AW', BHS: 'BS', PRI: 'PR',
+  TTO: 'TT', SXM: 'SX', BRB: 'BB',
   ALB: 'AL', AND: 'AD', AUT: 'AT', BEL: 'BE', BGR: 'BG', BIH: 'BA', BLR: 'BY', CHE: 'CH',
   CZE: 'CZ', DEU: 'DE', DNK: 'DK', ESP: 'ES', EST: 'EE', FIN: 'FI', FRA: 'FR', GBR: 'GB',
   GRC: 'GR', HRV: 'HR', HUN: 'HU', IRL: 'IE', ISL: 'IS', ITA: 'IT', LTU: 'LT', LUX: 'LU',
@@ -176,18 +182,48 @@ export function getCountryInfo(
 }
 
 /**
+ * Common aliases used by users when searching for countries.
+ */
+const ALIASES_BY_ISO3: Record<string, string[]> = {
+  NLD: ['Holanda', 'Netherlands'],
+  GBR: ['Inglaterra', 'Escócia', 'País de Gales', 'Irlanda do Norte', 'Grã-Bretanha', 'UK', 'United Kingdom'],
+  USA: ['EUA', 'Estados Unidos da América', 'US'],
+  ARE: ['Dubai', 'Abu Dhabi', 'UAE'],
+  DEU: ['Germany'],
+  ESP: ['Spain'],
+  FRA: ['France'],
+  ITA: ['Italy'],
+  KOR: ['Coreia'],
+  PRK: ['Coreia'],
+  ZAF: ['Africa do Sul'],
+};
+
+/**
  * Full catalog of countries with a known Portuguese name.
  * Sorted alphabetically by name. Used by the "Add visited countries" search sheet.
  */
-export const ALL_COUNTRIES: CountryInfo[] = Object.keys(PT_NAME_BY_ISO3)
+const regionNames = new Intl.DisplayNames(['pt-BR'], { type: 'region' });
+
+export const ALL_COUNTRIES: CountryInfo[] = Object.keys(CONTINENT_BY_ISO3)
   .map(iso3 => {
     const iso2 = (ISO3_TO_ISO2[iso3] || NAME_TO_ISO2_FALLBACK[iso3] || '').toUpperCase();
+    
+    let name = PT_NAME_BY_ISO3[iso3];
+    if (!name && iso2) {
+      try {
+        name = regionNames.of(iso2) || iso3;
+      } catch {
+        name = iso3;
+      }
+    }
+
     return {
       code: iso2 || iso3,
       iso3,
-      name: PT_NAME_BY_ISO3[iso3],
+      name: name || iso3,
       continent: CONTINENT_BY_ISO3[iso3] || 'Mundo',
       flag: iso2 ? iso2ToFlag(iso2) : '🏳️',
+      aliases: ALIASES_BY_ISO3[iso3] || [],
     } as CountryInfo;
   })
   .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));

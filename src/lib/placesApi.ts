@@ -6,20 +6,21 @@
 import type { CityPlace } from '@/data/cityRecommendations';
 import { estimatedPriceFor } from '@/lib/paidAttractions';
 import { fetchAiPlacesForCity } from '@/lib/aiPlaceRecommendations';
+import { searchGooglePlacesAutocomplete, getGooglePlaceDetails } from '@/lib/googlePlacesApi';
 
 // ─── OSM Tag → App Category mapping ─────────────────────────────────────────
 
 const osmCategoryMap: Record<string, { category: string; categoryColor: string; image: string }> = {
   // Tourism
   museum:          { category: 'Museu',            categoryColor: '#6366F1', image: 'https://images.unsplash.com/photo-1554907984-15263bfd63bd?w=300' },
-  attraction:      { category: 'Ponto Turístico',  categoryColor: '#10B981', image: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=300' },
+  attraction:      { category: 'Ponto Turístico',  categoryColor: '#10B981', image: 'https://images.unsplash.com/photo-1503220317375-aaad61436b1b?w=300' },
   viewpoint:       { category: 'Mirante',           categoryColor: '#0EA5E9', image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=300' },
   gallery:         { category: 'Galeria',           categoryColor: '#6366F1', image: 'https://images.unsplash.com/photo-1531243269054-5ebf6f34081e?w=300' },
   zoo:             { category: 'Zoológico',         categoryColor: '#22C55E', image: 'https://images.unsplash.com/photo-1534567153574-2b12153a87f0?w=300' },
   aquarium:        { category: 'Aquário',           categoryColor: '#0EA5E9', image: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=300' },
   artwork:         { category: 'Arte',              categoryColor: '#8B5CF6', image: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=300' },
   theme_park:      { category: 'Parque Temático',   categoryColor: '#EC4899', image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=300' },
-  information:     { category: 'Informação',        categoryColor: '#6B7280', image: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=300' },
+  information:     { category: 'Informação',        categoryColor: '#6B7280', image: 'https://images.unsplash.com/photo-1503220317375-aaad61436b1b?w=300' },
   // Amenity
   restaurant:      { category: 'Restaurante',       categoryColor: '#F59E0B', image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=300' },
   cafe:            { category: 'Cafeteria',          categoryColor: '#92400E', image: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=300' },
@@ -62,7 +63,7 @@ const osmCategoryMap: Record<string, { category: string; categoryColor: string; 
   pedestrian:      { category: 'Calçadão',           categoryColor: '#10B981', image: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=300' },
 };
 
-const defaultCategory = { category: 'Local', categoryColor: '#6B7280', image: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=300' };
+const defaultCategory = { category: 'Local', categoryColor: '#6B7280', image: 'https://images.unsplash.com/photo-1503220317375-aaad61436b1b?w=300' };
 
 function getOsmCategory(tags: Record<string, string>) {
   if (tags.tourism && osmCategoryMap[tags.tourism]) return osmCategoryMap[tags.tourism];
@@ -530,17 +531,19 @@ export async function fetchPlacesForCity(cityName: string): Promise<CityPlace[]>
     // (restaurants/experiences/nightlife/events) in parallel.
     const aiPromise = fetchAiPlacesForCity(cityName).catch(() => [] as CityPlace[]);
 
-    // Geocode city for Wikipedia geosearch
-    const geoRes = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityName)}&format=json&limit=1&accept-language=pt`,
-      { headers: { 'User-Agent': 'WaiTravel/1.0' } }
-    );
-    const geoData = await geoRes.json();
+    // Geocode city for Wikipedia geosearch using Google Places API
+    const googlePredictions = await searchGooglePlacesAutocomplete(cityName, ['(cities)']);
+    let cityLat, cityLng;
+    if (googlePredictions.length > 0) {
+      const details = await getGooglePlaceDetails(googlePredictions[0].placeId);
+      if (details) {
+        cityLat = details.lat;
+        cityLng = details.lng;
+      }
+    }
 
     let wikiPlaces: CityPlace[] = [];
-    if (geoData?.[0]) {
-      const cityLat = parseFloat(geoData[0].lat);
-      const cityLng = parseFloat(geoData[0].lon);
+    if (cityLat !== undefined && cityLng !== undefined) {
       wikiPlaces = await fetchWikipediaNearby(cityLat, cityLng, cacheKey);
     }
 
@@ -601,140 +604,161 @@ function interleaveByCategory(places: CityPlace[]): CityPlace[] {
   return out;
 }
 
-/**
- * Merge static and API places, deduplicating by name similarity.
- * Static data wins (has images, ratings).
- */
 export function mergePlaces(staticPlaces: CityPlace[], apiPlaces: CityPlace[]): CityPlace[] {
-  const staticNames = new Set(staticPlaces.map(p => p.name.toLowerCase().trim()));
-  const merged = [...staticPlaces];
+  const merged: CityPlace[] = [];
+  const allPlaces = [...staticPlaces, ...apiPlaces];
+  
+  const isGoogleImage = (url: string) => url.includes('googleapis.com');
+  const normalize = (name: string) => name.toLowerCase().trim();
 
-  for (const apiPlace of apiPlaces) {
-    const name = apiPlace.name.toLowerCase().trim();
-    // Skip if we already have a similar-name static place
-    if (staticNames.has(name)) continue;
-    // Also check partial match (e.g. "Museu do Louvre" vs "Louvre")
+  for (const place of allPlaces) {
+    const name = normalize(place.name);
     let isDuplicate = false;
-    for (const sn of staticNames) {
-      if (sn.includes(name) || name.includes(sn)) {
+
+    for (const existing of merged) {
+      const existingName = normalize(existing.name);
+
+      // 1. Same exact name
+      if (existingName === name) {
         isDuplicate = true;
         break;
       }
+
+      // 2. Substring match for sufficiently long names
+      if (existingName.length >= 6 && name.length >= 6 && Math.abs(existingName.length - name.length) <= 5) {
+        if (existingName.includes(name) || name.includes(existingName)) {
+          isDuplicate = true;
+          break;
+        }
+      }
+
+      // 3. Same Google Places photo URL
+      if (place.image && isGoogleImage(place.image) && place.image === existing.image) {
+        isDuplicate = true;
+        break;
+      }
+      
+      // 4. Geographic + Fuzzy name match
+      if (place.lat && place.lng && existing.lat && existing.lng) {
+        const distSq = Math.pow(place.lat - existing.lat, 2) + Math.pow(place.lng - existing.lng, 2);
+        
+        // If distance is practically zero (exact same coordinates from Google Places), it's a duplicate
+        if (distSq < 1e-10) {
+          isDuplicate = true;
+          break;
+        }
+
+        // If distance is within ~110m (0.000001 distSq)
+        if (distSq < 0.000001) {
+          const levenshtein = (a: string, b: string) => {
+            const matrix = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
+            for (let i = 0; i <= a.length; i++) matrix[i][0] = i;
+            for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
+            for (let i = 1; i <= a.length; i++) {
+              for (let j = 1; j <= b.length; j++) {
+                if (a[i - 1] === b[j - 1]) matrix[i][j] = matrix[i - 1][j - 1];
+                else matrix[i][j] = Math.min(matrix[i - 1][j - 1], matrix[i][j - 1], matrix[i - 1][j]) + 1;
+              }
+            }
+            return matrix[a.length][b.length];
+          };
+
+          const name1 = name.replace(/[^a-z0-9\s]/g, '');
+          const name2 = existingName.replace(/[^a-z0-9\s]/g, '');
+          const maxLen = Math.max(name1.replace(/\s/g,'').length, name2.replace(/\s/g,'').length);
+          const dist = levenshtein(name1.replace(/\s/g,''), name2.replace(/\s/g,''));
+          
+          // If the names as a whole are at least 50% similar (ignoring spaces), it's a duplicate
+          if (maxLen > 0 && dist / maxLen <= 0.5) {
+            isDuplicate = true;
+            break;
+          }
+          
+          // Fallback to fuzzy word sharing if they are very close
+          const words1 = name1.split(/\s+/).filter(w => w.length >= 4);
+          const words2 = name2.split(/\s+/).filter(w => w.length >= 4);
+          
+          let hasFuzzyMatch = false;
+          for (const w1 of words1) {
+            for (const w2 of words2) {
+              const maxL = Math.max(w1.length, w2.length);
+              if (maxL > 0 && levenshtein(w1, w2) / maxL <= 0.35) {
+                hasFuzzyMatch = true;
+                break;
+              }
+            }
+            if (hasFuzzyMatch) break;
+          }
+          
+          if (hasFuzzyMatch) {
+            isDuplicate = true;
+            break;
+          }
+        }
+      }
     }
+
     if (!isDuplicate) {
-      merged.push(apiPlace);
-      staticNames.add(name);
+      merged.push(place);
     }
   }
 
   return merged;
 }
 
-// ─── Nominatim fallback search ──────────────────────────────────────────────
+// ─── Google Places Text Search fallback ─────────────────────────────────────
 
-interface NominatimResult {
-  place_id: number;
-  lat: string;
-  lon: string;
-  display_name: string;
-  name?: string;
-  class?: string;
-  type?: string;
-  extratags?: Record<string, string>;
-  address?: {
-    road?: string;
-    pedestrian?: string;
-    house_number?: string;
-    suburb?: string;
-    neighbourhood?: string;
-    city?: string;
-    town?: string;
-    village?: string;
-    municipality?: string;
-    state?: string;
-    postcode?: string;
-    country?: string;
-  };
-}
+import { searchGooglePlacesText } from './googlePlacesApi';
 
-const nominatimCategoryMap: Record<string, { category: string; categoryColor: string; image: string }> = {
-  tourism:  { category: 'Ponto Turístico', categoryColor: '#10B981', image: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=300' },
-  historic: { category: 'Monumento',       categoryColor: '#10B981', image: 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=300' },
-  amenity:  { category: 'Local',           categoryColor: '#6B7280', image: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=300' },
-  leisure:  { category: 'Lazer',           categoryColor: '#22C55E', image: 'https://images.unsplash.com/photo-1534430480872-3498386e7856?w=300' },
-  place:    { category: 'Bairro',          categoryColor: '#0EA5E9', image: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=300' },
-  highway:  { category: 'Rua',             categoryColor: '#0EA5E9', image: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=300' },
-  building: { category: 'Edifício',        categoryColor: '#6366F1', image: 'https://images.unsplash.com/photo-1554907984-15263bfd63bd?w=300' },
-  shop:     { category: 'Loja',            categoryColor: '#F59E0B', image: 'https://images.unsplash.com/photo-1555992643-0ab5a39ab10a?w=300' },
+const googleCategoryMap: Record<string, { category: string; categoryColor: string; image: string }> = {
+  tourist_attraction: { category: 'Ponto Turístico', categoryColor: '#10B981', image: 'https://images.unsplash.com/photo-1503220317375-aaad61436b1b?w=300' },
+  museum:             { category: 'Museu',       categoryColor: '#10B981', image: 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=300' },
+  park:               { category: 'Parque',           categoryColor: '#22C55E', image: 'https://images.unsplash.com/photo-1534430480872-3498386e7856?w=300' },
+  restaurant:         { category: 'Restaurante',            categoryColor: '#F59E0B', image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=300' },
+  default:            { category: 'Local',           categoryColor: '#6B7280', image: 'https://images.unsplash.com/photo-1503220317375-aaad61436b1b?w=300' },
 };
 
-const nominatimCache = new Map<string, CityPlace[]>();
+const googleSearchCache = new Map<string, CityPlace[]>();
 
 /**
- * Search any named place in OpenStreetMap via Nominatim, restricted to a city.
- * Used as a fallback when local data + Overpass yield 0 matches for a query.
+ * Search any named place using Google Places Text Search.
+ * Used as a fallback when local data yields 0 matches.
  */
-export async function searchNominatim(query: string, city: string): Promise<CityPlace[]> {
+export async function searchGoogleFallback(query: string, city: string): Promise<CityPlace[]> {
   const q = query.trim();
   if (q.length < 2) return [];
   const cacheKey = `${city.toLowerCase()}::${q.toLowerCase()}`;
-  const cached = nominatimCache.get(cacheKey);
+  const cached = googleSearchCache.get(cacheKey);
   if (cached) return cached;
 
-  // Detect Brazilian postal code (CEP) like 01310-100 or 01310100
-  const cepMatch = q.replace(/\s/g, '').match(/^\d{5}-?\d{3}$/);
-  const isCep = !!cepMatch;
-
   try {
-    const fullQuery = isCep
-      ? q.replace(/\s/g, '')
-      : (city ? `${q}, ${city}` : q);
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(fullQuery)}&format=json&limit=8&addressdetails=1&accept-language=pt&extratags=1`;
-    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-    if (!res.ok) return [];
-    const data: NominatimResult[] = await res.json();
+    const results = await searchGooglePlacesText(q, city);
 
-    const places: CityPlace[] = data.map(r => {
-      const klass = r.class || '';
-      const meta = nominatimCategoryMap[klass] || nominatimCategoryMap.tourism;
-      const addr = r.address || {};
-      const street = addr.road || addr.pedestrian || '';
-      const houseNum = addr.house_number ? `, ${addr.house_number}` : '';
-      const cityName = addr.city || addr.town || addr.village || addr.municipality || addr.suburb || '';
-      const stateName = addr.state || '';
-      const postcode = addr.postcode || '';
-      const fallbackCity = city || cityName || (r.display_name.split(',').slice(-3, -2)[0] || '').trim();
-
-      // Build a clean address line: "Rua X, 123 — Bairro, Cidade — CEP"
-      const addressParts: string[] = [];
-      if (street) addressParts.push(`${street}${houseNum}`);
-      const cityState = [cityName, stateName].filter(Boolean).join(' - ');
-      if (cityState) addressParts.push(cityState);
-      if (postcode) addressParts.push(postcode);
-      const addressLine = addressParts.length > 0 ? addressParts.join(' • ') : r.display_name;
-
-      const name = r.name || street || r.display_name.split(',')[0];
+    const places: CityPlace[] = results.map(r => {
+      const type = r.primaryType || 'default';
+      const meta = googleCategoryMap[type] || googleCategoryMap.default;
 
       return {
-        id: r.place_id + 900000,
-        name,
-        city: (cityName || fallbackCity || '').toString().toLowerCase(),
+        // Generate a random stable-ish ID
+        id: Math.floor(Math.random() * 1000000) + 900000,
+        name: r.name,
+        city: city.toLowerCase(),
         category: meta.category,
         categoryColor: meta.categoryColor,
         image: meta.image,
         rating: 0,
-        price: estimatedPriceFor(name, cityName || fallbackCity),
+        price: estimatedPriceFor(r.name, city),
         openHours: '',
-        lat: parseFloat(r.lat),
-        lng: parseFloat(r.lon),
-        address: addressLine,
+        lat: r.lat,
+        lng: r.lng,
+        address: r.address,
       };
     });
 
-    nominatimCache.set(cacheKey, places);
+    googleSearchCache.set(cacheKey, places);
     return places;
   } catch (e) {
-    console.warn('Nominatim search failed:', e);
+    console.warn('Google search fallback failed:', e);
     return [];
   }
 }

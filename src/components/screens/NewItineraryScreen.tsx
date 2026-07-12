@@ -19,6 +19,9 @@ import { format, differenceInDays, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ItineraryFormData } from '@/components/travel/CreateItinerarySheet';
 import { BackButton } from '@/components/ui/BackButton';
+import { useAuth } from '@/contexts/AuthContext';
+import { useMyItineraries } from '@/hooks/use-my-itineraries';
+import { PlanLimitReachedSheet } from '@/components/travel/PlanLimitReachedSheet';
 
 interface Activity {
   id: number;
@@ -52,6 +55,7 @@ interface NewItineraryScreenProps {
   onBack: () => void;
   onDelete?: () => void;
   onNavigateToSales?: () => void;
+  onUpgrade?: () => void;
 }
 
 const activityColors = ['#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EF4444', '#EC4899'];
@@ -80,7 +84,14 @@ function getTransportIcon(type: TransportBetween['type']) {
   }
 }
 
-export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales }: NewItineraryScreenProps) {
+export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales, onUpgrade }: NewItineraryScreenProps) {
+  const { session } = useAuth();
+  const { itineraries: myItinerariesForLimit } = useMyItineraries();
+  const FREE_PLAN_ITINERARY_LIMIT = 3;
+  const ownCreatedCount = myItinerariesForLimit.filter(
+    (it) => it.userId === session?.user?.id && it.sourceDatasetId == null
+  ).length;
+
   const [selectedDay, setSelectedDay] = useState(1);
   const [showTransportes, setShowTransportes] = useState(false);
   const [showReservas, setShowReservas] = useState(false);
@@ -91,6 +102,7 @@ export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales }
   const [dayTitles, setDayTitles] = useState<Record<number, string>>({});
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showPlanLimitSheet, setShowPlanLimitSheet] = useState(false);
   const [showPublishFlow, setShowPublishFlow] = useState(false);
   const [showEditPublish, setShowEditPublish] = useState(false);
   const [isItineraryPublic, setIsItineraryPublic] = useState(false);
@@ -520,7 +532,13 @@ export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales }
         onClose={() => setShowSettings(false)}
         tripName={itineraryData.destinations.length > 0 ? `${itineraryData.destinations[0].split(',')[0]} trip` : 'Paris trip'}
         onManageItinerary={() => setShowManageItinerary(true)}
-        onDuplicate={() => setDuplicateToast(true)}
+        onDuplicate={() => {
+          if (ownCreatedCount >= FREE_PLAN_ITINERARY_LIMIT) {
+            setShowPlanLimitSheet(true);
+          } else {
+            setDuplicateToast(true);
+          }
+        }}
         onDelete={onDelete ?? onBack}
         isPublic={isItineraryPublic}
         onTogglePublic={(v) => setIsItineraryPublic(v)}
@@ -602,19 +620,28 @@ export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales }
             setSelectedActivity(null);
             setItineraryData(prev => {
               const firstDestination = prev.destinations[0] ?? 'Paris, França';
-              const [city, ...rest] = firstDestination.split(',');
-              const duplicatedFirst = `Cópia de ${city.trim()}${rest.length ? `,${rest.join(',')}` : ''}`;
+              const [city] = firstDestination.split(',');
+              const newTitle = prev.tripName ? `Cópia de ${prev.tripName}` : `Cópia de ${city.trim()}`;
 
               return {
                 ...prev,
-                destinations: prev.destinations.length > 0
-                  ? [duplicatedFirst, ...prev.destinations.slice(1)]
-                  : ['Cópia de Paris, França'],
+                tripName: newTitle,
               };
             });
             setIsOpeningDuplicate(false);
           }, 700);
         }}
+      />
+
+      <PlanLimitReachedSheet
+        isOpen={showPlanLimitSheet}
+        onClose={() => setShowPlanLimitSheet(false)}
+        onUpgrade={() => {
+          setShowPlanLimitSheet(false);
+          onUpgrade?.();
+        }}
+        currentCount={ownCreatedCount}
+        limit={FREE_PLAN_ITINERARY_LIMIT}
       />
     </div>
   );

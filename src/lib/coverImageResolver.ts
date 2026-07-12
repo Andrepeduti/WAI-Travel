@@ -61,7 +61,7 @@ const cityImages: Record<string, string> = {
   'florianópolis': 'https://images.unsplash.com/photo-1561518776-e76a5e48f731?w=800',
   'fortaleza': 'https://images.unsplash.com/photo-1571406761758-9a3eed5338ef?w=800',
   'natal': 'https://images.unsplash.com/photo-1583521214690-73421a1829a9?w=800',
-  'maceió': 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=800',
+  'maceió': 'https://images.unsplash.com/photo-1503220317375-aaad61436b1b?w=800',
   'porto seguro': 'https://images.unsplash.com/photo-1526392060635-9d6019884377?w=800',
   'búzios': 'https://images.unsplash.com/photo-1483729558449-99ef09a8c325?w=800',
   'jericoacoara': 'https://images.unsplash.com/photo-1571406761758-9a3eed5338ef?w=800',
@@ -100,7 +100,7 @@ const countryImages: Record<string, string> = {
   'chile': 'https://images.unsplash.com/photo-1531761535209-180857e963b9?w=800',
 };
 
-export const GENERIC_TRAVEL_PLACEHOLDER = 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=800';
+export const GENERIC_TRAVEL_PLACEHOLDER = 'https://images.unsplash.com/photo-1503220317375-aaad61436b1b?w=800';
 
 /**
  * Builds a dynamic Unsplash Source URL for a country query.
@@ -108,10 +108,7 @@ export const GENERIC_TRAVEL_PLACEHOLDER = 'https://images.unsplash.com/photo-146
  * so we still get a country-themed photo instead of a generic one.
  */
 function dynamicCountryImage(country: string): string {
-  const q = country.trim().toLowerCase();
-  if (!q) return GENERIC_TRAVEL_PLACEHOLDER;
-  // Unsplash Source returns a random featured image matching the query
-  return `https://source.unsplash.com/800x600/?${encodeURIComponent(q)},travel,landmark`;
+  return GENERIC_TRAVEL_PLACEHOLDER;
 }
 
 function resolveCountryImage(country: string): string {
@@ -123,7 +120,7 @@ function resolveCountryImage(country: string): string {
 const LEGACY_GENERIC_COVER_IDS = [
   'photo-1488646953014-85c8e12f0c0e',
   'photo-1488646953014-85cb44e25828',
-  'photo-1469854523086-cc02fe5d8800',
+  'photo-1503220317375-aaad61436b1b',
 ];
 
 function isUsableCustomCover(url?: string): url is string {

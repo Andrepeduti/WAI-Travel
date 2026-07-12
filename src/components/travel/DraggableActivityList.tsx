@@ -143,7 +143,7 @@ export function DraggableActivityList({
           const transport = transports[index];
 
           return (
-            <React.Fragment key={activity.id}>
+            <React.Fragment key={`${activity.id}-${index}`}>
               {/* Activity row: timeline left + card right */}
               <div className="flex gap-3">
                 {/* Timeline left column - times only */}
@@ -421,6 +421,7 @@ export function DraggableActivityList({
               <span className="text-[14px] font-medium text-foreground flex-1 text-left">Ver no mapa</span>
               <Icon name="chevron_right" size={18} className="text-muted-foreground" />
             </button>
+            {/* 
             <button
               className="w-full flex items-center gap-3 py-3.5 px-4 rounded-xl hover:bg-destructive/10 transition-colors"
               onClick={() => {
@@ -435,6 +436,7 @@ export function DraggableActivityList({
               </div>
               <span className="text-[14px] font-medium text-destructive flex-1 text-left">Excluir</span>
             </button>
+            */}
           </div>
         </SheetContent>
       </Sheet>

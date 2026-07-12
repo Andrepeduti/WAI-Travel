@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -28,8 +28,41 @@ export function AddVisitedCountriesSheet({
 }: AddVisitedCountriesSheetProps) {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const visitedSet = useMemo(() => new Set(visitedCodes), [visitedCodes]);
+
+  // Track visual viewport to react to keyboard open/close
+  useEffect(() => {
+    if (!open) return;
+
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const onResize = () => {
+      setViewportHeight(vv.height);
+    };
+
+    // Set initial value
+    onResize();
+
+    vv.addEventListener('resize', onResize);
+    vv.addEventListener('scroll', onResize);
+
+    return () => {
+      vv.removeEventListener('resize', onResize);
+      vv.removeEventListener('scroll', onResize);
+    };
+  }, [open]);
+
+  // Reset viewport height when sheet closes
+  useEffect(() => {
+    if (!open) {
+      setViewportHeight(null);
+    }
+  }, [open]);
 
   /**
    * Normaliza string removendo diacríticos (acentos, cedilha) para que a busca
@@ -41,11 +74,18 @@ export function AddVisitedCountriesSheet({
 
   const filtered = useMemo(() => {
     const q = normalize(query.trim());
-    if (!q) return ALL_COUNTRIES;
+    // Só mostra países depois que o usuário começa a digitar.
+    // Assim o sheet fica curto no mobile e o teclado não oculta o input.
+    if (!q) return [];
     return ALL_COUNTRIES.filter(
-      c => normalize(c.name).includes(q) || normalize(c.continent).includes(q),
+      c => 
+        normalize(c.name).includes(q) || 
+        normalize(c.continent).includes(q) ||
+        (c.aliases && c.aliases.some(alias => normalize(alias).includes(q)))
     );
   }, [query]);
+
+  const hasQuery = query.trim().length > 0;
 
   const toggle = (code: string) => {
     setSelected(prev => {
@@ -72,13 +112,31 @@ export function AddVisitedCountriesSheet({
     onOpenChange(next);
   };
 
+  // When the input receives focus, scroll the list container into view after
+  // the keyboard finishes animating (small delay).
+  const handleInputFocus = useCallback(() => {
+    setTimeout(() => {
+      listRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 350);
+  }, []);
+
   const selectableCount = Array.from(selected).filter(code => !visitedSet.has(code)).length;
+
+  // Compute the max-height for the sheet: when the keyboard is open,
+  // use the visual viewport height; otherwise fall back to 85vh.
+  const windowH = typeof window !== 'undefined' ? window.innerHeight : 0;
+  const keyboardIsOpen = viewportHeight != null && windowH > 0 && (windowH - viewportHeight) > 100;
+  const sheetMaxHeight = keyboardIsOpen
+    ? `${viewportHeight}px`
+    : '85vh';
 
   return (
     <Sheet open={open} onOpenChange={handleClose}>
       <SheetContent
         side="bottom"
-        className="rounded-t-2xl px-0 pb-0 pt-3 max-h-[85vh] overflow-hidden flex flex-col"
+        className="rounded-t-2xl px-0 pb-0 pt-3 overflow-hidden flex flex-col"
+        style={{ maxHeight: sheetMaxHeight, transition: 'max-height 0.15s ease-out' }}
+        onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <div className="w-10 h-1 rounded-full mx-auto mb-3" style={{ background: 'hsl(var(--muted))' }} />
 
@@ -96,11 +154,16 @@ export function AddVisitedCountriesSheet({
           >
             <Icon name="search" size={18} style={{ color: '#8E8E93' }} />
             <input
+              ref={inputRef}
               value={query}
               onChange={e => setQuery(e.target.value)}
+              onFocus={handleInputFocus}
               placeholder="Buscar país ou continente"
               className="flex-1 bg-transparent outline-none text-foreground"
               style={{ fontSize: 16, fontWeight: 500 }}
+              autoFocus={false}
+              autoComplete="off"
+              enterKeyHint="search"
             />
             {query && (
               <button onClick={() => setQuery('')} aria-label="Limpar">
@@ -111,8 +174,24 @@ export function AddVisitedCountriesSheet({
         </div>
 
         {/* List */}
-        <div className="flex-1 overflow-y-auto px-2">
-          {filtered.length === 0 ? (
+        <div ref={listRef} className="flex-1 overflow-y-auto px-2">
+          {!hasQuery ? (
+            /* Estado inicial: sem busca → convida o usuário a digitar */
+            <div className="flex flex-col items-center justify-center py-12">
+              <div
+                className="w-14 h-14 rounded-full flex items-center justify-center mb-3"
+                style={{ background: '#F2F2F2' }}
+              >
+                <Icon name="travel_explore" size={26} className="text-muted-foreground" />
+              </div>
+              <p className="text-muted-foreground text-center" style={{ fontSize: 14, fontWeight: 600 }}>
+                Busque um país para adicionar
+              </p>
+              <p className="text-muted-foreground text-center mt-1" style={{ fontSize: 12 }}>
+                Digite o nome do país ou continente
+              </p>
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
               <div
                 className="w-14 h-14 rounded-full flex items-center justify-center mb-3"
@@ -144,6 +223,7 @@ export function AddVisitedCountriesSheet({
                           style={{ fontSize: 14, fontWeight: 600 }}
                         >
                           {country.name}
+                          {query.trim() && !normalize(country.name).includes(normalize(query.trim())) && country.aliases?.some(a => normalize(a).includes(normalize(query.trim()))) ? ` (${country.aliases.find(a => normalize(a).includes(normalize(query.trim())))})` : ''}
                         </p>
                         <p
                           className="text-muted-foreground truncate"
@@ -174,7 +254,7 @@ export function AddVisitedCountriesSheet({
 
         {/* Footer */}
         <div
-          className="px-5 pt-3 pb-6"
+          className="px-5 pt-3 pb-6 shrink-0"
           style={{ borderTop: '1px solid hsl(var(--divider))', background: '#FFFFFF' }}
         >
           <button

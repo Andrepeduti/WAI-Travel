@@ -3,6 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Icon } from '@/components/ui/Icon';
 import { BackButton } from '@/components/ui/BackButton';
+import { searchGooglePlacesText } from '@/lib/googlePlacesApi';
 
 interface MapPlace {
   id: number;
@@ -55,24 +56,15 @@ function createPinIcon(color: string = '#9DCC36', selected = false) {
 }
 
 async function geocode(name: string, address?: string): Promise<{ lat: number; lng: number } | null> {
-  const queries = [
-    [name, address].filter(Boolean).join(', '),
-    name,
-  ].filter(q => q && q.trim().length > 0);
-  for (const q of queries) {
-    try {
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&accept-language=pt`;
-      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-      if (!res.ok) continue;
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        const lat = parseFloat(data[0].lat);
-        const lng = parseFloat(data[0].lon);
-        if (!Number.isNaN(lat) && !Number.isNaN(lng)) return { lat, lng };
-      }
-    } catch {
-      // try next
+  const query = [name, address].filter(Boolean).join(', ');
+  if (!query) return null;
+  try {
+    const results = await searchGooglePlacesText(query);
+    if (results && results.length > 0) {
+      return { lat: results[0].lat, lng: results[0].lng };
     }
+  } catch {
+    // ignore
   }
   return null;
 }
@@ -90,7 +82,7 @@ export function CollectionMapScreen({ title, places, onBack }: CollectionMapScre
   );
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  // Geocode missing places (sequential w/ small delay to be polite with Nominatim)
+  // Geocode missing places (sequential w/ small delay to be polite with APIs)
   useEffect(() => {
     let cancelled = false;
     const missing = places.filter(

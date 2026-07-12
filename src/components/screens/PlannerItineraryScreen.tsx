@@ -62,6 +62,8 @@ import { loadBudget, saveBudget } from '@/lib/budgetApi';
 import { listItineraryMembers, getMyRole, getItineraryOwnerProfile, type ItineraryMember, type ItineraryRole } from '@/lib/itineraryMembersApi';
 import { ShareItinerarySheet } from '@/components/travel/ShareItinerarySheet';
 import { useItineraryRealtime } from '@/hooks/use-itinerary-realtime';
+import { useMyItineraries } from '@/hooks/use-my-itineraries';
+import { PlanLimitReachedSheet } from '@/components/travel/PlanLimitReachedSheet';
 const LazyItineraryMapScreen = lazy(() => import('./ItineraryMapScreen').then((m) => ({ default: m.ItineraryMapScreen })));
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -129,6 +131,7 @@ export interface PlannerItineraryScreenProps {
   onSaveCreatorEdit?: () => void;
   onNavigateToSales?: () => void;
   onOpenItinerary?: (dataset: UserItinerary) => void;
+  onUpgrade?: () => void;
 }
 
 // ─── Persistence helpers ─────────────────────────────────────────────────────
@@ -340,27 +343,31 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
 
 /** Pick best transport mode & estimate duration based on straight-line distance */
 function smartTransport(distanceKm: number): TransportBetween {
+  if (distanceKm < 0.01) {
+    return { type: 'walk', duration: '0 min', distance: '0 m' };
+  }
   // Apply a 1.3x factor to approximate real road distance from straight-line
   const roadKm = distanceKm * 1.3;
+  const distStr = roadKm < 1 ? `${Math.round(roadKm * 1000)} m` : `${roadKm.toFixed(1)} km`;
 
   if (roadKm <= 1.2) {
     // Walk: avg 5 km/h
-    const mins = Math.max(5, Math.round((roadKm / 5) * 60));
-    return { type: 'walk', duration: `${mins} min` };
+    const mins = Math.max(3, Math.round((roadKm / 5) * 60));
+    return { type: 'walk', duration: `${mins} min`, distance: distStr };
   }
   if (roadKm <= 5) {
     // Bus/Tram: avg 18 km/h (urban, with stops)
     const mins = Math.max(8, Math.round((roadKm / 18) * 60));
-    return { type: 'bus', duration: `${mins} min` };
+    return { type: 'bus', duration: `${mins} min`, distance: distStr };
   }
   if (roadKm <= 15) {
     // Metro: avg 30 km/h
     const mins = Math.max(10, Math.round((roadKm / 30) * 60));
-    return { type: 'metro', duration: `${mins} min` };
+    return { type: 'metro', duration: `${mins} min`, distance: distStr };
   }
   // Car/Taxi: avg 40 km/h (urban)
   const mins = Math.max(10, Math.round((roadKm / 40) * 60));
-  return { type: 'car', duration: `${mins} min` };
+  return { type: 'car', duration: `${mins} min`, distance: distStr };
 }
 
 function getTransportIcon(type: TransportBetween['type']) {
@@ -386,12 +393,12 @@ async function getRouteInfo(
     const { data, error } = await supabase.functions.invoke('get-route', {
       body: { origin: [lng1, lat1], destination: [lng2, lat2] },
     });
-    if (error || !data?.duration_min) throw new Error(error?.message || 'no data');
+    if (error || data?.duration_min == null) throw new Error(error?.message || 'no data');
 
     const result: TransportBetween = {
       type: (data.transport_type === 'walk' ? 'walk' : data.transport_type === 'bus' ? 'bus' : data.transport_type === 'metro' ? 'metro' : 'car') as TransportBetween['type'],
       duration: `${data.duration_min} min`,
-      distance: data.distance_km ? `${data.distance_km} km` : undefined,
+      distance: data.distance_km != null ? `${data.distance_km} km` : (Number(data.duration_min) === 0 ? '0 m' : undefined),
     };
     routeCache.set(key, result);
     return result;
@@ -485,6 +492,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   const [editObservation, setEditObservation] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [showShareSheet, setShowShareSheet] = useState(false);
+  const [showPlanLimitSheet, setShowPlanLimitSheet] = useState(false);
   const [showPublishFlow, setShowPublishFlow] = useState(!!autoOpenPublishFlow);
   const [showEditPublish, setShowEditPublish] = useState(false);
   const [isItineraryPublic, setIsItineraryPublic] = useState(data.isPublic ?? false);
@@ -520,6 +528,13 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
 
   const [showManageItinerary, setShowManageItinerary] = useState(false);
   const [showParticipantsSheet, setShowParticipantsSheet] = useState(false);
+  
+  const { itineraries: myItinerariesForLimit } = useMyItineraries();
+  const FREE_PLAN_ITINERARY_LIMIT = 3;
+  const ownCreatedCount = myItinerariesForLimit.filter(
+    (it) => it.userId === session?.user?.id && it.sourceDatasetId == null
+  ).length;
+
   const [itineraryData, setItineraryData] = useState(data);
   const [manualCover, setManualCover] = useState<string | null>(data.coverImage ?? null);
   const isFirstRender = useRef(true);
@@ -709,12 +724,11 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   // ─── Documentos (reservas + transportes-doc) sync com Lovable Cloud ───
   const docsHydratedRef = useRef(false);
   const skipNextDocsSaveRef = useRef(false);
-  const skipNextDocsRemoteRef = useRef(false);
+  const lastDocsSaveTimeRef = useRef(0);
 
   const reloadDocs = useCallback(async () => {
     if (!isUuidId || typeof itineraryId !== 'string') return;
-    if (skipNextDocsRemoteRef.current) {
-      skipNextDocsRemoteRef.current = false;
+    if (Date.now() - lastDocsSaveTimeRef.current < 2500) {
       return;
     }
     const remote = await loadItineraryDocs(itineraryId);
@@ -744,7 +758,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       return;
     }
     const handle = setTimeout(async () => {
-      skipNextDocsRemoteRef.current = true;
+      lastDocsSaveTimeRef.current = Date.now();
       const result = await saveItineraryDocs(itineraryId, { reservas, transportes });
       if (!result) return;
       const hasPendingResv = reservas.some((r) => r._pendingFile);
@@ -761,12 +775,11 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   // ─── Notas (notes) sync com Lovable Cloud ──────────────────────────────
   const notesHydratedRef = useRef(false);
   const skipNextNotesSaveRef = useRef(false);
-  const skipNextNotesRemoteRef = useRef(false);
+  const lastNotesSaveTimeRef = useRef(0);
 
   const reloadNotes = useCallback(async () => {
     if (!isUuidId || typeof itineraryId !== 'string') return;
-    if (skipNextNotesRemoteRef.current) {
-      skipNextNotesRemoteRef.current = false;
+    if (Date.now() - lastNotesSaveTimeRef.current < 2500) {
       return;
     }
     const remote = await loadItineraryNotes(itineraryId);
@@ -793,19 +806,18 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       skipNextNotesSaveRef.current = false;
       return;
     }
-    skipNextNotesRemoteRef.current = true;
+    lastNotesSaveTimeRef.current = Date.now();
     void saveItineraryNotes(itineraryId, tripNotes);
   }, [tripNotes, isUuidId, itineraryId, isViewer]);
 
   // ─── Orçamento (expenses) sync com Lovable Cloud ──────────────────────
   const budgetHydratedRef = useRef(false);
   const skipNextBudgetSaveRef = useRef(false);
-  const skipNextBudgetRemoteRef = useRef(false);
+  const lastBudgetSaveTimeRef = useRef(0);
 
   const reloadBudget = useCallback(async () => {
     if (!isUuidId || typeof itineraryId !== 'string') return;
-    if (skipNextBudgetRemoteRef.current) {
-      skipNextBudgetRemoteRef.current = false;
+    if (Date.now() - lastBudgetSaveTimeRef.current < 2500) {
       return;
     }
     const remote = await loadBudget(itineraryId);
@@ -831,7 +843,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       return;
     }
     const handle = setTimeout(() => {
-      skipNextBudgetRemoteRef.current = true;
+      lastBudgetSaveTimeRef.current = Date.now();
       void saveBudget(itineraryId, expenses);
     }, 600);
     return () => clearTimeout(handle);
@@ -1411,14 +1423,24 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
 
     const missingIndices: number[] = [];
     for (let i = 0; i < needed; i++) {
-      if (!transports[i] || transports[i].duration === '0 min') {
+      const isPlaceholder = !transports[i] || (transports[i].duration === '0 min' && transports[i].distance === undefined);
+      if (isPlaceholder) {
         const from = activities[i];
         const to = activities[i + 1];
         if (from?.lat && from?.lng && to?.lat && to?.lng) {
           missingIndices.push(i);
+        } else {
+          console.log('[DEBUG] Transport', i, 'isPlaceholder but missing lat/lng. from:', from, 'to:', to);
         }
+      } else {
+        // console.log('[DEBUG] Transport', i, 'is NOT placeholder.', transports[i]);
       }
     }
+    
+    if (missingIndices.length > 0) {
+      console.log('[DEBUG] INFINITE LOOP TRIGGERED! missingIndices:', missingIndices, 'Transports:', transports.map(t => t ? `${t.duration} - ${t.distance}` : 'null'));
+    }
+
     if (missingIndices.length === 0) return;
 
     // Async fill
@@ -2249,18 +2271,18 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
 
       {/* Hero Header */}
       <div
-        className="relative bg-cover bg-center"
+        className="relative bg-cover bg-center flex flex-col justify-between"
         style={{
-          height: '26vh',
-          minHeight: '200px',
-          maxHeight: '260px',
+          minHeight: '280px',
+          paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)',
+          paddingBottom: '40px',
           backgroundImage: `url(${coverImage})`
         }}>
         
         <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/70" />
 
         {/* Nav buttons */}
-        <div className="absolute top-0 left-0 right-0 px-4 flex items-center justify-between z-10" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
+        <div className="relative px-4 flex items-center justify-between z-10">
           <BackButton onClick={onBack} />
           {!creatorEditMode && (
             <button onClick={() => setShowSettings(true)} className="w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-sm">
@@ -2270,7 +2292,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         </div>
 
         {/* Title + metadata on image */}
-        <div className="absolute bottom-20 left-4 right-4 z-10">
+        <div className="relative px-4 z-10 mt-auto">
           <h1 className="text-[24px] font-bold text-white leading-tight mb-2">
             {itineraryData.tripName || itineraryDataset?.title || (itineraryData.destinations.length > 0 ? `${itineraryData.destinations[0].split(',')[0]} trip` : 'Paris trip')}
           </h1>
@@ -2821,7 +2843,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                         className="flex items-center gap-1 text-[13px] font-semibold text-[#7C3AED] active:opacity-70 transition-opacity"
                       >
                         <Icon name="auto_awesome" size={14} className="text-[#7C3AED]" />
-                        Preencher com IA
+                        <span>Preencher com IA</span>
                       </button>
                     )}
                     {dayActs.length >= 2 && (
@@ -2831,17 +2853,14 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                         onClick={() => setConfirmOptimizeDay(dayItem.day)}
                         className="flex items-center gap-1 text-[13px] font-semibold text-[#2563EB] active:opacity-70 transition-opacity disabled:opacity-60"
                       >
-                        {optimizingDays.has(dayItem.day) ? (
-                          <>
-                            <Icon name="autorenew" size={14} className="animate-spin text-[#2563EB]" />
-                            Otimizando…
-                          </>
-                        ) : (
-                          <>
-                            <Icon name="route" size={14} className="text-[#2563EB]" />
-                            Otimizar rota
-                          </>
-                        )}
+                        <Icon 
+                          name={optimizingDays.has(dayItem.day) ? "autorenew" : "route"} 
+                          size={14} 
+                          className={`text-[#2563EB] ${optimizingDays.has(dayItem.day) ? 'animate-spin' : ''}`}
+                        />
+                        <span key={optimizingDays.has(dayItem.day) ? 'optimizing' : 'idle'}>
+                          {optimizingDays.has(dayItem.day) ? 'Otimizando rota...' : 'Otimizar rota'}
+                        </span>
                       </button>
                     )}
                   </div>
@@ -2863,10 +2882,6 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
 
               {dayActs.length > 0 && optimizingDays.has(dayItem.day) ? (
                 <div className="space-y-3 mb-4 animate-fade-in" aria-busy="true" aria-live="polite">
-                  <div className="flex items-center gap-2 text-[12px] font-semibold text-[#2563EB]">
-                    <Icon name="autorenew" size={14} className="animate-spin text-[#2563EB]" />
-                    Otimizando rota…
-                  </div>
                   {Array.from({ length: Math.max(3, dayActs.length) }).map((_, i) => (
                     <div key={i}>
                       <div
@@ -3184,7 +3199,13 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         tripName={itineraryData.tripName?.trim() || itineraryDataset?.title || (itineraryData.destinations.length > 0 ? `${itineraryData.destinations[0].split(',')[0]} trip` : 'Paris trip')}
         onManageItinerary={() => setShowManageItinerary(true)}
         onShare={isUuidId ? () => setShowShareSheet(true) : undefined}
-        onDuplicate={() => setDuplicateToast(true)}
+        onDuplicate={() => {
+          if (ownCreatedCount >= FREE_PLAN_ITINERARY_LIMIT) {
+            setShowPlanLimitSheet(true);
+          } else {
+            setDuplicateToast(true);
+          }
+        }}
         onDelete={onDelete ?? onBack}
         isParticipant={!!(typeof itineraryId === 'string' && session?.user?.id && ownerProfile && ownerProfile.userId !== session.user.id)}
         onLeave={async () => {
@@ -3322,14 +3343,12 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
           if (isUuidId && typeof itineraryId === 'string') {
             try {
               const firstDestination = itineraryData.destinations[0] ?? 'Paris, França';
-              const [city, ...rest] = firstDestination.split(',');
-              const duplicatedFirst = `Cópia de ${city.trim()}${rest.length ? `,${rest.join(',')}` : ''}`;
-              
-              const newTitle = itineraryData.tripName ? `Cópia de ${itineraryData.tripName}` : duplicatedFirst;
+              const [city] = firstDestination.split(',');
+              const newTitle = itineraryData.tripName ? `Cópia de ${itineraryData.tripName}` : `Cópia de ${city.trim()}`;
               
               const newItinerary = await createItinerary({
                 title: newTitle,
-                destinations: itineraryData.destinations.length > 0 ? [duplicatedFirst, ...itineraryData.destinations.slice(1)] : ['Cópia de Paris, França'],
+                destinations: itineraryData.destinations.length > 0 ? [...itineraryData.destinations] : ['Paris, França'],
                 startDate: itineraryData.startDate ? itineraryData.startDate.toISOString() : null,
                 endDate: itineraryData.endDate ? itineraryData.endDate.toISOString() : null,
               });
@@ -3364,14 +3383,12 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
             setSelectedActivity(null);
             setItineraryData((prev) => {
               const firstDestination = prev.destinations[0] ?? 'Paris, França';
-              const [city, ...rest] = firstDestination.split(',');
-              const duplicatedFirst = `Cópia de ${city.trim()}${rest.length ? `,${rest.join(',')}` : ''}`;
+              const [city] = firstDestination.split(',');
+              const newTitle = prev.tripName ? `Cópia de ${prev.tripName}` : `Cópia de ${city.trim()}`;
 
               return {
                 ...prev,
-                destinations: prev.destinations.length > 0 ?
-                [duplicatedFirst, ...prev.destinations.slice(1)] :
-                ['Cópia de Paris, França']
+                tripName: newTitle,
               };
             });
             setIsOpeningDuplicate(false);
@@ -3908,6 +3925,17 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         </p>
       </div>
     </BottomSheet>
+
+    <PlanLimitReachedSheet
+      isOpen={showPlanLimitSheet}
+      onClose={() => setShowPlanLimitSheet(false)}
+      onUpgrade={() => {
+        setShowPlanLimitSheet(false);
+        onUpgrade?.();
+      }}
+      currentCount={ownCreatedCount}
+      limit={FREE_PLAN_ITINERARY_LIMIT}
+    />
     </>);
 
 }

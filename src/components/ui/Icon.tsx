@@ -92,10 +92,12 @@ import {
   XCircleIcon,
   Bars3Icon,
   QrCodeIcon,
+  ComputerDesktopIcon,
+  TicketIcon,
 } from '@heroicons/react/24/outline';
 
 // Lucide icons for transport (not available in Heroicons)
-import { Footprints, Bus as LucideBus, TrainFront, CarFront, TrainFrontTunnel, GripVertical, LayoutList, Rows3, Route, UtensilsCrossed, Landmark, Trees, Wine, MapPin, Ticket, Bike, Coffee, Moon, Luggage, SquarePen, Crown, SunMoon, Umbrella, Mountain, Snowflake, BookMarked, Palette, Sandwich, Waves, Anchor, Flower2, Martini, Building2, Church, PartyPopper, Backpack, Gem, Pause } from 'lucide-react';
+import { Footprints, Bus as LucideBus, TrainFront, CarFront, TrainFrontTunnel, GripVertical, LayoutList, Rows3, Route, UtensilsCrossed, Landmark, Trees, Wine, MapPin, Ticket, Bike, Coffee, Moon, Luggage, SquarePen, Crown, SunMoon, Umbrella, Mountain, Snowflake, BookMarked, Palette, Sandwich, Waves, Anchor, Flower2, Martini, Building2, Church, PartyPopper, Backpack, Gem, Pause, Tent, PawPrint, Leaf, Ship, Beer, Utensils } from 'lucide-react';
 
 // Wrap lucide components to match heroicon SVG prop interface
 const makeLucideWrapper = (LucideIcon: React.ComponentType<any>): React.ComponentType<React.SVGProps<SVGSVGElement>> => {
@@ -151,6 +153,12 @@ const GemIcon = makeLucideWrapper(Gem);
 const UmbrellaIcon = makeLucideWrapper(Umbrella);
 const MountainIcon = makeLucideWrapper(Mountain);
 const SnowflakeIcon = makeLucideWrapper(Snowflake);
+const TentIcon = makeLucideWrapper(Tent);
+const PawPrintIcon = makeLucideWrapper(PawPrint);
+const LeafIcon = makeLucideWrapper(Leaf);
+const ShipIcon = makeLucideWrapper(Ship);
+const BeerIcon = makeLucideWrapper(Beer);
+const UtensilsIcon = makeLucideWrapper(Utensils);
 
 // Heroicons solid (for filled state)
 import {
@@ -357,6 +365,17 @@ const iconMap: Record<string, [React.ComponentType<React.SVGProps<SVGSVGElement>
   celebration: [PartyPopperIcon],
   backpack: [BackpackIcon],
   diamond: [GemIcon],
+  theater_comedy: [TicketIcon],
+  set_meal: [UtensilsIcon],
+  sports_bar: [BeerIcon],
+  liquor: [MartiniIcon],
+  ac_unit: [SnowflakeIcon],
+  terrain: [MountainIcon],
+  tent: [TentIcon],
+  pets: [PawPrintIcon],
+  eco: [LeafIcon],
+  directions_boat: [ShipIcon],
+  laptop_mac: [ComputerDesktopIcon],
 };
 
 interface IconProps {

@@ -10,6 +10,7 @@ import type { DateRange } from 'react-day-picker';
 import { resolveNextRange } from '@/lib/dateRangeSelection';
 import { SuccessToast } from '@/components/travel/SuccessToast';
 import { BackButton } from '@/components/ui/BackButton';
+import { searchGooglePlacesAutocomplete } from '@/lib/googlePlacesApi';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -86,7 +87,7 @@ interface ManageItineraryScreenProps {
 
 const defaultCover = 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=600';
 
-// ─── City autocomplete (Nominatim) ───────────────────────────────────────────
+// ─── City autocomplete (Google Places) ───────────────────────────────────────────
 
 interface CitySuggestion {
   display_name: string;
@@ -105,38 +106,23 @@ function useCitySearch(query: string) {
     }
     setLoading(true);
     clearTimeout(timerRef.current);
-    const ctrl = new AbortController();
+    let active = true;
     timerRef.current = setTimeout(async () => {
       try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=10&accept-language=pt-BR`,
-          { signal: ctrl.signal }
-        );
-        const data = await res.json();
-        const mapped: CitySuggestion[] = (Array.isArray(data) ? data : [])
-          .filter((r: any) => {
-            const addr = r.address || {};
-            const cityField = addr.city || addr.town || addr.village || addr.municipality || addr.hamlet;
-            if (!cityField || !addr.country) return false;
-            if (r.type === 'country' || r.type === 'state' || r.type === 'region' || r.type === 'administrative') return false;
-            return true;
-          })
-          .slice(0, 5)
-          .map((r: any) => {
-            const addr = r.address || {};
-            const city = addr.city || addr.town || addr.village || addr.municipality || addr.hamlet;
-            return { display_name: `${city}, ${addr.country}` };
-          });
-        setResults(mapped);
+        const predictions = await searchGooglePlacesAutocomplete(query, ['(cities)']);
+        const mapped: CitySuggestion[] = predictions.map(p => ({
+            display_name: p.location ? `${p.name}, ${p.location}` : p.name,
+        }));
+        if (active) setResults(mapped);
       } catch {
-        setResults([]);
+        if (active) setResults([]);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }, 350);
     return () => {
+      active = false;
       clearTimeout(timerRef.current);
-      ctrl.abort();
     };
   }, [query]);
 
@@ -165,6 +151,7 @@ export function ManageItineraryScreen({
   const [dateRange, setDateRange] = useState<DateRange | undefined>(
     initialStart ? { from: initialStart, to: initialEnd } : undefined
   );
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [currency, setCurrency] = useState(initialCurrency);
   const [description, setDescription] = useState(initialDescription);
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
@@ -320,7 +307,7 @@ export function ManageItineraryScreen({
       {/* Dates */}
       <div className="px-4 mb-5">
         <label className="text-[13px] font-medium text-muted-foreground block mb-1.5">Datas da viagem</label>
-        <Popover>
+        <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
           <PopoverTrigger asChild>
             <button className="w-full px-4 py-3 rounded-xl border border-border bg-background text-[14px] text-left flex items-center justify-between">
               <span className={dateRange?.from ? 'text-foreground' : 'text-muted-foreground'}>
@@ -336,8 +323,9 @@ export function ManageItineraryScreen({
               mode="range"
               selected={dateRange}
               onSelect={(range, day) => {
-                const { range: next } = resolveNextRange(dateRange, range, day);
+                const { range: next, isComplete } = resolveNextRange(dateRange, range, day);
                 setDateRange(next);
+                if (isComplete) setIsCalendarOpen(false);
               }}
               locale={ptBR}
               scrollable

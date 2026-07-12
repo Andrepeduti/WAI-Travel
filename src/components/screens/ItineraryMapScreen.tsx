@@ -198,7 +198,10 @@ export function ItineraryMapScreen({ title, places, days, onMovePlaceToDay, onBa
       attributionControl: false,
     }).setView([48.8566, 2.3522], 13);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+    L.tileLayer('https://mt0.google.com/vt/lyrs=m&hl=pt-BR&x={x}&y={y}&z={z}', {
+      maxZoom: 20,
+      attribution: '© Google',
+    }).addTo(map);
 
     mapRef.current = map;
 

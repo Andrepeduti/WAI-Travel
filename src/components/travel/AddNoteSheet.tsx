@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { DaySelector } from './DaySelector';
+import { searchGooglePlacesText } from '@/lib/googlePlacesApi';
 
 interface AddNoteSheetProps {
   open: boolean;
@@ -72,22 +73,29 @@ export function AddNoteSheet({ open, onClose, onSave, dayNumber, totalDays, star
       return;
     }
     setIsSearching(true);
+    let active = true;
     searchTimeout.current = setTimeout(async () => {
       try {
-        const normalized = query.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(normalized)}&limit=5&addressdetails=1`,
-          { headers: { 'Accept-Language': 'pt-BR' } },
-        );
-        const data = (await res.json()) as AddressSuggestion[];
-        setSuggestions(data);
-        setShowSuggestions(data.length > 0);
+        const results = await searchGooglePlacesText(query);
+        const mapped: AddressSuggestion[] = results.map(r => ({
+            display_name: r.address ? `${r.name}, ${r.address}` : r.name,
+            lat: String(r.lat),
+            lon: String(r.lng),
+            place_id: parseInt(r.id.replace(/\D/g, '').substring(0, 8)) || Math.floor(Math.random() * 1000000)
+        }));
+        if (active) {
+            setSuggestions(mapped);
+            setShowSuggestions(mapped.length > 0);
+        }
       } catch {
-        setSuggestions([]);
+        if (active) setSuggestions([]);
       } finally {
-        setIsSearching(false);
+        if (active) setIsSearching(false);
       }
-    }, 350);
+    }, 1000);
+    return () => {
+      active = false;
+    };
   }, []);
 
   const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {

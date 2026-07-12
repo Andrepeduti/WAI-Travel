@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { DaySelector } from './DaySelector';
 import { getPlacesForDestinations, getDestinationForDay, searchPlaces, groupByCity, type CityPlace } from '@/data/cityRecommendations';
-import { fetchPlacesForCity, mergePlaces, searchNominatim } from '@/lib/placesApi';
+import { fetchPlacesForCity, mergePlaces, searchGoogleFallback } from '@/lib/placesApi';
 import { getUserCollections, type UserCollection } from '@/components/screens/TripsScreen';
 import { collectionsDataKey, readJSON } from '@/lib/userScopedStorage';
 
@@ -117,7 +117,7 @@ export function AddPlaceSheet({ open, onClose, onSelect, onAddManually, dayNumbe
   // Debounced search
   const [debouncedSearch, setDebouncedSearch] = useState('');
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    const t = setTimeout(() => setDebouncedSearch(search), 1000);
     return () => clearTimeout(t);
   }, [search]);
 
@@ -212,8 +212,8 @@ export function AddPlaceSheet({ open, onClose, onSelect, onAddManually, dayNumbe
     return [...mergedLocal, ...mergedOther];
   }, [destinations, dayDestination, dayCity, apiPlaces]);
 
-  // Nominatim fallback results (state, fed by effect below)
-  const [nominatimResults, setNominatimResults] = useState<CityPlace[]>([]);
+  // Google Places fallback results (state, fed by effect below)
+  const [googleResults, setGoogleResults] = useState<CityPlace[]>([]);
 
   // Search results
   const { localResults, globalResults } = useMemo(() => {
@@ -240,24 +240,24 @@ export function AddPlaceSheet({ open, onClose, onSelect, onAddManually, dayNumbe
 
     let mergedLocal = mergePlaces(staticLocal, apiLocal);
 
-    // Append Nominatim fallback results to local (deduped)
-    if (nominatimResults.length > 0) {
-      mergedLocal = mergePlaces(mergedLocal, nominatimResults);
+    // Append Google fallback results to local (deduped)
+    if (googleResults.length > 0) {
+      mergedLocal = mergePlaces(mergedLocal, googleResults);
     }
 
     // Always restrict to trip destinations — never show places outside referenced cities.
     void staticGlobal; void apiGlobal;
     return { localResults: mergedLocal, globalResults: [] as CityPlace[] };
-  }, [debouncedSearch, destinations, preloadedPlaces, apiPlaces, nominatimResults]);
+  }, [debouncedSearch, destinations, preloadedPlaces, apiPlaces, googleResults]);
 
   const hasResults = localResults.length > 0 || globalResults.length > 0;
 
-  // Nominatim fallback: when text search returns 0 results from local+API,
-  // search OSM globally restricted to the day's city.
+  // Google Places fallback: when text search returns 0 results from local+API,
+  // search globally restricted to the day's city.
   useEffect(() => {
     const q = debouncedSearch.trim();
     if (!q || !dayCity) {
-      setNominatimResults([]);
+      setGoogleResults([]);
       return;
     }
 
@@ -268,15 +268,15 @@ export function AddPlaceSheet({ open, onClose, onSelect, onAddManually, dayNumbe
       p.name.toLowerCase().includes(queryLower) || p.category.toLowerCase().includes(queryLower)
     );
     if (staticLocal.length + staticGlobal.length + apiMatches.length > 0) {
-      setNominatimResults([]);
+      setGoogleResults([]);
       return;
     }
 
     // Debounce extra (the search itself is already debounced 300ms; total ~500ms)
     let cancelled = false;
     const t = setTimeout(async () => {
-      const results = await searchNominatim(q, dayCity);
-      if (!cancelled) setNominatimResults(results);
+      const results = await searchGoogleFallback(q, dayCity);
+      if (!cancelled) setGoogleResults(results);
     }, 200);
     return () => { cancelled = true; clearTimeout(t); };
   }, [debouncedSearch, dayCity, destinations, apiPlaces]);

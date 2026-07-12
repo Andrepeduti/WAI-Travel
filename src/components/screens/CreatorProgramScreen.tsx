@@ -90,7 +90,7 @@ export function CreatorProgramScreen({ onBack, onStartCreating, onPublishExistin
     <div className="fixed inset-0 z-[200] flex items-start justify-center bg-[#f2f2f2]">
       <div className="relative w-full h-full max-w-[430px] mx-auto bg-[#f2f2f2] flex flex-col">
         {/* Header fixo — fundo sólido para não sobrepor conteúdo */}
-        <header className="sticky top-0 z-30 bg-[#f2f2f2]/95 backdrop-blur-md">
+        <header className="sticky top-0 z-30 bg-[#f2f2f2]/95 backdrop-blur-md pb-2" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 8px)' }}>
           <div className="flex items-center px-5 h-14">
             <button
               onClick={onBack}

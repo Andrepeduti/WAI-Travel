@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { EditInterestsSheet, INTEREST_CATALOG, type Interest } from '@/components/travel/EditInterestsSheet';
+import { searchGooglePlacesAutocomplete } from '@/lib/googlePlacesApi';
 
 interface EditProfileScreenProps {
   onBack: () => void;
@@ -60,7 +61,7 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
     setInterests(interestsFromProfile);
   }, [interestsFromProfile]);
 
-  // Autocomplete de cidades para o campo Localização (Nominatim)
+  // Autocomplete de cidades para o campo Localização (Google)
   const [locationInput, setLocationInput] = useState<string>(user.location ?? '');
   const [locationResults, setLocationResults] = useState<Array<{ label: string; sub: string; full: string }>>([]);
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
@@ -81,7 +82,7 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
     setAvatar(user.avatar ?? '');
   }, [user.name, user.username, user.location, user.avatar, user.bio, user.instagram, user.tiktok, user.youtube]);
 
-  // Busca cidades via Nominatim com debounce
+  // Busca cidades via Google Places com debounce
   useEffect(() => {
     const query = locationInput.trim();
     if (!showLocationSuggestions) return;
@@ -90,55 +91,28 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
       setIsSearchingLocation(false);
       return;
     }
-     setIsSearchingLocation(true);
-    const ctrl = new AbortController();
+    setIsSearchingLocation(true);
+    let active = true;
     const timeout = setTimeout(async () => {
       try {
-        // Remove acentos para facilitar a busca (ex: "sao paulo" encontra "São Paulo")
-        const normalizedQuery = query.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&accept-language=pt-BR&limit=10&q=${encodeURIComponent(normalizedQuery)}`;
-        const res = await fetch(url, { signal: ctrl.signal, headers: { Accept: 'application/json' } });
-        const data = await res.json();
-        const seen = new Set<string>();
-        const mapped = (Array.isArray(data) ? data : [])
-          .map((item: any) => {
-            const addr = item.address || {};
-            const city =
-              addr.city ||
-              addr.town ||
-              addr.village ||
-              addr.municipality ||
-              addr.hamlet ||
-              addr.suburb ||
-              addr.county ||
-              addr.state_district;
-            const state = addr.state;
-            const country = addr.country;
-            if (!city && !state && !country) return null;
-            const label = city || state || country;
-            const subParts = [city ? state : null, country].filter(Boolean);
-            const sub = subParts.join(', ');
-            const full = sub ? `${label}, ${sub}` : label;
-            return { label, sub, full };
-          })
-          .filter((r: any) => {
-            if (!r || !r.label) return false;
-            const key = r.full.toLowerCase();
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return true;
-          })
-          .slice(0, 8);
-        setLocationResults(mapped);
+        const predictions = await searchGooglePlacesAutocomplete(query, ['(cities)']);
+        
+        const mapped = predictions.map(p => ({
+            label: p.name,
+            sub: p.location || '',
+            full: p.location ? `${p.name}, ${p.location}` : p.name
+        }));
+        
+        if (active) setLocationResults(mapped);
       } catch (err) {
-        if ((err as Error).name !== 'AbortError') setLocationResults([]);
+        if (active) setLocationResults([]);
       } finally {
-        setIsSearchingLocation(false);
+        if (active) setIsSearchingLocation(false);
       }
-    }, 300);
+    }, 1000);
     return () => {
+      active = false;
       clearTimeout(timeout);
-      ctrl.abort();
     };
   }, [locationInput, showLocationSuggestions, formData.location]);
 
@@ -287,7 +261,7 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
   return (
     <div className="min-h-screen bg-background pb-32">
       {/* Header — padrão sub-page (sticky branco com BackButton) */}
-      <div className="sticky top-0 z-20 bg-background">
+      <div className="sticky top-0 z-20 bg-background pt-[env(safe-area-inset-top)]">
         <div className="flex items-center gap-3 px-4 py-4">
           <BackButton onClick={onBack} />
           <h1
@@ -316,7 +290,7 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
               className="absolute bottom-0 right-0 w-8 h-8 rounded-full flex items-center justify-center cursor-pointer shadow-sm"
               style={{ background: 'hsl(var(--primary))' }}
             >
-              <Icon name="photo_camera" size={16} style={{ color: 'hsl(var(--capri-dark))' }} />
+              <Icon name="photo_camera" size={16} style={{ color: 'hsl(var(--primary-foreground))' }} />
               <input
                 type="file"
                 accept="image/*"
@@ -534,7 +508,8 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
           </div>
         </div>
 
-        {/* Verificação de identidade */}
+        {/* TODO: Temporariamente oculto — reativar quando fluxo de verificação estiver pronto */}
+        {false && (
         <div className="mt-8">
           <h2
             className="text-foreground mb-3"
@@ -603,6 +578,7 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
             </div>
           </button>
         </div>
+        )}
 
       </div>
 

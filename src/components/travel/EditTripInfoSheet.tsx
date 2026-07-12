@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { DateRange } from 'react-day-picker';
 import { resolveNextRange } from '@/lib/dateRangeSelection';
+import { searchGooglePlacesAutocomplete } from '@/lib/googlePlacesApi';
 
 interface EditTripInfoSheetProps {
   open: boolean;
@@ -37,35 +38,18 @@ function useCitySearch(query: string) {
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(async () => {
       try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=10&accept-language=pt`
-        );
-        const data = await res.json();
-        const mapped: CitySuggestion[] = (Array.isArray(data) ? data : [])
-          .filter((r: any) => {
-            const addr = r.address || {};
-            const cityField = addr.city || addr.town || addr.village || addr.municipality || addr.hamlet;
-            if (!cityField || !addr.country) return false;
-            if (r.type === 'country' || r.type === 'state' || r.type === 'region' || r.type === 'administrative') return false;
-            return true;
-          })
-          .slice(0, 5)
-          .map((r: any) => {
-            const addr = r.address || {};
-            const city = addr.city || addr.town || addr.village || addr.municipality || addr.hamlet;
-            return {
-              display_name: `${city}, ${addr.country}`,
-              name: city,
-              type: r.type,
-            };
-          });
+        const predictions = await searchGooglePlacesAutocomplete(query, ['(cities)']);
+        const mapped: CitySuggestion[] = predictions.map(p => ({
+            display_name: p.location ? `${p.name}, ${p.location}` : p.name,
+            name: p.name,
+        }));
         setResults(mapped);
       } catch {
         setResults([]);
       } finally {
         setLoading(false);
       }
-    }, 400);
+    }, 1000);
 
     return () => clearTimeout(timerRef.current);
   }, [query]);

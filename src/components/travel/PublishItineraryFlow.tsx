@@ -74,6 +74,16 @@ export function PublishItineraryFlow({
   const [tags, setTags] = useState<string[]>(initialTags);
   const [mainTag, setMainTag] = useState<string>(initialMainTag);
 
+  useEffect(() => {
+    if (open) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [open]);
+
   if (!open) return null;
 
   const numericPrice = isFree ? 0 : Number(price.replace(/\D/g, '')) / 100;
@@ -468,29 +478,32 @@ function PriceScreen({
         </p>
 
         <div className="mt-6 relative">
-          <div className={cn(
-            "absolute left-5 top-1/2 -translate-y-1/2 font-semibold text-[16px] pointer-events-none",
-            isFree ? "text-[#0A0A0A]/20" : "text-[#0A0A0A]/40"
-          )}>
-            R$
-          </div>
-          <Input
-            value={isFree ? '' : displayValue}
-            onChange={(e) => onChange(e.target.value)}
-            onBlur={onBlur}
-            placeholder={isFree ? 'Grátis' : '0,00'}
-            inputMode="numeric"
-            autoFocus={!isFree}
-            disabled={isFree}
+          <div 
             className={cn(
-              'rounded-2xl bg-white pl-12 pr-5 text-[#0A0A0A] font-semibold placeholder:text-[#0A0A0A]/25 focus-visible:ring-2 focus-visible:ring-offset-0 shadow-[0_2px_8px_-2px_rgba(10,10,10,0.06)]',
-              error
-                ? 'border border-[#E5484D] focus-visible:ring-[#E5484D]'
-                : 'border-0 focus-visible:ring-[#9DCC36]',
-              isFree && 'opacity-50 cursor-not-allowed'
+              "flex items-center rounded-2xl bg-white px-5 transition-all shadow-[0_2px_8px_-2px_rgba(10,10,10,0.06)] overflow-hidden",
+              error ? "ring-1 ring-[#E5484D] border border-[#E5484D]" : "border border-transparent focus-within:ring-2 focus-within:ring-[#9DCC36]",
+              isFree && "opacity-50"
             )}
-            style={{ fontSize: '20px', height: '64px' }}
-          />
+            style={{ height: '64px' }}
+          >
+            <span className={cn(
+              "font-semibold text-[20px] mr-2 shrink-0 select-none",
+              isFree ? "text-[#0A0A0A]/20" : "text-[#0A0A0A]/40"
+            )}>
+              R$
+            </span>
+            <input
+              value={isFree ? '' : displayValue}
+              onChange={(e) => onChange(e.target.value)}
+              onBlur={onBlur}
+              placeholder={isFree ? 'Grátis' : '0,00'}
+              inputMode="numeric"
+              autoFocus={!isFree}
+              disabled={isFree}
+              className="flex-1 w-full h-full bg-transparent text-[#0A0A0A] font-semibold placeholder:text-[#0A0A0A]/25 outline-none"
+              style={{ fontSize: '20px' }}
+            />
+          </div>
           <AnimatePresence>
             {error && !isFree && (
               <motion.p

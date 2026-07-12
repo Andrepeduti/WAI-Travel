@@ -135,19 +135,33 @@ export const airports: Airport[] = [
   { iata: 'CMN', name: 'Mohammed V', city: 'Casablanca', country: 'Marrocos' },
 ];
 
+let cachedAirports: Airport[] | null = null;
+let loadPromise: Promise<void> | null = null;
+
+export function loadAirportsAsync(): Promise<void> {
+  if (cachedAirports) return Promise.resolve();
+  if (loadPromise) return loadPromise;
+  loadPromise = fetch('/airports.json')
+    .then(r => r.json())
+    .then(data => { cachedAirports = data; })
+    .catch(console.error);
+  return loadPromise;
+}
+
 export function searchAirports(query: string, limit = 8): Airport[] {
+  const list = cachedAirports || airports;
   const q = query.trim().toLowerCase();
-  if (!q) return airports.slice(0, limit);
+  if (!q) return list.slice(0, limit);
   const normalize = (s: string) =>
-    s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    s ? s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
   const nq = normalize(q);
-  return airports
+  return list
     .filter(
       (a) =>
-        a.iata.toLowerCase().includes(q) ||
-        normalize(a.city).includes(nq) ||
-        normalize(a.name).includes(nq) ||
-        normalize(a.country).includes(nq)
+        (a.iata && a.iata.toLowerCase().includes(q)) ||
+        (a.city && normalize(a.city).includes(nq)) ||
+        (a.name && normalize(a.name).includes(nq)) ||
+        (a.country && normalize(a.country).includes(nq))
     )
     .slice(0, limit);
 }

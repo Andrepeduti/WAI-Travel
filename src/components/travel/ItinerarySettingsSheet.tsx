@@ -132,7 +132,8 @@ export function ItinerarySettingsSheet({
               <Icon name="chevron_right" size={18} className="text-muted-foreground" />
             </button>
 
-            {/* Duplicar roteiro */}
+            {/* Duplicar roteiro – only the owner can duplicate */}
+            {!isParticipant && (
             <button
               onClick={() => {onClose();onDuplicate?.();}}
               className="w-full flex items-center gap-3.5 py-3 px-1 rounded-xl hover:bg-muted/50 transition-colors">
@@ -143,6 +144,7 @@ export function ItinerarySettingsSheet({
               <span className="text-[14px] font-medium text-foreground flex-1 text-left">Duplicar roteiro</span>
               <Icon name="chevron_right" size={18} className="text-muted-foreground" />
             </button>
+            )}
 
             {/* Baixar em PDF */}
             <button

@@ -6,11 +6,12 @@
 
 import type { CityPlace } from '@/data/cityRecommendations';
 import { FALLBACK_IMAGE } from '@/lib/imageFallback';
+import { searchGooglePlacesText } from '@/lib/googlePlacesApi';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 
-const CACHE_PREFIX = 'wai_ai_recs_v6::';
+const CACHE_PREFIX = 'wai_ai_recs_v7::';
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 type AiCategoryKey = 'restaurants' | 'experiences' | 'attractions' | 'nightlife' | 'events';
@@ -131,196 +132,53 @@ function toCityPlaces(payload: AiResponse, cityKeyStr: string): CityPlace[] {
 // Use only sources that can be tied back to the place name. Generic photo
 // fallbacks are intentionally avoided because they produce visually wrong cards.
 
-const imageCache = new Map<string, string>();
-
-function normalizeText(value: string): string {
-  return value
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function meaningfulTokens(value: string): string[] {
-  const stop = new Set(['the', 'de', 'da', 'do', 'dos', 'das', 'du', 'des', 'del', 'la', 'le', 'les', 'el', 'a', 'o', 'of', 'and', 'restaurant', 'restaurante', 'bar', 'cafe', 'café']);
-  return normalizeText(value).split(' ').filter((t) => t.length >= 3 && !stop.has(t));
-}
-
-function matchScore(candidate: string, name: string, city: string): number {
-  const hay = normalizeText(candidate);
-  const exactName = hay.includes(normalizeText(name)) ? 2 : 0;
-  const placeTokens = meaningfulTokens(name);
-  const cityTokens = meaningfulTokens(city);
-  const matchedPlace = placeTokens.filter((t) => hay.includes(t)).length;
-  const matchedCity = cityTokens.some((t) => hay.includes(t)) ? 1 : 0;
-  return exactName + matchedPlace * 2 + matchedCity;
-}
-
-function commonsThumb(fileName: string, width = 900): string {
-  const clean = fileName.replace(/^File:/i, '').replace(/ /g, '_');
-  return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(clean)}?width=${width}`;
-}
-
-async function wikidataImageFor(name: string, city: string): Promise<string | null> {
-  const langs = ['pt', 'en', 'es', 'fr'];
-  for (const lang of langs) {
-    try {
-      const searchUrl = `https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&origin=*`
-        + `&language=${lang}&limit=5&search=${encodeURIComponent(`${name} ${city}`)}`;
-      const searchRes = await fetch(searchUrl);
-      if (!searchRes.ok) continue;
-      const searchJson = await searchRes.json() as any;
-      const best = ((searchJson?.search ?? []) as any[])
-        .map((entity) => ({
-          entity,
-          score: matchScore(`${entity?.label ?? ''} ${entity?.description ?? ''}`, name, city),
-        }))
-        .filter(({ score, entity }) => score >= MIN_EXACT_IMAGE_SCORE && /^Q\d+$/.test(entity?.id ?? ''))
-        .sort((a, b) => b.score - a.score)[0]?.entity;
-      if (!best?.id) continue;
-
-      const entityUrl = `https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&origin=*`
-        + `&ids=${best.id}&props=claims`;
-      const entityRes = await fetch(entityUrl);
-      if (!entityRes.ok) continue;
-      const entityJson = await entityRes.json() as any;
-      const file = entityJson?.entities?.[best.id]?.claims?.P18?.[0]?.mainsnak?.datavalue?.value;
-      if (typeof file === 'string' && file.trim()) return commonsThumb(file);
-    } catch {
-      // try next language
-    }
-  }
-  return null;
-}
-
-async function wikipediaImageFor(name: string, city: string): Promise<string | null> {
-  const langs = ['pt', 'en', 'es', 'fr'];
-  for (const lang of langs) {
-    try {
-      const searchUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&format=json&origin=*`
-        + `&list=search&srlimit=5&srsearch=${encodeURIComponent(`intitle:"${name}" ${city}`)}`;
-      const searchRes = await fetch(searchUrl);
-      if (!searchRes.ok) continue;
-      const searchJson = await searchRes.json() as any;
-      const candidates = (searchJson?.query?.search ?? []) as any[];
-      const best = candidates
-        .map((page) => ({ page, score: matchScore(`${page.title} ${page.snippet ?? ''}`, name, city) }))
-        .filter(({ score }) => score >= MIN_EXACT_IMAGE_SCORE)
-        .sort((a, b) => b.score - a.score)[0]?.page;
-      if (!best?.pageid) continue;
-
-      const imageUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&format=json&origin=*`
-        + `&prop=pageimages&pageids=${best.pageid}&piprop=thumbnail&pithumbsize=900`;
-      const imageRes = await fetch(imageUrl);
-      if (!imageRes.ok) continue;
-      const imageJson = await imageRes.json() as any;
-      const page = imageJson?.query?.pages?.[best.pageid];
-      const thumb = page?.thumbnail?.source as string | undefined;
-      if (thumb) return thumb;
-    } catch {
-      // try next language
-    }
-  }
-  return null;
-}
-
-async function commonsImageFor(name: string, city: string): Promise<string | null> {
-  try {
-    const q = encodeURIComponent(`"${name}" ${city}`.trim());
-    const url = `https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*`
-      + `&generator=search&gsrnamespace=6&gsrlimit=8&gsrsearch=${q}`
-      + `&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=900`;
-    const r = await fetch(url);
-    if (!r.ok) return null;
-    const j = await r.json() as any;
-    const pages = Object.values(j?.query?.pages ?? {}) as any[];
-    const ranked = pages
-      .map((page) => {
-        const meta = page?.imageinfo?.[0]?.extmetadata ?? {};
-        const candidateText = [
-          page?.title,
-          meta?.ObjectName?.value,
-          meta?.ImageDescription?.value,
-          meta?.Categories?.value,
-        ].filter(Boolean).join(' ');
-        return { page, score: matchScore(candidateText, name, city) };
-      })
-      .filter(({ score, page }) => score >= MIN_EXACT_IMAGE_SCORE && (page?.imageinfo?.[0]?.thumburl || page?.imageinfo?.[0]?.url))
-      .sort((a, b) => b.score - a.score);
-    return ranked[0]?.page?.imageinfo?.[0]?.thumburl || ranked[0]?.page?.imageinfo?.[0]?.url || null;
-  } catch {
-    return null;
-  }
-}
-
-async function openverseImageFor(name: string, city: string): Promise<string | null> {
-  try {
-    const q = encodeURIComponent(`"${name}" ${city}`.trim());
-    const url = `https://api.openverse.org/v1/images/?q=${q}&page_size=8&license_type=all&mature=false`;
-    const r = await fetch(url);
-    if (!r.ok) return null;
-    const j = await r.json() as any;
-    const ranked = ((j?.results ?? []) as any[])
-      .map((item) => ({
-        item,
-        score: matchScore([item?.title, item?.tags?.map((t: any) => t?.name).join(' '), item?.creator].filter(Boolean).join(' '), name, city),
-      }))
-      .filter(({ score, item }) => score >= MIN_EXACT_IMAGE_SCORE && (item?.thumbnail || item?.url))
-      .sort((a, b) => b.score - a.score);
-    return ranked[0]?.item?.thumbnail || ranked[0]?.item?.url || null;
-  } catch {
-    return null;
-  }
-}
-
-async function googleImageFor(name: string, city: string): Promise<string | null> {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/google-image-search`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: SUPABASE_PUBLISHABLE_KEY,
-        Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
-      },
-      body: JSON.stringify({ query: `${name} ${city}`.trim() }),
-    });
-    if (!res.ok) return null;
-    const j = await res.json() as any;
-    return typeof j?.image === 'string' && j.image ? j.image : null;
-  } catch {
-    return null;
-  }
-}
-
-async function resolveImageFor(name: string, city: string, fallback: string): Promise<string> {
-  const key = `${name.toLowerCase()}|${city.toLowerCase()}`;
-  const cached = imageCache.get(key);
-  if (cached) return cached;
-  const wikidata = await wikidataImageFor(name, city);
-  const wiki = wikidata ? null : await wikipediaImageFor(name, city);
-  const commons = wikidata || wiki ? null : await commonsImageFor(name, city);
-  const openverse = wikidata || wiki || commons ? null : await openverseImageFor(name, city);
-  const google = wikidata || wiki || commons || openverse ? null : await googleImageFor(name, city);
-  const url = wikidata || wiki || commons || openverse || google || FALLBACK_IMAGE || fallback;
-  imageCache.set(key, url);
-  return url;
-}
-
-async function enrichWithRealImages(places: CityPlace[], city: string): Promise<CityPlace[]> {
-  // Limit concurrency to avoid hammering Wikipedia.
+async function enrichWithGooglePlaces(places: CityPlace[], city: string): Promise<CityPlace[]> {
   const out: CityPlace[] = new Array(places.length);
   const queue = places.map((p, i) => ({ p, i }));
-  const workers = Array.from({ length: 4 }, async () => {
+  
+  const startTime = Date.now();
+  
+  // Concurrency up to 10 to speed up API calls. 
+  const workers = Array.from({ length: 10 }, async () => {
     while (queue.length) {
+      // Abort enrichment if it's taking more than 12 seconds to prevent locking the UI
+      if (Date.now() - startTime > 12000) {
+        break;
+      }
       const job = queue.shift();
       if (!job) break;
-      const img = await resolveImageFor(job.p.name, city, job.p.image);
-      out[job.i] = { ...job.p, image: img };
+      
+      const p = job.p;
+      out[job.i] = { ...p };
+      
+      try {
+        const results = await searchGooglePlacesText(p.name, city);
+        if (results && results.length > 0) {
+          const best = results[0];
+          
+          // Override with accurate Google Places data
+          out[job.i].lat = best.lat;
+          out[job.i].lng = best.lng;
+          if (best.address) {
+            out[job.i].address = best.address;
+          }
+          if (best.photoUrl) {
+            out[job.i].image = best.photoUrl;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to enrich place with Google Places API:', p.name, e);
+      }
     }
   });
+  
   await Promise.all(workers);
+  
+  // Fill any remaining unenriched items that were skipped due to timeout
+  for (const job of queue) {
+    out[job.i] = { ...job.p };
+  }
+  
   return out;
 }
 
@@ -358,7 +216,7 @@ export async function fetchAiPlacesForCity(cityName: string): Promise<CityPlace[
       if (!res.ok) return [];
       const data = (await res.json()) as AiResponse;
       const rawPlaces = toCityPlaces(data, key);
-      const places = rawPlaces.length > 0 ? await enrichWithRealImages(rawPlaces, key) : rawPlaces;
+      const places = rawPlaces.length > 0 ? await enrichWithGooglePlaces(rawPlaces, key) : rawPlaces;
       if (places.length > 0) {
         memCache.set(key, places);
         writeLocal(key, places);
