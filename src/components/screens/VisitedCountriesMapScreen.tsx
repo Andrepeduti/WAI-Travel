@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Globe from 'react-globe.gl';
+import MapGL, { Source, Layer, MapRef } from 'react-map-gl/mapbox';
+import 'mapbox-gl/dist/mapbox-gl.css';
 import { Icon } from '@/components/ui/Icon';
 import { CountryDetailSheet } from '@/components/travel/CountryDetailSheet';
 import { CountryActionSheet } from '@/components/travel/CountryActionSheet';
@@ -69,15 +70,12 @@ export function VisitedCountriesMapScreen({
   onDeleteCountry,
   wantedCountryCodes = [],
 }: VisitedCountriesMapScreenProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const globeRef = useRef<any>(null);
+  const mapRef = useRef<MapRef>(null);
   
-  const [dimensions, setDimensions] = useState({ 
-    width: typeof window !== 'undefined' ? window.innerWidth : 0, 
-    height: typeof window !== 'undefined' ? window.innerHeight : 0 
-  });
-  
-  const [geoData, setGeoData] = useState<any[]>([]);
+  const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
+
+  const [geoData, setGeoData] = useState<any>(null);
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [region, setRegion] = useState<Region>('Mundo');
   const [hoveredPolygon, setHoveredPolygon] = useState<any | null>(null);
 
@@ -130,70 +128,66 @@ export function VisitedCountriesMapScreen({
   }, [countries]);
 
   useEffect(() => {
-    const handleResize = () => {
-      setDimensions({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
-    };
-    window.addEventListener('resize', handleResize);
-    // Trigger once on mount just in case
-    handleResize();
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  useEffect(() => {
     fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson')
       .then(res => res.json())
       .then(data => {
-        setGeoData(data.features);
+        // Pre-process features to ensure a standard iso3 property
+        data.features = data.features.map((f: any) => {
+          const props = f.properties || {};
+          const iso3 = props['ISO3166-1-Alpha-3'] || props.ISO_A3 || props.iso_a3 || f.id;
+          return {
+            ...f,
+            properties: { ...props, iso3 }
+          };
+        });
+        setGeoData(data);
       });
   }, []);
 
-  const initializedRef = useRef(false);
-
-  useEffect(() => {
-    if (globeRef.current && dimensions.width > 0 && !initializedRef.current) {
-      globeRef.current.pointOfView({ lat: 20, lng: 0, altitude: 2.5 }, 0);
-      initializedRef.current = true;
-    }
-  }, [dimensions]);
+  const fillColorExpression = useMemo(() => {
+    if (iso3ColorMap.size === 0) return 'rgba(255, 255, 255, 0)';
+    const expr: any[] = ['match', ['get', 'iso3']];
+    iso3ColorMap.forEach((color, iso3) => {
+      expr.push(iso3, color);
+    });
+    expr.push('rgba(255, 255, 255, 0)'); // default
+    return expr;
+  }, [iso3ColorMap]);
 
   useEffect(() => {
     const target = regions.find(r => r.key === region);
-    if (target && globeRef.current) {
-      globeRef.current.pointOfView({ lat: target.lat, lng: target.lng, altitude: target.altitude }, 800);
+    if (target && mapRef.current) {
+      let targetZoom = 2;
+      if (target.altitude >= 2.5) targetZoom = 1;
+      else if (target.altitude >= 1.5) targetZoom = 2.5;
+      else if (target.altitude >= 1.2) targetZoom = 3;
+      else targetZoom = 3.5;
+
+      mapRef.current.flyTo({
+        center: [target.lng, target.lat],
+        zoom: targetZoom,
+        duration: 1200
+      });
     }
   }, [region]);
 
-  const getPolygonCentroid = (polygon: any) => {
-    if (!polygon || !polygon.geometry || !polygon.geometry.coordinates) return [0, 0];
-    let latSum = 0, lngSum = 0, pts = 0;
-    const processCoords = (coords: any) => {
-      if (typeof coords[0] === 'number') {
-        lngSum += coords[0];
-        latSum += coords[1];
-        pts++;
-      } else {
-        coords.forEach(processCoords);
-      }
-    };
-    processCoords(polygon.geometry.coordinates);
-    return pts > 0 ? [latSum / pts, lngSum / pts] : [0, 0];
-  };
-
-  const handlePolygonClick = (polygon: any) => {
-    const props = polygon.properties || {};
-    const iso3 = props['ISO3166-1-Alpha-3'] || props.ISO_A3 || props.iso_a3 || polygon.id;
+  const handleMapClick = (e: any) => {
+    if (!e.features || e.features.length === 0) return;
+    const feature = e.features[0];
+    const props = feature.properties || {};
+    const iso3 = props.iso3;
     const country = iso3ToCountryMap.get(iso3);
     const fallbackName = props.ADMIN || props.name || props.NAME || props.NAME_LONG || iso3 || 'País';
     const iso2Hint = props['ISO3166-1-Alpha-2'] || props.ISO_A2 || props.iso_a2;
     const ptInfo = getCountryInfo(iso3, fallbackName, iso2Hint);
 
-    // Zoom and fly to the clicked country
-    if (globeRef.current) {
-      const [lat, lng] = getPolygonCentroid(polygon);
-      globeRef.current.pointOfView({ lat, lng, altitude: 0.6 }, 800); // 0.6 altitude is close enough to see small countries clearly
+    // Zoom and fly to clicked country
+    if (mapRef.current) {
+      mapRef.current.flyTo({
+        center: [e.lngLat.lng, e.lngLat.lat],
+        zoom: 4,
+        duration: 1000
+      });
     }
 
     if (country) {
@@ -206,39 +200,74 @@ export function VisitedCountriesMapScreen({
   };
 
   return (
-    <div className="relative h-screen w-full overflow-hidden bg-[#EAECEF]" ref={containerRef}>
-      {dimensions.width > 0 && dimensions.height > 0 && (
-        <div className="absolute inset-0 z-0 flex items-center justify-center">
-          <Globe
-            ref={globeRef}
-            width={dimensions.width}
-            height={dimensions.height}
-            globeImageUrl="https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
-            backgroundColor="#EAECEF"
-            showAtmosphere={true}
-            atmosphereColor="#c5ced9"
-            atmosphereAltitude={0.15}
-            polygonsData={geoData}
-            polygonAltitude={() => 0.01}
-            polygonCapColor={d => {
-              const props = d.properties || {};
-              const iso3 = props['ISO3166-1-Alpha-3'] || props.ISO_A3 || props.iso_a3 || d.id;
-              const color = iso3ColorMap.get(iso3);
-              if (color) return color;
-              return 'rgba(255, 255, 255, 0.01)';
-            }}
-            polygonSideColor={() => 'rgba(200, 200, 200, 0.1)'}
-            polygonStrokeColor={() => 'rgba(255, 255, 255, 0.3)'}
-            onPolygonClick={handlePolygonClick}
-            polygonsTransitionDuration={300}
-          />
-        </div>
-      )}
+    <div className="relative h-screen w-full overflow-hidden bg-[#0a0a0a]">
+      {/* Loading Overlay */}
+      <div
+        className={`absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#0a0a0a] transition-opacity duration-1000 ease-in-out ${isMapLoaded ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+      >
+        <div className="w-12 h-12 border-4 border-[#1A1C40] border-t-blue-500 rounded-full animate-spin mb-4 shadow-lg shadow-blue-500/20"></div>
+        <p className="text-white text-[15px] font-semibold font-inter animate-pulse">Carregando a Terra...</p>
+      </div>
+
+      <style>{`
+        .mapboxgl-ctrl-logo { display: none !important; }
+        .mapboxgl-ctrl-bottom-right { display: none !important; }
+        .mapboxgl-ctrl-bottom-left { display: none !important; }
+      `}</style>
+      <div className="absolute inset-0 z-0">
+        <MapGL
+          ref={mapRef}
+          attributionControl={false}
+          mapboxAccessToken={MAPBOX_TOKEN}
+          initialViewState={{
+            longitude: 0,
+            latitude: 20,
+            zoom: 1
+          }}
+          mapStyle="mapbox://styles/mapbox/satellite-v9"
+          projection={{ name: 'globe' } as any}
+          interactiveLayerIds={['country-fills']}
+          onClick={handleMapClick}
+          onLoad={() => {
+            setIsMapLoaded(true);
+            if (mapRef.current) {
+              mapRef.current.getMap().setFog({
+                color: 'rgb(186, 210, 235)', // Lower atmosphere
+                'high-color': 'rgb(36, 92, 223)', // Upper atmosphere
+                'horizon-blend': 0.02, // Atmosphere thickness
+                'space-color': 'rgb(11, 11, 25)', // Background space
+                'star-intensity': 0.6 // Background stars
+              });
+            }
+          }}
+        >
+          {geoData && (
+            <Source id="countries" type="geojson" data={geoData}>
+              <Layer
+                id="country-fills"
+                type="fill"
+                paint={{
+                  'fill-color': fillColorExpression,
+                  'fill-opacity': 1
+                }}
+              />
+              <Layer
+                id="country-borders"
+                type="line"
+                paint={{
+                  'line-color': 'rgba(255, 255, 255, 0.4)',
+                  'line-width': 1
+                }}
+              />
+            </Source>
+          )}
+        </MapGL>
+      </div>
 
       {/* Top Bar - Hidden when maximized */}
-      <div 
-        className="absolute top-0 left-0 z-10 px-4 transition-opacity duration-300" 
-        style={{ 
+      <div
+        className="absolute top-0 left-0 z-10 px-4 transition-opacity duration-300"
+        style={{
           paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)',
           opacity: isMaximized ? 0 : 1,
           pointerEvents: isMaximized ? 'none' : 'auto'
@@ -248,9 +277,9 @@ export function VisitedCountriesMapScreen({
       </div>
 
       {/* Maximize Toggle Button */}
-      <div 
+      <div
         className="absolute z-10"
-        style={{ 
+        style={{
           top: 'calc(max(16px, env(safe-area-inset-top)) + 12px)',
           right: 16
         }}
@@ -262,20 +291,20 @@ export function VisitedCountriesMapScreen({
         >
           {isMaximized ? (
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A1C40" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>
+              <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
             </svg>
           ) : (
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A1C40" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
             </svg>
           )}
         </button>
       </div>
 
       {/* Bottom Regions Bar - Hidden when maximized */}
-      <div 
-        className="absolute left-0 right-0 z-10 transition-transform duration-500 ease-in-out" 
-        style={{ 
+      <div
+        className="absolute left-0 right-0 z-10 transition-transform duration-500 ease-in-out"
+        style={{
           bottom: onMarkVisited ? 84 : 24,
           transform: isMaximized ? 'translateY(150%)' : 'translateY(0)'
         }}
