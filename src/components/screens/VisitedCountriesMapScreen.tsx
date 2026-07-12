@@ -275,7 +275,9 @@ export function VisitedCountriesMapScreen({
       <div
         className="absolute left-0 right-0 z-10"
         style={{
-          bottom: onMarkVisited ? 84 : 24
+          bottom: onMarkVisited 
+            ? 'calc(env(safe-area-inset-bottom, 0px) + 84px)' 
+            : 'calc(env(safe-area-inset-bottom, 0px) + 24px)'
         }}
       >
         <div className="px-4 overflow-x-auto no-scrollbar">
