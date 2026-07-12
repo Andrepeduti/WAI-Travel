@@ -113,7 +113,7 @@ export function LoginSecurityScreen({ onBack }: LoginSecurityScreenProps) {
       {/* Fixed footer with update button */}
       {!showBlockedList && (
         <div
-          className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-background border-t border-border z-30"
+          className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full w-full bg-background border-t border-border z-30"
           style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
         >
           <div className="px-5 pt-3">
@@ -126,7 +126,7 @@ export function LoginSecurityScreen({ onBack }: LoginSecurityScreenProps) {
 
       {/* Delete / Deactivate Account Bottom Sheet */}
       <Sheet open={showDeleteSheet} onOpenChange={(open) => { if (!open) closeDeleteSheet(); else setShowDeleteSheet(true); }}>
-        <SheetContent side="bottom" className="rounded-t-[20px] px-5 pb-8 pt-3 max-w-[430px] mx-auto">
+        <SheetContent side="bottom" className="rounded-t-[20px] px-5 pb-8 pt-3 w-full mx-auto">
           <div className="flex justify-center mb-4">
             <div className="w-10 h-1 rounded-full" style={{ background: 'hsl(var(--divider))' }} />
           </div>

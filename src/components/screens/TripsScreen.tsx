@@ -1420,7 +1420,7 @@ export function TripsScreen({
         <>
           <div className="fixed inset-0 bg-black/40 z-[100]" onClick={() => setShowDeleteConfirm(null)} />
           <div className="fixed bottom-0 left-0 right-0 z-[101] flex justify-center">
-            <div className="bg-background rounded-t-3xl w-full max-w-[430px] animate-in slide-in-from-bottom duration-300">
+            <div className="bg-background rounded-t-3xl w-full w-full animate-in slide-in-from-bottom duration-300">
               <div className="flex justify-center py-3">
                 <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
               </div>

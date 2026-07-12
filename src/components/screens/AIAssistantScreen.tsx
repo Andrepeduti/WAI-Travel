@@ -376,7 +376,7 @@ export function AIAssistantScreen({ onBack, onOpenHistory, contextLabel, onClear
           />
           <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center">
             <div
-              className="w-full max-w-[430px] bg-background rounded-t-[24px] animate-in slide-in-from-bottom duration-300 pb-6"
+              className="w-full w-full bg-background rounded-t-[24px] animate-in slide-in-from-bottom duration-300 pb-6"
               style={{ boxShadow: '0 -4px 24px rgba(0,0,0,0.08)' }}
             >
               <div className="flex justify-center pt-3 pb-4">

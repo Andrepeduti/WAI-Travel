@@ -108,7 +108,7 @@ export function EditTripInfoSheet({ open, onClose, destinations: initialDest, st
     <div className="fixed inset-0 z-[210] flex items-end justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
       <div
-        className="relative w-full max-w-[430px] bg-card rounded-t-2xl max-h-[85vh] overflow-y-auto"
+        className="relative w-full w-full bg-card rounded-t-2xl max-h-[85vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         {/* Handle */}

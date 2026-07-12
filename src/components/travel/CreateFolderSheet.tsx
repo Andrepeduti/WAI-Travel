@@ -49,7 +49,7 @@ export function CreateFolderSheet({ isOpen, onClose, onSubmit }: CreateFolderShe
         className="fixed bottom-0 left-0 right-0 z-50 flex justify-center"
         style={{ fontFamily: 'var(--font-family-primary)' }}
       >
-        <div className="bg-white rounded-t-[20px] w-full max-w-[430px] flex flex-col animate-in slide-in-from-bottom duration-300">
+        <div className="bg-white rounded-t-[20px] w-full w-full flex flex-col animate-in slide-in-from-bottom duration-300">
           {/* Handle */}
           <div className="flex justify-center pt-3 pb-1">
             <div className="w-9 h-[4px] bg-muted-foreground/20 rounded-full" />

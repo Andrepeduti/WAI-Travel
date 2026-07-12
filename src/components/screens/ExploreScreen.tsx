@@ -272,7 +272,7 @@ export function ExploreScreen({ onSearchClick, onSeeDestinationItineraries }: Ex
   if (activeStory) {
     return (
       <div
-        className="fixed inset-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-black overflow-hidden"
+        className="fixed inset-0 left-1/2 -translate-x-1/2 w-full w-full bg-black overflow-hidden"
         style={{ height: '100dvh' }}
       >
         <DestinationContent dest={activeStory} onSeeItineraries={() => openDestinationList(activeStory)} />
@@ -297,7 +297,7 @@ export function ExploreScreen({ onSearchClick, onSeeDestinationItineraries }: Ex
   // ─── Modo Padrão (preview com header + filtros + 1 card) ─────────
   return (
     <div
-      className="fixed inset-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] flex flex-col"
+      className="fixed inset-0 left-1/2 -translate-x-1/2 w-full w-full flex flex-col"
       style={{ height: '100dvh', backgroundColor: '#F2F2F2' }}
     >
       {/* Header */}

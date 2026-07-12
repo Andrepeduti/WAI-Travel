@@ -47,7 +47,7 @@ export function PurchaseSuccessScreen({ itineraryTitle, onViewItinerary, onClose
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: '#00000020' }}>
-      <div className="w-full max-w-[430px] h-[100dvh] flex flex-col items-center justify-center px-8 text-center mx-auto relative overflow-hidden shadow-2xl" style={{ background: '#7aad2a' }}>
+      <div className="w-full w-full h-[100dvh] flex flex-col items-center justify-center px-8 text-center mx-auto relative overflow-hidden shadow-2xl" style={{ background: '#7aad2a' }}>
         {/* Expanding green that takes over the whole screen */}
         <div
           className="absolute rounded-full pointer-events-none"

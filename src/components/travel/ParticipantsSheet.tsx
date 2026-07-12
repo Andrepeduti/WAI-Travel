@@ -140,7 +140,7 @@ export function ParticipantsSheet({ open, onClose, itineraryId, currentUserId, o
     <div className="fixed inset-0 z-[210]" onClick={onClose}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
       <div
-        className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl flex flex-col animate-in slide-in-from-bottom duration-300 max-w-[430px] mx-auto"
+        className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl flex flex-col animate-in slide-in-from-bottom duration-300 w-full mx-auto"
         style={{ maxHeight: '85vh' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -241,7 +241,7 @@ export function ParticipantsSheet({ open, onClose, itineraryId, currentUserId, o
         <div className="fixed inset-0 z-[220]" onClick={() => setActionMember(null)}>
           <div className="absolute inset-0 bg-black/40" />
           <div
-            className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl px-5 pt-3 pb-6 max-w-[430px] mx-auto animate-in slide-in-from-bottom duration-300"
+            className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl px-5 pt-3 pb-6 w-full mx-auto animate-in slide-in-from-bottom duration-300"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-3" />

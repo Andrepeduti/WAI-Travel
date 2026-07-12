@@ -108,7 +108,7 @@ const OnboardingPage = () => {
 
   return (
     <div className="w-full min-h-[100dvh] bg-background flex justify-center text-4xl">
-      <div className="w-full max-w-[430px] h-[100dvh] relative">
+      <div className="w-full w-full h-[100dvh] relative">
         {isLoading ? (
           <OnboardingLoading onComplete={handleLoadingComplete} />
         ) : (

@@ -112,7 +112,7 @@ const AuthPage = () => {
 
   return (
     <div className="w-full min-h-[100dvh] bg-premium-navy flex justify-center">
-      <div className="w-full max-w-[430px] h-[100dvh] relative">
+      <div className="w-full w-full h-[100dvh] relative">
         {processingOAuth || (!!session && onboardingCompleted === null) ? (
           <div className="absolute inset-0 flex items-center justify-center">
             <Loader2 className="w-8 h-8 animate-spin text-white/80" />

@@ -286,7 +286,7 @@ export function CardPaymentScreen({ onBack, onSave, onDelete, initialData }: Car
 
       {/* Fixed footer */}
       <div
-        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-card border-t border-border z-30 px-5 pt-4"
+        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full w-full bg-card border-t border-border z-30 px-5 pt-4"
         style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
       >
         <button
@@ -310,7 +310,7 @@ export function CardPaymentScreen({ onBack, onSave, onDelete, initialData }: Car
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 bg-black/40" onClick={() => setShowDeleteConfirm(false)}>
           <div
-            className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-card rounded-t-3xl animate-in slide-in-from-bottom duration-300"
+            className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full w-full bg-card rounded-t-3xl animate-in slide-in-from-bottom duration-300"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Handle */}

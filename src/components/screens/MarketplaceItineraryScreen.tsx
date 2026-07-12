@@ -914,13 +914,13 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
 
       {/* Fixed footer */}
       <div 
-        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-card border-t border-border z-30"
+        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full w-full bg-card border-t border-border z-30"
         style={{ 
           boxShadow: 'var(--shadow-bottom-nav)',
           paddingBottom: 'max(12px, env(safe-area-inset-bottom))'
         }}
       >
-        <div className="max-w-[430px] mx-auto px-5 pt-4 flex items-center justify-between gap-4">
+        <div className="w-full mx-auto px-5 pt-4 flex items-center justify-between gap-4">
           <div>
             <span className="text-xs text-muted-foreground">Preço total</span>
             <p className="text-[20px] font-bold" style={{ color: '#1A1C40' }}>R$ {itineraryData.price.toFixed(2).replace('.', ',')}</p>
@@ -942,7 +942,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
       {showDateChoice && (
         <div className="fixed inset-0 z-[60] bg-black/40" onClick={() => { setShowDateChoice(false); onBack(); }}>
           <div
-            className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-card rounded-t-3xl animate-in slide-in-from-bottom duration-300"
+            className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full w-full bg-card rounded-t-3xl animate-in slide-in-from-bottom duration-300"
             style={{ maxHeight: '85vh' }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1049,7 +1049,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
       {showDetailsSheet && (
         <div className="fixed inset-0 z-[60] bg-black/40" onClick={() => setShowDetailsSheet(false)}>
           <div
-            className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-card rounded-t-3xl animate-in slide-in-from-bottom duration-300"
+            className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full w-full bg-card rounded-t-3xl animate-in slide-in-from-bottom duration-300"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-center pt-3 pb-1">

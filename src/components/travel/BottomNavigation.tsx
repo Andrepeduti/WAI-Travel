@@ -21,7 +21,7 @@ const tabs: {
 export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationProps) {
   return (
     <nav
-      className="fixed bottom-0 left-1/2 -translate-x-1/2 z-40 w-full max-w-[430px] px-4"
+      className="fixed bottom-0 left-1/2 -translate-x-1/2 z-40 w-full w-full px-4"
       style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom, 12px))' }}
     >
       <div

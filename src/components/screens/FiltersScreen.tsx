@@ -129,7 +129,7 @@ export function FiltersScreen({ onClose, initial = DEFAULT_FILTERS, onApply, cou
 
   return (
     <div
-      className="fixed inset-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] flex flex-col z-50"
+      className="fixed inset-0 left-1/2 -translate-x-1/2 w-full w-full flex flex-col z-50"
       style={{ height: '100dvh', backgroundColor: '#F2F2F2' }}
     >
       {/* Header */}
@@ -274,7 +274,7 @@ export function FiltersScreen({ onClose, initial = DEFAULT_FILTERS, onApply, cou
 
       {/* Footer */}
       <div
-        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-30"
+        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full w-full z-30"
         style={{
           backgroundColor: '#F2F2F2',
           paddingBottom: 'max(16px, env(safe-area-inset-bottom))',

@@ -84,7 +84,7 @@ export function BottomSheet({
       {/* Container */}
       <div
         className={cn(
-          'relative w-full max-w-[430px] mt-auto rounded-t-3xl shadow-2xl flex flex-col',
+          'relative w-full w-full mt-auto rounded-t-3xl shadow-2xl flex flex-col',
           'animate-in slide-in-from-bottom duration-300',
           bg,
         )}

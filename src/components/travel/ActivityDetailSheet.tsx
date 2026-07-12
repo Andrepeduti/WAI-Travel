@@ -422,7 +422,7 @@ export function ActivityDetailSheet({ activity, videoLink, onClose }: ActivityDe
     <div className="fixed inset-0 z-[2000] flex items-end justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
       <div
-        className="relative w-full max-w-[430px] bg-card rounded-t-2xl max-h-[90vh] overflow-y-auto scrollbar-hide"
+        className="relative w-full w-full bg-card rounded-t-2xl max-h-[90vh] overflow-y-auto scrollbar-hide"
         onClick={(e) => e.stopPropagation()}>
         
         {/* Handle */}
@@ -536,7 +536,7 @@ export function ActivityDetailSheet({ activity, videoLink, onClose }: ActivityDe
         {/* In-app Photo Gallery */}
         {showGallery && (
           <div className="fixed inset-0 z-[2900] bg-background flex justify-center">
-            <div className="w-full max-w-[430px] h-full flex flex-col">
+            <div className="w-full w-full h-full flex flex-col">
               {/* Header */}
               <div className="sticky top-0 z-10 bg-background flex items-center gap-3 px-4 h-14 border-b border-border/40">
                 <button
@@ -590,7 +590,7 @@ export function ActivityDetailSheet({ activity, videoLink, onClose }: ActivityDe
             >
               <Icon name="close" size={20} className="text-white" />
             </button>
-            <div className="w-full max-w-[430px] h-full flex items-center justify-center px-4">
+            <div className="w-full w-full h-full flex items-center justify-center px-4">
               <img
                 src={photos[expandedPhotoIndex]}
                 alt={`Foto ${expandedPhotoIndex + 1}`}

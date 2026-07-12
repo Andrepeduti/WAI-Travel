@@ -340,7 +340,7 @@ export function BudgetScreen({ onBack, expenses, onExpensesChange, autoOpenAdd =
       {(showAddPerson || editingPerson) && (
         <div className="fixed inset-0 z-[60] flex items-end justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => { setShowAddPerson(false); setEditingPerson(null); }} />
-          <div className="relative w-full max-w-[430px] bg-card rounded-t-3xl p-6 pb-8 animate-in slide-in-from-bottom duration-300">
+          <div className="relative w-full w-full bg-card rounded-t-3xl p-6 pb-8 animate-in slide-in-from-bottom duration-300">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-[18px] font-bold text-foreground">
                 {editingPerson ? 'Editar pessoa' : 'Adicionar pessoa'}
@@ -514,7 +514,7 @@ export function BudgetScreen({ onBack, expenses, onExpensesChange, autoOpenAdd =
       {showEditPeople && (
         <div className="fixed inset-0 z-[60] flex items-end justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowEditPeople(false)} />
-          <div className="relative w-full max-w-[430px] bg-card rounded-t-3xl p-6 pb-8 animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-y-auto">
+          <div className="relative w-full w-full bg-card rounded-t-3xl p-6 pb-8 animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-y-auto">
             <div className="w-10 h-1 rounded-full bg-muted-foreground/20 mx-auto mb-4" />
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-[18px] font-bold text-foreground">Editar pessoas</h2>
@@ -558,7 +558,7 @@ export function BudgetScreen({ onBack, expenses, onExpensesChange, autoOpenAdd =
       {selectedPersonExtrato && (
         <div className="fixed inset-0 z-[60] flex items-end justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setSelectedPersonExtrato(null)} />
-          <div className="relative w-full max-w-[430px] bg-card rounded-t-3xl p-6 pb-8 animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-y-auto">
+          <div className="relative w-full w-full bg-card rounded-t-3xl p-6 pb-8 animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-y-auto">
             <div className="w-10 h-1 rounded-full bg-muted-foreground/20 mx-auto mb-4" />
             <div className="flex items-center gap-3 mb-5">
               <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-[12px] font-bold" style={{ backgroundColor: selectedPersonExtrato.color }}>

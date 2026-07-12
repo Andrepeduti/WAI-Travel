@@ -508,7 +508,7 @@ export function TripChecklistScreen({ onBack, destination = 'Amsterdam', onCheck
       <>
           <div className="fixed inset-0 bg-black/40 z-50" onClick={() => {setShowEditSectionSheet(null);setEditSectionName('');}} />
           <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center">
-            <div className="bg-background rounded-t-3xl w-full max-w-[430px] p-6 pb-8 animate-in slide-in-from-bottom duration-300">
+            <div className="bg-background rounded-t-3xl w-full w-full p-6 pb-8 animate-in slide-in-from-bottom duration-300">
               <div className="flex justify-center mb-3">
                 <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
               </div>
@@ -557,7 +557,7 @@ export function TripChecklistScreen({ onBack, destination = 'Amsterdam', onCheck
       <>
           <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setShowDeleteConfirm(false)} />
           <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center">
-            <div className="bg-background rounded-t-3xl w-full max-w-[430px] p-6 pb-8 animate-in slide-in-from-bottom duration-300">
+            <div className="bg-background rounded-t-3xl w-full w-full p-6 pb-8 animate-in slide-in-from-bottom duration-300">
               <div className="flex justify-center mb-3">
                 <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
               </div>

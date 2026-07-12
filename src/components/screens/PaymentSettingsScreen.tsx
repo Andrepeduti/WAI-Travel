@@ -150,7 +150,7 @@ export function PaymentSettingsScreen({ onBack }: PaymentSettingsScreenProps) {
 
       {/* Fixed footer */}
       <div
-        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-card border-t border-border z-30"
+        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full w-full bg-card border-t border-border z-30"
         style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
       >
         <div className="px-5 pt-3">

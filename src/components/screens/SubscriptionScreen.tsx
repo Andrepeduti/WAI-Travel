@@ -301,7 +301,7 @@ export function SubscriptionScreen({ onBack }: SubscriptionScreenProps) {
       {showPayment && selectedPlanData && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowPayment(false)} />
-          <div className="relative w-full max-w-[430px] bg-background rounded-t-3xl p-5 pb-8 animate-in slide-in-from-bottom">
+          <div className="relative w-full w-full bg-background rounded-t-3xl p-5 pb-8 animate-in slide-in-from-bottom">
             <div className="w-10 h-1 rounded-full bg-muted-foreground/30 mx-auto mb-5" />
             <h3 className="text-foreground text-center mb-1" style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-weight-bold)' }}>
               Assinar plano {selectedPlanData.name}

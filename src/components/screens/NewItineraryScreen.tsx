@@ -189,7 +189,7 @@ export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales, 
     <div className="min-h-screen pb-8 relative" style={{ fontFamily: 'var(--font-family-primary)', background: '#F2F2F2' }}>
       {/* Floating FABs */}
       <div className="fixed inset-x-0 bottom-24 z-50 pointer-events-none">
-        <div className="max-w-[430px] mx-auto relative">
+        <div className="w-full mx-auto relative">
           <div className="absolute right-4 bottom-0 flex flex-col gap-3 pointer-events-auto">
             <button className="w-12 h-12 rounded-full shadow-lg flex items-center justify-center" style={{ background: '#1A1C40' }}>
               <Icon name="map" size={22} className="text-primary" />

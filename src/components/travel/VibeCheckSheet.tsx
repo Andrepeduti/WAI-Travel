@@ -229,7 +229,7 @@ export function VibeCheckSheet({
       />
       {/* Sheet */}
       <div
-        className="relative w-full max-w-[430px] bg-background rounded-t-[28px] animate-in slide-in-from-bottom duration-300 pb-7 flex flex-col"
+        className="relative w-full w-full bg-background rounded-t-[28px] animate-in slide-in-from-bottom duration-300 pb-7 flex flex-col"
         style={{ boxShadow: '0 -8px 32px rgba(0,0,0,0.12)', maxHeight: '88vh' }}
       >
         {/* Drag handle */}

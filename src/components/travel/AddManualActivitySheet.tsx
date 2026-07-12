@@ -77,7 +77,7 @@ export function AddManualActivitySheet({ open, onClose, onSave, dayNumber, total
 
       {/* Sheet */}
       <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center">
-        <div className="bg-background rounded-t-3xl w-full max-w-[430px] max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
+        <div className="bg-background rounded-t-3xl w-full w-full max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
           {/* Handle */}
           <div className="flex justify-center py-3 sticky top-0 bg-background z-10">
             <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />

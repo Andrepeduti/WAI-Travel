@@ -107,7 +107,7 @@ export function SaveToCollectionSheet({ open, onClose, place, onSaved }: SaveToC
     <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/40" />
       <div
-        className="relative w-full max-w-[430px] bg-card rounded-t-3xl overflow-hidden"
+        className="relative w-full w-full bg-card rounded-t-3xl overflow-hidden"
         style={{ maxHeight: '85vh' }}
         onClick={(e) => e.stopPropagation()}
       >

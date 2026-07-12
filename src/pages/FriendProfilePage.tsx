@@ -65,8 +65,8 @@ const FriendProfilePage = () => {
 
   if (showChat) {
     return (
-      <div className="min-h-screen bg-muted flex items-start justify-center">
-        <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+      <div className="min-h-screen bg-background w-full">
+        <div className="w-full bg-background min-h-screen overflow-x-clip">
           <ChatScreen onBack={() => setShowChat(false)} />
         </div>
       </div>
@@ -76,7 +76,7 @@ const FriendProfilePage = () => {
   if (loading && !friend) {
     return (
       <div className="min-h-screen bg-muted flex items-center justify-center">
-        <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl flex items-center justify-center">
+        <div className="w-full bg-background min-h-screen flex items-center justify-center">
           <span className="text-sm text-muted-foreground">Carregando perfil…</span>
         </div>
       </div>
@@ -86,7 +86,7 @@ const FriendProfilePage = () => {
   if (notFound || !friend) {
     return (
       <div className="min-h-screen bg-muted flex items-center justify-center">
-        <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl flex flex-col items-center justify-center gap-3 px-6 text-center">
+        <div className="w-full bg-background min-h-screen flex flex-col items-center justify-center gap-3 px-6 text-center">
           <span className="text-base font-semibold text-foreground">Perfil não encontrado</span>
           <span className="text-sm text-muted-foreground">Esse usuário pode ter saído do app.</span>
           <button
@@ -101,8 +101,8 @@ const FriendProfilePage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-muted flex items-start justify-center">
-      <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+    <div className="min-h-screen bg-background w-full">
+      <div className="w-full bg-background min-h-screen overflow-x-clip">
         <FriendProfileScreen
           friend={friend}
           onBack={() => navigate(-1)}

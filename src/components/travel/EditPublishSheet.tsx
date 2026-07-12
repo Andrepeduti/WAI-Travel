@@ -202,7 +202,7 @@ export function EditPublishSheet({
   return (
     <div className="fixed inset-0 z-[210] flex justify-center" style={{ background: '#F2F2F2' }}>
       <div
-        className="relative w-full max-w-[430px] flex flex-col"
+        className="relative w-full w-full flex flex-col"
         style={{ height: '100dvh', background: '#F2F2F2' }}
       >
         {/* Header */}
@@ -487,7 +487,7 @@ export function EditPublishSheet({
         >
           <div className="absolute inset-0 bg-black/30" />
           <div
-            className="relative w-full max-w-[430px] bg-card rounded-t-2xl"
+            className="relative w-full w-full bg-card rounded-t-2xl"
             style={{ animation: 'slideUpSheet 0.3s cubic-bezier(0.32, 0.72, 0, 1)' }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -530,7 +530,7 @@ export function EditPublishSheet({
         >
           <div className="absolute inset-0 bg-black/30" />
           <div
-            className="relative w-full max-w-[430px] bg-card rounded-t-2xl"
+            className="relative w-full w-full bg-card rounded-t-2xl"
             style={{ animation: 'slideUpSheet 0.3s cubic-bezier(0.32, 0.72, 0, 1)' }}
             onClick={(e) => e.stopPropagation()}
           >

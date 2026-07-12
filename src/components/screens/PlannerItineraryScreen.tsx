@@ -2186,7 +2186,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       }
       {!isViewer && (
       <div className="fixed right-0 left-0 z-50 pointer-events-none" style={{ bottom: creatorEditMode ? 'calc(env(safe-area-inset-bottom, 0px) + 92px)' : 'calc(env(safe-area-inset-bottom, 0px) + 16px)' }}>
-        <div className="max-w-[430px] mx-auto relative">
+        <div className="w-full mx-auto relative">
           <div className="absolute right-5 bottom-0 flex items-end gap-3 pointer-events-auto">
             {/* Expanded action buttons - stacked vertically, beside the FAB column */}
             {showAddAction &&
@@ -3177,7 +3177,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
 
       {creatorEditMode && (
         <div
-          className="fixed left-0 right-0 z-50 mx-auto w-full max-w-[430px] px-4 pt-3 bg-white border-t border-border"
+          className="fixed left-0 right-0 z-50 mx-auto w-full w-full px-4 pt-3 bg-white border-t border-border"
           style={{ bottom: 0, paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}
         >
           <button
@@ -3771,7 +3771,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         <>
           <div className="fixed inset-0 z-[220] bg-black/40 backdrop-blur-[2px]" onClick={() => setMoveToDayTarget(null)} />
           <div className="fixed bottom-0 left-0 right-0 z-[230] flex justify-center" onClick={() => setMoveToDayTarget(null)}>
-            <div className="bg-card rounded-t-2xl w-full max-w-[430px] animate-in slide-in-from-bottom duration-300" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-card rounded-t-2xl w-full w-full animate-in slide-in-from-bottom duration-300" onClick={(e) => e.stopPropagation()}>
               <div className="flex justify-center pt-3 pb-1">
                 <div className="w-9 h-1 rounded-full bg-muted" />
               </div>

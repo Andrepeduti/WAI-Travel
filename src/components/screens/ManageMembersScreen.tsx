@@ -220,7 +220,7 @@ export function ManageMembersScreen({ onBack, invitedFriends = [] }: ManageMembe
           <>
             <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setMenuOpen(null)} />
             <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center">
-              <div className="bg-card rounded-t-3xl w-full max-w-[430px] px-5 pt-3 animate-in slide-in-from-bottom duration-300 flex flex-col">
+              <div className="bg-card rounded-t-3xl w-full w-full px-5 pt-3 animate-in slide-in-from-bottom duration-300 flex flex-col">
                 <div className="flex justify-center mb-2">
                   <div className="w-10 h-1 rounded-full bg-muted" />
                 </div>
@@ -300,7 +300,7 @@ export function ManageMembersScreen({ onBack, invitedFriends = [] }: ManageMembe
       <div className="fixed inset-0 z-[60] flex items-end justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => {setShowAddMember(false);setEditingMember(null);}} />
           <div
-          className="relative w-full max-w-[430px] bg-card rounded-t-3xl p-6 pb-8"
+          className="relative w-full w-full bg-card rounded-t-3xl p-6 pb-8"
           style={{ animation: 'slideUpSheet 0.35s cubic-bezier(0.32, 0.72, 0, 1)' }}>
           
             <div className="flex items-center justify-between mb-5">
@@ -375,7 +375,7 @@ export function ManageMembersScreen({ onBack, invitedFriends = [] }: ManageMembe
       <div className="fixed inset-0 z-[60] flex items-end justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowRoleSheet(null)} />
           <div
-          className="relative w-full max-w-[430px] bg-card rounded-t-3xl p-6 pb-8"
+          className="relative w-full w-full bg-card rounded-t-3xl p-6 pb-8"
           style={{ animation: 'slideUpSheet 0.35s cubic-bezier(0.32, 0.72, 0, 1)' }}>
           
             <div className="flex justify-center pt-0 pb-3">
@@ -425,7 +425,7 @@ export function ManageMembersScreen({ onBack, invitedFriends = [] }: ManageMembe
       <div className="fixed inset-0 z-[60] flex items-end justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowInviteSheet(false)} />
           <div
-          className="relative w-full max-w-[430px] bg-card rounded-t-3xl p-6 pb-8"
+          className="relative w-full w-full bg-card rounded-t-3xl p-6 pb-8"
           style={{ animation: 'slideUpSheet 0.35s cubic-bezier(0.32, 0.72, 0, 1)' }}>
           
             <div className="flex justify-center pt-0 pb-3">

@@ -853,8 +853,8 @@ const Index = () => {
   // Show Creator Profile
   if (selectedCreator) {
     return (
-      <div className="min-h-screen bg-muted flex items-start justify-center">
-        <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+      <div className="min-h-screen bg-background w-full">
+        <div className="w-full bg-background min-h-screen overflow-x-clip">
           <CreatorProfileScreen
             creator={selectedCreator}
             onBack={wrapBack(() => setSelectedCreator(null))}
@@ -872,8 +872,8 @@ const Index = () => {
   // Show Similar Travelers (clicked from "Viajantes com mesmo interesse")
   if (showSimilarTravelers) {
     return (
-      <div className="min-h-screen bg-muted flex items-start justify-center">
-        <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+      <div className="min-h-screen bg-background w-full">
+        <div className="w-full bg-background min-h-screen overflow-x-clip">
           <SimilarTravelersScreen
             onBack={wrapBack(() => setShowSimilarTravelers(false))}
             onViewProfile={(traveler) => {
@@ -900,8 +900,8 @@ const Index = () => {
   // Show AI History
   if (showAIHistory) {
     return (
-      <div className="min-h-screen bg-muted flex items-start justify-center">
-        <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+      <div className="min-h-screen bg-background w-full">
+        <div className="w-full bg-background min-h-screen overflow-x-clip">
           <AIHistoryScreen
             onBack={wrapBack(() => setShowAIHistory(false))}
             onSelectChat={(id) => {
@@ -917,8 +917,8 @@ const Index = () => {
   // Show AI Assistant
   if (showAIAssistant) {
     return (
-      <div className="min-h-screen bg-muted flex items-start justify-center">
-        <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+      <div className="min-h-screen bg-background w-full">
+        <div className="w-full bg-background min-h-screen overflow-x-clip">
           <AIAssistantScreen
             onBack={wrapBack(() => {
               if (navigatedFromNotifications) {
@@ -942,8 +942,8 @@ const Index = () => {
   // Show experience detail
   if (selectedExperienceId !== null) {
     return (
-      <div className="min-h-screen bg-muted flex items-start justify-center">
-        <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+      <div className="min-h-screen bg-background w-full">
+        <div className="w-full bg-background min-h-screen overflow-x-clip">
           <ExperienceDetailScreen 
             experienceId={selectedExperienceId} 
             onBack={wrapBack(() => setSelectedExperienceId(null))} 
@@ -955,8 +955,8 @@ const Index = () => {
 
   if (creatorDashboardItinerary) {
     return (
-      <div className="min-h-screen bg-muted flex items-start justify-center">
-        <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+      <div className="min-h-screen bg-background w-full">
+        <div className="w-full bg-background min-h-screen overflow-x-clip">
           <CreatorItineraryDashboardScreen
             itinerary={creatorDashboardItinerary}
             onBack={wrapBack(() => setCreatorDashboardItinerary(null))}
@@ -979,8 +979,8 @@ const Index = () => {
 
   if (profileSubScreen === 'sales') {
     return (
-      <div className="min-h-screen bg-muted flex items-start justify-center">
-        <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+      <div className="min-h-screen bg-background w-full">
+        <div className="w-full bg-background min-h-screen overflow-x-clip">
           <SalesSummaryScreen onBack={wrapBack(() => {
             if (navigatedFromNotifications) {
               setNavigatedFromNotifications(false);
@@ -1023,8 +1023,8 @@ const Index = () => {
 
     if (selectedItinerary.type === 'marketplace') {
       return (
-        <div className="min-h-screen bg-muted flex items-start justify-center">
-          <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+        <div className="min-h-screen bg-background w-full">
+          <div className="w-full bg-background min-h-screen overflow-x-clip">
             <MarketplaceItineraryScreen 
               itineraryId={selectedItinerary.id} 
               autoOpenCheckout={resumeCheckoutId === selectedItinerary.id}
@@ -1143,8 +1143,8 @@ const Index = () => {
       invitedFriends: [],
     };
     return (
-      <div className="min-h-screen bg-muted flex items-start justify-center">
-        <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+      <div className="min-h-screen bg-background w-full">
+        <div className="w-full bg-background min-h-screen overflow-x-clip">
           <PlannerItineraryScreen 
             data={plannerData}
             itineraryDataset={selectedItinerary}
@@ -1184,8 +1184,8 @@ const Index = () => {
   // Show new itinerary screen (from creation flow)
   if (newItineraryData) {
     return (
-      <div className="min-h-screen bg-muted flex items-start justify-center">
-        <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+      <div className="min-h-screen bg-background w-full">
+        <div className="w-full bg-background min-h-screen overflow-x-clip">
           <PlannerItineraryScreen 
             data={newItineraryData}
             itineraryDataset={activeUserItineraryDataset ?? undefined}
@@ -1249,8 +1249,8 @@ const Index = () => {
   // Show collection detail screen
   if (selectedCollectionId !== null) {
     return (
-      <div className="min-h-screen bg-muted flex items-start justify-center">
-        <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+      <div className="min-h-screen bg-background w-full">
+        <div className="w-full bg-background min-h-screen overflow-x-clip">
           <CollectionDetailScreen 
             collectionId={selectedCollectionId} 
             collectionName={newCollectionName}
@@ -1266,8 +1266,8 @@ const Index = () => {
   // Show cart screen
   if (showCart) {
     return (
-      <div className="min-h-screen bg-muted flex items-start justify-center">
-        <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+      <div className="min-h-screen bg-background w-full">
+        <div className="w-full bg-background min-h-screen overflow-x-clip">
           <CartScreen
             onBack={wrapBack(() => setShowCart(false))}
             onResumeCheckout={(id) => {
@@ -1282,8 +1282,8 @@ const Index = () => {
 
   if (showChat) {
     return (
-      <div className="min-h-screen bg-muted flex items-start justify-center">
-        <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+      <div className="min-h-screen bg-background w-full">
+        <div className="w-full bg-background min-h-screen overflow-x-clip">
           <ChatScreen
             onBack={wrapBack(() => { setShowChat(false); setChatInitialContact(null); })}
             initialContact={chatInitialContact}
@@ -1301,8 +1301,8 @@ const Index = () => {
   // Show trip reminders screen
   if (showTripReminders) {
     return (
-      <div className="min-h-screen bg-muted flex items-start justify-center">
-        <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+      <div className="min-h-screen bg-background w-full">
+        <div className="w-full bg-background min-h-screen overflow-x-clip">
           <TripRemindersScreen onBack={wrapBack(() => {
             if (navigatedFromNotifications) {
               setNavigatedFromNotifications(false);
@@ -1320,8 +1320,8 @@ const Index = () => {
   // Show promo detail screen
   if (showPromoDetail) {
     return (
-      <div className="min-h-screen bg-muted flex items-start justify-center">
-        <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+      <div className="min-h-screen bg-background w-full">
+        <div className="w-full bg-background min-h-screen overflow-x-clip">
           <PromoDetailScreen onBack={wrapBack(() => {
             if (navigatedFromNotifications) {
               setNavigatedFromNotifications(false);
@@ -1339,8 +1339,8 @@ const Index = () => {
   // Show notifications screen
   if (showNotifications) {
     return (
-      <div className="min-h-screen bg-muted flex items-start justify-center">
-        <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+      <div className="min-h-screen bg-background w-full">
+        <div className="w-full bg-background min-h-screen overflow-x-clip">
           <NotificationsScreen
             onBack={wrapBack(() => setShowNotifications(false))}
             onNavigateToItinerary={(id) => { 
@@ -1387,8 +1387,8 @@ const Index = () => {
   // Show generic itinerary list (from Home "see all" sections)
   if (itineraryList) {
     return (
-      <div className="min-h-screen bg-muted flex items-start justify-center">
-        <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+      <div className="min-h-screen bg-background w-full">
+        <div className="w-full bg-background min-h-screen overflow-x-clip">
           <ItineraryListScreen
             title={itineraryList.title}
             items={itineraryList.items}
@@ -1403,8 +1403,8 @@ const Index = () => {
 
   if (destinationList) {
     return (
-      <div className="min-h-screen bg-muted flex items-start justify-center">
-        <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+      <div className="min-h-screen bg-background w-full">
+        <div className="w-full bg-background min-h-screen overflow-x-clip">
           <DestinationItinerariesScreen
             country={destinationList.country}
             continent={destinationList.continent}
@@ -1423,8 +1423,8 @@ const Index = () => {
   // Show search screen
   if (showSearch) {
     return (
-      <div className="min-h-screen bg-muted flex items-start justify-center">
-        <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+      <div className="min-h-screen bg-background w-full">
+        <div className="w-full bg-background min-h-screen overflow-x-clip">
           <SearchScreen 
             onClose={handleSearchClose} 
             onItineraryClick={handleItineraryClick}
@@ -1440,8 +1440,8 @@ const Index = () => {
   if (activeTab === 'home' && profileSubScreen !== 'main') {
     if (profileSubScreen === 'profile' || profileSubScreen === 'user') {
       return (
-        <div className="min-h-screen bg-muted flex items-start justify-center">
-          <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+        <div className="min-h-screen bg-background w-full">
+          <div className="w-full bg-background min-h-screen overflow-x-clip">
             <UserProfileScreen 
               onBack={wrapBack(() => setProfileSubScreen('main'))}
               onEditProfile={() => setProfileSubScreen('edit')}
@@ -1457,8 +1457,8 @@ const Index = () => {
     }
     if (profileSubScreen === 'creator') {
       return (
-        <div className="min-h-screen bg-muted flex items-start justify-center">
-          <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+        <div className="min-h-screen bg-background w-full">
+          <div className="w-full bg-background min-h-screen overflow-x-clip">
             <CreatorDashboardScreen 
               onBack={wrapBack(() => setProfileSubScreen('main'))}
               onEditProfile={() => setProfileSubScreen('edit')}
@@ -1470,8 +1470,8 @@ const Index = () => {
     }
     if (profileSubScreen === 'friend' && selectedFriend) {
       return (
-        <div className="min-h-screen bg-muted flex items-start justify-center">
-          <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+        <div className="min-h-screen bg-background w-full">
+          <div className="w-full bg-background min-h-screen overflow-x-clip">
             <FriendProfileScreen
               friend={selectedFriend}
               onBack={wrapBack(() => { setProfileSubScreen('main'); setSelectedFriend(null); })}
@@ -1484,8 +1484,8 @@ const Index = () => {
     }
     if (profileSubScreen === 'creator-program') {
       return (
-        <div className="min-h-screen bg-muted flex items-start justify-center">
-          <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+        <div className="min-h-screen bg-background w-full">
+          <div className="w-full bg-background min-h-screen overflow-x-clip">
             <CreatorProgramScreen
               onBack={wrapBack(() => {
                 if (creatorProgramOrigin === 'trips') {
@@ -1521,8 +1521,8 @@ const Index = () => {
     }
     if (profileSubScreen === 'edit') {
       return (
-        <div className="min-h-screen bg-muted flex items-start justify-center">
-          <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+        <div className="min-h-screen bg-background w-full">
+          <div className="w-full bg-background min-h-screen overflow-x-clip">
             <EditProfileScreen 
               onBack={wrapBack(() => setProfileSubScreen('user'))}
               onSave={() => setProfileSubScreen('user')}
@@ -1533,8 +1533,8 @@ const Index = () => {
     }
     if (profileSubScreen === 'achievements') {
       return (
-        <div className="min-h-screen bg-muted flex items-start justify-center">
-          <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+        <div className="min-h-screen bg-background w-full">
+          <div className="w-full bg-background min-h-screen overflow-x-clip">
             <AchievementsScreen onBack={wrapBack(() => setProfileSubScreen('user'))} />
           </div>
         </div>
@@ -1542,8 +1542,8 @@ const Index = () => {
     }
     if (profileSubScreen === 'find-people') {
       return (
-        <div className="min-h-screen bg-muted flex items-start justify-center">
-          <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+        <div className="min-h-screen bg-background w-full">
+          <div className="w-full bg-background min-h-screen overflow-x-clip">
             <FindPeopleScreen
               onBack={wrapBack(() => setProfileSubScreen('user'))}
               onViewProfile={() => navigate('/profile')}
@@ -1554,8 +1554,8 @@ const Index = () => {
     }
     if (profileSubScreen === 'top-creators') {
       return (
-        <div className="min-h-screen bg-muted flex items-start justify-center">
-          <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+        <div className="min-h-screen bg-background w-full">
+          <div className="w-full bg-background min-h-screen overflow-x-clip">
             <TopCreatorsScreen
               onBack={wrapBack(() => setProfileSubScreen('main'))}
               onViewProfile={() => navigate('/profile')}
@@ -1586,8 +1586,8 @@ const Index = () => {
     const settingsEntry = settingsScreenMap[profileSubScreen];
     if (settingsEntry) {
       return (
-        <div className="min-h-screen bg-muted flex items-start justify-center">
-          <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+        <div className="min-h-screen bg-background w-full">
+          <div className="w-full bg-background min-h-screen overflow-x-clip">
             {settingsEntry.component}
           </div>
         </div>
@@ -1596,8 +1596,7 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-muted flex items-start justify-center">
-      <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl relative overflow-x-clip">
+    <div className="min-h-screen bg-background w-full relative overflow-x-clip">
         {activeTab === 'home' && (
           <HomeScreen 
             onItineraryClick={handleMarketplaceItineraryClick} 
@@ -1770,7 +1769,6 @@ const Index = () => {
           description="A coleção foi removida com sucesso."
         />
       </div>
-    </div>
   );
 };
 

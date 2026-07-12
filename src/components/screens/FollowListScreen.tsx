@@ -226,8 +226,8 @@ export function FollowListScreen({ profileUserId, profileLabel, initialTab, init
   };
 
   return (
-    <div className="min-h-screen bg-muted flex items-start justify-center">
-      <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl flex flex-col" style={{ minHeight: '100dvh' }}>
+    <div className="min-h-screen bg-background w-full">
+      <div className="w-full bg-background min-h-screen flex flex-col" style={{ minHeight: '100dvh' }}>
         {/* Header */}
         <div className="sticky z-20 bg-background border-b border-border px-4 flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />
@@ -349,7 +349,7 @@ export function FollowListScreen({ profileUserId, profileLabel, initialTab, init
         {/* Bottom sheet: ações de follow (remover seguidor / deixar de seguir) */}
         {followSheet && (
           <div className="fixed inset-0 z-[100] flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={() => setFollowSheet(null)}>
-            <div className="w-full max-w-[430px] bg-background rounded-t-2xl p-5 pb-7" onClick={e => e.stopPropagation()}>
+            <div className="w-full w-full bg-background rounded-t-2xl p-5 pb-7" onClick={e => e.stopPropagation()}>
               <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-4" />
               <div className="flex items-center gap-3 mb-4">
                 <UserAvatar src={followSheet.entry.avatar} alt={followSheet.entry.name} size={48} />
@@ -388,7 +388,7 @@ export function FollowListScreen({ profileUserId, profileLabel, initialTab, init
         {/* Bottom sheet: moderação (long press) — Denunciar / Bloquear */}
         {moderateSheet && (
           <div className="fixed inset-0 z-[100] flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={() => setModerateSheet(null)}>
-            <div className="w-full max-w-[430px] bg-background rounded-t-2xl p-5 pb-7" onClick={e => e.stopPropagation()}>
+            <div className="w-full w-full bg-background rounded-t-2xl p-5 pb-7" onClick={e => e.stopPropagation()}>
               <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-4" />
               <div className="flex items-center gap-3 mb-4">
                 <UserAvatar src={moderateSheet.entry.avatar} alt={moderateSheet.entry.name} size={48} />

@@ -115,7 +115,7 @@ export function AddBudgetExpenseSheet({ open, onClose, onSave, onDelete, editing
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={handleClose} />
-      <div className="relative w-full max-w-[430px] bg-card rounded-t-3xl p-6 pb-8 animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-y-auto">
+      <div className="relative w-full w-full bg-card rounded-t-3xl p-6 pb-8 animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-[18px] font-bold text-foreground">{editingExpense ? 'Editar gasto' : 'Novo gasto'}</h2>
           <button onClick={handleClose} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#F2F2F2' }}>

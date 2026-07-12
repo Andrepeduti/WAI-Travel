@@ -196,7 +196,7 @@ export function EditItineraryDataScreen({
         <div className="fixed inset-0 z-[100] flex items-end justify-center" onClick={() => setShowCurrencyPicker(false)}>
           <div className="absolute inset-0 bg-black/40" style={{ animation: 'fadeIn 0.3s ease-out' }} />
           <div
-            className="relative w-full max-w-[430px] bg-background rounded-t-2xl max-h-[60vh] flex flex-col"
+            className="relative w-full w-full bg-background rounded-t-2xl max-h-[60vh] flex flex-col"
             style={{ animation: 'slideUpSheet 0.35s cubic-bezier(0.32, 0.72, 0, 1)' }}
             onClick={e => e.stopPropagation()}
           >
@@ -236,7 +236,7 @@ export function EditItineraryDataScreen({
       )}
 
       {/* Fixed footer save button */}
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-background border-t border-border px-4 py-4 z-50">
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full w-full bg-background border-t border-border px-4 py-4 z-50">
         <button
           onClick={handleSave}
           className="w-full h-[41px] rounded-[16px] bg-primary text-primary-foreground font-semibold text-[14px] flex items-center justify-center gap-2 active:scale-[0.96] transition-transform"

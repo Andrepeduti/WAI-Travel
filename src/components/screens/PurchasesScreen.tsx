@@ -434,7 +434,7 @@ export function PurchasesScreen({ onBack, onNavigateToItinerary, onResumeCheckou
       {receiptId !== null && receiptItem && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setReceiptId(null)} />
-          <div className="relative w-full max-w-[430px] bg-background rounded-t-3xl p-5 pb-8 animate-in slide-in-from-bottom">
+          <div className="relative w-full w-full bg-background rounded-t-3xl p-5 pb-8 animate-in slide-in-from-bottom">
             <div className="w-10 h-1 rounded-full bg-muted-foreground/30 mx-auto mb-5" />
             <h3 className="text-foreground text-center mb-5" style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-weight-bold)' }}>
               Comprovante de Compra
@@ -514,7 +514,7 @@ export function PurchasesScreen({ onBack, onNavigateToItinerary, onResumeCheckou
       {reviewingId !== null && reviewingItem && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setReviewingId(null)} />
-          <div className="relative w-full max-w-[430px] bg-background rounded-t-3xl p-5 pb-8 animate-in slide-in-from-bottom">
+          <div className="relative w-full w-full bg-background rounded-t-3xl p-5 pb-8 animate-in slide-in-from-bottom">
             <div className="w-10 h-1 rounded-full bg-muted-foreground/30 mx-auto mb-4" />
 
             {/* Itinerary header */}
@@ -597,7 +597,7 @@ export function PurchasesScreen({ onBack, onNavigateToItinerary, onResumeCheckou
       {cancelId !== null && cancelItem && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setCancelId(null)} />
-          <div className="relative w-full max-w-[430px] bg-background rounded-t-3xl p-5 pb-8 animate-in slide-in-from-bottom">
+          <div className="relative w-full w-full bg-background rounded-t-3xl p-5 pb-8 animate-in slide-in-from-bottom">
             <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-4" />
             <div className="flex flex-col items-center text-center mb-5">
               <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3" style={{ background: 'rgba(239, 68, 68, 0.1)' }}>
