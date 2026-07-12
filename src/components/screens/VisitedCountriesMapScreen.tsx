@@ -147,9 +147,12 @@ export function VisitedCountriesMapScreen({
       });
   }, []);
 
+  const initializedRef = useRef(false);
+
   useEffect(() => {
-    if (globeRef.current && dimensions.width > 0) {
+    if (globeRef.current && dimensions.width > 0 && !initializedRef.current) {
       globeRef.current.pointOfView({ lat: 20, lng: 0, altitude: 2.5 }, 0);
+      initializedRef.current = true;
     }
   }, [dimensions]);
 
@@ -190,16 +193,13 @@ export function VisitedCountriesMapScreen({
       globeRef.current.pointOfView({ lat, lng, altitude: 0.6 }, 800); // 0.6 altitude is close enough to see small countries clearly
     }
 
-    // Delay opening the sheet slightly so the user sees the flight animation starting
-    setTimeout(() => {
-      if (country) {
-        setSelectedCountry(country);
-        setSheetOpen(true);
-      } else if (canMarkCountries) {
-        setActionCountry(ptInfo);
-        setActionSheetOpen(true);
-      }
-    }, 400);
+    if (country) {
+      setSelectedCountry(country);
+      setSheetOpen(true);
+    } else if (canMarkCountries) {
+      setActionCountry(ptInfo);
+      setActionSheetOpen(true);
+    }
   };
 
   return (
@@ -210,24 +210,22 @@ export function VisitedCountriesMapScreen({
             ref={globeRef}
             width={dimensions.width}
             height={dimensions.height}
-            globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
-            bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
+            globeImageUrl="https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
             backgroundColor="#EAECEF"
             showAtmosphere={true}
             atmosphereColor="#c5ced9"
             atmosphereAltitude={0.15}
             polygonsData={geoData}
-            polygonAltitude={d => d === hoveredPolygon ? 0.02 : 0.01}
+            polygonAltitude={() => 0.01}
             polygonCapColor={d => {
               const props = d.properties || {};
               const iso3 = props['ISO3166-1-Alpha-3'] || props.ISO_A3 || props.iso_a3 || d.id;
               const color = iso3ColorMap.get(iso3);
               if (color) return color;
-              return d === hoveredPolygon ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.01)';
+              return 'rgba(255, 255, 255, 0.01)';
             }}
             polygonSideColor={() => 'rgba(200, 200, 200, 0.1)'}
             polygonStrokeColor={() => 'rgba(255, 255, 255, 0.3)'}
-            onPolygonHover={setHoveredPolygon}
             onPolygonClick={handlePolygonClick}
             polygonsTransitionDuration={300}
           />
