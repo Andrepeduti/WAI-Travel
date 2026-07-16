@@ -12,7 +12,7 @@ export interface DestinationFilters {
 
 export const DEFAULT_FILTERS: DestinationFilters = {
   daysRange: [1, 30],
-  priceRange: [0, 500],
+  priceRange: [0, 2000],
   seasons: [],
   categories: [],
   minRating: 0,
@@ -93,7 +93,7 @@ export function DestinationFiltersSheet({ open, onClose, initial, onApply }: Pro
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-[14px] font-bold text-foreground">Duração</h4>
             <span className="text-[12px] font-medium text-foreground/70">
-              {filters.daysRange[0]}–{filters.daysRange[1]} dias
+              {filters.daysRange[0]}–{filters.daysRange[1] === 30 ? '30+' : filters.daysRange[1]} dias
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -131,15 +131,15 @@ export function DestinationFiltersSheet({ open, onClose, initial, onApply }: Pro
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-[14px] font-bold text-foreground">Faixa de preço</h4>
             <span className="text-[12px] font-medium text-foreground/70">
-              R$ {filters.priceRange[0]} – R$ {filters.priceRange[1]}
+              R$ {filters.priceRange[0]} – {filters.priceRange[1] === 2000 ? 'R$ 2000+' : `R$ ${filters.priceRange[1]}`}
             </span>
           </div>
           <div className="flex items-center gap-3">
             <input
               type="range"
               min={0}
-              max={500}
-              step={10}
+              max={2000}
+              step={50}
               value={filters.priceRange[0]}
               onChange={(e) =>
                 setFilters((f) => ({
@@ -152,8 +152,8 @@ export function DestinationFiltersSheet({ open, onClose, initial, onApply }: Pro
             <input
               type="range"
               min={0}
-              max={500}
-              step={10}
+              max={2000}
+              step={50}
               value={filters.priceRange[1]}
               onChange={(e) =>
                 setFilters((f) => ({

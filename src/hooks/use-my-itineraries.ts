@@ -15,6 +15,7 @@ import {
 
 const optimisticItinerariesByUser = new Map<string, UserItinerary[]>();
 const optimisticListeners = new Set<() => void>();
+let cachedMyItineraries: UserItinerary[] | null = null;
 
 const notifyOptimisticItineraries = () => optimisticListeners.forEach(listener => listener());
 
@@ -46,7 +47,6 @@ export function buildOptimisticItinerary(input: CreateItineraryInput, userId: st
     priceCents: input.priceCents ?? null,
     description: input.description ?? '',
     tags: input.tags ?? [],
-    mainTag: input.mainTag ?? '',
     userId,
   };
 }
@@ -73,18 +73,21 @@ export function removeOptimisticItinerary(tempId: string) {
 export function useMyItineraries() {
   const { session } = useAuth();
   const userId = session?.user?.id ?? null;
-  const [itineraries, setItineraries] = useState<UserItinerary[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [itineraries, setItineraries] = useState<UserItinerary[]>(() => cachedMyItineraries || []);
+  const [loading, setLoading] = useState(() => !cachedMyItineraries);
 
   const refetch = useCallback(async () => {
     if (!userId) {
+      cachedMyItineraries = null;
       setItineraries([]);
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!cachedMyItineraries) setLoading(true);
     const data = await listMyItineraries();
-    setItineraries(mergeWithOptimistic(userId, data));
+    const merged = mergeWithOptimistic(userId, data);
+    cachedMyItineraries = merged;
+    setItineraries(merged);
     setLoading(false);
   }, [userId]);
 

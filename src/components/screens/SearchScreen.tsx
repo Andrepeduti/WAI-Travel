@@ -4,13 +4,22 @@ import { differenceInDays } from 'date-fns';
 import { SlidersHorizontal } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { FiltersScreen, DEFAULT_FILTERS, type ExploreFilters } from './FiltersScreen';
-import { getItinerariesByType, type ItineraryDataset } from '@/data/itineraries';
 import { visitedCountries } from '@/data/visitedCountries';
 import { BackButton } from '@/components/ui/BackButton';
 import { supabase } from '@/integrations/supabase/client';
 import { listPublicItineraries, type UserItinerary } from '@/lib/itinerariesApi';
-import { COUNTRY_TO_TAGS } from '@/data/countriesCatalog';
+import { COUNTRY_TO_TAGS, ALL_COUNTRIES } from '@/data/countriesCatalog';
 import { toast } from 'sonner';
+import { resolveCoverImage } from '@/lib/coverImageResolver';
+const defaultAvatarUrl = '/__l5e/assets-v1/9cb2fe10-a285-4f17-bbef-f67389a96b37/wai-logo.png';
+
+let cachedRealPeople: PeopleSuggestion[] | null = null;
+let cachedPublicItineraries: SearchItinerary[] | null = null;
+let cachedDestinations: any[] | null = null;
+let lastReloadAtPublicItin = 0;
+let lastReloadAtProfiles = 0;
+let lastReloadAtDestinations = 0;
+let cachedCurrentUserId: string | null = null;
 
 const formatBRL = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -116,7 +125,7 @@ interface ProfileSearchRow {
 
 // Mocked people suggestions have been removed. Using real users from Supabase.
 
-type RecentType = 'lugar' | 'pessoa' | 'roteiro';
+type RecentType = 'lugar' | 'pessoa' | 'roteiro' | 'termo';
 interface RecentSearch {
   id: string;
   type: RecentType;
@@ -155,17 +164,49 @@ interface SearchScreenProps {
   onPlaceClick?: (place: { country: string; continent: string; image: string }) => void;
 }
 
-const profileRowToPerson = (row: ProfileSearchRow): PeopleSuggestion => ({
-  id: `profile-${row.user_id}`,
-  userId: row.user_id,
-  name: row.name || row.username || 'Viajante',
-  handle: row.username ? `@${row.username.replace(/^@/, '')}` : '@viajante',
-  image: row.avatar_url || '',
-  location: row.location || 'WaiTravel',
-  followers: String(row.followers_count ?? 0),
-  following: row.following_count ?? 0,
-  tags: [row.name, row.username ?? '', row.location, row.bio, ...(row.interests ?? [])].filter(Boolean).map(norm),
-});
+const profileRowToPerson = (row: ProfileSearchRow): PeopleSuggestion => {
+  const baseTags = [row.name, row.username ?? '', row.location, row.bio, ...(row.interests ?? [])].filter(Boolean).map(norm);
+  const tagSet = new Set(baseTags);
+  if (row.location) {
+    const locNorm = norm(row.location);
+    const matchedCountry = ALL_COUNTRIES.find(c => {
+      const cNorm = norm(c.name);
+      if (locNorm.includes(cNorm)) return true;
+      if (c.aliases?.some(a => new RegExp(`\\b${norm(a)}\\b`).test(locNorm))) {
+        return true;
+      }
+      return false;
+    });
+
+    if (matchedCountry) {
+      const nc = norm(matchedCountry.name);
+      tagSet.add(nc);
+      tagSet.add(norm(matchedCountry.continent));
+      const extras = COUNTRY_TO_TAGS[matchedCountry.name.toLowerCase()] ?? COUNTRY_TO_TAGS[nc] ?? [];
+      extras.forEach((t) => tagSet.add(norm(t)));
+    } else {
+      const parts = row.location.split(',').map(s => s.trim());
+      const country = parts.length > 1 ? parts[parts.length - 1] : parts[0];
+      if (country) {
+        const nc = norm(country);
+        const extras = COUNTRY_TO_TAGS[country.toLowerCase()] ?? COUNTRY_TO_TAGS[nc] ?? [];
+        extras.forEach((t) => tagSet.add(norm(t)));
+      }
+    }
+  }
+
+  return {
+    id: `profile-${row.user_id}`,
+    userId: row.user_id,
+    name: row.name || row.username || 'Viajante',
+    handle: row.username ? `@${row.username.replace(/^@/, '')}` : '@viajante',
+    image: row.avatar_url || '',
+    location: row.location || 'WaiTravel',
+    followers: String(row.followers_count ?? 0),
+    following: row.following_count ?? 0,
+    tags: Array.from(tagSet),
+  };
+};
 
 export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryClick, onPlaceClick }: SearchScreenProps) {
   const navigate = useNavigate();
@@ -176,7 +217,14 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
   const [appliedFilters, setAppliedFilters] = useState<ExploreFilters>(() => {
     try {
       const saved = sessionStorage.getItem('wai_appliedFilters');
-      return saved ? JSON.parse(saved) : DEFAULT_FILTERS;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.searchType === 'todos') {
+          parsed.searchType = null;
+        }
+        return { ...DEFAULT_FILTERS, ...parsed };
+      }
+      return DEFAULT_FILTERS;
     } catch {
       return DEFAULT_FILTERS;
     }
@@ -193,11 +241,10 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
   useEffect(() => {
     sessionStorage.setItem('wai_appliedFilters', JSON.stringify(appliedFilters));
   }, [appliedFilters]);
-  const [realPeople, setRealPeople] = useState<PeopleSuggestion[]>([]);
-  const [publicItineraries, setPublicItineraries] = useState<SearchItinerary[]>([]);
-  const [destinations, setDestinations] = useState<{id: string; name: string; country: string; continent: string; image: string; itineraryCount: number; tags: string[]; rating: number}[]>([]);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const lastReloadAtRef = useRef<number>(0);
+  const [realPeople, setRealPeople] = useState<PeopleSuggestion[]>(() => cachedRealPeople || []);
+  const [publicItineraries, setPublicItineraries] = useState<SearchItinerary[]>(() => cachedPublicItineraries || []);
+  const [destinations, setDestinations] = useState<{id: string; name: string; country: string; continent: string; image: string; itineraryCount: number; tags: string[]; rating: number}[]>(() => cachedDestinations || []);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(() => cachedCurrentUserId);
 
   const mergedItineraries = useMemo<SearchItinerary[]>(() => {
     // Prioriza roteiros do próprio usuário, depois demais públicos, depois o catálogo estático.
@@ -221,8 +268,8 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
   // Extraído do useEffect para que possa ser reutilizado no submit (com guard de 5s).
   const reloadPublic = async () => {
     const now = Date.now();
-    if (now - lastReloadAtRef.current < 5000) return;
-    lastReloadAtRef.current = now;
+    if (now - lastReloadAtPublicItin < 5000) return;
+    lastReloadAtPublicItin = now;
     try {
       const rows = await listPublicItineraries(200);
       const mapped: SearchItinerary[] = rows.map((row) => {
@@ -271,12 +318,12 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
         return {
           id: row.id,
           title: row.title || 'Roteiro',
-          image: row.images?.[0] || 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=800',
-          rating: 4.7,
+          image: row.images?.[0] && !row.images[0].includes('placeholder') ? row.images[0] : resolveCoverImage(row.destinations).url,
+          rating: 0,
           days,
           cities: cities.size || 1,
           author: row.authorName,
-          authorImage: row.authorAvatar || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
+          authorImage: row.authorAvatar || defaultAvatarUrl,
           price: (row.priceCents ?? 0) / 100,
           tags: Array.from(tagSet),
           destinationsRaw: row.destinations ?? [],
@@ -301,7 +348,47 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
           },
         };
       });
+
+      const generatedDestinations = new Map<string, any>();
+      rows.forEach(row => {
+        (row.destinations || []).forEach(dest => {
+          const [city, country] = dest.split(',').map((s) => s?.trim() ?? '');
+          const placeName = city || dest;
+          if (!placeName) return;
+          const key = norm(placeName);
+          
+          if (!generatedDestinations.has(key)) {
+            generatedDestinations.set(key, {
+              id: key,
+              name: placeName,
+              country: country || '',
+              continent: '',
+              image: row.images?.[0] && !row.images[0].includes('placeholder') ? row.images[0] : resolveCoverImage([dest]).url,
+              itineraryCount: 1,
+              tags: Array.from(COUNTRY_TO_TAGS[norm(country || placeName)] || []),
+              rating: row.rating || 4.7
+            });
+          } else {
+            generatedDestinations.get(key).itineraryCount++;
+          }
+        });
+      });
+
+      cachedPublicItineraries = mapped;
       setPublicItineraries(mapped);
+
+      setDestinations(prev => {
+        const dbKeys = new Set(prev.map(d => norm(d.name)));
+        const finalDests = [...prev];
+        for (const gen of generatedDestinations.values()) {
+          if (!dbKeys.has(norm(gen.name))) {
+            finalDests.push(gen);
+            dbKeys.add(norm(gen.name));
+          }
+        }
+        cachedDestinations = finalDests;
+        return finalDests;
+      });
     } catch (err) {
       console.error('[SearchScreen] listPublicItineraries failed', err);
       toast.error('Não foi possível atualizar a lista de roteiros');
@@ -312,6 +399,14 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
     const q = searchQuery.trim();
     if (!q) return;
     setSubmittedQuery(q);
+    addRecent({
+      id: `term-${norm(q)}`,
+      type: 'termo',
+      title: q,
+      subtitle: 'Busca por termo',
+      image: '',
+      refId: q,
+    });
     // Atualiza a lista no submit para garantir dados frescos (com guard de 5s).
     void reloadPublic();
   };
@@ -322,13 +417,14 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
   };
 
   const activeFiltersCount =
-    (appliedFilters.searchType !== 'todos' ? 1 : 0) +
-    appliedFilters.regions.length +
-    appliedFilters.tripTypes.length +
-    appliedFilters.seasons.length +
-    (appliedFilters.priceRange[0] !== 0 || appliedFilters.priceRange[1] !== 1000 ? 1 : 0) +
-    (appliedFilters.durationRange[0] !== 1 || appliedFilters.durationRange[1] !== 30 ? 1 : 0) +
-    appliedFilters.creatorType.length;
+    (appliedFilters.searchType !== null ? 1 : 0) +
+    (appliedFilters.regions?.length || 0) +
+    (appliedFilters.countries?.length || 0) +
+    (appliedFilters.tripTypes?.length || 0) +
+    (appliedFilters.seasons?.length || 0) +
+    (appliedFilters.priceRange?.[0] !== 0 || appliedFilters.priceRange?.[1] !== 1000 ? 1 : 0) +
+    (appliedFilters.durationRange?.[0] !== 1 || appliedFilters.durationRange?.[1] !== 30 ? 1 : 0) +
+    (appliedFilters.creatorType?.length || 0);
 
   useEffect(() => {
     saveRecent(recent);
@@ -337,8 +433,12 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
   // Captura o user atual para priorizar seus próprios roteiros publicados.
   useEffect(() => {
     let cancelled = false;
+    if (cachedCurrentUserId) return; // If already cached, don't refetch
     supabase.auth.getUser().then(({ data }) => {
-      if (!cancelled) setCurrentUserId(data.user?.id ?? null);
+      if (!cancelled) {
+        cachedCurrentUserId = data.user?.id ?? null;
+        setCurrentUserId(cachedCurrentUserId);
+      }
     });
     return () => { cancelled = true; };
   }, []);
@@ -346,6 +446,9 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
   useEffect(() => {
     let cancelled = false;
     const loadProfiles = async () => {
+      const now = Date.now();
+      if (now - lastReloadAtProfiles < 5000) return;
+      lastReloadAtProfiles = now;
       const { data, error } = await supabase
         .from('profiles_public')
         .select('user_id, name, username, location, avatar_url, bio, interests, followers_count, following_count')
@@ -355,7 +458,11 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
         console.error('[SearchScreen] profiles search failed', error);
         return;
       }
-      if (!cancelled) setRealPeople((data ?? []).map((row) => profileRowToPerson(row as ProfileSearchRow)));
+      if (!cancelled) {
+        const mapped = (data ?? []).map((row) => profileRowToPerson(row as ProfileSearchRow));
+        cachedRealPeople = mapped;
+        setRealPeople(mapped);
+      }
     };
     loadProfiles();
     return () => { cancelled = true; };
@@ -368,9 +475,12 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
     // Load destinations
     let cancelled = false;
     const loadDestinations = async () => {
+      const now = Date.now();
+      if (now - lastReloadAtDestinations < 5000) return;
+      lastReloadAtDestinations = now;
       const { data, error } = await supabase.from('destinations').select('*').order('created_at', { ascending: false });
       if (!cancelled && !error && data) {
-        setDestinations(data.map(d => ({
+        const mapped = data.map(d => ({
           id: d.id,
           name: d.name,
           country: d.country,
@@ -379,7 +489,9 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
           itineraryCount: d.itinerary_count ?? 0,
           tags: d.hashtags ?? [],
           rating: d.rating ?? 4.7
-        })));
+        }));
+        cachedDestinations = mapped;
+        setDestinations(mapped);
       }
     };
     loadDestinations();
@@ -407,32 +519,49 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
   const resultsQuery = norm(submittedQuery.trim());
 
   const hasAnyFilter = (f: ExploreFilters) => {
-    return f.searchType !== 'todos' || f.regions.length > 0 || f.tripTypes.length > 0 || f.seasons.length > 0 || f.creatorType.length > 0 || 
-      f.priceRange[0] !== 0 || f.priceRange[1] !== 1000 || 
-      f.durationRange[0] !== 1 || f.durationRange[1] !== 30;
+    return f.searchType !== null || f.regions?.length > 0 || f.countries?.length > 0 || f.tripTypes?.length > 0 || f.seasons?.length > 0 || f.creatorType?.length > 0 || 
+      f.priceRange?.[0] !== 0 || f.priceRange?.[1] !== 1000 || 
+      f.durationRange?.[0] !== 1 || f.durationRange?.[1] !== 30;
+  };
+
+  const regionMatch = (haystack: string, r: string) => {
+    if (r === 'americas') return haystack.includes('america');
+    return haystack.includes(norm(r));
   };
 
   const buildResults = (q: string, f: ExploreFilters) => {
     if (!q && !hasAnyFilter(f)) return { places: [], people: [], itineraries: [] };
     const peopleCatalog = realPeople;
     
+    const hasItineraryFilters = 
+      f.regions.length > 0 || 
+      f.tripTypes.length > 0 || 
+      f.seasons.length > 0 || 
+      f.priceRange[0] !== 0 || 
+      f.priceRange[1] !== 1000 || 
+      f.durationRange[0] !== 1 || 
+      f.durationRange[1] !== 30;
+
+    const forceRoteiros = f.searchType === null && hasItineraryFilters;
+
     return {
-      places: f.searchType === 'pessoas' ? [] : destinations.filter((d) => {
+      places: (f.searchType === 'pessoas' || f.searchType === 'roteiros' || forceRoteiros) ? [] : destinations.filter((d) => {
         const haystack = [d.name, d.country, d.continent, ...d.tags].map(norm).join(' ');
         if (q && !haystack.includes(q)) return false;
-        if (f.regions.length && !f.regions.some((r) => haystack.includes(norm(r)))) return false;
+        if (f.regions.length && !f.regions.some((r) => regionMatch(haystack, r))) return false;
         if (f.tripTypes.length && !f.tripTypes.some((t) => haystack.includes(norm(t)))) return false;
         if (f.seasons.length && !f.seasons.some((s) => haystack.includes(norm(s)))) return false;
         return true;
       }),
-      people: f.searchType === 'roteiros' ? [] : peopleCatalog.filter((p) => {
+      people: (f.searchType === 'roteiros' || f.searchType === 'lugares' || forceRoteiros) ? [] : peopleCatalog.filter((p) => {
         const haystack = [p.name, p.handle, p.location, ...p.tags].map(norm).join(' ');
         if (q && !haystack.includes(q)) return false;
-        if (f.regions.length && !f.regions.some((r) => haystack.includes(norm(r)))) return false;
-        if (f.creatorType.length && !f.creatorType.some((c) => haystack.includes(norm(c)))) return false;
+        if (f.regions.length && !f.regions.some((r) => regionMatch(haystack, r))) return false;
+        if (f.countries?.length && !f.countries.some((c) => haystack.includes(norm(c)))) return false;
+        if (f.creatorType?.length && !f.creatorType.some((c) => haystack.includes(norm(c)))) return false;
         return true;
       }),
-      itineraries: f.searchType === 'pessoas' ? [] : mergedItineraries
+      itineraries: (f.searchType === 'pessoas' || f.searchType === 'lugares') ? [] : mergedItineraries
         .filter((i) => {
           const tags = (i.tags ?? []).map(norm);
           const haystack = [
@@ -443,7 +572,7 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
             i.descriptionRaw ?? '',
           ].map(norm).join(' ');
           if (q && !haystack.includes(q)) return false;
-          if (f.regions.length && !f.regions.some((r) => haystack.includes(norm(r)))) return false;
+          if (f.regions.length && !f.regions.some((r) => regionMatch(haystack, r))) return false;
           if (f.tripTypes.length && !f.tripTypes.some((t) => haystack.includes(norm(t)))) return false;
           if (f.seasons.length && !f.seasons.some((s) => haystack.includes(norm(s)))) return false;
           if (typeof i.price === 'number') {
@@ -468,7 +597,7 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
       id: `place-${dest.id}`,
       type: 'lugar',
       title: dest.name,
-      subtitle: `Lugar • ${dest.country}`,
+      subtitle: dest.country,
       image: dest.image,
       refId: dest.id,
     });
@@ -478,6 +607,7 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
   };
 
   const goToPersonProfile = (person: PeopleSuggestion) => {
+    sessionStorage.setItem('wai_returnToSearch', 'true');
     // Rota canônica /u/:username quando temos o handle. FriendProfilePage
     // hidrata via fetch real do banco; o state apenas evita "flash" vazio.
     const handle = (person.handle || '').replace(/^@/, '').toLowerCase();
@@ -553,10 +683,15 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
         onPlaceClick({ country: dest.name, continent: dest.country, image: dest.image });
       }
     }
+    if (item.type === 'termo') {
+      setSearchQuery(item.title);
+      setSubmittedQuery(item.title);
+      void reloadPublic();
+    }
   };
 
-  const displayQuery = resultsQuery || query;
-  const displayResults = resultsQuery ? results : suggestions;
+  const displayQuery = resultsQuery;
+  const displayResults = results;
   const hasResults =
     displayResults.places.length > 0 ||
     displayResults.people.length > 0 ||
@@ -617,28 +752,38 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
                   setSearchQuery('');
                   setSubmittedQuery('');
                 }}
-                className="w-5 h-5 rounded-full bg-muted flex items-center justify-center flex-shrink-0"
+                className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-muted-foreground hover:bg-muted/50"
                 aria-label="Limpar"
               >
-                <Icon name="close" size={12} className="text-foreground" />
+                <Icon name="close" size={16} />
               </button>
             )}
+            <button
+              onClick={handleSubmit}
+              disabled={!searchQuery.trim()}
+              className="text-[14px] font-bold transition-colors disabled:opacity-50"
+              style={{ color: '#9DCC36' }}
+            >
+              Buscar
+            </button>
           </div>
-          <button
-            aria-label="Filtros"
-            onClick={() => setShowFilters(true)}
-            className="relative w-10 h-10 -mr-1 rounded-full bg-card border border-border flex items-center justify-center active:scale-95 transition-transform flex-shrink-0"
-          >
-            <SlidersHorizontal size={18} className="text-foreground" />
-            {activeFiltersCount > 0 && (
-              <span
-                className="absolute top-0.5 right-0.5 min-w-[14px] h-[14px] px-1 rounded-full text-[9px] font-bold flex items-center justify-center"
-                style={{ backgroundColor: '#9DCC36', color: '#1A1C40' }}
+            {!!submittedQuery && (
+              <button
+                aria-label="Filtros"
+                onClick={() => setShowFilters(true)}
+                className="relative w-10 h-10 -mr-1 rounded-full bg-card border border-border flex items-center justify-center active:scale-95 transition-transform flex-shrink-0"
               >
-                {activeFiltersCount}
-              </span>
+                <SlidersHorizontal size={18} className="text-foreground" />
+                {activeFiltersCount > 0 && (
+                  <span
+                    className="absolute top-0.5 right-0.5 min-w-[14px] h-[14px] px-1 rounded-full text-[9px] font-bold flex items-center justify-center"
+                    style={{ backgroundColor: '#9DCC36', color: '#1A1C40' }}
+                  >
+                    {activeFiltersCount}
+                  </span>
+                )}
+              </button>
             )}
-          </button>
         </div>
       </header>
 
@@ -677,13 +822,19 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
                         onClick={() => handleRecentClick(item)}
                         className="flex items-center gap-3 flex-1 min-w-0 text-left"
                       >
-                        <img
-                          src={item.image}
-                          alt={item.title}
-                          className={`w-12 h-12 object-cover flex-shrink-0 ${
-                            isCircle ? 'rounded-full' : 'rounded-lg'
-                          }`}
-                        />
+                        {item.type === 'termo' ? (
+                          <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                            <Icon name="search" size={20} className="text-muted-foreground" />
+                          </div>
+                        ) : (
+                          <img
+                            src={item.image}
+                            alt={item.title}
+                            className={`w-12 h-12 object-cover flex-shrink-0 ${
+                              isCircle ? 'rounded-full' : 'rounded-lg'
+                            }`}
+                          />
+                        )}
                         <div className="flex-1 min-w-0">
                           <p className="text-[15px] font-semibold text-foreground truncate">
                             {item.title}
@@ -740,7 +891,7 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
                         <img src={d.image} alt={d.name} className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-[15px] font-semibold text-foreground truncate">{d.name}</p>
-                          <p className="text-[12px] text-muted-foreground truncate">Lugar • {d.country}</p>
+                          <p className="text-[12px] text-muted-foreground truncate">{d.country}</p>
                         </div>
                       </button>
                     </li>
@@ -798,7 +949,7 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
                               </p>
                               <span className="flex items-center gap-0.5 text-[12px] text-foreground flex-shrink-0 mt-0.5">
                                 <span className="text-[#FACC15]">★</span>
-                                <span className="font-semibold">{(item.rating ?? 0).toFixed(1)}</span>
+                                <span className="font-semibold">{(item.rating ?? 0) > 0 ? (item.rating ?? 0).toFixed(1) : '-'}</span>
                               </span>
                             </div>
                             <p className="text-[12px] text-muted-foreground mt-1">

@@ -79,10 +79,14 @@ import { formatLocalDate, parseLocalDate } from '@/lib/localDate';
 import { ptBR } from 'date-fns/locale';
 import { visitedCountries } from '@/data/visitedCountries';
 
+import { Loader2 } from 'lucide-react';
+
 // Suspense fallback for lazy-loaded screens — matches the App-level fallback
 // so transitions look like an instant render with empty background.
 const ScreenFallback = () => (
-  <div className="flex h-[100dvh] w-full items-center justify-center bg-background" />
+  <div className="flex h-[100dvh] w-full items-center justify-center bg-background">
+    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground opacity-50" />
+  </div>
 );
 
 type ProfileSubScreen = 'main' | 'profile' | 'user' | 'creator' | 'friend' | 'creator-program' | 'edit' | 'achievements' | 'sales' | 'find-people' | 'top-creators' | 'personal-info' | 'login-security' | 'payment-settings' | 'notification-settings' | 'language' | 'help-center' | 'purchases' | 'subscription' | 'goals';
@@ -136,9 +140,9 @@ const Index = () => {
   const FREE_PLAN_ITINERARY_LIMIT = 3;
   // Conta apenas roteiros originais criados pelo próprio usuário.
   // Exclui: comprados (sourceDatasetId != null) e compartilhados (userId != auth user).
-  // Não excluímos os publicados, pois eles também contam no limite do plano free.
+  // Excluímos os publicados (roteiros à venda não entram no limite)
   const ownCreatedCount = myItinerariesForLimit.filter(
-    (it) => it.userId === session?.user?.id && it.sourceDatasetId == null
+    (it) => it.userId === session?.user?.id && it.sourceDatasetId == null && !it.isPublic
   ).length;
 
   // Listen for the custom event to show the plan limit sheet (e.g. from duplicating an itinerary)
@@ -146,6 +150,14 @@ const Index = () => {
     const handler = () => setShowPlanLimitSheet(true);
     window.addEventListener('wai:plan-limit-reached', handler);
     return () => window.removeEventListener('wai:plan-limit-reached', handler);
+  }, []);
+
+  // Restore SearchScreen when navigating back from a profile.
+  useEffect(() => {
+    if (sessionStorage.getItem('wai_returnToSearch')) {
+      sessionStorage.removeItem('wai_returnToSearch');
+      setShowSearch(true);
+    }
   }, []);
 
   /**
@@ -590,6 +602,7 @@ const Index = () => {
       )[0],
       isPublic: userItinerary.isPublic,
       priceCents: userItinerary.priceCents,
+      tags: userItinerary.tags,
     };
     setActiveUserItineraryId(userItinerary.id);
     // Try to load the original dataset for purchased itineraries (linked via sourceDatasetId)
@@ -629,6 +642,7 @@ const Index = () => {
         destinations: updatedData.destinations,
         startDate: formatLocalDate(updatedData.startDate) || formatLocalDate(new Date()),
         endDate: formatLocalDate(updatedData.endDate) || formatLocalDate(new Date()),
+        tags: updatedData.tags,
         ...(updatedData.coverImage ? { images: [updatedData.coverImage] } : {}),
       });
     }
@@ -783,6 +797,7 @@ const Index = () => {
         : baseDataset.places;
       marketplaceDataset = {
         ...baseDataset,
+        id: userItinerary.id,
         startDate,
         endDate,
         days: finalDays,
@@ -795,8 +810,7 @@ const Index = () => {
         authorImage: currentUser.avatar || baseDataset.authorImage || '',
         price: priceFromCents,
         description: userItinerary.description ?? baseDataset.description ?? '',
-        tags: userItinerary.tags && userItinerary.tags.length > 0 ? userItinerary.tags : (baseDataset.tags ?? []),
-        mainTag: userItinerary.mainTag || baseDataset.mainTag || '',
+        tags: userItinerary.tags && userItinerary.tags.length > 0 ? userItinerary.tags : (baseDataset.tags ?? [])
       };
     } else {
       const skeleton = Array.from({ length: totalDays }, (_, i) => ({
@@ -806,7 +820,7 @@ const Index = () => {
       }));
       const hydratedDays = buildHydratedDays(skeleton);
       marketplaceDataset = {
-        id: -1,
+        id: userItinerary.id,
         title: userItinerary.title || 'Roteiro',
         type: 'marketplace',
         state: 'filled',
@@ -824,8 +838,7 @@ const Index = () => {
         reviewCount: 0,
         price: priceFromCents,
         description: userItinerary.description ?? '',
-        tags: userItinerary.tags ?? [],
-        mainTag: userItinerary.mainTag ?? '',
+        tags: userItinerary.tags ?? []
       };
     }
 
@@ -1165,9 +1178,21 @@ const Index = () => {
               setReturnToCollections(false);
               setShowDeleteSuccessToast(true);
             }}
-            onUpdate={() => {
-              // Header edits on a freshly-purchased dataset are not persisted until the user
-              // re-opens it from the "Privados" tab as their own itinerary record.
+            onUpdate={(updatedData) => {
+              if (selectedItinerary?.id && typeof selectedItinerary.id === 'string' && !purchasedItineraryId) {
+                const autoTitle = updatedData.destinations.length > 0
+                  ? `${updatedData.destinations[0].split(',')[0]} trip`
+                  : 'Novo roteiro';
+                const title = updatedData.tripName?.trim() || autoTitle;
+                void updateItinerary(selectedItinerary.id, {
+                  title,
+                  destinations: updatedData.destinations,
+                  startDate: formatLocalDate(updatedData.startDate) || formatLocalDate(new Date()),
+                  endDate: formatLocalDate(updatedData.endDate) || formatLocalDate(new Date()),
+                  tags: updatedData.tags,
+                  ...(updatedData.coverImage ? { images: [updatedData.coverImage] } : {}),
+                });
+              }
             }}
 
             onNavigateToAI={() => { setSelectedItinerary(null); setPurchasedItineraryId(null); setShowAIAssistant(true); }}
@@ -1412,7 +1437,11 @@ const Index = () => {
             onBack={wrapBack(() => setDestinationList(null))}
             onItineraryClick={(id, item) => {
               setDestinationList(null);
-              handleMarketplaceItineraryClick(id, item);
+              if (item?.userItinerary) {
+                handleUserPublicItineraryClick(item.userItinerary);
+              } else {
+                handleMarketplaceItineraryClick(id, item as any);
+              }
             }}
           />
         </div>

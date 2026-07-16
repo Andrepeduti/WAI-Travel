@@ -1,5 +1,6 @@
-import { User } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+const defaultAvatarUrl = '/__l5e/assets-v1/9cb2fe10-a285-4f17-bbef-f67389a96b37/wai-logo.png';
 
 interface UserAvatarProps {
   /** URL da foto. Quando vazio/undefined, exibe o ícone genérico de usuário. */
@@ -30,16 +31,11 @@ export function UserAvatar({ src, alt = 'Avatar', size = 48, className }: UserAv
   }
 
   return (
-    <div
-      role="img"
-      aria-label={alt}
+    <img
+      src={defaultAvatarUrl}
+      alt={alt}
       style={dimension}
-      className={cn(
-        'rounded-full bg-muted flex items-center justify-center text-muted-foreground',
-        className,
-      )}
-    >
-      <User size={Math.round(size * 0.55)} strokeWidth={1.75} />
-    </div>
+      className={cn('rounded-full object-cover bg-[#E2EECE]', className)}
+    />
   );
 }

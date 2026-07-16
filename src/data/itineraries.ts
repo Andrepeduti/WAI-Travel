@@ -89,8 +89,6 @@ export interface ItineraryDataset {
   description?: string;
   /** Tags selecionadas pelo criador no fluxo de publicação */
   tags?: string[];
-  /** Tag principal escolhida pelo criador no fluxo de publicação */
-  mainTag?: string;
   /** Bump to invalidate persisted localStorage overrides for this itinerary */
   dataVersion?: number;
 }
@@ -293,7 +291,6 @@ const greciaItinerary: ItineraryDataset = {
   reviewCount: 245,
   price: 59,
   tags: ['Cultura', 'História', 'Praia', 'Romance', 'Gastronomia'],
-  mainTag: 'Cultura',
   days: [
     {
       day: 1, title: 'Chegada em Atenas', date: new Date(2026, 4, 20),
@@ -348,7 +345,6 @@ const portugalEspanhaItinerary: ItineraryDataset = {
   reviewCount: 182,
   price: 45,
   tags: ['História', 'Gastronomia', 'Praia', 'Arquitetura', 'Família'],
-  mainTag: 'História',
   days: [
     {
       day: 1, title: 'Lisboa', date: new Date(2026, 5, 10),
@@ -405,7 +401,6 @@ const rotaVinhosItinerary: ItineraryDataset = {
   reviewCount: 312,
   price: 0,
     tags: ['Gastronomia', 'Romance', 'Natureza', 'Praia', 'Relaxamento'],
-  mainTag: 'Gastronomia',
   days: [
     {
       day: 1, title: 'Porto', date: new Date(2026, 6, 1),
@@ -448,7 +443,6 @@ const tailandiaItinerary: ItineraryDataset = {
   reviewCount: 198,
   price: 79.90,
     tags: ['Cultura', 'Praia', 'Aventura', 'Gastronomia', 'Natureza'],
-  mainTag: 'Cultura',
   days: [
     {
       day: 1, title: 'Bangkok', date: new Date(2026, 7, 1),
@@ -494,7 +488,6 @@ const lesteEuropeuItinerary: ItineraryDataset = {
   reviewCount: 234,
   price: 50,
     tags: ['História', 'Cultura', 'Gastronomia', 'Romance', 'Festivais'],
-  mainTag: 'História',
   days: [
     {
       day: 1,
@@ -635,7 +628,6 @@ const parisRomanticaItinerary: ItineraryDataset = {
   reviewCount: 412,
   price: 75,
   tags: ['Romance', 'Cultura', 'Gastronomia', 'Arte', 'História'],
-  mainTag: 'Romance',
   days: [
     { day: 1, title: 'Chegada & Montmartre', date: new Date(2026, 4, 1), activities: [
       { id: 1, startTime: '10:00', endTime: '12:00', category: 'Bairro', categoryColor: '#F59E0B', name: 'Montmartre', image: 'https://images.unsplash.com/photo-1550340499-a6c60fc8287c?w=400', openHours: '24h', rating: 4.8, price: 'Grátis' },
@@ -689,7 +681,6 @@ const nycItinerary: ItineraryDataset = {
   reviewCount: 328,
   price: 60,
   tags: ['Aventura', 'Natureza', 'Praia', 'Esportes', 'Gastronomia'],
-  mainTag: 'Aventura',
   days: [
     { day: 1, title: 'Manhattan', date: new Date(2026, 8, 1), activities: [
       { id: 1, startTime: '09:00', endTime: '12:00', category: 'Parque', categoryColor: '#10B981', name: 'Central Park', image: 'https://images.unsplash.com/photo-1568515387631-8b650bbcdb90?w=400', openHours: '6h - 1h', rating: 4.9, price: 'Grátis' },
@@ -738,7 +729,6 @@ const baliItinerary: ItineraryDataset = {
   reviewCount: 276,
   price: 85,
   tags: ['História', 'Cultura', 'Aventura', 'Natureza', 'Praia'],
-  mainTag: 'História',
   days: [
     { day: 1, title: 'Ubud', date: new Date(2026, 9, 10), activities: [
       { id: 1, startTime: '08:00', endTime: '10:00', category: 'Templo', categoryColor: '#F59E0B', name: 'Tirta Empul', image: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=400', openHours: '8h - 18h', rating: 4.8, price: 'IDR 50K' },
@@ -776,7 +766,6 @@ const patagoniaItinerary: ItineraryDataset = {
   reviewCount: 156,
   price: 0,
   tags: ['Aventura', 'História', 'Natureza', 'Cultura', 'Gastronomia'],
-  mainTag: 'Aventura',
   days: [
     { day: 1, title: 'El Calafate', date: new Date(2026, 10, 1), activities: [
       { id: 1, startTime: '09:00', endTime: '17:00', category: 'Natureza', categoryColor: '#10B981', name: 'Glaciar Perito Moreno', image: 'https://images.unsplash.com/photo-1531761535209-180857e963b9?w=400', openHours: '8h - 18h', rating: 4.9, price: 'ARS 8000' },
@@ -808,7 +797,6 @@ const japaoItinerary: ItineraryDataset = {
   reviewCount: 289,
   price: 95,
   tags: ['Cultura', 'História', 'Gastronomia', 'Arte', 'Natureza'],
-  mainTag: 'Cultura',
   days: [
     { day: 1, title: 'Tóquio Moderno', date: new Date(2026, 3, 1), activities: [
       { id: 1, startTime: '09:00', endTime: '11:00', category: 'Templo', categoryColor: '#F59E0B', name: 'Senso-ji', image: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=400', openHours: '6h - 17h', rating: 4.8, price: 'Grátis' },
@@ -848,7 +836,6 @@ const costaAmalfitanaItinerary: ItineraryDataset = {
   reviewCount: 198,
   price: 70,
     tags: ['Praia', 'Romance', 'Gastronomia', 'Natureza', 'Luxo'],
-  mainTag: 'Praia',
   days: [
     { day: 1, title: 'Positano', date: new Date(2026, 6, 15), activities: [
       { id: 1, startTime: '10:00', endTime: '13:00', category: 'Praia', categoryColor: '#06B6D4', name: 'Spiaggia Grande', image: 'https://images.unsplash.com/photo-1533104816931-20fa691ff6ca?w=400', openHours: '24h', rating: 4.8, price: 'Grátis' },
@@ -883,7 +870,6 @@ const marrocosItinerary: ItineraryDataset = {
   authorImage: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=150',
   rating: 4.8, reviewCount: 167, price: 78,
   tags: ['Cultura', 'História', 'Aventura', 'Gastronomia', 'Natureza'],
-  mainTag: 'Cultura',
   days: [
     { day: 1, title: 'Marraquexe', date: new Date(2026, 8, 10), activities: [
       { id: 1, startTime: '10:00', endTime: '13:00', category: 'Mercado', categoryColor: '#F59E0B', name: 'Jemaa el-Fnaa', image: 'https://images.unsplash.com/photo-1539020140153-e479b8c5cf6b?w=400', openHours: '24h', rating: 4.7, price: 'Grátis' },
@@ -916,7 +902,6 @@ const islandiaItinerary: ItineraryDataset = {
   authorImage: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150',
   rating: 4.9, reviewCount: 312, price: 120,
   tags: ['Aventura', 'Natureza', 'Praia', 'Esportes', 'Gastronomia'],
-  mainTag: 'Aventura',
   days: [
     { day: 1, title: 'Círculo Dourado', date: new Date(2026, 7, 5), activities: [
       { id: 1, startTime: '09:00', endTime: '13:00', category: 'Natureza', categoryColor: '#10B981', name: 'Geysir', image: 'https://images.unsplash.com/photo-1486022138526-7ddc26eb3a02?w=400', openHours: '24h', rating: 4.9, price: 'Grátis' },
@@ -945,7 +930,6 @@ const egitoItinerary: ItineraryDataset = {
   authorImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
   rating: 4.7, reviewCount: 203, price: 88,
   tags: ['História', 'Cultura', 'Aventura', 'Natureza', 'Praia'],
-  mainTag: 'História',
   days: [
     { day: 1, title: 'Pirâmides', date: new Date(2026, 9, 1), activities: [
       { id: 1, startTime: '09:00', endTime: '13:00', category: 'Histórico', categoryColor: '#F59E0B', name: 'Pirâmides de Gizé', image: 'https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e?w=400', openHours: '8h - 17h', rating: 4.9, price: 'EGP 240' },
@@ -974,7 +958,6 @@ const peruItinerary: ItineraryDataset = {
   authorImage: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150',
   rating: 4.9, reviewCount: 421, price: 105,
   tags: ['Aventura', 'História', 'Natureza', 'Cultura', 'Gastronomia'],
-  mainTag: 'Aventura',
   days: [
     { day: 1, title: 'Cusco', date: new Date(2026, 5, 10), activities: [
       { id: 1, startTime: '10:00', endTime: '13:00', category: 'Histórico', categoryColor: '#8B5CF6', name: 'Plaza de Armas', image: 'https://images.unsplash.com/photo-1531065208531-4036c0dba3ca?w=400', openHours: '24h', rating: 4.7, price: 'Grátis' },
@@ -1003,7 +986,6 @@ const mexicoItinerary: ItineraryDataset = {
   authorImage: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
   rating: 4.6, reviewCount: 278, price: 82,
     tags: ['Praia', 'Luxo', 'Gastronomia', 'História', 'Relaxamento'],
-  mainTag: 'Praia',
   days: [
     { day: 1, title: 'Cancún', date: new Date(2026, 0, 15), activities: [
       { id: 1, startTime: '10:00', endTime: '15:00', category: 'Praia', categoryColor: '#06B6D4', name: 'Playa Delfines', image: 'https://images.unsplash.com/photo-1518638150340-f706e86654de?w=400', openHours: '24h', rating: 4.8, price: 'Grátis' },
@@ -1032,7 +1014,6 @@ const croaciaItinerary: ItineraryDataset = {
   authorImage: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=150',
   rating: 4.8, reviewCount: 245, price: 92,
     tags: ['Praia', 'Natureza', 'História', 'Aventura', 'Gastronomia'],
-  mainTag: 'Praia',
   days: [
     { day: 1, title: 'Dubrovnik', date: new Date(2026, 6, 1), activities: [
       { id: 1, startTime: '10:00', endTime: '13:00', category: 'Histórico', categoryColor: '#8B5CF6', name: 'Cidade Velha', image: 'https://images.unsplash.com/photo-1555990538-32308e3a06f1?w=400', openHours: '24h', rating: 4.9, price: 'Grátis' },
@@ -1061,7 +1042,6 @@ const escociaItinerary: ItineraryDataset = {
   authorImage: 'https://images.unsplash.com/photo-1521252659862-eec69941b071?w=150',
   rating: 4.7, reviewCount: 156, price: 98,
     tags: ['Natureza', 'Aventura', 'História', 'Cultura', 'Esportes'],
-  mainTag: 'Natureza',
   days: [
     { day: 1, title: 'Edimburgo', date: new Date(2026, 4, 20), activities: [
       { id: 1, startTime: '10:00', endTime: '13:00', category: 'Histórico', categoryColor: '#8B5CF6', name: 'Castelo de Edimburgo', image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400', openHours: '9h30 - 18h', rating: 4.8, price: '£ 19' },
@@ -1090,7 +1070,6 @@ const dubaiItinerary: ItineraryDataset = {
   authorImage: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150',
   rating: 4.6, reviewCount: 189, price: 110,
     tags: ['Luxo', 'Arquitetura', 'Compras', 'Praia', 'Gastronomia'],
-  mainTag: 'Luxo',
   days: [
     { day: 1, title: 'Burj Khalifa', date: new Date(2026, 10, 5), activities: [
       { id: 1, startTime: '14:00', endTime: '17:00', category: 'Mirante', categoryColor: '#3B82F6', name: 'Burj Khalifa', image: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=400', openHours: '10h - 22h', rating: 4.8, price: 'AED 169' },
@@ -1119,7 +1098,6 @@ const africaSulItinerary: ItineraryDataset = {
   authorImage: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=150',
   rating: 4.9, reviewCount: 267, price: 135,
     tags: ['Natureza', 'Aventura', 'Esportes', 'Praia', 'Família'],
-  mainTag: 'Natureza',
   days: [
     { day: 1, title: 'Cidade do Cabo', date: new Date(2026, 8, 1), activities: [
       { id: 1, startTime: '10:00', endTime: '14:00', category: 'Natureza', categoryColor: '#10B981', name: 'Table Mountain', image: 'https://images.unsplash.com/photo-1516026672322-bc52d61a55d5?w=400', openHours: '8h - 19h', rating: 4.9, price: 'ZAR 380' },
@@ -1148,7 +1126,6 @@ const vietnamItinerary: ItineraryDataset = {
   authorImage: 'https://images.unsplash.com/photo-1545996124-0501ebae84d0?w=150',
   rating: 4.8, reviewCount: 198, price: 75,
     tags: ['Cultura', 'Gastronomia', 'Natureza', 'História', 'Aventura'],
-  mainTag: 'Cultura',
   days: [
     { day: 1, title: 'Hanói', date: new Date(2026, 2, 5), activities: [
       { id: 1, startTime: '10:00', endTime: '13:00', category: 'Cultural', categoryColor: '#8B5CF6', name: 'Old Quarter', image: 'https://images.unsplash.com/photo-1528127269322-539801943592?w=400', openHours: '24h', rating: 4.7, price: 'Grátis' },

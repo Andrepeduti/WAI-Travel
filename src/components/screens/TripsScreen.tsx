@@ -74,140 +74,11 @@ const originOptions: { id: OriginFilter; label: string }[] = [
   { id: 'purchased', label: 'Comprados' },
 ];
 
-const privateItineraries = [{
-  id: 1,
-  title: 'Amsterdam em 5 dias',
-  dateRange: '14 de Mar - 24 de Abr',
-  endDateISO: '2025-04-24',
-  places: 39,
-  daysRemaining: 3,
-  images: [
-    'https://images.unsplash.com/photo-1534351590666-13e3e96b5017?w=400',
-    'https://images.unsplash.com/photo-1583037189850-1921ae7c6c22?w=400',
-    'https://images.unsplash.com/photo-1512470876337-d72d5c37f8f3?w=400',
-    'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400'
-  ],
-  participants: [
-    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100',
-    'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100',
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100',
-    'https://images.unsplash.com/photo-1544723795-3fb6469f5b39?w=100',
-    'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=100'
-  ]
-}, {
-  id: 2,
-  title: 'Paris Romântica',
-  dateRange: '14 de Mar - 24 de Abr',
-  endDateISO: '2025-06-24',
-  places: 39,
-  daysRemaining: 56,
-  images: [
-    'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=400',
-    'https://images.unsplash.com/photo-1499856871958-5b9627545d1a?w=400',
-    'https://images.unsplash.com/photo-1520939817895-060bdaf4fe1b?w=400',
-    'https://images.unsplash.com/photo-1549144511-f099e773c147?w=400'
-  ],
-  participants: [
-    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100',
-    'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100'
-  ]
-}, {
-  id: 3,
-  title: 'Roteiro Completo Tóquio',
-  dateRange: '14 de Mar - 24 de Abr',
-  endDateISO: '2025-05-15',
-  places: 39,
-  daysRemaining: 17,
-  images: [
-    'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=400',
-    'https://images.unsplash.com/photo-1545569341-9eb8b30979d9?w=400',
-    'https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=400',
-    'https://images.unsplash.com/photo-1536098561742-ca998e48cbcc?w=400'
-  ],
-  participants: [
-    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100'
-  ]
-}, {
-  id: 99,
-  title: 'Lisboa & Porto',
-  dateRange: '10 de Set - 20 de Set',
-  endDateISO: '2024-09-20',
-  places: 27,
-  daysRemaining: 0,
-  images: [
-    'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?w=400',
-    'https://images.unsplash.com/photo-1513735718075-2e2d37956363?w=400',
-    'https://images.unsplash.com/photo-1568797629192-789acf8e4df3?w=400',
-    'https://images.unsplash.com/photo-1542640244-7e672d6cef4e?w=400'
-  ],
-  participants: [
-    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100'
-  ]
-}];
+const privateItineraries: any[] = [];
 
-const publicItineraries = [{
-  id: 4,
-  title: 'Grécia Mitológica',
-  dateRange: '20 de Mai - 30 de Mai',
-  places: 28,
-  daysRemaining: 120,
-  rating: 4.8,
-  reviews: 245,
-  comments: 32,
-  sold: 1284,
-  images: [
-    'https://images.unsplash.com/photo-1533105079780-92b9be482077?w=400',
-    'https://images.unsplash.com/photo-1555400082-d78c66fa7a6a?w=400',
-    'https://images.unsplash.com/photo-1516483638261-f4dbaf036963?w=400',
-    'https://images.unsplash.com/photo-1603565816030-6b389eeb23cb?w=400'
-  ],
-  participants: []
-}, {
-  id: 5,
-  title: 'Portugal & Espanha',
-  dateRange: '10 de Jun - 25 de Jun',
-  places: 45,
-  daysRemaining: 145,
-  rating: 4.5,
-  reviews: 182,
-  comments: 18,
-  sold: 743,
-  images: [
-    'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?w=400',
-    'https://images.unsplash.com/photo-1539037116277-4db20889f2d4?w=400',
-    'https://images.unsplash.com/photo-1509840841025-9088ba78a826?w=400',
-    'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400'
-  ],
-  participants: []
-}];
+const publicItineraries: any[] = [];
 
-const favoriteItineraries = [{
-  id: 101,
-  title: 'Rota dos Vinhos - Portugal',
-  image: 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?w=400',
-  creator: '@marianatravel',
-  creatorImage: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
-  days: 7,
-  places: 18,
-  price: 49.90,
-  rating: 4.9,
-  reviews: 312,
-}, {
-  id: 102,
-  title: 'Tailândia Completa',
-  image: 'https://images.unsplash.com/photo-1528181304800-259b08848526?w=400',
-  creator: '@alexmundo',
-  creatorImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100',
-  days: 14,
-  places: 32,
-  price: 79.90,
-  rating: 4.7,
-  reviews: 198,
-}];
+const favoriteItineraries: any[] = [];
 
 const collections = [{
   id: 2,
@@ -259,6 +130,8 @@ const collections = [{
   ],
   participants: []
 }];
+
+let cachedMemberAvatars: Record<string, string[]> = {};
 
 type TabType = 'private' | 'public' | 'favorites' | 'collections';
 
@@ -433,7 +306,7 @@ function SwipeableItineraryCard({
                     <Icon name="check_circle" size={14} className="text-[#8E8E93]" />
                     Concluída
                   </span>
-                ) : (
+                ) : item.isFlexible ? null : (
                   <span className={`h-7 inline-flex items-center text-[12px] font-medium px-3 rounded-2xl ${getDaysRemainingStyle(item.daysRemaining)}`}>
                     Em {item.daysRemaining} dias
                   </span>
@@ -733,18 +606,24 @@ export function TripsScreen({
   }, [authUser?.id, userItineraries.length, purchasesVersion]);
 
   // Avatares reais (dono + membros aceitos) por roteiro — usados nos cards.
-  const [memberAvatarsByItin, setMemberAvatarsByItin] = useState<Record<string, string[]>>({});
+  const [memberAvatarsByItin, setMemberAvatarsByItin] = useState<Record<string, string[]>>(() => cachedMemberAvatars);
   useEffect(() => {
     const ids = userItineraries.map((u) => u.id).filter((id): id is string => typeof id === 'string');
     if (ids.length === 0) {
-      setMemberAvatarsByItin({});
+      if (Object.keys(cachedMemberAvatars).length > 0) {
+        cachedMemberAvatars = {};
+        setMemberAvatarsByItin({});
+      }
       return;
     }
     let cancelled = false;
     (async () => {
       try {
         const map = await fetchItineraryMemberAvatars(ids);
-        if (!cancelled) setMemberAvatarsByItin(map);
+        if (!cancelled) {
+          cachedMemberAvatars = map;
+          setMemberAvatarsByItin(map);
+        }
       } catch {
         /* silencioso */
       }
@@ -761,8 +640,10 @@ export function TripsScreen({
     const userCards = userItineraries.filter(ui => !ui.isPublic).map(ui => {
       const start = parseLocalDate(ui.startDate) ?? new Date();
       const end = parseLocalDate(ui.endDate) ?? new Date();
+      const isFlexible = ui.tags?.includes('_FLEXIBLE_DATES_') || false;
+      const durationDays = differenceInDays(end, start) + 1;
       const daysRemaining = Math.max(0, differenceInDays(start, new Date()));
-      const dateRange = `${format(start, "d 'de' MMM", { locale: ptBR })} - ${format(end, "d 'de' MMM", { locale: ptBR })}`;
+      const dateRange = isFlexible ? `Duração: ${durationDays} ${durationDays === 1 ? 'dia' : 'dias'}` : `${format(start, "d 'de' MMM", { locale: ptBR })} - ${format(end, "d 'de' MMM", { locale: ptBR })}`;
       const validImages = ui.images.filter((image) => image && !image.startsWith('blob:'));
       const images = validImages.length > 0 ? validImages : resolveTripThumbnailImages(ui.destinations);
       return {
@@ -771,7 +652,8 @@ export function TripsScreen({
         dateRange,
         places: ui.places,
         daysRemaining,
-        isPast: end < today,
+        isPast: !isFlexible && end < today,
+        isFlexible,
         images,
         participants: (typeof ui.id === 'string' && (memberAvatarsByItin[ui.id]?.length ?? 0) > 0)
           ? memberAvatarsByItin[ui.id]
@@ -792,8 +674,10 @@ export function TripsScreen({
     const userPublicCards = userItineraries.filter(ui => ui.isPublic).map(ui => {
       const start = parseLocalDate(ui.startDate) ?? new Date();
       const end = parseLocalDate(ui.endDate) ?? new Date();
+      const isFlexible = ui.tags?.includes('_FLEXIBLE_DATES_') || false;
+      const durationDays = differenceInDays(end, start) + 1;
       const daysRemaining = Math.max(0, differenceInDays(start, new Date()));
-      const dateRange = `${format(start, "d 'de' MMM", { locale: ptBR })} - ${format(end, "d 'de' MMM", { locale: ptBR })}`;
+      const dateRange = isFlexible ? `Duração: ${durationDays} ${durationDays === 1 ? 'dia' : 'dias'}` : `${format(start, "d 'de' MMM", { locale: ptBR })} - ${format(end, "d 'de' MMM", { locale: ptBR })}`;
       const validImages = ui.images.filter((image) => image && !image.startsWith('blob:'));
       const images = validImages.length > 0 ? validImages : resolveTripThumbnailImages(ui.destinations);
       return {
@@ -802,7 +686,8 @@ export function TripsScreen({
         dateRange,
         places: ui.places,
         daysRemaining,
-        isPast: end < today,
+        isPast: !isFlexible && end < today,
+        isFlexible,
         images,
         participants: ui.participants,
         priceCents: ui.priceCents ?? null,

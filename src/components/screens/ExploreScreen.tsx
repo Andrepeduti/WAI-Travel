@@ -3,6 +3,10 @@ import { Flame } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { listPublicItineraries } from '@/lib/itinerariesApi';
+import { getFriendsWhoVisited } from '@/lib/passportApi';
+import { ALL_COUNTRIES } from '@/data/countriesCatalog';
+import { resolveCoverImage } from '@/lib/coverImageResolver';
 
 // ─── Quick Filters ───────────────────────────────────────────────────────────────
 
@@ -33,16 +37,9 @@ interface DestinationStory {
   category: string;
   status?: StatusTag;
   hashtags: string[];
-  visitors: { id: number; avatar: string; name: string }[];
+  visitors: { user_id: string; avatar: string; name: string }[];
   totalVisitors: number;
 }
-
-// ─── Mock Visitors (enquanto não criamos a relação completa no BD)
-const getMockVisitors = (country: string) => [
-  { id: 1, avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100', name: 'Marina' },
-  { id: 2, avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100', name: 'Alessandra' },
-  { id: 3, avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100', name: 'Camila' },
-];
 
 interface ExploreScreenProps {
   onItineraryClick: (id: number) => void;
@@ -103,21 +100,23 @@ function DestinationContent({ dest, onSeeItineraries }: DestinationContentProps)
         </div>
 
         {/* Prova social */}
-        <div className="flex items-center gap-2.5 mb-4">
-          <div className="flex items-center -space-x-2 flex-shrink-0">
-            {dest.visitors.slice(0, 3).map((v) => (
-              <img
-                key={v.id}
-                src={v.avatar}
-                alt={v.name}
-                className="w-7 h-7 rounded-full object-cover border-2 border-white"
-              />
-            ))}
+        {dest.visitors.length > 0 && (
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="flex items-center -space-x-2 flex-shrink-0">
+              {dest.visitors.slice(0, 3).map((v) => (
+                <img
+                  key={v.user_id}
+                  src={v.avatar}
+                  alt={v.name}
+                  className="w-7 h-7 rounded-full object-cover border-2 border-white"
+                />
+              ))}
+            </div>
+            <span className="text-[12px] font-medium text-white/95">
+              Amigos que visitaram
+            </span>
           </div>
-          <span className="text-[12px] font-medium text-white/95">
-            Já visitaram esse lugar
-          </span>
-        </div>
+        )}
 
         {/* Card "X roteiros" */}
         <button
@@ -152,25 +151,160 @@ export function ExploreScreen({ onSearchClick, onSeeDestinationItineraries }: Ex
     let cancelled = false;
     const fetchDestinations = async () => {
       setLoading(true);
-      const { data, error } = await supabase.from('destinations').select('*').order('created_at', { ascending: false });
-      if (cancelled) return;
-      if (error) {
-        console.error('Failed to load destinations:', error);
-      } else if (data) {
-        setDestinationStories(data.map(d => ({
-          id: d.id,
-          country: d.country,
-          continent: d.continent,
-          image: d.image_url,
-          itineraryCount: d.itinerary_count ?? 0,
-          category: d.category || '',
-          status: d.status as StatusTag,
-          hashtags: d.hashtags ?? [],
-          visitors: getMockVisitors(d.country),
-          totalVisitors: d.total_visitors ?? 0,
-        })));
+      try {
+        const publicItineraries = await listPublicItineraries(1000);
+        if (cancelled) return;
+
+        // Buscar vendas para calcular métrica de Popularidade
+        const { data: sales } = await supabase.from('itinerary_sales').select('itinerary_id');
+        const salesCountByItinerary: Record<string, number> = {};
+        if (sales) {
+          sales.forEach((s) => {
+            salesCountByItinerary[s.itinerary_id] = (salesCountByItinerary[s.itinerary_id] || 0) + 1;
+          });
+        }
+
+        const countryMap = new Map<string, {
+          itinerariesCount: number;
+          salesCount: number;
+          tags: Record<string, number>;
+          firstImage: string;
+          countryName: string;
+          continent: string;
+          code: string;
+        }>();
+
+        publicItineraries.forEach(it => {
+          if (!it.destinations || it.destinations.length === 0) return;
+          
+          let mappedCountry = null;
+          for (const d of it.destinations) {
+            const countryPart = d.split(',').pop()?.trim().toLowerCase() || d.toLowerCase();
+            const match = ALL_COUNTRIES.find(c => 
+              c.name.toLowerCase() === countryPart || 
+              c.aliases?.some(a => a.toLowerCase() === countryPart)
+            );
+            if (match) {
+              mappedCountry = match;
+              break;
+            }
+          }
+
+          let countryName = 'Outro';
+          let continent = 'Mundo';
+          let countryCode = '';
+          if (mappedCountry) {
+            countryName = mappedCountry.name;
+            continent = mappedCountry.continent;
+            countryCode = mappedCountry.code;
+          } else {
+            const lastDest = it.destinations[it.destinations.length - 1];
+            if (lastDest) {
+               countryName = lastDest.split(',').pop()?.trim() || lastDest;
+            }
+          }
+
+          const existing = countryMap.get(countryName) || {
+            itinerariesCount: 0,
+            salesCount: 0,
+            tags: {},
+            firstImage: '',
+            countryName,
+            continent,
+            code: countryCode
+          };
+
+          existing.itinerariesCount += 1;
+          existing.salesCount += (salesCountByItinerary[it.id] || 0);
+          
+          if (!existing.firstImage && it.images && it.images[0]) {
+            existing.firstImage = it.images[0];
+          }
+
+          
+          if (it.tags) {
+            it.tags.forEach(t => {
+              existing.tags[t] = (existing.tags[t] || 0) + 1;
+            });
+          }
+
+          countryMap.set(countryName, existing);
+        });
+
+        // Busca os amigos (followers) que visitaram esses países
+        const uniqueCodes = Array.from(countryMap.values()).map(d => d.code).filter(Boolean);
+        const friendsVisits = await getFriendsWhoVisited(uniqueCodes);
+
+        const stories: (DestinationStory & { salesCount: number })[] = [];
+        let maxSales = -1;
+        let mostPopularCountry = '';
+
+        for (const [name, data] of countryMap.entries()) {
+          const sortedTags = Object.entries(data.tags)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 2)
+            .map(t => t[0].replace('#', ''));
+          
+          let coverImage = data.firstImage;
+          if (!coverImage || coverImage.includes('placeholder')) {
+             coverImage = resolveCoverImage([name]).url;
+          }
+
+          // Enhance image resolution for fullscreen display
+          if (coverImage.includes('unsplash.com')) {
+            coverImage = coverImage.replace('w=400', 'w=1200').replace('w=800', 'w=1200');
+            if (!coverImage.includes('q=')) coverImage += '&q=90';
+            if (!coverImage.includes('auto=')) coverImage += '&auto=format,compress';
+          } else if (coverImage.includes('googleapis.com')) {
+            coverImage = coverImage
+              .replace('maxwidth=400', 'maxwidth=1200')
+              .replace('maxWidthPx=400', 'maxWidthPx=1200')
+              .replace('maxheight=400', 'maxheight=1200')
+              .replace('maxHeightPx=400', 'maxHeightPx=1200');
+          }
+
+          if (data.salesCount > maxSales || (data.salesCount === maxSales && data.itinerariesCount > 0)) {
+            maxSales = data.salesCount;
+            mostPopularCountry = name;
+          }
+
+          // Pegamos as visitas reais dos amigos para este código de país
+          const realVisitors = data.code ? (friendsVisits[data.code] || []) : [];
+
+          stories.push({
+            id: name,
+            country: name,
+            continent: data.continent,
+            image: coverImage,
+            itineraryCount: data.itinerariesCount,
+            category: 'todos',
+            hashtags: sortedTags.length > 0 ? sortedTags : ['viagem'],
+            visitors: realVisitors,
+            totalVisitors: realVisitors.length,
+            salesCount: data.salesCount
+          });
+        }
+
+        if (mostPopularCountry) {
+          const pop = stories.find(s => s.country === mostPopularCountry);
+          if (pop) {
+            pop.status = 'Popular';
+          }
+        }
+
+        stories.sort((a, b) => {
+          if (b.salesCount !== a.salesCount) return b.salesCount - a.salesCount;
+          return b.itineraryCount - a.itineraryCount;
+        });
+
+        if (!cancelled) {
+          setDestinationStories(stories);
+        }
+      } catch (err) {
+        console.error('Failed to load destinations:', err);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setLoading(false);
     };
     fetchDestinations();
     return () => { cancelled = true; };

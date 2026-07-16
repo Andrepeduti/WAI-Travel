@@ -35,7 +35,6 @@ interface RecordPurchaseInput {
     places?: number;
     description?: string;
     tags?: string[];
-    mainTag?: string;
     days?: number;
   };
 }
@@ -95,8 +94,7 @@ export async function recordPurchase({ datasetId, priceBRL, snapshot }: RecordPu
       is_public: false,
       price_cents: null,
       description: snapshot.description ?? '',
-      tags: snapshot.tags ?? [],
-      main_tag: snapshot.mainTag ?? '',
+      tags: snapshot.tags ?? []
     });
   };
 
@@ -161,3 +159,109 @@ export async function recordPurchase({ datasetId, priceBRL, snapshot }: RecordPu
   emitPurchasesChanged();
   return { ok: true, saleId: inserted.id, itineraryId: itinerary.id };
 }
+
+export interface PurchasedItineraryView {
+  id: string; // sale id
+  itineraryId: string;
+  sourceDatasetId: number | null;
+  title: string;
+  image: string;
+  author: string;
+  authorImage: string;
+  price: number;
+  purchaseDate: string;
+  rating: number | null;
+  review: string;
+  transactionId: string;
+  paymentMethod: 'pix' | 'card';
+  status: 'paid' | 'pending_payment';
+}
+
+/**
+ * Busca todas as compras do usuário logado e cruza com a tabela de avaliações.
+ */
+export async function getUserPurchases(): Promise<PurchasedItineraryView[]> {
+  const { data: authData } = await supabase.auth.getUser();
+  if (!authData?.user) return [];
+
+  const { data, error } = await supabase
+    .from('itinerary_sales')
+    .select(`
+      id,
+      created_at,
+      gross_cents,
+      status,
+      itineraries!itinerary_sales_itinerary_id_fkey (
+        id,
+        title,
+        images,
+        source_dataset_id,
+        user_id
+      )
+    `)
+    .eq('buyer_id', authData.user.id)
+    .order('created_at', { ascending: false });
+
+  if (error || !data) {
+    console.error('[purchasesApi] getUserPurchases error', error);
+    return [];
+  }
+
+  // Fetch reviews of the user for these itineraries
+  const itineraryIds = data.map(s => s.itineraries?.id).filter(Boolean);
+  let reviewsMap: Record<string, any> = {};
+  
+  if (itineraryIds.length > 0) {
+    const { data: revData } = await supabase
+      .from('itinerary_reviews')
+      .select('*')
+      .eq('user_id', authData.user.id)
+      .in('itinerary_id', itineraryIds);
+      
+    if (revData) {
+      reviewsMap = revData.reduce((acc: any, row: any) => {
+        acc[row.itinerary_id] = row;
+        return acc;
+      }, {});
+    }
+  }
+
+  // Fetch profiles for the authors of these itineraries
+  const authorIds = Array.from(new Set(data.map(s => s.itineraries?.user_id).filter(Boolean)));
+  let profilesMap: Record<string, any> = {};
+  
+  if (authorIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles_public')
+      .select('user_id, name, username, avatar_url')
+      .in('user_id', authorIds);
+      
+    if (profiles) {
+      profilesMap = Object.fromEntries(profiles.map(p => [p.user_id, p]));
+    }
+  }
+
+  return data.map((sale: any) => {
+    const itinerary = sale.itineraries;
+    const authorProfile = profilesMap[itinerary?.user_id];
+    const reviewData = reviewsMap[itinerary?.id];
+
+    return {
+      id: sale.id,
+      itineraryId: itinerary?.id,
+      sourceDatasetId: itinerary?.source_dataset_id,
+      title: itinerary?.title || 'Roteiro Comprado',
+      image: itinerary?.images?.[0] || 'https://images.unsplash.com/photo-1519677100203-a0e668c92439?w=800',
+      author: authorProfile?.name || authorProfile?.username || 'Autor',
+      authorImage: authorProfile?.avatar_url || '',
+      price: (sale.gross_cents ?? 0) / 100,
+      purchaseDate: sale.created_at,
+      rating: reviewData?.rating || null,
+      review: reviewData?.comment || '',
+      transactionId: sale.id.split('-')[0].toUpperCase(),
+      paymentMethod: 'pix', // Mockado para Pix por enquanto
+      status: sale.status === 'completed' ? 'paid' : 'pending_payment',
+    };
+  });
+}
+

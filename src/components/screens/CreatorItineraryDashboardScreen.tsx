@@ -186,7 +186,6 @@ export function CreatorItineraryDashboardScreen({
     priceCents?: number;
     description?: string;
     tags?: string[];
-    mainTag?: string;
   }) => {
     const { coverUrl, ...rest } = patch;
     const updates: Partial<UserItinerary> = { ...rest };

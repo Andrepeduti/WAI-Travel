@@ -243,6 +243,7 @@ export function getCountryInfo(
  * Common aliases used by users when searching for countries.
  */
 const ALIASES_BY_ISO3: Record<string, string[]> = {
+  BRA: ['Brazil', 'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO', 'Minas Gerais', 'São Paulo', 'Rio de Janeiro', 'Bahia', 'Paraná', 'Rio Grande do Sul', 'Pernambuco', 'Ceará', 'Amazonas', 'Pará', 'Goiás', 'Mato Grosso', 'Mato Grosso do Sul', 'Espírito Santo', 'Santa Catarina', 'Maranhão', 'Paraíba', 'Rio Grande do Norte', 'Alagoas', 'Piauí', 'Sergipe', 'Rondônia', 'Tocantins', 'Acre', 'Amapá', 'Roraima'],
   NLD: ['Holanda', 'Netherlands'],
   GBR: ['Inglaterra', 'Escócia', 'País de Gales', 'Irlanda do Norte', 'Grã-Bretanha', 'UK', 'United Kingdom'],
   USA: ['EUA', 'Estados Unidos da América', 'US'],

@@ -18,14 +18,12 @@ interface EditPublishSheetProps {
   initialPriceCents?: number | null;
   initialDescription?: string;
   initialTags?: string[];
-  initialMainTag?: string;
   onSave: (patch: {
     title?: string;
     coverUrl?: string;
     priceCents?: number;
     description?: string;
     tags?: string[];
-    mainTag?: string;
   }) => void;
   onUnpublish: () => void;
   onEditItinerary?: () => void;
@@ -65,7 +63,6 @@ export function EditPublishSheet({
   initialPriceCents,
   initialDescription = '',
   initialTags = [],
-  initialMainTag = '',
   onSave,
   onUnpublish,
   onEditItinerary,
@@ -78,7 +75,6 @@ export function EditPublishSheet({
   const [priceDigits, setPriceDigits] = useState('');
   const [description, setDescription] = useState(initialDescription);
   const [tags, setTags] = useState<string[]>(initialTags);
-  const [mainTag, setMainTag] = useState<string>(initialMainTag);
   const [showUnpublishConfirm, setShowUnpublishConfirm] = useState(false);
   const [showStatusSheet, setShowStatusSheet] = useState(false);
   const [activitiesCount, setActivitiesCount] = useState<number | null>(null);
@@ -92,22 +88,29 @@ export function EditPublishSheet({
       setPriceDigits(initialPriceCents ? String(initialPriceCents) : '');
       setDescription(initialDescription);
       setTags(initialTags);
-      setMainTag(initialMainTag);
       setShowUnpublishConfirm(false);
       setShowStatusSheet(false);
     }
-  }, [open, initialTitle, initialCoverUrl, initialPriceCents, initialDescription, initialTags, initialMainTag]);
+  }, [open, initialTitle, initialCoverUrl, initialPriceCents, initialDescription, initialTags]);
 
-  // Lazy-load planner summary
   useEffect(() => {
-    if (!open || !itineraryId) return;
+    if (!open) return;
     let cancelled = false;
     (async () => {
       try {
-        const data = await loadPlannerData(itineraryId);
-        if (cancelled || !data) return;
-        const total = Object.values(data.activities).reduce(
-          (sum, list) => sum + list.filter((a) => a.type !== 'note').length,
+        const raw = localStorage.getItem('wai-travel-planner-activities');
+        if (!raw) {
+          if (!cancelled) setActivitiesCount(0);
+          return;
+        }
+        const data = JSON.parse(raw);
+        const itinData = data[itineraryId]?.data;
+        if (!itinData) {
+          if (!cancelled) setActivitiesCount(0);
+          return;
+        }
+        const total = Object.values(itinData as Record<string, any[]>).reduce(
+          (sum: number, list) => sum + list.filter((a) => a.type !== 'note').length,
           0,
         );
         setActivitiesCount(total);
@@ -119,10 +122,9 @@ export function EditPublishSheet({
   }, [open, itineraryId]);
 
   const numericPrice = Number(priceDigits || '0') / 100;
-  const priceValid = numericPrice >= 5 && numericPrice <= 999;
+  const priceValid = numericPrice > 0;
   const descriptionValid = description.trim().length >= 20;
   const tagsValid = tags.length >= 1 && tags.length <= 5;
-  const mainTagValid = !!mainTag && tags.includes(mainTag);
 
   const platformFee = numericPrice * 0.1;
   const earning = numericPrice - platformFee;
@@ -135,7 +137,6 @@ export function EditPublishSheet({
   const toggleTag = (t: string) => {
     setTags((prev) => {
       if (prev.includes(t)) {
-        if (mainTag === t) setMainTag('');
         return prev.filter((x) => x !== t);
       }
       if (prev.length >= 5) return prev;
@@ -167,8 +168,8 @@ export function EditPublishSheet({
   };
 
   const confirmTags = () => {
-    if (!tagsValid || !mainTagValid) return;
-    onSave({ tags, mainTag });
+    if (!tagsValid) return;
+    onSave({ tags });
     toast.success('Tags atualizadas!');
     setView('summary');
   };
@@ -353,7 +354,7 @@ export function EditPublishSheet({
               </div>
             )}
             {!priceValid && priceDigits.length > 0 && (
-              <p className="mt-1.5 text-[12px] text-[#E5484D]">O valor deve estar entre R$ 5,00 e R$ 999,00.</p>
+              <p className="mt-1.5 text-[12px] text-[#E5484D]">O valor deve ser maior que zero.</p>
             )}
           </div>
         )}
@@ -410,35 +411,6 @@ export function EditPublishSheet({
               </div>
             </div>
 
-            {tags.length > 0 && (
-              <div>
-                <label className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">
-                  Tag principal
-                </label>
-                <div className="space-y-2">
-                  {tags.map((t) => {
-                    const isSelected = mainTag === t;
-                    return (
-                      <button
-                        key={t}
-                        onClick={() => setMainTag(t)}
-                        className={cn(
-                          'w-full flex items-center justify-between px-4 h-12 rounded-xl text-[14px] font-semibold transition-all border',
-                          isSelected
-                            ? 'bg-[#1A1C40] text-white border-[#1A1C40]'
-                            : 'bg-white text-foreground border-foreground/10'
-                        )}
-                      >
-                        <span>{t}</span>
-                        {isSelected && (
-                          <span className="text-[11px] uppercase tracking-wide opacity-70">Principal</span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </div>
         )}
 
@@ -453,7 +425,7 @@ export function EditPublishSheet({
                     ? priceValid
                     : view === 'description'
                       ? descriptionValid
-                      : tagsValid && mainTagValid;
+                      : tagsValid;
               const onClick =
                 view === 'title'
                   ? confirmTitle

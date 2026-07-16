@@ -36,7 +36,6 @@ export interface UserItinerary {
   priceCents?: number | null;
   description?: string;
   tags?: string[];
-  mainTag?: string;
   userId: string;
 }
 
@@ -53,7 +52,6 @@ export interface CreateItineraryInput {
   priceCents?: number | null;
   description?: string;
   tags?: string[];
-  mainTag?: string;
 }
 
 export interface UpdateItineraryInput {
@@ -68,7 +66,6 @@ export interface UpdateItineraryInput {
   priceCents?: number | null;
   description?: string;
   tags?: string[];
-  mainTag?: string;
 }
 
 function rowToItinerary(row: any): UserItinerary {
@@ -86,7 +83,6 @@ function rowToItinerary(row: any): UserItinerary {
     priceCents: row.price_cents ?? null,
     description: row.description ?? '',
     tags: row.tags ?? [],
-    mainTag: row.main_tag ?? '',
     userId: row.user_id,
   };
 }
@@ -170,8 +166,7 @@ export async function createItinerary(input: CreateItineraryInput): Promise<User
       is_public: input.isPublic ?? false,
       price_cents: input.priceCents ?? null,
       description: input.description ?? '',
-      tags: input.tags ?? [],
-      main_tag: input.mainTag ?? '',
+      tags: input.tags ?? []
     })
     .select('*')
     .single();
@@ -198,7 +193,6 @@ export async function updateItinerary(id: string, patch: UpdateItineraryInput): 
     price_cents?: number | null;
     description?: string;
     tags?: string[];
-    main_tag?: string;
   } = {};
   if (patch.title !== undefined) updates.title = patch.title;
   if (patch.destinations !== undefined) updates.destinations = patch.destinations;
@@ -211,7 +205,6 @@ export async function updateItinerary(id: string, patch: UpdateItineraryInput): 
   if (patch.priceCents !== undefined) updates.price_cents = patch.priceCents;
   if (patch.description !== undefined) updates.description = patch.description;
   if (patch.tags !== undefined) updates.tags = patch.tags;
-  if (patch.mainTag !== undefined) updates.main_tag = patch.mainTag;
   if (Object.keys(updates).length === 0) return;
   const { error } = await supabase.from('itineraries').update(updates as never).eq('id', id);
   if (error) {
@@ -378,7 +371,7 @@ export async function listPublicItineraries(limit = 200): Promise<PublicItinerar
  */
 export async function publishItineraryAsCopy(
   source: UserItinerary,
-  publishData: { priceCents: number | null; description: string; tags: string[]; mainTag: string },
+  publishData: { priceCents: number | null; description: string; tags: string[]; },
   snapshot?: {
     activities?: Record<number, unknown[]>;
     transports?: Record<number, unknown[]>;
@@ -397,8 +390,7 @@ export async function publishItineraryAsCopy(
     isPublic: true,
     priceCents: publishData.priceCents,
     description: publishData.description,
-    tags: publishData.tags,
-    mainTag: publishData.mainTag,
+    tags: publishData.tags
   });
   if (!created) return null;
 

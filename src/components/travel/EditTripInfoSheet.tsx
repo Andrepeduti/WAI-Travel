@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -14,7 +14,9 @@ interface EditTripInfoSheetProps {
   destinations: string[];
   startDate?: Date;
   endDate?: Date;
-  onSave: (data: { destinations: string[]; startDate?: Date; endDate?: Date }) => void;
+  isFlexible?: boolean;
+  durationDays?: number;
+  onSave: (data: { destinations: string[]; startDate?: Date; endDate?: Date; isFlexible?: boolean; durationDays?: number }) => void;
 }
 
 interface CitySuggestion {
@@ -57,25 +59,65 @@ function useCitySearch(query: string) {
   return { results, loading };
 }
 
-export function EditTripInfoSheet({ open, onClose, destinations: initialDest, startDate, endDate, onSave }: EditTripInfoSheetProps) {
+import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
+import { addDays } from 'date-fns';
+
+export function EditTripInfoSheet({ open, onClose, destinations: initialDest, startDate, endDate, isFlexible, durationDays: initialDuration, onSave }: EditTripInfoSheetProps) {
   const [destinations, setDestinations] = useState<string[]>(initialDest.length > 0 ? initialDest : ['']);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(
-    startDate ? { from: startDate, to: endDate } : undefined
+    startDate && endDate ? { from: startDate, to: endDate } : undefined
   );
+  const [isFixedDate, setIsFixedDate] = useState(!isFlexible);
+  const [durationDays, setDurationDays] = useState<number | ''>(initialDuration || '');
   const [showCalendar, setShowCalendar] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   const activeQuery = activeIndex !== null ? destinations[activeIndex] || '' : '';
   const { results, loading } = useCitySearch(activeQuery);
 
+  const isFormChanged = useMemo(() => {
+    const destStr = destinations.filter(d => d.trim() !== '').join('|');
+    const initDestStr = initialDest.filter(d => d.trim() !== '').join('|');
+    if (destStr !== initDestStr) return true;
+
+    const initFlexible = !!isFlexible;
+    if (isFixedDate === initFlexible) return true;
+
+    if (isFixedDate) {
+      const currentFrom = dateRange?.from?.getTime();
+      const initialFrom = startDate?.getTime();
+      if (currentFrom !== initialFrom) return true;
+
+      const currentTo = dateRange?.to?.getTime();
+      const initialTo = endDate?.getTime();
+      if (currentTo !== initialTo) return true;
+    } else {
+      if (durationDays !== (initialDuration || '')) return true;
+    }
+
+    return false;
+  }, [destinations, initialDest, isFixedDate, isFlexible, dateRange, startDate, endDate, durationDays, initialDuration]);
+
   if (!open) return null;
 
   const handleSave = () => {
     const filtered = destinations.filter(d => d.trim() !== '');
+    
+    let finalStart = dateRange?.from;
+    let finalEnd = dateRange?.to;
+    
+    if (!isFixedDate) {
+      finalStart = new Date();
+      finalEnd = addDays(new Date(), Math.max(1, Number(durationDays) || 1) - 1);
+    }
+
     onSave({
       destinations: filtered,
-      startDate: dateRange?.from,
-      endDate: dateRange?.to,
+      startDate: finalStart,
+      endDate: finalEnd,
+      isFlexible: !isFixedDate,
+      durationDays: !isFixedDate ? (durationDays === '' ? 1 : durationDays) : undefined,
     });
     onClose();
   };
@@ -190,43 +232,67 @@ export function EditTripInfoSheet({ open, onClose, destinations: initialDest, st
 
           {/* Date Range */}
           <div>
-            <label className="text-[13px] font-semibold text-foreground mb-2 block">Datas</label>
-            <Popover open={showCalendar} onOpenChange={setShowCalendar}>
-              <PopoverTrigger asChild>
-                <button className="w-full flex items-center gap-2 bg-muted/40 rounded-xl px-3 h-[44px]">
-                  <Icon name="calendar_today" size={16} className="text-muted-foreground" />
-                  <span className="text-[14px] text-foreground">
-                    {dateRange?.from
-                      ? `${format(dateRange.from, "d 'de' MMM", { locale: ptBR })}${dateRange.to ? ` - ${format(dateRange.to, "d 'de' MMM", { locale: ptBR })}` : ''}`
-                      : 'Selecionar datas'}
-                  </span>
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 z-[220]" align="start">
-                <Calendar
-                  mode="range"
-                  selected={dateRange}
-                  onSelect={(range, day) => {
-                    const { range: next, isComplete } = resolveNextRange(dateRange, range, day);
-                    setDateRange(next);
-                    if (isComplete) setShowCalendar(false);
-                  }}
-                  locale={ptBR}
-                  scrollable
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[13px] font-semibold text-foreground">Datas</label>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Datas fixas?</span>
+                <Switch checked={isFixedDate} onCheckedChange={setIsFixedDate} />
+              </div>
+            </div>
+            
+            {isFixedDate ? (
+              <Popover open={showCalendar} onOpenChange={setShowCalendar}>
+                <PopoverTrigger asChild>
+                  <button className="w-full flex items-center gap-2 bg-muted/40 rounded-xl px-3 h-[44px]">
+                    <Icon name="calendar_today" size={16} className="text-muted-foreground" />
+                    <span className="text-[14px] text-foreground">
+                      {dateRange?.from
+                        ? `${format(dateRange.from, "d 'de' MMM", { locale: ptBR })}${dateRange.to ? ` - ${format(dateRange.to, "d 'de' MMM", { locale: ptBR })}` : ''}`
+                        : 'Selecionar datas'}
+                    </span>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 z-[220]" align="start">
+                  <Calendar
+                    mode="range"
+                    selected={dateRange}
+                    onSelect={(range, day) => {
+                      const { range: next, isComplete } = resolveNextRange(dateRange, range, day);
+                      setDateRange(next);
+                      if (isComplete) setShowCalendar(false);
+                    }}
+                    locale={ptBR}
+                    scrollable
+                  />
+                </PopoverContent>
+              </Popover>
+            ) : (
+              <div className="w-full flex items-center gap-2 bg-muted/40 rounded-xl px-3 h-[44px]">
+                <Icon name="schedule" size={16} className="text-muted-foreground" />
+                <input
+                  type="number"
+                  min="1"
+                  max="365"
+                  value={durationDays}
+                  onChange={(e) => setDurationDays(e.target.value === '' ? '' : parseInt(e.target.value) || '')}
+                  className="flex-1 bg-transparent text-[14px] text-foreground outline-none"
+                  placeholder="Duração"
                 />
-              </PopoverContent>
-            </Popover>
+                <span className="text-[14px] text-muted-foreground">dias</span>
+              </div>
+            )}
           </div>
 
           {/* Save Button */}
           {(() => {
             const isEditing = activeIndex !== null || showCalendar;
+            const disabled = isEditing || (!isFixedDate && (durationDays === '' || durationDays < 1)) || !isFormChanged;
             return (
               <button
                 onClick={handleSave}
-                disabled={isEditing}
+                disabled={disabled}
                 className={`w-full h-[41px] rounded-[16px] font-semibold text-[14px] flex items-center justify-center transition-colors ${
-                  isEditing
+                  disabled
                     ? 'bg-muted text-muted-foreground cursor-not-allowed'
                     : 'bg-primary text-primary-foreground'
                 }`}
