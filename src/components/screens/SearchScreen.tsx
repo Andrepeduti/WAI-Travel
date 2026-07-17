@@ -11,6 +11,7 @@ import { listPublicItineraries, type UserItinerary } from '@/lib/itinerariesApi'
 import { COUNTRY_TO_TAGS, ALL_COUNTRIES } from '@/data/countriesCatalog';
 import { toast } from 'sonner';
 import { resolveCoverImage } from '@/lib/coverImageResolver';
+import { cn } from '@/lib/utils';
 const defaultAvatarUrl = '/__l5e/assets-v1/9cb2fe10-a285-4f17-bbef-f67389a96b37/wai-logo.png';
 
 let cachedRealPeople: PeopleSuggestion[] | null = null;
@@ -147,14 +148,14 @@ const loadRecent = (): RecentSearch[] => {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
-  } catch {}
+  } catch { }
   return DEFAULT_RECENT;
 };
 
 const saveRecent = (items: RecentSearch[]) => {
   try {
     localStorage.setItem(RECENT_KEY, JSON.stringify(items));
-  } catch {}
+  } catch { }
 };
 
 interface SearchScreenProps {
@@ -210,40 +211,16 @@ const profileRowToPerson = (row: ProfileSearchRow): PeopleSuggestion => {
 
 export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryClick, onPlaceClick }: SearchScreenProps) {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState(() => sessionStorage.getItem('wai_searchQuery') || '');
-  const [submittedQuery, setSubmittedQuery] = useState(() => sessionStorage.getItem('wai_submittedQuery') || '');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [submittedQuery, setSubmittedQuery] = useState('');
   const [recent, setRecent] = useState<RecentSearch[]>(() => loadRecent());
   const [showFilters, setShowFilters] = useState(false);
-  const [appliedFilters, setAppliedFilters] = useState<ExploreFilters>(() => {
-    try {
-      const saved = sessionStorage.getItem('wai_appliedFilters');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.searchType === 'todos') {
-          parsed.searchType = null;
-        }
-        return { ...DEFAULT_FILTERS, ...parsed };
-      }
-      return DEFAULT_FILTERS;
-    } catch {
-      return DEFAULT_FILTERS;
-    }
-  });
+  const [appliedFilters, setAppliedFilters] = useState<ExploreFilters>(DEFAULT_FILTERS);
 
-  useEffect(() => {
-    sessionStorage.setItem('wai_searchQuery', searchQuery);
-  }, [searchQuery]);
 
-  useEffect(() => {
-    sessionStorage.setItem('wai_submittedQuery', submittedQuery);
-  }, [submittedQuery]);
-
-  useEffect(() => {
-    sessionStorage.setItem('wai_appliedFilters', JSON.stringify(appliedFilters));
-  }, [appliedFilters]);
   const [realPeople, setRealPeople] = useState<PeopleSuggestion[]>(() => cachedRealPeople || []);
   const [publicItineraries, setPublicItineraries] = useState<SearchItinerary[]>(() => cachedPublicItineraries || []);
-  const [destinations, setDestinations] = useState<{id: string; name: string; country: string; continent: string; image: string; itineraryCount: number; tags: string[]; rating: number}[]>(() => cachedDestinations || []);
+  const [destinations, setDestinations] = useState<{ id: string; name: string; country: string; continent: string; image: string; itineraryCount: number; tags: string[]; rating: number }[]>(() => cachedDestinations || []);
   const [currentUserId, setCurrentUserId] = useState<string | null>(() => cachedCurrentUserId);
 
   const mergedItineraries = useMemo<SearchItinerary[]>(() => {
@@ -303,7 +280,7 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
           }
         });
         (row.tags ?? []).forEach((t) => t && tagSet.add(norm(t)));
-        if (row.mainTag) tagSet.add(norm(row.mainTag));
+        if ((row as any).mainTag) tagSet.add(norm((row as any).mainTag));
         tagSet.add(norm(row.authorName));
         if (row.authorUsername) tagSet.add(norm(row.authorUsername.replace(/^@/, '')));
         // Descrição: cada palavra como tag adicional
@@ -343,7 +320,7 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
             priceCents: row.priceCents,
             description: row.description,
             tags: row.tags,
-            mainTag: row.mainTag,
+            mainTag: (row as any).mainTag,
             userId: row.userId,
           },
         };
@@ -356,7 +333,7 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
           const placeName = city || dest;
           if (!placeName) return;
           const key = norm(placeName);
-          
+
           if (!generatedDestinations.has(key)) {
             generatedDestinations.set(key, {
               id: key,
@@ -366,7 +343,7 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
               image: row.images?.[0] && !row.images[0].includes('placeholder') ? row.images[0] : resolveCoverImage([dest]).url,
               itineraryCount: 1,
               tags: Array.from(COUNTRY_TO_TAGS[norm(country || placeName)] || []),
-              rating: row.rating || 4.7
+              rating: (row as any).rating || 4.7
             });
           } else {
             generatedDestinations.get(key).itineraryCount++;
@@ -377,15 +354,8 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
       cachedPublicItineraries = mapped;
       setPublicItineraries(mapped);
 
-      setDestinations(prev => {
-        const dbKeys = new Set(prev.map(d => norm(d.name)));
-        const finalDests = [...prev];
-        for (const gen of generatedDestinations.values()) {
-          if (!dbKeys.has(norm(gen.name))) {
-            finalDests.push(gen);
-            dbKeys.add(norm(gen.name));
-          }
-        }
+      setDestinations(() => {
+        const finalDests = Array.from(generatedDestinations.values());
         cachedDestinations = finalDests;
         return finalDests;
       });
@@ -403,7 +373,7 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
       id: `term-${norm(q)}`,
       type: 'termo',
       title: q,
-      subtitle: 'Busca por termo',
+      subtitle: '',
       image: '',
       refId: q,
     });
@@ -471,7 +441,7 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
   // Carrega no mount.
   useEffect(() => {
     void reloadPublic();
-    
+
     // Load destinations
     let cancelled = false;
     const loadDestinations = async () => {
@@ -519,8 +489,8 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
   const resultsQuery = norm(submittedQuery.trim());
 
   const hasAnyFilter = (f: ExploreFilters) => {
-    return f.searchType !== null || f.regions?.length > 0 || f.countries?.length > 0 || f.tripTypes?.length > 0 || f.seasons?.length > 0 || f.creatorType?.length > 0 || 
-      f.priceRange?.[0] !== 0 || f.priceRange?.[1] !== 1000 || 
+    return f.searchType !== null || f.regions?.length > 0 || f.countries?.length > 0 || f.tripTypes?.length > 0 || f.seasons?.length > 0 || f.creatorType?.length > 0 ||
+      f.priceRange?.[0] !== 0 || f.priceRange?.[1] !== 1000 ||
       f.durationRange?.[0] !== 1 || f.durationRange?.[1] !== 30;
   };
 
@@ -532,14 +502,14 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
   const buildResults = (q: string, f: ExploreFilters) => {
     if (!q && !hasAnyFilter(f)) return { places: [], people: [], itineraries: [] };
     const peopleCatalog = realPeople;
-    
-    const hasItineraryFilters = 
-      f.regions.length > 0 || 
-      f.tripTypes.length > 0 || 
-      f.seasons.length > 0 || 
-      f.priceRange[0] !== 0 || 
-      f.priceRange[1] !== 1000 || 
-      f.durationRange[0] !== 1 || 
+
+    const hasItineraryFilters =
+      f.regions.length > 0 ||
+      f.tripTypes.length > 0 ||
+      f.seasons.length > 0 ||
+      f.priceRange[0] !== 0 ||
+      f.priceRange[1] !== 1000 ||
+      f.durationRange[0] !== 1 ||
       f.durationRange[1] !== 30;
 
     const forceRoteiros = f.searchType === null && hasItineraryFilters;
@@ -577,11 +547,14 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
           if (f.seasons.length && !f.seasons.some((s) => haystack.includes(norm(s)))) return false;
           if (typeof i.price === 'number') {
             if (i.price < f.priceRange[0]) return false;
-            if (f.priceRange[1] < 1000 && i.price > f.priceRange[1]) return false;
+            // Se o limite max for diferente do padrão (1000), então aplicamos o filtro. 
+            // 1000 no slider atua como "sem limite".
+            if (f.priceRange[1] !== 1000 && i.price > f.priceRange[1]) return false;
           }
           if (typeof i.days === 'number') {
             if (i.days < f.durationRange[0]) return false;
-            if (f.durationRange[1] < 30 && i.days > f.durationRange[1]) return false;
+            // Da mesma forma, 30 atua como sem limite. Valores diferentes inseridos criam teto.
+            if (f.durationRange[1] !== 30 && i.days > f.durationRange[1]) return false;
           }
           return true;
         })
@@ -597,12 +570,12 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
       id: `place-${dest.id}`,
       type: 'lugar',
       title: dest.name,
-      subtitle: dest.country,
+      subtitle: dest.country ? `${dest.country} • ${dest.itineraryCount} ${dest.itineraryCount === 1 ? 'roteiro' : 'roteiros'}` : `${dest.itineraryCount} ${dest.itineraryCount === 1 ? 'roteiro' : 'roteiros'}`,
       image: dest.image,
       refId: dest.id,
     });
     if (onPlaceClick) {
-      onPlaceClick({ country: dest.name, continent: dest.country, image: dest.image });
+      onPlaceClick({ country: dest.name, continent: dest.continent || dest.country, image: dest.image });
     }
   };
 
@@ -724,49 +697,49 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
           countResults={countFilteredResults}
         />
       )}
-    <div className="min-h-screen pb-24" style={{ backgroundColor: '#F2F2F2' }}>
-      {/* Header */}
- <header className="sticky top-0 z-20 px-5 pb-3" style={{ backgroundColor: '#F2F2F2' }}>
-        <div className="flex items-center gap-2 w-full min-w-0" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
-          <BackButton onClick={onClose} ariaLabel="Voltar" />
-          <div className="flex-1 min-w-0 flex items-center gap-2.5 px-4 h-10 bg-card rounded-full border border-border">
-            <Icon name="search" size={18} className="text-muted-foreground flex-shrink-0" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleSubmit();
-                }
-              }}
-              placeholder="Buscar lugar, pessoas, roteiros..."
-              className="flex-1 bg-transparent text-[16px] placeholder:text-muted-foreground focus:outline-none min-w-0"
-              autoFocus
-              enterKeyHint="search"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => {
-                  setSearchQuery('');
-                  setSubmittedQuery('');
+      <div className="min-h-screen pb-24" style={{ backgroundColor: '#F2F2F2' }}>
+        {/* Header */}
+        <header className="sticky top-0 z-20 px-5 pb-3" style={{ backgroundColor: '#F2F2F2' }}>
+          <div className="flex items-center gap-2 w-full min-w-0" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
+            <BackButton onClick={onClose} ariaLabel="Voltar" />
+            <div className="flex-1 min-w-0 flex items-center gap-2.5 px-4 h-10 bg-card rounded-full border border-border">
+              <Icon name="search" size={18} className="text-muted-foreground flex-shrink-0" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSubmit();
+                  }
                 }}
-                className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-muted-foreground hover:bg-muted/50"
-                aria-label="Limpar"
+                placeholder="Comece a buscar"
+                className="flex-1 bg-transparent text-[16px] placeholder:text-muted-foreground focus:outline-none min-w-0"
+                autoFocus
+                enterKeyHint="search"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSubmittedQuery('');
+                  }}
+                  className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-muted-foreground hover:bg-muted/50"
+                  aria-label="Limpar"
+                >
+                  <Icon name="close" size={16} />
+                </button>
+              )}
+              <button
+                onClick={handleSubmit}
+                disabled={!searchQuery.trim()}
+                className="text-[14px] font-bold transition-colors disabled:opacity-50"
+                style={{ color: '#1E3A8A' }}
               >
-                <Icon name="close" size={16} />
+                Buscar
               </button>
-            )}
-            <button
-              onClick={handleSubmit}
-              disabled={!searchQuery.trim()}
-              className="text-[14px] font-bold transition-colors disabled:opacity-50"
-              style={{ color: '#9DCC36' }}
-            >
-              Buscar
-            </button>
-          </div>
+            </div>
             {!!submittedQuery && (
               <button
                 aria-label="Filtros"
@@ -784,207 +757,237 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
                 )}
               </button>
             )}
-        </div>
-      </header>
-
-      <main className="px-5 pt-2">
-        {/* Empty query and no filters: recent searches */}
-        {!(displayQuery || hasAnyFilter(appliedFilters)) && (
-          <section>
-            <div className="flex items-center justify-between mb-3 mt-2">
-              <h2 className="text-[18px] font-bold text-foreground">Buscas recentes</h2>
-              {recent.length > 0 && (
-                <button
-                  onClick={clearRecent}
-                  className="text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Limpar tudo
-                </button>
-              )}
+          </div>
+          {/* Tabs */}
+          {(displayQuery || hasAnyFilter(appliedFilters)) && (
+            <div className="mt-4 flex items-center gap-2 overflow-x-auto hide-scrollbar pb-1">
+              {[
+                { id: null, label: 'Todos' },
+                { id: 'roteiros', label: 'Roteiros à venda' },
+                { id: 'lugares', label: 'Lugares' },
+                { id: 'pessoas', label: 'Pessoas' }
+              ].map(tab => {
+                const isActive = appliedFilters.searchType === tab.id;
+                return (
+                  <button
+                    key={tab.id || 'todos'}
+                    onClick={() => setAppliedFilters(prev => ({ ...prev, searchType: tab.id as any }))}
+                    className={cn(
+                      "px-4 py-1.5 rounded-full text-[13px] font-semibold flex-shrink-0 transition-colors border",
+                      isActive
+                        ? "bg-[#1A1C40] text-white border-[#1A1C40]"
+                        : "bg-white text-muted-foreground border-border/60 hover:border-[#9DCC36]"
+                    )}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
             </div>
+          )}
+        </header>
 
-            {recent.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16">
-                <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-3">
-                  <Icon name="history" size={24} className="text-muted-foreground" />
-                </div>
-                <p className="text-[14px] text-muted-foreground text-center">
-                  Suas buscas recentes aparecerão aqui
-                </p>
+        <main className="px-5 pt-2">
+          {/* Empty query and no filters: recent searches */}
+          {!(displayQuery || hasAnyFilter(appliedFilters)) && (
+            <section>
+              <div className="flex items-center justify-between mb-3 mt-2">
+                <h2 className="text-[18px] font-bold text-foreground">Buscas recentes</h2>
+                {recent.length > 0 && (
+                  <button
+                    onClick={clearRecent}
+                    className="text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Limpar tudo
+                  </button>
+                )}
               </div>
-            ) : (
-              <ul className="divide-y divide-border/60">
-                {recent.map((item) => {
-                  const isCircle = item.type === 'pessoa';
-                  return (
-                    <li key={item.id} className="flex items-center gap-3 py-3">
-                      <button
-                        onClick={() => handleRecentClick(item)}
-                        className="flex items-center gap-3 flex-1 min-w-0 text-left"
-                      >
-                        {item.type === 'termo' ? (
-                          <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                            <Icon name="search" size={20} className="text-muted-foreground" />
+
+              {recent.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16">
+                  <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-3">
+                    <Icon name="history" size={24} className="text-muted-foreground" />
+                  </div>
+                  <p className="text-[14px] text-muted-foreground text-center">
+                    Suas buscas recentes aparecerão aqui
+                  </p>
+                </div>
+              ) : (
+                <ul className="divide-y divide-border/60">
+                  {recent.map((item) => {
+                    const isCircle = item.type === 'pessoa';
+                    return (
+                      <li key={item.id} className="flex items-center gap-3 py-3">
+                        <button
+                          onClick={() => handleRecentClick(item)}
+                          className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                        >
+                          {item.type === 'termo' ? (
+                            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                              <Icon name="history" size={20} className="text-muted-foreground" />
+                            </div>
+                          ) : (
+                            <img
+                              src={item.image}
+                              alt={item.title}
+                              className={`w-12 h-12 object-cover flex-shrink-0 ${isCircle ? 'rounded-full' : 'rounded-lg'
+                                }`}
+                            />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[15px] font-semibold text-foreground truncate">
+                              {item.title}
+                            </p>
+                            {item.type !== 'termo' && item.subtitle && (
+                              <p className="text-[12px] text-muted-foreground truncate">
+                                {item.subtitle}
+                              </p>
+                            )}
                           </div>
-                        ) : (
+                        </button>
+                        <button
+                          onClick={() => removeRecent(item.id)}
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted/50 transition-colors flex-shrink-0"
+                          aria-label="Remover"
+                        >
+                          <Icon name="close" size={18} />
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+          )}
+
+          {/* Active query or active filters: results */}
+          {(displayQuery || hasAnyFilter(appliedFilters)) && (
+            <div className="space-y-6 pt-2">
+              <div className="flex items-center justify-between mb-1 mt-2">
+                <h2 className="text-[18px] font-bold text-foreground">Resultados</h2>
+              </div>
+              {!hasResults && (
+                <div className="flex flex-col items-center justify-center py-16">
+                  <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-3">
+                    <Icon name="search" size={24} className="text-muted-foreground" />
+                  </div>
+                  <p className="text-[14px] text-muted-foreground text-center">
+                    {searchQuery ? `Nenhum resultado para "${searchQuery}"` : 'Nenhum resultado encontrado.'}
+                  </p>
+                </div>
+              )}
+
+              {displayResults.places.length > 0 && (
+                <section>
+                  <h2 className="text-[14px] font-bold text-muted-foreground uppercase tracking-wide mb-2">
+                    Lugares
+                  </h2>
+                  <ul className="divide-y divide-border/60">
+                    {displayResults.places.map((d) => (
+                      <li key={d.id}>
+                        <button
+                          onClick={() => handlePlaceClick(d)}
+                          className="w-full flex items-center gap-3 py-3 text-left"
+                        >
+                          <img src={d.image} alt={d.name} className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[15px] font-semibold text-foreground truncate">{d.name}</p>
+                            <p className="text-[12px] text-muted-foreground truncate">
+                              {d.country ? `${d.country} • ` : ''}{d.itineraryCount} {d.itineraryCount === 1 ? 'roteiro' : 'roteiros'}
+                            </p>
+                          </div>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              {displayResults.people.length > 0 && (
+                <section>
+                  <h2 className="text-[14px] font-bold text-muted-foreground uppercase tracking-wide mb-2">
+                    Pessoas
+                  </h2>
+                  <ul className="divide-y divide-border/60">
+                    {displayResults.people.map((p) => (
+                      <li key={p.id}>
+                        <button
+                          onClick={() => handlePersonClick(p)}
+                          className="w-full flex items-center gap-3 py-3 text-left"
+                        >
+                          <img src={p.image} alt={p.name} className="w-12 h-12 rounded-full object-cover flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[15px] font-semibold text-foreground truncate">{p.name}</p>
+                            <p className="text-[12px] text-muted-foreground truncate">Pessoa • {p.handle}</p>
+                          </div>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              {displayResults.itineraries.length > 0 && (
+                <section>
+                  <h2 className="text-[14px] font-bold text-muted-foreground uppercase tracking-wide mb-2">
+                    Roteiros à venda
+                  </h2>
+                  <ul className="space-y-3">
+                    {displayResults.itineraries.map((item) => (
+                      <li key={item.id}>
+                        <button
+                          onClick={() => handleItineraryClick(item)}
+                          className="w-full flex gap-3 text-left bg-white rounded-2xl p-4 border border-border/60"
+                        >
                           <img
                             src={item.image}
                             alt={item.title}
-                            className={`w-12 h-12 object-cover flex-shrink-0 ${
-                              isCircle ? 'rounded-full' : 'rounded-lg'
-                            }`}
+                            className="w-24 h-24 rounded-xl object-cover flex-shrink-0"
                           />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[15px] font-semibold text-foreground truncate">
-                            {item.title}
-                          </p>
-                          <p className="text-[12px] text-muted-foreground truncate">
-                            {item.subtitle}
-                          </p>
-                        </div>
-                      </button>
-                      <button
-                        onClick={() => removeRecent(item.id)}
-                        className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted/50 transition-colors flex-shrink-0"
-                        aria-label="Remover"
-                      >
-                        <Icon name="close" size={18} />
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </section>
-        )}
-
-        {/* Active query or active filters: results */}
-        {(displayQuery || hasAnyFilter(appliedFilters)) && (
-          <div className="space-y-6 pt-2">
-            <div className="flex items-center justify-between mb-1 mt-2">
-              <h2 className="text-[18px] font-bold text-foreground">Resultados</h2>
-            </div>
-            {!hasResults && (
-              <div className="flex flex-col items-center justify-center py-16">
-                <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-3">
-                  <Icon name="search" size={24} className="text-muted-foreground" />
-                </div>
-                <p className="text-[14px] text-muted-foreground text-center">
-                  {searchQuery ? `Nenhum resultado para "${searchQuery}"` : 'Nenhum resultado encontrado.'}
-                </p>
-              </div>
-            )}
-
-            {displayResults.places.length > 0 && (
-              <section>
-                <h2 className="text-[14px] font-bold text-muted-foreground uppercase tracking-wide mb-2">
-                  Lugares
-                </h2>
-                <ul className="divide-y divide-border/60">
-                  {displayResults.places.map((d) => (
-                    <li key={d.id}>
-                      <button
-                        onClick={() => handlePlaceClick(d)}
-                        className="w-full flex items-center gap-3 py-3 text-left"
-                      >
-                        <img src={d.image} alt={d.name} className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[15px] font-semibold text-foreground truncate">{d.name}</p>
-                          <p className="text-[12px] text-muted-foreground truncate">{d.country}</p>
-                        </div>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            {displayResults.people.length > 0 && (
-              <section>
-                <h2 className="text-[14px] font-bold text-muted-foreground uppercase tracking-wide mb-2">
-                  Pessoas
-                </h2>
-                <ul className="divide-y divide-border/60">
-                  {displayResults.people.map((p) => (
-                    <li key={p.id}>
-                      <button
-                        onClick={() => handlePersonClick(p)}
-                        className="w-full flex items-center gap-3 py-3 text-left"
-                      >
-                        <img src={p.image} alt={p.name} className="w-12 h-12 rounded-full object-cover flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[15px] font-semibold text-foreground truncate">{p.name}</p>
-                          <p className="text-[12px] text-muted-foreground truncate">Pessoa • {p.handle}</p>
-                        </div>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            {displayResults.itineraries.length > 0 && (
-              <section>
-                <h2 className="text-[14px] font-bold text-muted-foreground uppercase tracking-wide mb-2">
-                  Roteiros à venda
-                </h2>
-                <ul className="space-y-3">
-                  {displayResults.itineraries.map((item) => (
-                    <li key={item.id}>
-                      <button
-                        onClick={() => handleItineraryClick(item)}
-                        className="w-full flex gap-3 text-left bg-white rounded-2xl p-4 border border-border/60"
-                      >
-                        <img
-                          src={item.image}
-                          alt={item.title}
-                          className="w-24 h-24 rounded-xl object-cover flex-shrink-0"
-                        />
-                        <div className="flex-1 min-w-0 flex flex-col justify-between">
-                          <div className="min-w-0">
-                            <div className="flex items-start gap-2 min-w-0">
-                              <p className="text-[15px] font-bold text-foreground leading-tight line-clamp-2 flex-1 min-w-0">
-                                {item.title}
+                          <div className="flex-1 min-w-0 flex flex-col justify-between">
+                            <div className="min-w-0">
+                              <div className="flex items-start gap-2 min-w-0">
+                                <p className="text-[15px] font-bold text-foreground leading-tight line-clamp-2 flex-1 min-w-0">
+                                  {item.title}
+                                </p>
+                                <span className="flex items-center gap-0.5 text-[12px] text-foreground flex-shrink-0 mt-0.5">
+                                  <span className="text-[#FACC15]">★</span>
+                                  <span className="font-semibold">{(item.rating ?? 0) > 0 ? (item.rating ?? 0).toFixed(1) : '-'}</span>
+                                </span>
+                              </div>
+                              <p className="text-[12px] text-muted-foreground mt-1">
+                                {item.days} {item.days === 1 ? 'dia' : 'dias'}
+                                {item.cities > 0 && ` • ${item.cities} ${item.cities === 1 ? 'lugar' : 'lugares'}`}
                               </p>
-                              <span className="flex items-center gap-0.5 text-[12px] text-foreground flex-shrink-0 mt-0.5">
-                                <span className="text-[#FACC15]">★</span>
-                                <span className="font-semibold">{(item.rating ?? 0) > 0 ? (item.rating ?? 0).toFixed(1) : '-'}</span>
+                            </div>
+                            <div className="flex items-center justify-between mt-2">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <img
+                                  src={item.authorImage}
+                                  alt={item.author}
+                                  className="w-5 h-5 rounded-full object-cover flex-shrink-0"
+                                />
+                                <span className="text-[12px] text-muted-foreground truncate">
+                                  {item.author}
+                                </span>
+                              </div>
+                              <span className="text-[14px] font-bold text-foreground flex-shrink-0 ml-2">
+                                {item.price > 0
+                                  ? formatBRL(item.price)
+                                  : 'Grátis'}
                               </span>
                             </div>
-                            <p className="text-[12px] text-muted-foreground mt-1">
-                              {item.days} {item.days === 1 ? 'dia' : 'dias'}
-                              {item.cities > 0 && ` • ${item.cities} ${item.cities === 1 ? 'lugar' : 'lugares'}`}
-                            </p>
                           </div>
-                          <div className="flex items-center justify-between mt-2">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <img
-                                src={item.authorImage}
-                                alt={item.author}
-                                className="w-5 h-5 rounded-full object-cover flex-shrink-0"
-                              />
-                              <span className="text-[12px] text-muted-foreground truncate">
-                                {item.author}
-                              </span>
-                            </div>
-                            <span className="text-[14px] font-bold text-foreground flex-shrink-0 ml-2">
-                              {item.price > 0
-                                ? formatBRL(item.price)
-                                : 'Grátis'}
-                            </span>
-                          </div>
-                        </div>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-          </div>
-        )}
-      </main>
-    </div>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+            </div>
+          )}
+        </main>
+      </div>
     </>
   );
 }
