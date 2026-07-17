@@ -131,7 +131,7 @@ export function AddPlaceToCollectionSheet({ open, onClose, onSelect }: AddPlaceT
     <div className="fixed inset-0 z-[210] flex justify-center" onClick={handleClose}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
       <div
-        className="absolute bottom-0 w-full max-w-[430px] bg-card rounded-t-3xl flex flex-col animate-in slide-in-from-bottom duration-300"
+        className="absolute bottom-0 w-full w-full bg-card rounded-t-3xl flex flex-col animate-in slide-in-from-bottom duration-300"
         style={{ maxHeight: '85vh' }}
         onClick={e => e.stopPropagation()}
       >

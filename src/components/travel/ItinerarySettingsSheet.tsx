@@ -88,7 +88,7 @@ export function ItinerarySettingsSheet({
           style={{ animation: 'fadeIn 0.3s ease-out' }} />
         
         <div
-          className="relative w-full max-w-[430px] bg-background rounded-t-2xl"
+          className="relative w-full w-full bg-background rounded-t-2xl"
           style={{ animation: 'slideUpSheet 0.35s cubic-bezier(0.32, 0.72, 0, 1)' }}
           onClick={(e) => e.stopPropagation()}>
           
@@ -236,7 +236,7 @@ export function ItinerarySettingsSheet({
           style={{ animation: 'fadeIn 0.2s ease-out' }} />
         
           <div
-          className="relative w-full max-w-[430px] bg-background rounded-t-2xl"
+          className="relative w-full w-full bg-background rounded-t-2xl"
           style={{ animation: 'slideUpSheet 0.35s cubic-bezier(0.32, 0.72, 0, 1)' }}
           onClick={(e) => e.stopPropagation()}>
           
@@ -286,7 +286,7 @@ export function ItinerarySettingsSheet({
           style={{ animation: 'fadeIn 0.2s ease-out' }} />
 
           <div
-          className="relative w-full max-w-[430px] bg-background rounded-t-2xl"
+          className="relative w-full w-full bg-background rounded-t-2xl"
           style={{ animation: 'slideUpSheet 0.35s cubic-bezier(0.32, 0.72, 0, 1)' }}
           onClick={(e) => e.stopPropagation()}>
 

@@ -83,8 +83,8 @@ const UserPage = () => {
   })();
 
   return (
-    <div className="min-h-screen bg-muted flex items-start justify-center">
-      <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl overflow-x-clip">
+    <div className="min-h-screen bg-background w-full">
+      <div className="w-full bg-background min-h-screen overflow-x-clip">
         {content}
       </div>
     </div>

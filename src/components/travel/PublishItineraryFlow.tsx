@@ -1,16 +1,16 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, DollarSign, TrendingUp, Star, ShieldCheck, Sparkles, Users, Check } from 'lucide-react';
+import { ArrowLeft, DollarSign, TrendingUp, Star, ShieldCheck, Sparkles, Users, Check, Copy, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 
 export interface PublishItineraryResult {
   price: number;
   description: string;
   tags: string[];
-  mainTag: string;
 }
 
 interface PublishItineraryFlowProps {
@@ -22,19 +22,23 @@ interface PublishItineraryFlowProps {
   totalCities?: number;
   initialDescription?: string;
   initialTags?: string[];
-  initialMainTag?: string;
   onClose: () => void;
-  onPublished?: (result: PublishItineraryResult) => void;
+  onPublished?: (result: PublishItineraryResult) => void | Promise<void>;
   onNavigateToSales?: () => void;
 }
 
-export const ITINERARY_TAG_OPTIONS = [
-  'Praia', 'Natureza', 'Aventura', 'Gastronomia', 'Cultura', 'História',
-  'Romance', 'Família', 'Mochilão', 'Luxo', 'Vida noturna', 'Compras',
-  'Relaxamento', 'Esportes', 'Arquitetura', 'Arte', 'Festivais', 'Pet friendly',
-];
+import { TRIP_TYPES } from '../screens/FiltersScreen';
 
-const TOTAL_QUESTION_STEPS = 5; // Price, Description, Tags, MainTag, Review
+export const SEASONS_OPTIONS = [
+  { id: 'verao', label: 'Verão', emoji: '☀️' },
+  { id: 'inverno', label: 'Inverno', emoji: '❄️' },
+  { id: 'primavera', label: 'Primavera', emoji: '🌸' },
+  { id: 'outono', label: 'Outono', emoji: '🍂' },
+  { id: 'qualquer', label: 'Qualquer época', emoji: '📅' },
+];
+import { Icon } from '@/components/ui/Icon';
+
+const TOTAL_QUESTION_STEPS = 5; // Price, Description, Season, Tags, Review
 
 function StepDots({ current, total }: { current: number; total: number }) {
   return (
@@ -61,18 +65,24 @@ export function PublishItineraryFlow({
   totalCities,
   initialDescription = '',
   initialTags = [],
-  initialMainTag = '',
   onClose,
   onPublished,
   onNavigateToSales,
 }: PublishItineraryFlowProps) {
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('wai_hide_publish_onboarding') === 'true' ? 1 : 0;
+    }
+    return 0;
+  });
   const [price, setPrice] = useState('');
   const [isFree, setIsFree] = useState(false);
   const [touched, setTouched] = useState(false);
   const [description, setDescription] = useState(initialDescription);
+  const [season, setSeason] = useState<string>('');
   const [tags, setTags] = useState<string[]>(initialTags);
-  const [mainTag, setMainTag] = useState<string>(initialMainTag);
+  const [isReviewingTerms, setIsReviewingTerms] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -100,41 +110,55 @@ export function PublishItineraryFlow({
     return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  const priceValid = isFree || (numericPrice >= 5 && numericPrice <= 999);
+  const priceValid = isFree || numericPrice > 0;
   const priceError = isFree
     ? null
     : touched && price.length > 0 && !priceValid
-      ? 'O valor deve estar entre R$ 5,00 e R$ 999,00.'
+      ? 'O valor deve ser maior que zero.'
       : touched && price.length === 0
         ? 'Defina um preço para o seu roteiro.'
         : null;
 
   const descriptionValid = description.trim().length >= 20;
   const tagsValid = tags.length >= 1 && tags.length <= 5;
-  const mainTagValid = !!mainTag && tags.includes(mainTag);
+  const seasonValid = !!season;
 
-  const LAST_STEP = 6;
+  const LAST_STEP = 5;
 
-  const next = () => {
+  const next = async () => {
+    if (step === 0 && isReviewingTerms) {
+      setIsReviewingTerms(false);
+      setStep(5);
+      return;
+    }
     if (step < LAST_STEP) {
       setStep((s) => s + 1);
     } else {
-      onPublished?.({
-        price: numericPrice,
-        description: description.trim(),
-        tags,
-        mainTag,
-      });
-      toast.success('Roteiro publicado!', {
-        description: 'Agora ele está disponível no marketplace.',
-      });
-      handleClose();
-      onNavigateToSales?.();
+      setIsPublishing(true);
+      try {
+        await onPublished?.({
+          price: numericPrice,
+          description: description.trim(),
+          tags: Array.from(new Set([season, ...tags.filter(t => t !== ''), ...initialTags.filter(t => t === '_FLEXIBLE_DATES_')])),
+        });
+        toast.success('Roteiro publicado com sucesso!', {
+          description: 'Agora ele está disponível no marketplace.',
+        });
+        handleClose();
+        onNavigateToSales?.();
+      } finally {
+        setIsPublishing(false);
+      }
     }
   };
 
   const back = () => {
-    if (step <= 1) {
+    if (step === 0 && isReviewingTerms) {
+      setIsReviewingTerms(false);
+      setStep(5);
+      return;
+    }
+    if (step <= 1 && !isReviewingTerms) {
       handleClose();
     } else {
       setStep((s) => s - 1);
@@ -142,40 +166,45 @@ export function PublishItineraryFlow({
   };
 
   const handleClose = () => {
-    setStep(1);
+    setStep(localStorage.getItem('wai_hide_publish_onboarding') === 'true' ? 1 : 0);
     setPrice('');
     setIsFree(false);
     setTouched(false);
     setDescription(initialDescription);
+    setSeason('');
     setTags(initialTags);
-    setMainTag(initialMainTag);
+    setIsReviewingTerms(false);
     onClose();
   };
 
   const toggleTag = (t: string) => {
     setTags((prev) => {
+      const displayLen = prev.filter(x => x !== '_FLEXIBLE_DATES_').length;
       if (prev.includes(t)) {
         return prev.filter((x) => x !== t);
       }
-      if (prev.length >= 5) return prev;
+      if (displayLen >= 5) return prev;
       return [...prev, t];
     });
   };
 
+  const displayTags = tags.filter((t) => t !== '_FLEXIBLE_DATES_');
+  const tagsValidCheck = displayTags.length >= 1 && displayTags.length <= 5;
+
   const canAdvance =
-    step === 2 ? priceValid :
-    step === 3 ? descriptionValid :
-    step === 4 ? tagsValid :
-    step === 5 ? mainTagValid :
-    true;
+    step === 1 ? priceValid :
+      step === 2 ? descriptionValid :
+        step === 3 ? seasonValid :
+          step === 4 ? tagsValid :
+            true;
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[#F2F2F2]">
-      <div className="relative w-full h-full max-w-[430px] mx-auto overflow-hidden font-sans">
+      <div className="relative w-full h-full w-full mx-auto overflow-hidden font-sans">
         {/* Top bar — only back button */}
-        <div className={cn('absolute top-0 left-0 right-0 z-30', step <= 1 ? 'pt-[68px]' : 'pt-safe-top pb-3 bg-[#F2F2F2]')}>
-          <div className={step <= 1 ? 'px-3' : 'px-7'}>
-            <div className={cn('flex items-center', step <= 1 && 'w-full max-w-[396px] mx-auto px-7')}>
+        <div className={cn('absolute top-0 left-0 right-0 z-30', step <= 0 ? 'pt-[68px]' : 'pt-safe-top pb-3 bg-[#F2F2F2]')}>
+          <div className={step <= 0 ? 'px-3' : 'px-7'}>
+            <div className={cn('flex items-center', step <= 0 && 'w-full max-w-[396px] mx-auto px-7')}>
               <button
                 onClick={back}
                 className="w-10 h-10 -ml-2 rounded-full flex items-center justify-center transition-all bg-[#0A0A0A]/5 text-[#0A0A0A] hover:bg-[#0A0A0A]/10 shrink-0"
@@ -188,9 +217,8 @@ export function PublishItineraryFlow({
         </div>
 
         <AnimatePresence mode="wait">
-          {step === 0 && <IntroScreen key="intro" tripName={tripName} onNext={next} />}
-          {step === 1 && <HowItWorksScreen key="how" onNext={next} />}
-          {step === 2 && (
+          {step === 0 && <HowItWorksScreen key="how" onNext={next} hideCheckbox={isReviewingTerms} />}
+          {step === 1 && (
             <PriceScreen
               key="price"
               value={price}
@@ -217,7 +245,7 @@ export function PublishItineraryFlow({
               canAdvance={canAdvance}
             />
           )}
-          {step === 3 && (
+          {step === 2 && (
             <DescriptionScreen
               key="description"
               value={description}
@@ -226,26 +254,25 @@ export function PublishItineraryFlow({
               canAdvance={canAdvance}
             />
           )}
+          {step === 3 && (
+            <SeasonScreen
+              key="season"
+              value={season}
+              onSelect={setSeason}
+              onNext={next}
+              canAdvance={canAdvance}
+            />
+          )}
           {step === 4 && (
             <TagsScreen
               key="tags"
-              selected={tags}
+              selected={displayTags}
               onToggle={toggleTag}
               onNext={next}
               canAdvance={canAdvance}
             />
           )}
           {step === 5 && (
-            <MainTagScreen
-              key="mainTag"
-              tags={tags}
-              mainTag={mainTag}
-              onSetMainTag={setMainTag}
-              onNext={next}
-              canAdvance={canAdvance}
-            />
-          )}
-          {step === 6 && (
             <ReviewScreen
               key="review"
               tripName={tripName}
@@ -256,9 +283,14 @@ export function PublishItineraryFlow({
               numericPrice={numericPrice}
               earning={earning}
               description={description}
-              tags={tags}
+              tags={season ? [...tags, season] : tags}
               formatBRL={formatBRL}
               onPublish={next}
+              isPublishing={isPublishing}
+              onReviewTerms={() => {
+                setIsReviewingTerms(true);
+                setStep(0);
+              }}
             />
           )}
         </AnimatePresence>
@@ -267,79 +299,9 @@ export function PublishItineraryFlow({
   );
 }
 
-/* ---------------- Intro ---------------- */
-
-function IntroScreen({ tripName, onNext }: { tripName?: string; onNext: () => void }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.4 }}
-      className="absolute inset-0 flex items-center justify-center bg-[#F2F2F2] px-3 pt-12 pb-3"
-    >
-      <div
-        className="relative w-full h-full max-w-[396px] rounded-[30px] overflow-hidden flex flex-col"
-        style={{ background: '#E8F1D4' }}
-      >
-        <div className="px-6 pt-24 pb-2">
-          <h1
-            className="text-[#0A0A0A] leading-[1.05] tracking-[-0.025em]"
-            style={{ fontSize: '34px', fontWeight: 800 }}
-          >
-            Torne-se um<br />criador de<br />roteiros
-          </h1>
-          <p className="mt-3 text-[#6B6B6B] leading-snug max-w-[280px] text-base">
-            Publique{tripName ? ` "${tripName}"` : ' seu roteiro'} no marketplace
-            e ganhe dinheiro com sua experiência de viagem.
-          </p>
-        </div>
-
-        <div className="flex-1 flex items-center justify-center px-8">
-          <div className="relative w-full max-w-[280px] aspect-square">
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-              className="absolute inset-0 rounded-full bg-[#9DCC36]/30 blur-2xl"
-            />
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ duration: 0.6, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
-              className="absolute inset-6 rounded-[28px] bg-white shadow-[0_20px_50px_-15px_rgba(10,10,10,0.25)] flex flex-col items-center justify-center gap-3 p-6"
-            >
-              <div className="w-16 h-16 rounded-2xl bg-[#9DCC36] flex items-center justify-center">
-                <Sparkles size={32} strokeWidth={2.2} className="text-[#0A0A0A]" />
-              </div>
-              <div className="text-center">
-                <p className="text-[13px] font-semibold text-[#6B6B6B] uppercase tracking-wide">Programa</p>
-                <p className="text-[20px] font-extrabold text-[#0A0A0A] leading-tight">Criador WaiTravel</p>
-              </div>
-            </motion.div>
-          </div>
-        </div>
-
-        <div className="absolute bottom-6 right-6 z-20">
-          <motion.button
-            whileTap={{ scale: 0.92 }}
-            onClick={onNext}
-            className="h-14 px-7 rounded-full bg-[#9DCC36] text-[#0A0A0A] font-bold text-[15px] shadow-[0_12px_32px_-10px_rgba(157,204,54,0.7)] flex items-center gap-2"
-          >
-            Começar
-            <span className="w-7 h-7 rounded-full bg-[#0A0A0A] text-white flex items-center justify-center">
-              →
-            </span>
-          </motion.button>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
 /* ---------------- How it works ---------------- */
 
-function HowItWorksScreen({ onNext }: { onNext: () => void }) {
+function HowItWorksScreen({ onNext, hideCheckbox }: { onNext: () => void; hideCheckbox?: boolean }) {
   const items: { icon: typeof Users; title: string; desc: string; color: string }[] = [
     {
       icon: Users,
@@ -352,6 +314,12 @@ function HowItWorksScreen({ onNext }: { onNext: () => void }) {
       title: 'Receba 90% de cada venda',
       desc: 'Cobramos apenas 10% de taxa de serviço. O resto é seu.',
       color: '#E8F1D4',
+    },
+    {
+      icon: Copy,
+      title: 'Cópia independente',
+      desc: 'A versão à venda é independente do seu roteiro privado.',
+      color: '#E0E7FF',
     },
     {
       icon: ShieldCheck,
@@ -383,9 +351,7 @@ function HowItWorksScreen({ onNext }: { onNext: () => void }) {
           >
             Como funciona<br />a venda
           </h1>
-          <p className="mt-3 text-[#6B6B6B] leading-snug max-w-[280px] text-[15px]">
-            Quatro princípios que tornam a publicação simples e justa.
-          </p>
+
         </div>
 
         <div className="flex-1 px-6 pt-6 pb-28 overflow-y-auto">
@@ -413,7 +379,23 @@ function HowItWorksScreen({ onNext }: { onNext: () => void }) {
           </div>
         </div>
 
-        <div className="absolute left-0 right-0 bottom-0 px-6 pb-6 pt-4 bg-gradient-to-t from-white via-white to-transparent">
+        <div className="absolute left-0 right-0 bottom-0 px-6 pb-6 pt-4 bg-gradient-to-t from-white via-white to-transparent flex flex-col gap-4">
+          {!hideCheckbox && (
+            <label className="flex items-center gap-2 cursor-pointer self-center">
+              <input
+                type="checkbox"
+                className="w-4 h-4 rounded border-[#0A0A0A]/20 text-[#9DCC36] focus:ring-[#9DCC36]"
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    localStorage.setItem('wai_hide_publish_onboarding', 'true');
+                  } else {
+                    localStorage.removeItem('wai_hide_publish_onboarding');
+                  }
+                }}
+              />
+              <span className="text-[13px] font-medium text-[#6B6B6B]">Não mostrar novamente</span>
+            </label>
+          )}
           <button
             onClick={onNext}
             className="w-full h-14 rounded-2xl font-bold text-[15px] tracking-[-0.01em] bg-[#9DCC36] text-[#0A0A0A] hover:brightness-105 active:scale-[0.99] shadow-[0_8px_22px_-8px_rgba(157,204,54,0.5)] transition-all"
@@ -478,7 +460,7 @@ function PriceScreen({
         </p>
 
         <div className="mt-6 relative">
-          <div 
+          <div
             className={cn(
               "flex items-center rounded-2xl bg-white px-5 transition-all shadow-[0_2px_8px_-2px_rgba(10,10,10,0.06)] overflow-hidden",
               error ? "ring-1 ring-[#E5484D] border border-[#E5484D]" : "border border-transparent focus-within:ring-2 focus-within:ring-[#9DCC36]",
@@ -604,6 +586,8 @@ function ReviewScreen({
   tags,
   formatBRL,
   onPublish,
+  isPublishing,
+  onReviewTerms,
 }: {
   tripName?: string;
   coverImage?: string;
@@ -616,6 +600,8 @@ function ReviewScreen({
   tags: string[];
   formatBRL: (v: number) => string;
   onPublish: () => void;
+  isPublishing?: boolean;
+  onReviewTerms: () => void;
 }) {
   const today = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const receiptId = `#${Math.floor(100000 + Math.random() * 900000)}`;
@@ -635,7 +621,7 @@ function ReviewScreen({
       className="absolute inset-0 overflow-y-auto bg-[#F2F2F2]"
     >
       <div className="px-7 pt-20 pb-0">
-        <StepDots current={3} total={TOTAL_QUESTION_STEPS} />
+        <StepDots current={4} total={TOTAL_QUESTION_STEPS} />
         <h1
           className="text-[#0A0A0A] leading-[1.1] tracking-[-0.02em]"
           style={{ fontSize: '28px', fontWeight: 800 }}
@@ -705,7 +691,7 @@ function ReviewScreen({
                 <div>
                   <p className="text-[11px] text-[#6B6B6B] font-semibold uppercase tracking-wide mb-1.5">Tags</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {tags.map((t) => (
+                    {tags.filter(t => t !== '_FLEXIBLE_DATES_').map((t) => (
                       <span
                         key={t}
                         className="px-2.5 py-1 rounded-full text-[12px] font-semibold bg-[#E7E7EE] text-[#1A1C40]"
@@ -722,21 +708,48 @@ function ReviewScreen({
           <div className="pb-5" />
         </motion.div>
 
-        <div className="mt-4 flex items-start gap-2.5 p-3.5 rounded-xl bg-[#9DCC36]/10">
-          <Check size={16} strokeWidth={2.5} className="text-[#9DCC36] mt-0.5 shrink-0" />
-          <p className="text-[12.5px] text-[#1A1C40] leading-snug">
+
+
+        <div className="mt-4 flex items-center justify-between p-4 rounded-xl bg-[#F2F2F2]">
+          <div className="flex flex-col gap-1 pr-4">
+            <span className="text-[14px] font-semibold text-[#1A1C40]">Configuração de datas</span>
+            <span className="text-[12px] text-[#6B6B6B] leading-tight">
+              {tags.includes('_FLEXIBLE_DATES_') 
+                ? `Seu roteiro não tem datas fixas. Os compradores verão apenas a duração de ${totalDays} dias.`
+                : `Seu roteiro tem datas fixas. Os compradores verão os dias específicos da viagem.`}
+            </span>
+          </div>
+        </div>
+
+        <div
+          onClick={onReviewTerms}
+          className="mt-4 flex items-center gap-3 p-3.5 rounded-xl bg-[#9DCC36]/10 cursor-pointer active:scale-[0.98] transition-transform"
+        >
+          <Check size={16} strokeWidth={2.5} className="text-[#9DCC36] shrink-0" />
+          <p className="text-[12.5px] text-[#1A1C40] leading-snug flex-1">
             Ao publicar você concorda com os termos do programa de criadores.
             Você pode despublicar a qualquer momento.
           </p>
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#9DCC36] shrink-0">
+            <path d="m9 18 6-6-6-6" />
+          </svg>
         </div>
       </div>
 
       <div className="sticky bottom-0 px-6 pb-8 pt-4 mt-4 bg-gradient-to-t from-[#F2F2F2] via-[#F2F2F2] to-transparent">
         <button
           onClick={onPublish}
-          className="w-full h-14 rounded-2xl font-bold text-[15px] tracking-[-0.01em] bg-[#9DCC36] text-[#0A0A0A] hover:brightness-105 active:scale-[0.99] shadow-[0_8px_22px_-8px_rgba(157,204,54,0.5)] transition-all"
+          disabled={isPublishing}
+          className="w-full h-14 rounded-2xl font-bold text-[15px] tracking-[-0.01em] bg-[#9DCC36] text-[#0A0A0A] hover:brightness-105 active:scale-[0.99] disabled:opacity-70 disabled:active:scale-100 shadow-[0_8px_22px_-8px_rgba(157,204,54,0.5)] transition-all flex items-center justify-center gap-2"
         >
-          Publicar roteiro
+          {isPublishing ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Publicando...
+            </>
+          ) : (
+            'Publicar roteiro'
+          )}
         </button>
       </div>
     </motion.div>
@@ -837,25 +850,7 @@ function TagsScreen({
   onNext: () => void;
   canAdvance: boolean;
 }) {
-  const [customInput, setCustomInput] = useState('');
   const limitReached = selected.length >= 5;
-
-  const customSelected = selected.filter((t) => !ITINERARY_TAG_OPTIONS.includes(t));
-
-  const addCustom = () => {
-    const value = customInput.trim().slice(0, 24);
-    if (!value) return;
-    if (limitReached) {
-      toast.error('Você já atingiu o limite de 5 tags.');
-      return;
-    }
-    if (selected.some((t) => t.toLowerCase() === value.toLowerCase())) {
-      toast.error('Essa tag já foi adicionada.');
-      return;
-    }
-    onToggle(value);
-    setCustomInput('');
-  };
 
   return (
     <motion.div
@@ -867,7 +862,7 @@ function TagsScreen({
     >
       <div className="flex-1" />
       <div className="px-7 pb-40">
-        <StepDots current={2} total={TOTAL_QUESTION_STEPS} />
+        <StepDots current={3} total={TOTAL_QUESTION_STEPS} />
         <h1
           className="text-[#0A0A0A] leading-[1.1] tracking-[-0.02em]"
           style={{ fontSize: '28px', fontWeight: 800 }}
@@ -879,16 +874,16 @@ function TagsScreen({
         </p>
 
         <div className="mt-6 flex flex-wrap gap-2">
-          {ITINERARY_TAG_OPTIONS.map((t) => {
-            const isSelected = selected.includes(t);
+          {TRIP_TYPES.map((t) => {
+            const isSelected = selected.includes(t.label);
             const disabled = !isSelected && limitReached;
             return (
               <button
-                key={t}
-                onClick={() => onToggle(t)}
+                key={t.id}
+                onClick={() => onToggle(t.label)}
                 disabled={disabled}
                 className={cn(
-                  'px-4 h-10 rounded-full text-[13px] font-semibold transition-all border',
+                  'px-4 h-10 rounded-full text-[13px] font-semibold transition-all border flex items-center gap-1.5',
                   isSelected
                     ? 'bg-[#1A1C40] text-white border-[#1A1C40]'
                     : disabled
@@ -896,53 +891,14 @@ function TagsScreen({
                       : 'bg-white text-[#1A1C40] border-[#0A0A0A]/8 hover:border-[#9DCC36]'
                 )}
               >
-                {t}
+                <span>{t.emoji}</span>
+                <span>{t.label}</span>
               </button>
             );
           })}
-          {customSelected.map((t) => (
-            <button
-              key={t}
-              onClick={() => onToggle(t)}
-              className="px-4 h-10 rounded-full text-[13px] font-semibold transition-all border bg-[#1A1C40] text-white border-[#1A1C40]"
-            >
-              {t}
-            </button>
-          ))}
         </div>
 
-        {/* Adicionar tag personalizada */}
-        <div className="mt-4 flex items-center gap-2">
-          <Input
-            value={customInput}
-            onChange={(e) => setCustomInput(e.target.value.slice(0, 24))}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                addCustom();
-              }
-            }}
-            placeholder="Criar tag personalizada"
-            disabled={limitReached}
-            className="rounded-full bg-white border-0 h-10 px-4 text-[#0A0A0A] placeholder:text-[#0A0A0A]/30 focus-visible:ring-2 focus-visible:ring-[#9DCC36]"
-            style={{ fontSize: '16px' }}
-          />
-          <button
-            type="button"
-            onClick={addCustom}
-            disabled={!customInput.trim() || limitReached}
-            className={cn(
-              'h-10 px-4 rounded-full text-[13px] font-semibold transition-all shrink-0',
-              !customInput.trim() || limitReached
-                ? 'bg-[#E5E7DD] text-[#0A0A0A]/30 cursor-not-allowed'
-                : 'bg-[#1A1C40] text-white active:scale-[0.98]'
-            )}
-          >
-            Adicionar
-          </button>
-        </div>
-
-        <p className="mt-4 text-[12px] text-[#6B6B6B]">
+        <p className="mt-6 text-[12px] text-[#6B6B6B]">
           {selected.length}/5 selecionadas
         </p>
       </div>
@@ -965,18 +921,16 @@ function TagsScreen({
   );
 }
 
-/* ---------------- MainTag ---------------- */
+/* ---------------- Season ---------------- */
 
-function MainTagScreen({
-  tags,
-  mainTag,
-  onSetMainTag,
+function SeasonScreen({
+  value,
+  onSelect,
   onNext,
   canAdvance,
 }: {
-  tags: string[];
-  mainTag: string;
-  onSetMainTag: (t: string) => void;
+  value: string;
+  onSelect: (v: string) => void;
   onNext: () => void;
   canAdvance: boolean;
 }) {
@@ -990,33 +944,41 @@ function MainTagScreen({
     >
       <div className="flex-1" />
       <div className="px-7 pb-40">
-        <StepDots current={3} total={TOTAL_QUESTION_STEPS} />
+        <StepDots current={2} total={TOTAL_QUESTION_STEPS} />
         <h1
           className="text-[#0A0A0A] leading-[1.1] tracking-[-0.02em]"
           style={{ fontSize: '28px', fontWeight: 800 }}
         >
-          Qual é a tag<br />principal?
+          Qual a melhor<br />época?
         </h1>
         <p className="mt-2 text-[#6B6B6B] text-[13px] leading-snug max-w-[320px]">
-          Escolha a tag que melhor resume a experiência do seu roteiro.
+          Ajude os viajantes a saberem quando é a melhor época para fazer essa viagem.
         </p>
 
-        <div className="mt-6 flex flex-wrap gap-2">
-          {tags.map((t) => {
-            const isMain = mainTag === t;
+        <div className="mt-6 flex flex-col gap-2.5">
+          {SEASONS_OPTIONS.map((s) => {
+            const isSelected = value === s.label;
             return (
               <button
-                key={t}
-                onClick={() => onSetMainTag(t)}
+                key={s.id}
+                onClick={() => onSelect(s.label)}
                 className={cn(
-                  'px-4 h-10 rounded-full text-[13px] font-semibold transition-all border inline-flex items-center gap-1.5',
-                  isMain
-                    ? 'bg-[#9DCC36] text-[#0A0A0A] border-[#9DCC36]'
-                    : 'bg-white text-[#1A1C40] border-[#0A0A0A]/8 hover:border-[#9DCC36]'
+                  'h-14 rounded-2xl px-5 flex items-center gap-3 transition-all border-2 text-[15px] font-semibold text-left',
+                  isSelected
+                    ? 'border-[#9DCC36] bg-[#9DCC36]/10 text-[#0A0A0A]'
+                    : 'border-transparent bg-white text-[#0A0A0A] hover:border-[#0A0A0A]/10 shadow-[0_2px_8px_-2px_rgba(10,10,10,0.04)]'
                 )}
               >
-                <span>{t}</span>
-                {isMain && <Check size={14} strokeWidth={2.5} />}
+                <span className="text-[18px]">{s.emoji}</span>
+                <span className="flex-1">{s.label}</span>
+                <div
+                  className={cn(
+                    'w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-colors border-2',
+                    isSelected ? 'bg-[#9DCC36] border-[#9DCC36]' : 'border-[#0A0A0A]/25 bg-transparent'
+                  )}
+                >
+                  {isSelected && <div className="w-2 h-2 rounded-full bg-[#0A0A0A]" />}
+                </div>
               </button>
             );
           })}
@@ -1040,3 +1002,4 @@ function MainTagScreen({
     </motion.div>
   );
 }
+

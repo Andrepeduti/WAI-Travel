@@ -22,24 +22,29 @@ export function SimilarTravelersScreen({ onBack, onViewProfile }: SimilarTravele
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const list = await fetchSimilarTravelers(8);
-      if (cancelled) return;
-      setTravelers(list);
-      setLoading(false);
+      try {
+        const list = await fetchSimilarTravelers(8);
+        if (cancelled) return;
+        setTravelers(list);
 
-      // Hidrata o estado inicial de "Seguindo" a partir do banco
-      const realIds = list.filter(t => !t.isMock).map(t => t.userId);
-      if (realIds.length === 0) return;
-      const { data: auth } = await supabase.auth.getUser();
-      const me = auth.user?.id;
-      if (!me) return;
-      const { data: rows } = await (supabase as any)
-        .from('profile_follows')
-        .select('following_id')
-        .eq('follower_id', me)
-        .in('following_id', realIds);
-      if (cancelled || !rows) return;
-      setFollowedIds(new Set(rows.map((r: any) => r.following_id as string)));
+        // Hidrata o estado inicial de "Seguindo" a partir do banco
+        const realIds = list.filter(t => !t.isMock).map(t => t.userId);
+        if (realIds.length === 0) return;
+        const { data: auth } = await supabase.auth.getUser();
+        const me = auth.user?.id;
+        if (!me) return;
+        const { data: rows } = await (supabase as any)
+          .from('profile_follows')
+          .select('following_id')
+          .eq('follower_id', me)
+          .in('following_id', realIds);
+        if (cancelled || !rows) return;
+        setFollowedIds(new Set(rows.map((r: any) => r.following_id as string)));
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
     })();
     return () => { cancelled = true; };
   }, []);

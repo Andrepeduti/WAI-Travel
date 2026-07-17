@@ -1015,7 +1015,7 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
           className="fixed left-0 right-0 bottom-0 z-40 flex justify-center px-4 pt-3 bg-white border-t border-[#0A0A0A]/8"
           style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))', boxShadow: '0 -6px 20px rgba(0,0,0,0.06)' }}
         >
-          <div className="w-full max-w-[430px] flex items-center gap-3">
+          <div className="w-full w-full flex items-center gap-3">
             <div className="flex-1 text-[14px] font-semibold" style={{ color: '#1A1C40' }}>
               {selectedPlaceIds.length} {selectedPlaceIds.length === 1 ? 'selecionado' : 'selecionados'}
             </div>
@@ -1135,7 +1135,7 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
       />
 
       <Drawer open={newFilterSheetOpen} onOpenChange={setNewFilterSheetOpen}>
-        <DrawerContent className="bg-white rounded-t-3xl max-w-[430px] mx-auto">
+        <DrawerContent className="bg-white rounded-t-3xl w-full mx-auto">
           <div className="flex items-center justify-between px-6 pt-5 pb-4">
             <div className="w-10" />
             <h2 className="text-[16px] font-bold text-center flex-1" style={{ color: '#1A1C40' }}>
@@ -1175,7 +1175,7 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
 
       {/* Place Options Bottom Sheet */}
       <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
-        <DrawerContent className="bg-white rounded-t-3xl max-w-[430px] mx-auto">
+        <DrawerContent className="bg-white rounded-t-3xl w-full mx-auto">
           {/* Header */}
           <div className="flex items-center justify-between px-6 pt-5 pb-4">
             <div className="w-10" />
@@ -1268,7 +1268,7 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
 
       {/* References Bottom Sheet */}
       <Drawer open={showReferencesSheet} onOpenChange={setShowReferencesSheet}>
-        <DrawerContent className="bg-white rounded-t-3xl max-w-[430px] mx-auto max-h-[85vh]">
+        <DrawerContent className="bg-white rounded-t-3xl w-full mx-auto max-h-[85vh]">
           {/* Header */}
           <div className="relative px-6 pt-5 pb-2">
             <button
@@ -1352,7 +1352,7 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
 
       {/* Header Settings Bottom Sheet */}
       <Drawer open={headerSheetOpen} onOpenChange={setHeaderSheetOpen}>
-        <DrawerContent className="bg-white rounded-t-3xl max-w-[430px] mx-auto">
+        <DrawerContent className="bg-white rounded-t-3xl w-full mx-auto">
           {/* Header */}
           <div className="flex items-center justify-between px-6 pt-5 pb-4">
             <div className="w-10" />
@@ -1520,7 +1520,7 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
             className="fixed bottom-0 left-0 right-0 z-50 flex justify-center"
             style={{ fontFamily: 'var(--font-family-primary)' }}
           >
-            <div className="bg-white rounded-t-[20px] w-full max-w-[430px] flex flex-col animate-in slide-in-from-bottom duration-300">
+            <div className="bg-white rounded-t-[20px] w-full w-full flex flex-col animate-in slide-in-from-bottom duration-300">
               <div className="flex justify-center pt-3 pb-1">
                 <div className="w-9 h-[4px] bg-muted-foreground/20 rounded-full" />
               </div>
@@ -1552,7 +1552,7 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
             style={{ animation: 'fadeIn 0.2s ease-out' }}
           />
           <div
-            className="relative w-full max-w-[430px] bg-background rounded-t-2xl"
+            className="relative w-full w-full bg-background rounded-t-2xl"
             style={{ animation: 'slideUpSheet 0.35s cubic-bezier(0.32, 0.72, 0, 1)' }}
             onClick={e => e.stopPropagation()}
           >

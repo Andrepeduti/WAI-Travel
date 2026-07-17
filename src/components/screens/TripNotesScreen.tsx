@@ -109,7 +109,7 @@ export function TripNotesScreen({ onBack, destination, notes: externalNotes, onN
       )}
 
       {/* Fixed bottom: add button */}
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-30 bg-background">
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full w-full z-30 bg-background">
         <div className="px-6 pb-8 pt-3 safe-bottom">
           <button
             onClick={() => setShowAddNote(true)}

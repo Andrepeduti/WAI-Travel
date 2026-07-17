@@ -4,9 +4,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { TravelRetrospective } from '@/components/travel/TravelRetrospective';
 import { PassportStamps } from '@/components/travel/PassportStamps';
 import { CountryDetailSheet } from '@/components/travel/CountryDetailSheet';
-import { visitedCountries, getUniqueCountinents, CountryVisit } from '@/data/visitedCountries';
+import { getUniqueCountinents, CountryVisit } from '@/data/visitedCountries';
 import { ContactUsSheet } from '@/components/travel/ContactUsSheet';
 import { BackButton } from '@/components/ui/BackButton';
+import { supabase } from '@/integrations/supabase/client';
+import { getFullPassport, removeVisitedCountry, PASSPORT_CHANGED_EVENT } from '@/lib/passportApi';
 
 interface ProfileScreenProps {
   onBack?: () => void;
@@ -48,7 +50,7 @@ export function ProfileScreen({
   onViewSales,
   onNavigateToSetting,
 }: ProfileScreenProps) {
-  const [countries, setCountries] = useState<CountryVisit[]>(visitedCountries);
+  const [countries, setCountries] = useState<CountryVisit[]>([]);
   const [selectedCountry, setSelectedCountry] = useState<CountryVisit | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [retroOpen, setRetroOpen] = useState(false);
@@ -56,20 +58,42 @@ export function ProfileScreen({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 700);
-    return () => clearTimeout(t);
+    let active = true;
+    const fetchPassport = async () => {
+      setLoading(true);
+      const { data: authData } = await supabase.auth.getUser();
+      if (authData?.user && active) {
+        const visits = await getFullPassport(authData.user.id);
+        if (active) setCountries(visits);
+      }
+      if (active) setLoading(false);
+    };
+
+    fetchPassport();
+
+    const handleEvent = () => fetchPassport();
+    window.addEventListener(PASSPORT_CHANGED_EVENT, handleEvent);
+
+    return () => {
+      active = false;
+      window.removeEventListener(PASSPORT_CHANGED_EVENT, handleEvent);
+    };
   }, []);
 
   const handleUpdatePhotos = (countryCode: string, photos: string[]) => {
+    // Para simplificar, a atualização de fotos no localStorage ou db será feita separadamente,
+    // mas por enquanto, manteremos no state local
     setCountries(prev => prev.map(c => c.code === countryCode ? { ...c, photos } : c));
     if (selectedCountry?.code === countryCode) {
       setSelectedCountry(prev => prev ? { ...prev, photos } : null);
     }
   };
 
-  const handleDeleteCountry = (countryCode: string) => {
+  const handleDeleteCountry = async (countryCode: string) => {
+    // Optimistic UI update
     setCountries(prev => prev.filter(c => c.code !== countryCode));
     setSelectedCountry(null);
+    await removeVisitedCountry(countryCode);
   };
 
   const continents = getUniqueCountinents(countries);

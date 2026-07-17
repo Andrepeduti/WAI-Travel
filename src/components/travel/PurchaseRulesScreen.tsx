@@ -86,7 +86,7 @@ export function PurchaseRulesScreen({ onBack, onAccept }: PurchaseRulesScreenPro
       </motion.div>
 
       <div
-        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] px-6 pt-4 bg-gradient-to-t from-[#F2F2F2] via-[#F2F2F2] to-transparent"
+        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full w-full px-6 pt-4 bg-gradient-to-t from-[#F2F2F2] via-[#F2F2F2] to-transparent"
         style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
       >
         <button

@@ -192,7 +192,7 @@ export function FolderDetailScreen({
 
       {/* Place Options Bottom Sheet */}
       <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
-        <DrawerContent className="bg-white rounded-t-3xl max-w-[430px] mx-auto">
+        <DrawerContent className="bg-white rounded-t-3xl w-full mx-auto">
           <div className="flex items-center justify-between px-6 pt-5 pb-4">
             <div className="w-10" />
             <h2
@@ -268,7 +268,7 @@ export function FolderDetailScreen({
 
       {/* Folder Actions Bottom Sheet */}
       <Drawer open={folderActionsOpen} onOpenChange={setFolderActionsOpen}>
-        <DrawerContent className="bg-white rounded-t-3xl max-w-[430px] mx-auto">
+        <DrawerContent className="bg-white rounded-t-3xl w-full mx-auto">
           <div className="flex items-center justify-between px-6 pt-5 pb-4">
             <h2 className="text-[16px] font-bold" style={{ color: '#1A1C40' }}>
               {folderName}
@@ -334,7 +334,7 @@ export function FolderDetailScreen({
 
       {/* Rename Bottom Sheet */}
       <Drawer open={renameOpen} onOpenChange={setRenameOpen}>
-        <DrawerContent className="bg-white rounded-t-3xl max-w-[430px] mx-auto">
+        <DrawerContent className="bg-white rounded-t-3xl w-full mx-auto">
           <div className="flex items-center justify-between px-6 pt-5 pb-4">
             <h2 className="text-[16px] font-bold" style={{ color: '#1A1C40' }}>
               Renomear pasta
@@ -378,7 +378,7 @@ export function FolderDetailScreen({
 
       {/* Delete Confirm Bottom Sheet */}
       <Drawer open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DrawerContent className="bg-white rounded-t-3xl max-w-[430px] mx-auto">
+        <DrawerContent className="bg-white rounded-t-3xl w-full mx-auto">
           <div className="flex items-center justify-between px-6 pt-5 pb-4">
             <h2 className="text-[16px] font-bold" style={{ color: '#1A1C40' }}>
               Excluir pasta

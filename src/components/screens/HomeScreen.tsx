@@ -331,7 +331,7 @@ export function HomeScreen({
   const { insights, loading: insightsLoading } = useUserInsights();
   const { unreadCount } = useNotifications();
   const unreadChatCount = useUnreadChatCount();
-  const { itineraries: myItineraries } = useMyItineraries();
+  const { itineraries: myItineraries, loading: myLoading } = useMyItineraries();
   const ongoingTrips = (() => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     return myItineraries
@@ -501,7 +501,23 @@ export function HomeScreen({
       <main className="pt-4 section-stack bg-[#f2f2f2] -mr-4">
 
         {/* Continue planejando */}
-        {ongoingTrips.length > 0 && (
+        {myLoading ? (
+          <section>
+            <h2 className="text-[16px] font-semibold text-foreground mb-3">Continue planejando</h2>
+            <HorizontalCarousel showDots={false} className="w-full pb-1" itemClassName="w-[260px]">
+              {[1, 2].map(i => (
+                <div key={i} className="w-[260px] flex items-center gap-3 bg-card rounded-2xl p-2 pr-3 text-left" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.06)' }}>
+                  <Skeleton className="w-16 h-16 rounded-xl flex-shrink-0" />
+                  <div className="flex-1 min-w-0 flex flex-col gap-1">
+                    <Skeleton className="h-4 w-3/4 rounded" />
+                    <Skeleton className="h-3 w-1/2 rounded" />
+                    <Skeleton className="h-[18px] w-20 rounded-full mt-1" />
+                  </div>
+                </div>
+              ))}
+            </HorizontalCarousel>
+          </section>
+        ) : ongoingTrips.length > 0 && (
           <section>
             <h2 className="text-[16px] font-semibold text-foreground mb-3">Continue planejando</h2>
             <HorizontalCarousel showDots={false} className="w-full pb-1" itemClassName="w-[260px]">

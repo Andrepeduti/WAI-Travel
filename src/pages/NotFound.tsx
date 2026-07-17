@@ -20,7 +20,7 @@ const NotFound = () => {
 
   return (
     <div
-      className="fixed inset-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] flex flex-col items-center justify-center px-6"
+      className="fixed inset-0 left-1/2 -translate-x-1/2 w-full w-full flex flex-col items-center justify-center px-6"
       style={{ height: "100dvh", backgroundColor: "#F2F2F2" }}
     >
       {/* Ícone ilustrativo */}

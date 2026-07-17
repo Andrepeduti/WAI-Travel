@@ -330,7 +330,7 @@ export function CheckoutScreen({ itinerary, onBack, onConfirm, onSaveForLater }:
 
       {/* Fixed footer */}
       <div
-        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-card z-30 px-5 pt-4"
+        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full w-full bg-card z-30 px-5 pt-4"
         style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
       >
         <div className="flex flex-col gap-2">

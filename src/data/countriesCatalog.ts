@@ -13,7 +13,6 @@ export interface CountryInfo {
   aliases?: string[]; // Alternative names or common terms (e.g. "Holanda" for "Países Baixos")
 }
 
-/** Convert ISO-2 country code (e.g. "BR") to flag emoji 🇧🇷 */
 export function iso2ToFlag(iso2: string): string {
   if (!iso2 || iso2.length !== 2) return '🏳️';
   const codePoints = iso2
@@ -26,6 +25,65 @@ export function iso2ToFlag(iso2: string): string {
     return '🏳️';
   }
 }
+
+/**
+ * Map of country -> continent / region keywords used to enrich tags so a
+ * search like "europa" surfaces every European itinerary even when the title
+ * doesn't literally contain the word.
+ */
+export const COUNTRY_TO_TAGS: Record<string, string[]> = {
+  // Europa
+  'portugal': ['europa', 'iberia'],
+  'espanha': ['europa', 'iberia'],
+  'frança': ['europa'],
+  'franca': ['europa'],
+  'itália': ['europa', 'mediterraneo'],
+  'italia': ['europa', 'mediterraneo'],
+  'grécia': ['europa', 'mediterraneo'],
+  'grecia': ['europa', 'mediterraneo'],
+  'holanda': ['europa'],
+  'países baixos': ['europa'],
+  'reino unido': ['europa'],
+  'inglaterra': ['europa', 'reino unido'],
+  'escócia': ['europa', 'reino unido'],
+  'escocia': ['europa', 'reino unido'],
+  'alemanha': ['europa'],
+  'suíça': ['europa', 'alpes'],
+  'suica': ['europa', 'alpes'],
+  'bélgica': ['europa'],
+  'belgica': ['europa'],
+  'república tcheca': ['europa', 'leste europeu'],
+  'republica tcheca': ['europa', 'leste europeu'],
+  'hungria': ['europa', 'leste europeu'],
+  'áustria': ['europa', 'leste europeu'],
+  'austria': ['europa', 'leste europeu'],
+  // Ásia
+  'japão': ['asia'],
+  'japao': ['asia'],
+  'tailândia': ['asia', 'sudeste asiatico'],
+  'tailandia': ['asia', 'sudeste asiatico'],
+  'indonésia': ['asia', 'sudeste asiatico'],
+  'indonesia': ['asia', 'sudeste asiatico'],
+  'china': ['asia'],
+  'vietnã': ['asia', 'sudeste asiatico'],
+  'vietna': ['asia', 'sudeste asiatico'],
+  // Américas
+  'brasil': ['america do sul', 'america latina'],
+  'argentina': ['america do sul', 'america latina'],
+  'chile': ['america do sul', 'america latina'],
+  'peru': ['america do sul', 'america latina'],
+  'eua': ['america do norte'],
+  'estados unidos': ['america do norte'],
+  'canadá': ['america do norte'],
+  'canada': ['america do norte'],
+  'méxico': ['america do norte', 'america latina'],
+  'mexico': ['america do norte', 'america latina'],
+  // África
+  'marrocos': ['africa'],
+  'egito': ['africa'],
+  'áfrica do sul': ['africa'],
+  'africa do sul': ['africa'],
+};
 
 /**
  * Continent in Portuguese, keyed by ISO-3 code.
@@ -185,6 +243,7 @@ export function getCountryInfo(
  * Common aliases used by users when searching for countries.
  */
 const ALIASES_BY_ISO3: Record<string, string[]> = {
+  BRA: ['Brazil', 'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO', 'Minas Gerais', 'São Paulo', 'Rio de Janeiro', 'Bahia', 'Paraná', 'Rio Grande do Sul', 'Pernambuco', 'Ceará', 'Amazonas', 'Pará', 'Goiás', 'Mato Grosso', 'Mato Grosso do Sul', 'Espírito Santo', 'Santa Catarina', 'Maranhão', 'Paraíba', 'Rio Grande do Norte', 'Alagoas', 'Piauí', 'Sergipe', 'Rondônia', 'Tocantins', 'Acre', 'Amapá', 'Roraima'],
   NLD: ['Holanda', 'Netherlands'],
   GBR: ['Inglaterra', 'Escócia', 'País de Gales', 'Irlanda do Norte', 'Grã-Bretanha', 'UK', 'United Kingdom'],
   USA: ['EUA', 'Estados Unidos da América', 'US'],

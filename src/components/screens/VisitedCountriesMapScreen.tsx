@@ -361,8 +361,7 @@ export function VisitedCountriesMapScreen({
           onOpenChange={setAddSheetOpen}
           visitedCodes={countries.map(c => c.code)}
           onConfirm={(chosen) => {
-            const y = new Date().getFullYear();
-            chosen.forEach(c => onMarkVisited(c, y));
+            chosen.forEach(item => onMarkVisited(item.country, item.year));
           }}
         />
       )}

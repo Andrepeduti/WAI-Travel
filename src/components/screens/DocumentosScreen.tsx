@@ -455,7 +455,7 @@ export function DocumentosScreen({
       )}
 
       {/* Fixed bottom: add button */}
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-30 bg-background">
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full w-full z-30 bg-background">
         <div className="px-6 pb-8 pt-3 safe-bottom">
           <button
             onClick={() => { setEditingTransporte(null); setEditingReserva(null); setShowTypePicker(true); }}
@@ -509,7 +509,7 @@ export function DocumentosScreen({
             className="fixed bottom-0 left-0 right-0 z-[110] flex justify-center"
             style={{ fontFamily: 'var(--font-family-primary)' }}
           >
-            <div className="bg-background rounded-t-3xl w-full max-w-[430px] pb-8 animate-in slide-in-from-bottom duration-300">
+            <div className="bg-background rounded-t-3xl w-full w-full pb-8 animate-in slide-in-from-bottom duration-300">
               <div className="flex justify-center py-3">
                 <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
               </div>

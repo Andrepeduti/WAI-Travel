@@ -495,7 +495,7 @@ export function ItineraryDetailScreen({ itineraryId, onBack, onOpenChat }: Itine
           paddingBottom: 'max(12px, env(safe-area-inset-bottom))'
         }}
       >
-        <div className="max-w-[430px] mx-auto px-5 pt-4 flex items-center justify-between gap-4">
+        <div className="w-full mx-auto px-5 pt-4 flex items-center justify-between gap-4">
           <div>
             <span className="text-xs text-muted-foreground">Preço total</span>
             <p className="text-[20px] font-bold text-primary">R$ {itineraryData.price.toFixed(2).replace('.', ',')}</p>

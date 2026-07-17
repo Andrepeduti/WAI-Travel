@@ -111,7 +111,7 @@ export function AIScreen() {
 
       {/* Input Bar */}
       <div className="fixed bottom-20 left-0 right-0 px-5 pb-4 bg-gradient-to-t from-background via-background to-transparent pt-8">
-        <div className="max-w-[430px] mx-auto flex items-center gap-2 p-2 bg-card rounded-2xl border border-border shadow-lg">
+        <div className="w-full mx-auto flex items-center gap-2 p-2 bg-card rounded-2xl border border-border shadow-lg">
           <input
             type="text"
             value={message}

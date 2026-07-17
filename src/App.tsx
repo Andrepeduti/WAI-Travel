@@ -32,8 +32,12 @@ const queryClient = new QueryClient({
   },
 });
 
+import { Loader2 } from "lucide-react";
+
 const RouteFallback = () => (
-  <div className="flex h-[100dvh] w-full items-center justify-center bg-background" />
+  <div className="flex h-[100dvh] w-full items-center justify-center bg-background">
+    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground opacity-50" />
+  </div>
 );
 
 const App = () => (

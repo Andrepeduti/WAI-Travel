@@ -9,102 +9,35 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getUserPurchases, type PurchasedItineraryView } from '@/lib/purchasesApi';
+import { submitItineraryReview } from '@/lib/marketplaceApi';
+import { Loader2 } from 'lucide-react';
 
 interface PurchasesScreenProps {
   onBack: () => void;
-  onNavigateToItinerary?: (id: number) => void;
-  onResumeCheckout?: (id: number) => void;
+  onNavigateToItinerary?: (id: number | string) => void;
+  onResumeCheckout?: (id: number | string) => void;
 }
-
-interface PurchasedItinerary {
-  id: number;
-  title: string;
-  image: string;
-  author: string;
-  authorImage: string;
-  price: number;
-  purchaseDate: string;
-  rating: number | null;
-  review: string;
-  transactionId: string;
-  paymentMethod: 'pix' | 'card';
-  status: 'paid' | 'pending_payment';
-  dueDate?: string;
-}
-
-const mockPurchases: PurchasedItinerary[] = [
-  {
-    id: 0,
-    title: 'Lisboa e Porto em 8 dias',
-    image: 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?w=400',
-    author: 'Rafael Lima',
-    authorImage: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100',
-    price: 44.90,
-    purchaseDate: '2025-01-08',
-    rating: null,
-    review: '',
-    transactionId: 'TXN-2025010800019',
-    paymentMethod: 'pix',
-    status: 'pending_payment',
-    dueDate: '2025-01-09',
-  },
-  {
-    id: 1,
-    title: '7 dias na Itália: Roma, Florença e Veneza',
-    image: 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=400',
-    author: 'Marina Costa',
-    authorImage: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100',
-    price: 49.90,
-    purchaseDate: '2024-12-15',
-    rating: null,
-    review: '',
-    transactionId: 'TXN-2024121500042',
-    paymentMethod: 'pix',
-    status: 'paid',
-  },
-  {
-    id: 2,
-    title: 'Mochilão pela Tailândia - 15 dias',
-    image: 'https://images.unsplash.com/photo-1528181304800-259b08848526?w=400',
-    author: 'Pedro Alves',
-    authorImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100',
-    price: 39.90,
-    purchaseDate: '2024-11-20',
-    rating: 5,
-    review: 'Roteiro incrível! Muito detalhado e com dicas ótimas.',
-    transactionId: 'TXN-2024112000038',
-    paymentMethod: 'card',
-    status: 'paid',
-  },
-  {
-    id: 3,
-    title: 'Paris em 5 dias - Guia Completo',
-    image: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=400',
-    author: 'Camila Souza',
-    authorImage: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100',
-    price: 29.90,
-    purchaseDate: '2024-10-05',
-    rating: 4,
-    review: 'Muito bom, só faltou mais opções de restaurantes.',
-    transactionId: 'TXN-2024100500027',
-    paymentMethod: 'pix',
-    status: 'paid',
-  },
-];
 
 const SUGGESTION_CHIPS = ['Roteiro detalhado', 'Boas dicas', 'Fácil de seguir', 'Bom custo-benefício'];
 
 export function PurchasesScreen({ onBack, onNavigateToItinerary, onResumeCheckout }: PurchasesScreenProps) {
-  const [purchases, setPurchases] = useState<PurchasedItinerary[]>(mockPurchases);
+  const queryClient = useQueryClient();
+  const { data: purchases = [], isLoading } = useQuery({
+    queryKey: ['user-purchases'],
+    queryFn: getUserPurchases,
+  });
+
   const { items: cartItems, removeFromCart } = useCart();
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'unpaid'>('all');
-  const [reviewingId, setReviewingId] = useState<number | null>(null);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [tempRating, setTempRating] = useState(0);
   const [tempReview, setTempReview] = useState('');
   const [selectedChips, setSelectedChips] = useState<string[]>([]);
-  const [receiptId, setReceiptId] = useState<number | null>(null);
+  const [receiptId, setReceiptId] = useState<string | null>(null);
 
-  const openReview = (item: PurchasedItinerary, initialRating?: number) => {
+  const openReview = (item: PurchasedItineraryView, initialRating?: number) => {
     setReviewingId(item.id);
     setTempRating(initialRating ?? item.rating ?? 0);
     setTempReview(item.review || '');
@@ -117,21 +50,37 @@ export function PurchasesScreen({ onBack, onNavigateToItinerary, onResumeCheckou
     );
   };
 
+  const reviewMutation = useMutation({
+    mutationFn: async ({ itineraryId, rating, comment }: { itineraryId: string, rating: number, comment: string }) => {
+      return await submitItineraryReview(itineraryId, rating, comment);
+    },
+    onSuccess: (success) => {
+      if (success) {
+        toast.success('Avaliação enviada com sucesso!');
+        queryClient.invalidateQueries({ queryKey: ['user-purchases'] });
+      } else {
+        toast.error('Erro ao enviar avaliação.');
+      }
+      setReviewingId(null);
+      setTempRating(0);
+      setTempReview('');
+      setSelectedChips([]);
+    }
+  });
+
   const submitReview = () => {
     if (reviewingId === null) return;
+    const item = purchases.find(p => p.id === reviewingId);
+    if (!item) return;
+
     const chipsText = selectedChips.length > 0 ? selectedChips.join(' • ') : '';
-    const finalReview = tempReview.trim()
-      ? tempReview
-      : chipsText;
-    setPurchases(prev =>
-      prev.map(p =>
-        p.id === reviewingId ? { ...p, rating: tempRating, review: finalReview } : p
-      )
-    );
-    setReviewingId(null);
-    setTempRating(0);
-    setTempReview('');
-    setSelectedChips([]);
+    const finalReview = tempReview.trim() ? tempReview : chipsText;
+    
+    reviewMutation.mutate({
+      itineraryId: item.itineraryId,
+      rating: tempRating,
+      comment: finalReview
+    });
   };
 
   const formatDate = (dateStr: string) => {
@@ -156,12 +105,13 @@ export function PurchasesScreen({ onBack, onNavigateToItinerary, onResumeCheckou
         ? purchases.filter(p => p.status === 'paid' && p.rating === null)
         : purchases.filter(p => p.status === 'pending_payment');
 
-  const [cancelId, setCancelId] = useState<number | null>(null);
+  const [cancelId, setCancelId] = useState<string | null>(null);
   const cancelItem = purchases.find(p => p.id === cancelId);
 
   const handleCancelPurchase = () => {
     if (cancelId === null) return;
-    setPurchases(prev => prev.filter(p => p.id !== cancelId));
+    // In a real app, we would call an API here to cancel/delete the purchase record
+    // setPurchases(prev => prev.filter(p => p.id !== cancelId));
     setCancelId(null);
     toast.success('Compra excluída');
   };
@@ -434,7 +384,7 @@ export function PurchasesScreen({ onBack, onNavigateToItinerary, onResumeCheckou
       {receiptId !== null && receiptItem && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setReceiptId(null)} />
-          <div className="relative w-full max-w-[430px] bg-background rounded-t-3xl p-5 pb-8 animate-in slide-in-from-bottom">
+          <div className="relative w-full w-full bg-background rounded-t-3xl p-5 pb-8 animate-in slide-in-from-bottom">
             <div className="w-10 h-1 rounded-full bg-muted-foreground/30 mx-auto mb-5" />
             <h3 className="text-foreground text-center mb-5" style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-weight-bold)' }}>
               Comprovante de Compra
@@ -514,7 +464,7 @@ export function PurchasesScreen({ onBack, onNavigateToItinerary, onResumeCheckou
       {reviewingId !== null && reviewingItem && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setReviewingId(null)} />
-          <div className="relative w-full max-w-[430px] bg-background rounded-t-3xl p-5 pb-8 animate-in slide-in-from-bottom">
+          <div className="relative w-full w-full bg-background rounded-t-3xl p-5 pb-8 animate-in slide-in-from-bottom">
             <div className="w-10 h-1 rounded-full bg-muted-foreground/30 mx-auto mb-4" />
 
             {/* Itinerary header */}
@@ -597,7 +547,7 @@ export function PurchasesScreen({ onBack, onNavigateToItinerary, onResumeCheckou
       {cancelId !== null && cancelItem && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setCancelId(null)} />
-          <div className="relative w-full max-w-[430px] bg-background rounded-t-3xl p-5 pb-8 animate-in slide-in-from-bottom">
+          <div className="relative w-full w-full bg-background rounded-t-3xl p-5 pb-8 animate-in slide-in-from-bottom">
             <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-4" />
             <div className="flex flex-col items-center text-center mb-5">
               <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3" style={{ background: 'rgba(239, 68, 68, 0.1)' }}>

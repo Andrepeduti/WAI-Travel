@@ -10,6 +10,7 @@ import { resolveNextRange } from '@/lib/dateRangeSelection';
 import { BackButton } from '@/components/ui/BackButton';
 import { supabase } from '@/integrations/supabase/client';
 import { searchGooglePlacesAutocomplete } from '@/lib/googlePlacesApi';
+import { Switch } from '@/components/ui/switch';
 
 export interface ItineraryFormData {
   destinations: string[];
@@ -29,7 +30,6 @@ export interface ItineraryFormData {
   /** Up to 5 thematic tags */
   tags?: string[];
   /** Primary highlighted tag */
-  mainTag?: string;
 }
 
 interface InvitedFriend {
@@ -94,6 +94,8 @@ export function CreateItinerarySheet({ isOpen, onClose, onSubmit, initialDestina
   const [tripName, setTripName] = useState('');
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
+  const [isFixedDate, setIsFixedDate] = useState(true);
+  const [durationDays, setDurationDays] = useState<number | ''>(5);
   const [friendInput, setFriendInput] = useState('');
   const [invitedFriends, setInvitedFriends] = useState<InvitedFriend[]>([]);
   const [friendSuggestions, setFriendSuggestions] = useState<FriendSuggestion[]>([]);
@@ -355,12 +357,23 @@ export function CreateItinerarySheet({ isOpen, onClose, onSubmit, initialDestina
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
+      let finalStart = startDate;
+      let finalEnd = endDate;
+      const tags: string[] = [];
+      
+      if (!isFixedDate) {
+        finalStart = new Date();
+        finalEnd = addDays(new Date(), Math.max(1, Number(durationDays) || 1) - 1);
+        tags.push('_FLEXIBLE_DATES_');
+      }
+
       await onSubmit({
         destinations,
-        startDate,
-        endDate,
+        startDate: finalStart,
+        endDate: finalEnd,
         invitedFriends,
         tripName: tripName.trim() || undefined,
+        tags,
       });
       setIsSubmitting(false);
     } catch {
@@ -381,8 +394,7 @@ export function CreateItinerarySheet({ isOpen, onClose, onSubmit, initialDestina
   const isFormValid =
     tripName.trim().length > 0 &&
     destinations.length > 0 &&
-    !!startDate &&
-    !!endDate;
+    (isFixedDate ? !!startDate && !!endDate : (typeof durationDays === 'number' && durationDays > 0));
 
   if (!isOpen) return null;
 
@@ -399,7 +411,7 @@ export function CreateItinerarySheet({ isOpen, onClose, onSubmit, initialDestina
         className="fixed bottom-0 left-0 right-0 z-50 flex justify-center"
         style={{ fontFamily: 'var(--font-family-primary)' }}
       >
-        <div className="bg-background rounded-t-3xl w-full max-w-[430px] max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
+        <div className="bg-background rounded-t-3xl w-full w-full max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
           {/* Handle */}
           <div className="flex justify-center py-3 sticky top-0 bg-background z-10">
             <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
@@ -522,36 +534,58 @@ export function CreateItinerarySheet({ isOpen, onClose, onSubmit, initialDestina
 
             {/* Date */}
             <div>
-              <label className="text-sm font-semibold text-foreground mb-2 block">Data da viagem</label>
-              <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                <PopoverTrigger asChild>
-                  <button className="w-full flex items-center gap-2 px-4 py-3 border border-border rounded-2xl text-left">
-                    <Icon name="calendar_today" size={20} className="text-muted-foreground flex-shrink-0" />
-                    <span className={cn(
-                      "text-sm",
-                      !startDate && "text-muted-foreground"
-                    )}>
-                      {formatDateRange() || "Ex: 14 de jun. - 21 de jun."}
-                    </span>
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="range"
-                    selected={{ from: startDate, to: endDate }}
-                    onSelect={handleDateSelect}
-                    disabled={(date) => date < new Date()}
-                    initialFocus
-                    scrollable
-                    className={cn("pointer-events-auto")}
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-semibold text-foreground">Data da viagem</label>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Datas fixas?</span>
+                  <Switch checked={isFixedDate} onCheckedChange={setIsFixedDate} />
+                </div>
+              </div>
+              
+              {isFixedDate ? (
+                <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <button className="w-full flex items-center gap-2 px-4 py-3 border border-border rounded-2xl text-left">
+                      <Icon name="calendar_today" size={20} className="text-muted-foreground flex-shrink-0" />
+                      <span className={cn(
+                        "text-sm",
+                        !startDate && "text-muted-foreground"
+                      )}>
+                        {formatDateRange() || "Ex: 14 de jun. - 21 de jun."}
+                      </span>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="range"
+                      selected={{ from: startDate, to: endDate }}
+                      onSelect={handleDateSelect}
+                      disabled={(date) => date < new Date()}
+                      initialFocus
+                      scrollable
+                      className={cn("pointer-events-auto")}
+                    />
+                    {startDate && !endDate && (
+                      <p className="px-3 pb-3 text-xs text-muted-foreground">
+                        Selecione a data de término
+                      </p>
+                    )}
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                <div className="flex items-center gap-2 px-4 py-3 border border-border rounded-2xl">
+                  <Icon name="schedule" size={20} className="text-muted-foreground flex-shrink-0" />
+                  <input
+                    type="number"
+                    min="1"
+                    max="365"
+                    value={durationDays}
+                    onChange={(e) => setDurationDays(e.target.value === '' ? '' : parseInt(e.target.value) || '')}
+                    className="flex-1 bg-transparent text-sm text-foreground focus:outline-none"
                   />
-                  {startDate && !endDate && (
-                    <p className="px-3 pb-3 text-xs text-muted-foreground">
-                      Selecione a data de término
-                    </p>
-                  )}
-                </PopoverContent>
-              </Popover>
+                  <span className="text-sm text-muted-foreground">dias</span>
+                </div>
+              )}
             </div>
 
             {/* Invite friends */}

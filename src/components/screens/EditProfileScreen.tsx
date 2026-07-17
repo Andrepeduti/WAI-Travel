@@ -583,7 +583,7 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
       </div>
 
       {/* Footer fixo — Salvar */}
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-background border-t border-border px-5 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)] z-30">
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full w-full bg-background border-t border-border px-5 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)] z-30">
         <button
           type="button"
           onClick={handleSave}
@@ -602,7 +602,7 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
           onClick={() => setVerifyOpen(false)}
         >
           <div
-            className="w-full max-w-[430px] bg-background rounded-t-3xl pb-8 max-h-[85vh] overflow-y-auto"
+            className="w-full w-full bg-background rounded-t-3xl pb-8 max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Handle */}

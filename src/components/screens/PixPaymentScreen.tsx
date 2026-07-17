@@ -144,7 +144,7 @@ export function PixPaymentScreen({ total, onBack, onExpired, onPaymentConfirmed 
 
       {/* Fixed footer */}
       <div
-        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-background border-t border-border z-30 px-5 pt-4 space-y-3"
+        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full w-full bg-background border-t border-border z-30 px-5 pt-4 space-y-3"
         style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
       >
         <button

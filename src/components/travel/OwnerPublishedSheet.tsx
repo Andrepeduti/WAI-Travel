@@ -70,7 +70,7 @@ export function OwnerPublishedSheet({
       <div className="fixed inset-0 z-[100] flex items-end justify-center" onClick={handleClose}>
         <div className="absolute inset-0 bg-black/40" style={{ animation: 'fadeIn 0.3s ease-out' }} />
         <div
-          className="relative w-full max-w-[430px] bg-background rounded-t-2xl"
+          className="relative w-full w-full bg-background rounded-t-2xl"
           style={{ animation: 'slideUpSheet 0.35s cubic-bezier(0.32, 0.72, 0, 1)' }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -133,7 +133,7 @@ export function OwnerPublishedSheet({
         <div className="fixed inset-0 z-[110] flex items-end justify-center" onClick={() => setShowDeleteConfirm(false)}>
           <div className="absolute inset-0 bg-black/20" style={{ animation: 'fadeIn 0.2s ease-out' }} />
           <div
-            className="relative w-full max-w-[430px] bg-background rounded-t-2xl"
+            className="relative w-full w-full bg-background rounded-t-2xl"
             style={{ animation: 'slideUpSheet 0.35s cubic-bezier(0.32, 0.72, 0, 1)' }}
             onClick={(e) => e.stopPropagation()}
           >

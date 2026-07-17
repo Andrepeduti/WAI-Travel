@@ -37,7 +37,7 @@ export function DocTypePickerSheet({ isOpen, onClose, onSelect }: DocTypePickerS
     <>
       <div className="fixed inset-0 bg-black/40 z-[100]" onClick={onClose} />
       <div className="fixed bottom-0 left-0 right-0 z-[110] flex justify-center" style={{ fontFamily: 'var(--font-family-primary)' }}>
-        <div className="bg-card rounded-t-3xl w-full max-w-[430px] pb-8 animate-in slide-in-from-bottom duration-300">
+        <div className="bg-card rounded-t-3xl w-full w-full pb-8 animate-in slide-in-from-bottom duration-300">
           {/* Handle */}
           <div className="flex justify-center py-3">
             <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />

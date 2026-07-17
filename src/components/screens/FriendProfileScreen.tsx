@@ -35,6 +35,7 @@ import { blockProfile, followProfile, getProfileSocialState, reportProfile, unbl
 import { ReportSheet } from '@/components/social/ReportSheet';
 import { supabase } from '@/integrations/supabase/client';
 import { getPublicItinerariesByUserId } from '@/lib/profilesApi';
+import { getFullPassport, removeVisitedCountry, addVisitedCountries, PASSPORT_CHANGED_EVENT } from '@/lib/passportApi';
 import { searchGooglePlacesText } from '@/lib/googlePlacesApi';
 import { ALL_COUNTRIES } from '@/data/countriesCatalog';
 import { Calendar } from '@/components/ui/calendar';
@@ -384,25 +385,31 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
   const [selectedCountry, setSelectedCountry] = useState<CountryVisit | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [checkoutItinerary, setCheckoutItinerary] = useState<PublicItinerary | null>(null);
-  // Self-only persistence: extra countries marked from the world map (besides the seed list).
-  const VISITED_EXTRA_KEY = 'wai-travel-visited-extra';
-  const [extraCountries, setExtraCountries] = useState<CountryVisit[]>(() => {
-    if (typeof window === 'undefined' || !isSelf) return [];
-    try {
-      const stored = localStorage.getItem(VISITED_EXTRA_KEY);
-      return stored ? (JSON.parse(stored) as CountryVisit[]) : [];
-    } catch {
-      return [];
-    }
-  });
+
+  const [countries, setCountries] = useState<CountryVisit[]>([]);
+
   useEffect(() => {
-    if (typeof window === 'undefined' || !isSelf) return;
-    localStorage.setItem(VISITED_EXTRA_KEY, JSON.stringify(extraCountries));
-  }, [extraCountries, isSelf]);
-  const countries = useMemo<CountryVisit[]>(
-    () => (isSelf ? [...friend.countries, ...extraCountries] : friend.countries),
-    [isSelf, friend.countries, extraCountries],
-  );
+    let active = true;
+    const fetchPassport = async () => {
+      const uid = friend.userId;
+      if (!uid) return;
+      const visits = await getFullPassport(uid);
+      if (active) setCountries(visits);
+    };
+
+    fetchPassport();
+
+    if (isSelf) {
+      const handleEvent = () => fetchPassport();
+      window.addEventListener(PASSPORT_CHANGED_EVENT, handleEvent);
+      return () => {
+        active = false;
+        window.removeEventListener(PASSPORT_CHANGED_EVENT, handleEvent);
+      };
+    }
+
+    return () => { active = false; };
+  }, [friend.userId, isSelf]);
 
   // Interests — only what the user picked at onboarding (self) until they edit it here.
   // We persist to localStorage ONLY after an explicit edit, so onboarding values from
@@ -467,12 +474,16 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
   // Roteiros públicos REAIS de outro usuário (vindos do banco). Só
   // entram em ação quando o perfil tem userId real (perfil do banco).
   const [realPublicItineraries, setRealPublicItineraries] = useState<PublicItinerary[]>([]);
+  const [isFetchingPublicItineraries, setIsFetchingPublicItineraries] = useState(!isSelf && !!friend.userId);
+
   useEffect(() => {
     if (isSelf || !friend.userId) {
       setRealPublicItineraries([]);
+      setIsFetchingPublicItineraries(false);
       return;
     }
     let cancelled = false;
+    setIsFetchingPublicItineraries(true);
     (async () => {
       const rows = await getPublicItinerariesByUserId(friend.userId!);
       if (cancelled) return;
@@ -499,6 +510,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
         };
       });
       setRealPublicItineraries(mapped);
+      setIsFetchingPublicItineraries(false);
     })();
     return () => { cancelled = true; };
   }, [isSelf, friend.userId, friend.name, friend.avatar]);
@@ -512,7 +524,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
   );
 
   // Roteiros públicos reais do próprio usuário (vindos do banco)
-  const { itineraries: myItineraries } = useMyItineraries();
+  const { itineraries: myItineraries, loading: myItinerariesLoading } = useMyItineraries();
   const myPublicItineraries = useMemo(
     () => (isSelf ? myItineraries.filter(it => it.isPublic) : []),
     [isSelf, myItineraries],
@@ -648,7 +660,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
   };
 
   // Map → mark a country as visited (adds a new stamp to the passport).
-  const handleMarkVisitedFromMap = (info: CountryInfo, year: number) => {
+  const handleMarkVisitedFromMap = async (info: CountryInfo, year: number) => {
     if (countries.some(c => c.code === info.code)) {
       toast.success(`${info.flag} ${info.name} já está nos seus visitados`);
       return;
@@ -666,8 +678,9 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
       lng: 0,
       photos: [],
     };
-    setExtraCountries(prev => [...prev, newCountry]);
+    setCountries(prev => [...prev, newCountry]);
     toast.success(`${info.flag} ${info.name} adicionado ao passaporte`);
+    await addVisitedCountries([info.code]);
   };
 
   // Map → "Quero visitar": abre o mesmo bottom sheet de "Adicionar próxima viagem"
@@ -785,11 +798,12 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
 
   const handleUpdatePhotos = (_countryCode: string, _photos: string[]) => {};
 
-  const handleDeleteCountry = (countryCode: string) => {
-    // Only "extra" (user-added) countries can be removed from local storage.
-    setExtraCountries(prev => prev.filter(c => c.code !== countryCode));
+  const handleDeleteCountry = async (countryCode: string) => {
+    if (!isSelf) return;
+    setCountries(prev => prev.filter(c => c.code !== countryCode));
     setSelectedCountry(null);
     setSheetOpen(false);
+    await removeVisitedCountry(countryCode);
   };
 
   if (showAllItineraries) {
@@ -932,7 +946,9 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
     );
   }
 
-  if (isLoading) {
+  const isScreenLoading = isLoading || isFetchingPublicItineraries || (isSelf && myItinerariesLoading);
+
+  if (isScreenLoading) {
     return (
       <div className="min-h-screen bg-[#F2F2F2] pb-24 animate-pulse">
         {/* Header */}

@@ -124,7 +124,7 @@ export function GoalsSettingsScreen({ onBack }: GoalsSettingsScreenProps) {
       </div>
 
       <div
-        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] px-5 pt-3 bg-background"
+        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full w-full px-5 pt-3 bg-background"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)' }}
       >
         <button

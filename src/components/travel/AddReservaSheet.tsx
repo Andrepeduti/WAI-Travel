@@ -274,7 +274,7 @@ export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva, initia
         className="fixed bottom-0 left-0 right-0 z-50 flex justify-center"
         style={{ fontFamily: 'var(--font-family-primary)' }}
       >
-        <div className="bg-background rounded-t-3xl w-full max-w-[430px] pb-8 animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto">
+        <div className="bg-background rounded-t-3xl w-full w-full pb-8 animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto">
           <div className="flex justify-center py-3">
             <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
           </div>

@@ -52,7 +52,7 @@ export function SuccessToast({
 
   return (
     <div className="fixed top-0 left-0 right-0 z-[200] flex justify-center pointer-events-none px-3 pt-3 safe-top sm:px-4 sm:pt-4">
-      <div className="w-full max-w-[430px] flex justify-center">
+      <div className="w-full w-full flex justify-center">
       <div
         className={`pointer-events-auto w-full max-w-[380px] rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.08)] border border-[#9DCC36]/30 ${
           isExiting ? 'animate-toast-exit' : 'animate-toast-enter'

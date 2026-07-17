@@ -9,8 +9,7 @@ import { PurchaseRulesScreen } from '@/components/travel/PurchaseRulesScreen';
 import { PurchaseSuccessScreen } from '@/components/screens/PurchaseSuccessScreen';
 import { AllReviewsScreen } from '@/components/screens/AllReviewsScreen';
 import { HorizontalCarousel } from '@/components/travel/HorizontalCarousel';
-import { getItineraryById } from '@/data/itineraries';
-import { differenceInDays, addDays, format } from 'date-fns';
+import { differenceInDays, addDays, format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
@@ -21,6 +20,10 @@ import { recordPurchase } from '@/lib/purchasesApi';
 import { getInterestIcon } from '@/lib/interestIcons';
 import { ReportSheet } from '@/components/social/ReportSheet';
 import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
+import { getMarketplaceItinerary, getItineraryReviews } from '@/lib/marketplaceApi';
+import { loadPlannerData } from '@/lib/plannerApi';
+import { Loader2 } from 'lucide-react';
 
 // ─── Season helpers ──────────────────────────────────────────────────────────
 const SOUTHERN_HEMISPHERE_KEYWORDS = [
@@ -71,7 +74,7 @@ interface Place {
 }
 
 interface Review {
-  id: number;
+  id: string;
   userName: string;
   userImage: string;
   rating: number;
@@ -79,98 +82,17 @@ interface Review {
   comment: string;
 }
 
-// ─── Mock data (marketplace) ─────────────────────────────────────────────────
-
-// Fallback data used when dataset is not found
-const fallbackItineraryData = {
-  id: 1,
-  title: 'Roteiro',
-  subtitle: '',
-  image: 'https://images.unsplash.com/photo-1519677100203-a0e668c92439?w=800',
-  rating: 4.5,
-  reviewCount: 0,
-  price: 0,
-  author: 'Autor',
-  authorImage: '',
-  authorUsername: 'Autor',
-  authorVerified: false,
-  duration: '',
-  cities: 0,
-  places: 0,
-  description: '',
-  tags: [] as string[],
-  mainTag: '',
-};
-
-const mockDays: DayItinerary[] = [
-  {
-    day: 1,
-    title: 'Chegada em Praga',
-    description: 'Chegue pela manhã e explore o centro histórico. Visite a Praça da Cidade Velha e o famoso Relógio Astronômico.',
-    places: ['Aeroporto de Praga', 'Praça da Cidade Velha', 'Relógio Astronômico', 'Ponte Carlos'],
-    estimatedTime: '6 horas',
-  },
-  {
-    day: 2,
-    title: 'Castelo de Praga',
-    description: 'Dia dedicado ao maior castelo antigo do mundo. Inclui a Catedral de São Vito e o Beco Dourado.',
-    places: ['Castelo de Praga', 'Catedral de São Vito', 'Beco Dourado', 'Jardins Reais'],
-    estimatedTime: '8 horas',
-  },
-  {
-    day: 3,
-    title: 'Viagem para Viena',
-    description: 'Partida de trem para Viena. Tarde livre para explorar o centro da cidade.',
-    places: ['Estação de Trem', 'Centro de Viena', 'Stephansplatz', 'Graben'],
-    estimatedTime: '7 horas',
-  },
-];
-
-const mockPlaces: Place[] = [
-  { id: 1, name: 'Castelo de Praga', image: 'https://images.unsplash.com/photo-1541849546-216549ae216d?w=800', category: 'História', rating: 4.8 },
-  { id: 2, name: 'Ponte Carlos', image: 'https://images.unsplash.com/photo-1574322092489-e5cb9e92aae0?w=800', category: 'Passeio', rating: 4.9 },
-  { id: 3, name: 'Relógio Astronômico', image: 'https://images.unsplash.com/photo-1458150945447-7fb764c11a92?w=800', category: 'Monumento', rating: 4.7 },
-  { id: 4, name: 'Praça da Cidade Velha', image: 'https://images.unsplash.com/photo-1592906209472-a36b1f3782ef?w=800', category: 'Praça', rating: 4.8 },
-];
-
-const mockReviews: Review[] = [
-  {
-    id: 1,
-    userName: 'Carolina Silva',
-    userImage: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
-    rating: 5,
-    date: '15 Jan 2026',
-    comment: 'Roteiro perfeito! Seguimos exatamente como indicado e foi incrível.',
-  },
-  {
-    id: 2,
-    userName: 'Pedro Oliveira',
-    userImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-    rating: 5,
-    date: '10 Jan 2026',
-    comment: 'Excelente custo-benefício! Economizamos muito tempo de pesquisa.',
-  },
-  {
-    id: 3,
-    userName: 'Marina Costa',
-    userImage: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150',
-    rating: 4,
-    date: '5 Jan 2026',
-    comment: 'Muito bom! Só achei o dia 3 um pouco corrido.',
-  },
-];
-
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 export interface MarketplaceItineraryScreenProps {
-  itineraryId: number;
+  itineraryId: number | string;
   onBack: () => void;
-  onViewPurchasedItinerary?: (itineraryId: number, newStartDate?: Date, newEndDate?: Date) => void;
+  onViewPurchasedItinerary?: (itineraryId: number | string, newStartDate?: Date, newEndDate?: Date) => void;
   onViewCreator?: (author: string, authorImage: string) => void;
   authorOverride?: string;
   authorImageOverride?: string;
   /** Optional dataset injected from outside (e.g. a user-published itinerary not in the static catalog). */
-  datasetOverride?: import('@/data/itineraries').ItineraryDataset | null;
+  datasetOverride?: any | null;
   /** True when the current user owns this published itinerary — swaps "favorite" for the ⋮ menu. */
   isOwner?: boolean;
   /** Owner-only callbacks shown in the ⋮ menu */
@@ -184,7 +106,7 @@ export interface MarketplaceItineraryScreenProps {
     author: string,
     authorImage: string,
     itineraryContext?: {
-      itineraryId?: number;
+      itineraryId?: number | string;
       title: string;
       thumbnail: string;
       destination?: string;
@@ -205,69 +127,117 @@ export interface MarketplaceItineraryScreenProps {
  * locais incluídos, reviews e botão de compra.
  */
 export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchasedItinerary, onViewCreator, authorOverride, authorImageOverride, datasetOverride, isOwner = false, onManageItinerary, onViewSalesDashboard, onUnpublish, onDownloadPdf, onDeleteItinerary, onOpenChat, autoOpenCheckout }: MarketplaceItineraryScreenProps) {
-  const dataset = useMemo(() => datasetOverride ?? getItineraryById(itineraryId), [itineraryId, datasetOverride]);
+  
+  const idStr = String(itineraryId);
+
+  const { data: marketplaceData, isLoading: isLoadingItinerary } = useQuery({
+    queryKey: ['marketplace-itinerary', idStr],
+    queryFn: () => getMarketplaceItinerary(idStr),
+    enabled: !!idStr,
+  });
+
+  const { data: reviewsData, isLoading: isLoadingReviews } = useQuery({
+    queryKey: ['itinerary-reviews', idStr],
+    queryFn: () => getItineraryReviews(idStr),
+    enabled: !!idStr,
+  });
+
+  const { data: plannerData, isLoading: isLoadingPlanner } = useQuery({
+    queryKey: ['planner-data', idStr],
+    queryFn: () => loadPlannerData(idStr),
+    enabled: !!idStr,
+  });
 
   const itineraryData = useMemo(() => {
-    if (!dataset) return fallbackItineraryData;
-    const totalDays = differenceInDays(dataset.endDate, dataset.startDate) + 1;
-    const uniqueCities = new Set(dataset.destinations.map(d => d.split(',')[0].trim()));
+    if (!marketplaceData) return null;
+    
+    // We only have startDate and endDate strings in marketplaceData
+    let totalDays = 3;
+    if (marketplaceData.startDate && marketplaceData.endDate) {
+      try {
+        totalDays = Math.max(1, differenceInDays(parseISO(marketplaceData.endDate), parseISO(marketplaceData.startDate)) + 1);
+      } catch (e) {}
+    }
+    
+    const uniqueCities = new Set(marketplaceData.destinations.map(d => d.split(',')[0].trim()));
+    const rCount = reviewsData?.length || 0;
+    const avgRating = rCount > 0 ? (reviewsData!.reduce((acc, curr) => acc + curr.rating, 0) / rCount).toFixed(1) : '0';
+
     return {
-      id: dataset.id,
-      title: dataset.title,
+      id: marketplaceData.id,
+      title: marketplaceData.title || 'Roteiro',
       subtitle: `${totalDays} dias • ${uniqueCities.size} cidades`,
-      image: dataset.coverImage,
-      rating: dataset.rating ?? 4.5,
-      reviewCount: dataset.reviewCount ?? 0,
-      price: dataset.price ?? 0,
-      author: authorOverride || dataset.author || 'Autor',
-      authorImage: authorImageOverride || dataset.authorImage || '',
-      authorUsername: dataset.authorUsername || (authorOverride || dataset.author || 'Autor'),
-      authorVerified: dataset.authorVerified ?? false,
+      image: marketplaceData.images?.[0] || 'https://images.unsplash.com/photo-1519677100203-a0e668c92439?w=800',
+      rating: Number(avgRating),
+      reviewCount: rCount,
+      price: (marketplaceData.priceCents ?? 0) / 100,
+      author: authorOverride || marketplaceData.authorName || 'Autor',
+      authorImage: authorImageOverride || marketplaceData.authorAvatar || '',
+      authorUsername: marketplaceData.authorUsername || (authorOverride || marketplaceData.authorName || 'Autor'),
+      authorVerified: true, // Assuming published means verified enough for this UI
       duration: `${totalDays} dias`,
-      cities: uniqueCities.size,
-      places: dataset.places.length,
-      description: dataset.description ?? '',
-      tags: dataset.tags ?? [],
-      mainTag: dataset.mainTag ?? '',
+      cities: uniqueCities.size || 1,
+      places: marketplaceData.places || 0,
+      description: marketplaceData.description ?? '',
+      tags: marketplaceData.tags ?? [],
+      destinations: marketplaceData.destinations ?? [],
+      startDate: marketplaceData.startDate ? parseISO(marketplaceData.startDate) : new Date(),
+      endDate: marketplaceData.endDate ? parseISO(marketplaceData.endDate) : addDays(new Date(), totalDays - 1),
+      salesCount: (marketplaceData as any).salesCount || 0,
     };
-  }, [dataset, authorOverride]);
+  }, [marketplaceData, reviewsData, authorOverride, authorImageOverride]);
 
-  const derivedDays = useMemo(() => {
-    if (!dataset) return mockDays;
-    return dataset.days.map(d => ({
-      day: d.day,
-      title: d.title,
-      description: `Dia ${d.day} do roteiro com ${d.activities.length} atividades planejadas.`,
-      places: d.activities.map(a => a.name),
-      estimatedTime: `${d.activities.length * 2} horas`,
-    }));
-  }, [dataset]);
+  const derivedDays = useMemo<DayItinerary[]>(() => {
+    if (!plannerData || !plannerData.activities) return [];
+    
+    const days: DayItinerary[] = [];
+    Object.keys(plannerData.activities).forEach(dayKey => {
+      const day = Number(dayKey);
+      const acts = plannerData.activities[day] || [];
+      if (acts.length > 0) {
+        days.push({
+          day,
+          title: `Dia ${day}`,
+          description: `Dia ${day} do roteiro com ${acts.length} atividades planejadas.`,
+          places: acts.map(a => a.name),
+          estimatedTime: `${acts.length * 2} horas`,
+        });
+      }
+    });
+    return days.sort((a, b) => a.day - b.day);
+  }, [plannerData]);
 
-  const derivedPlaces = useMemo(() => {
-    if (!dataset) return mockPlaces;
-    return dataset.places.map(p => ({
-      id: p.id,
-      name: p.name,
-      image: p.image,
-      category: p.category,
-      rating: p.rating,
-    }));
-  }, [dataset]);
+  const derivedPlaces = useMemo<Place[]>(() => {
+    if (!plannerData || !plannerData.activities) return [];
+    const allPlaces: Place[] = [];
+    Object.values(plannerData.activities).forEach(acts => {
+      acts.forEach(a => {
+        allPlaces.push({
+          id: a.id,
+          name: a.name,
+          image: a.image || 'https://images.unsplash.com/photo-1541849546-216549ae216d?w=800',
+          category: a.category || 'Atividade',
+          rating: a.rating || 4.5,
+        });
+      });
+    });
+    return allPlaces.slice(0, 10); // Show max 10 places in summary
+  }, [plannerData]);
 
   const seasonLabel = useMemo(() => {
-    if (!dataset) return '';
-    return getSeasonForDate(dataset.startDate, dataset.destinations ?? []);
-  }, [dataset]);
+    if (!itineraryData) return '';
+    return getSeasonForDate(itineraryData.startDate, itineraryData.destinations);
+  }, [itineraryData]);
 
   const suggestedDateLabel = useMemo(() => {
-    if (!dataset) return '';
-    return `${format(dataset.startDate, "dd MMM", { locale: ptBR })} — ${format(dataset.endDate, "dd MMM yyyy", { locale: ptBR })}`;
-  }, [dataset]);
+    if (!itineraryData) return '';
+    return `${format(itineraryData.startDate, "dd MMM", { locale: ptBR })} — ${format(itineraryData.endDate, "dd MMM yyyy", { locale: ptBR })}`;
+  }, [itineraryData]);
 
 
 
   const { toggleFavorite, isFavorite } = useFavorites();
-  const isFavorited = isFavorite(itineraryData.id);
+  const isFavorited = itineraryData ? isFavorite(itineraryData.id) : false;
   const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set([1]));
   const [savedPlaces, setSavedPlaces] = useState<Set<number>>(new Set());
   const [showOwnerSheet, setShowOwnerSheet] = useState(false);
@@ -294,17 +264,18 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
   const handleToggleFollow = useCallback(() => {
     setIsFollowing(prev => {
       const next = !prev;
-      toast.success(next ? `Seguindo ${itineraryData.author}` : `Você deixou de seguir ${itineraryData.author}`);
+      toast.success(next ? `Seguindo ${itineraryData?.author}` : `Você deixou de seguir ${itineraryData?.author}`);
       return next;
     });
-  }, [itineraryData.author]);
+  }, [itineraryData?.author]);
 
   const handleOpenChat = useCallback(async () => {
+    if (!itineraryData) return;
     if (!onOpenChat) {
       toast(`Abrindo conversa com ${itineraryData.author}…`);
       return;
     }
-    const destination = dataset?.destinations?.[0];
+    const destination = itineraryData?.destinations?.[0];
     // Resolve o userId real do autor pelo username (quando existir).
     let authorUserId: string | undefined;
     const usernameRaw = (itineraryData.authorUsername || '').replace(/^@/, '').trim();
@@ -327,13 +298,14 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
       destination,
       price: itineraryData.price,
     }, authorUserId);
-  }, [onOpenChat, itineraryData.author, itineraryData.authorImage, itineraryData.authorUsername, itineraryData.title, itineraryData.image, itineraryData.id, itineraryData.price, dataset]);
+  }, [onOpenChat, itineraryData?.author, itineraryData?.authorImage, itineraryData?.authorUsername, itineraryData?.title, itineraryData?.image, itineraryData?.id, itineraryData?.price]);
 
 
 
   const { addToCart, removeFromCart } = useCart();
 
   const addCurrentToCart = useCallback(() => {
+    if (!itineraryData) return;
     if (itineraryData.price > 0) {
       addToCart({
         itineraryId,
@@ -351,9 +323,9 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
   }, [addToCart, itineraryId, itineraryData]);
 
   const totalDaysCount = useMemo(() => {
-    if (!dataset) return 3;
-    return differenceInDays(dataset.endDate, dataset.startDate);
-  }, [dataset]);
+    if (!itineraryData?.startDate || !itineraryData?.endDate) return 3;
+    return differenceInDays(itineraryData.endDate, itineraryData.startDate);
+  }, [itineraryData]);
 
   const computedEndDate = useMemo(() => {
     if (!newStartDate) return undefined;
@@ -401,6 +373,27 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
   };
 
 
+  if (isLoadingItinerary) {
+    return (
+      <div className="flex h-[100dvh] items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!itineraryData) {
+    return (
+      <div className="flex flex-col h-[100dvh] items-center justify-center bg-background p-6 text-center">
+        <h2 className="text-2xl font-bold mb-2">Ops!</h2>
+        <p className="text-muted-foreground mb-2">Roteiro não encontrado.</p>
+        <p className="text-muted-foreground mb-8 text-sm">Este roteiro pode ter sido removido ou o link é inválido.</p>
+        <button onClick={onBack} className="bg-primary text-primary-foreground px-6 py-3 rounded-full font-medium w-full max-w-[200px]">
+          Voltar
+        </button>
+      </div>
+    );
+  }
+
   if (showPurchaseRules) {
     return (
       <PurchaseRulesScreen
@@ -426,16 +419,15 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
           const result = await recordPurchase({
             datasetId: itineraryId,
             priceBRL: itineraryData.price,
-            snapshot: dataset
+            snapshot: itineraryData
               ? {
-                  title: dataset.title,
-                  destinations: dataset.destinations,
-                  images: dataset.coverImage ? [dataset.coverImage] : [],
-                  places: dataset.places.length,
-                  description: dataset.description ?? '',
-                  tags: dataset.tags ?? [],
-                  mainTag: dataset.mainTag ?? '',
-                  days: dataset.days.length,
+                  title: itineraryData.title,
+                  destinations: itineraryData.destinations,
+                  images: itineraryData.image ? [itineraryData.image] : [],
+                  places: itineraryData.places,
+                  description: itineraryData.description ?? '',
+                  tags: itineraryData.tags ?? [],
+                  days: totalDaysCount,
                 }
               : undefined,
           });
@@ -453,14 +445,15 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
   }
 
   if (showAllReviews) {
-    const avg = mockReviews.length > 0
-      ? mockReviews.reduce((s, r) => s + r.rating, 0) / mockReviews.length
+    const rData = reviewsData ?? [];
+    const avg = rData.length > 0
+      ? rData.reduce((s, r) => s + r.rating, 0) / rData.length
       : 0;
     return (
       <AllReviewsScreen
         creatorName={itineraryData.author}
         averageRating={avg}
-        reviews={mockReviews.map((r) => ({
+        reviews={rData.map((r) => ({
           user: r.userName,
           text: r.comment,
           avatar: r.userImage,
@@ -502,38 +495,28 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
         <div className="absolute top-0 left-0 right-0 px-4 flex items-center justify-between z-10" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />
           <div className="flex gap-2">
-            {isOwner ? (
-              <button
-                onClick={() => setShowOwnerSheet(true)}
-                className="btn-icon bg-white shadow-md"
-                aria-label="Mais opções"
-              >
-                <Icon name="more_horiz" size={20} />
-              </button>
-            ) : (
-              <button 
-                onClick={() => toggleFavorite({
-                  id: itineraryData.id,
-                  title: itineraryData.title,
-                  image: itineraryData.image,
-                  creator: itineraryData.author,
-                  creatorImage: itineraryData.authorImage,
-                  days: derivedDays.length,
-                  places: itineraryData.places,
-                  price: itineraryData.price,
-                  rating: itineraryData.rating,
-                  reviews: itineraryData.reviewCount,
-                })}
-                className="btn-icon bg-white shadow-md"
-              >
-                <Icon 
-                  name="favorite" 
-                  size={20} 
-                  filled={isFavorited}
-                  className={isFavorited ? 'text-florida-normal' : ''}
-                />
-              </button>
-            )}
+            <button 
+              onClick={() => toggleFavorite({
+                id: itineraryData.id,
+                title: itineraryData.title,
+                image: itineraryData.image,
+                creator: itineraryData.author,
+                creatorImage: itineraryData.authorImage,
+                days: derivedDays.length,
+                places: itineraryData.places,
+                price: itineraryData.price,
+                rating: itineraryData.rating,
+                reviews: itineraryData.reviewCount,
+              })}
+              className="btn-icon bg-white shadow-md"
+            >
+              <Icon 
+                name="favorite" 
+                size={20} 
+                filled={isFavorited}
+                className={isFavorited ? 'text-florida-normal' : ''}
+              />
+            </button>
             <button
               onClick={() => setShowDetailsSheet(true)}
               className="btn-icon bg-white shadow-md"
@@ -562,7 +545,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
         <div className="flex items-center gap-2.5 mb-5 flex-nowrap whitespace-nowrap overflow-hidden">
           <div className="flex items-center gap-1 flex-shrink-0">
             <Icon name="star" size={14} filled className="text-[#F2B90C]" />
-            <span className="text-[13px] font-semibold">{itineraryData.rating}</span>
+            <span className="text-[13px] font-semibold">{itineraryData.rating > 0 ? itineraryData.rating : '-'}</span>
           </div>
 
           <div className="w-px h-3.5 bg-border flex-shrink-0" />
@@ -570,21 +553,6 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
           <div className="flex items-center gap-1 flex-shrink-0">
             <Icon name="chat_bubble" size={14} className="text-muted-foreground" />
             <span className="text-[13px] font-medium">{itineraryData.reviewCount} reviews</span>
-          </div>
-
-          <div className="w-px h-3.5 bg-border flex-shrink-0" />
-
-          <div className="flex items-center gap-1.5 flex-shrink-0 min-w-0">
-            <div className="avatar-stack flex-shrink-0">
-              {mockReviews.slice(0, 3).map((review) => (
-                <img 
-                  key={review.id}
-                  src={review.userImage}
-                  alt={review.userName}
-                />
-              ))}
-            </div>
-            <span className="text-[13px] text-muted-foreground truncate">+ 1k salvaram</span>
           </div>
         </div>
 
@@ -602,13 +570,6 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
             <div className="text-left">
               <div className="flex items-center gap-1">
                 <p className="text-[15px] font-semibold">{itineraryData.author}</p>
-                {itineraryData.authorVerified && (
-                  <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-[#3B82F6]">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  </span>
-                )}
               </div>
               <p className="text-xs text-muted-foreground">{itineraryData.authorUsername}</p>
             </div>
@@ -643,19 +604,10 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
         <div className="flex gap-3 mb-6 overflow-x-auto scrollbar-hide -mx-5 px-5">
           <div className="p-3.5 flex items-center gap-3 flex-shrink-0 min-w-[240px] rounded-2xl bg-white">
             <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-white">
-              <Icon name="language" size={16} className="text-[#1A1C40]" />
-            </div>
-            <p className="text-[13px] font-semibold text-[#1A1C40]">
-              Experiente em roteiros europeus
-            </p>
-          </div>
-
-          <div className="p-3.5 flex items-center gap-3 flex-shrink-0 min-w-[240px] rounded-2xl bg-white">
-            <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-white">
               <Icon name="group" size={16} className="text-[#1A1C40]" />
             </div>
             <p className="text-[13px] font-semibold text-[#1A1C40]">
-              +500 viajantes usaram
+              {itineraryData.salesCount > 0 ? `+${itineraryData.salesCount} viajantes compraram` : 'Nenhum viajante comprou ainda'}
             </p>
           </div>
         </div>
@@ -671,42 +623,30 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
               : `Roteiro completo com ${derivedDays.length} dias, ${derivedPlaces.length} locais imperdíveis e dicas práticas para aproveitar ao máximo sua viagem por ${itineraryData.title.toLowerCase()}.`}
           </p>
 
-          {suggestedDateLabel && (
+          {itineraryData && (
             <div className="flex items-center gap-2 mb-4 text-[13px] text-[#1A1C40]">
               <Icon name="calendar_month" size={16} className="text-[#1A1C40]" />
               <span>
-                <span className="font-semibold">Data sugerida:</span> {suggestedDateLabel}
+                {itineraryData.tags?.includes('_FLEXIBLE_DATES_') ? (
+                  <span className="font-semibold">Datas flexíveis</span>
+                ) : (
+                  <>
+                    <span className="font-semibold">Data sugerida:</span> {suggestedDateLabel}
+                  </>
+                )}
                 <span className="text-muted-foreground"> · {itineraryData.duration}</span>
               </span>
             </div>
           )}
 
-          {(itineraryData.tags.length > 0 || itineraryData.mainTag || seasonLabel) && (
+          {(itineraryData.tags.length > 0 || seasonLabel) && (
             <div className="flex flex-wrap gap-2">
               {(() => {
-                const baseList = itineraryData.tags.length > 0
-                  ? itineraryData.tags
-                  : (itineraryData.mainTag ? [itineraryData.mainTag] : []);
-                const ordered = itineraryData.mainTag
-                  ? [itineraryData.mainTag, ...baseList.filter((t) => t !== itineraryData.mainTag)]
-                  : baseList;
+                const ordered = itineraryData.tags.filter(t => t !== '_FLEXIBLE_DATES_');
                 const withSeason = seasonLabel && !ordered.includes(seasonLabel)
                   ? [...ordered, seasonLabel]
                   : ordered;
                 return withSeason.map((tag) => {
-                  const isMain = tag === itineraryData.mainTag;
-                  if (isMain) {
-                    return (
-                      <span
-                        key={tag}
-                        className="inline-flex items-center h-7 rounded-full px-3"
-                        style={{ background: '#1A1C40', fontSize: 12, fontWeight: 600, color: '#FFFFFF' }}
-                      >
-                        {tag}
-                      </span>
-                    );
-                  }
-                  
                   return (
                     <span
                       key={tag}
@@ -853,26 +793,12 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
             <Icon name="chevron_right" size={18} style={{ color: '#1A1C40' }} />
           </button>
 
-          {/* AI Summary */}
-          <div className="px-5">
-            <div className="card-base p-4 mb-4" style={{ background: 'linear-gradient(135deg, #f3e8ff 0%, #e0f2fe 100%)' }}>
-              <div className="flex items-start gap-2 mb-3">
-                <div className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center flex-shrink-0">
-                  <span className="text-white text-xs">✨</span>
-                </div>
-                <p className="text-[12px] font-bold text-purple-700">Resumo por IA</p>
-              </div>
-              <p className="text-[13px] text-gray-700 leading-relaxed">
-                Este roteiro tem <strong>excelente avaliação</strong>. Destaques:
-                <strong> organização impecável</strong> e <strong>dicas práticas</strong>.
-              </p>
-            </div>
-          </div>
+
 
           {/* Individual reviews carousel */}
           <div className="pl-5">
             <HorizontalCarousel showDots={false} itemClassName="w-[260px]">
-              {mockReviews.map((review) => (
+              {(reviewsData || []).map((review) => (
                 <div key={review.id} className="card-base p-3.5 w-full h-full">
                   <div className="flex items-start gap-3">
                     <img
@@ -914,19 +840,24 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
 
       {/* Fixed footer */}
       <div 
-        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-card border-t border-border z-30"
+        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full w-full bg-card border-t border-border z-30"
         style={{ 
           boxShadow: 'var(--shadow-bottom-nav)',
           paddingBottom: 'max(12px, env(safe-area-inset-bottom))'
         }}
       >
-        <div className="max-w-[430px] mx-auto px-5 pt-4 flex items-center justify-between gap-4">
+        <div className="w-full mx-auto px-5 pt-4 flex items-center justify-between gap-4">
           <div>
             <span className="text-xs text-muted-foreground">Preço total</span>
             <p className="text-[20px] font-bold" style={{ color: '#1A1C40' }}>R$ {itineraryData.price.toFixed(2).replace('.', ',')}</p>
           </div>
-          <button onClick={() => setShowPurchaseRules(true)} className="btn-primary px-8">
-            Comprar roteiro
+          <button 
+            onClick={() => setShowPurchaseRules(true)} 
+            className="btn-primary px-8"
+            disabled={isOwner}
+            style={isOwner ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
+          >
+            {isOwner ? 'Seu roteiro' : 'Comprar roteiro'}
           </button>
         </div>
       </div>
@@ -942,7 +873,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
       {showDateChoice && (
         <div className="fixed inset-0 z-[60] bg-black/40" onClick={() => { setShowDateChoice(false); onBack(); }}>
           <div
-            className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-card rounded-t-3xl animate-in slide-in-from-bottom duration-300"
+            className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full w-full bg-card rounded-t-3xl animate-in slide-in-from-bottom duration-300"
             style={{ maxHeight: '85vh' }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1049,7 +980,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
       {showDetailsSheet && (
         <div className="fixed inset-0 z-[60] bg-black/40" onClick={() => setShowDetailsSheet(false)}>
           <div
-            className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-card rounded-t-3xl animate-in slide-in-from-bottom duration-300"
+            className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full w-full bg-card rounded-t-3xl animate-in slide-in-from-bottom duration-300"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-center pt-3 pb-1">
@@ -1095,19 +1026,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
         </div>
       )}
 
-      {isOwner && (
-        <OwnerPublishedSheet
-          open={showOwnerSheet}
-          onClose={() => setShowOwnerSheet(false)}
-          tripName={itineraryData.title}
-          datasetId={itineraryId}
-          onManageItinerary={onManageItinerary}
-          onViewSalesDashboard={onViewSalesDashboard}
-          onUnpublish={onUnpublish}
-          onDownloadPdf={onDownloadPdf}
-          onDelete={onDeleteItinerary}
-        />
-      )}
+
 
       <ReportSheet
         open={reportSheetOpen}

@@ -57,8 +57,8 @@ const FollowListPage = ({ initialTab }: FollowListPageProps) => {
 
   if (loading && !resolved) {
     return (
-      <div className="min-h-screen bg-muted flex items-start justify-center">
-        <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl flex flex-col" style={{ minHeight: '100dvh' }}>
+      <div className="min-h-screen bg-background w-full">
+        <div className="w-full bg-background min-h-screen flex flex-col" style={{ minHeight: '100dvh' }}>
           <div className="sticky z-20 bg-background border-b border-border px-4 flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
             <BackButton onClick={() => navigate(-1)} />
             <div className="flex-1 min-w-0">
@@ -76,7 +76,7 @@ const FollowListPage = ({ initialTab }: FollowListPageProps) => {
   if (notFound || !resolved) {
     return (
       <div className="min-h-screen bg-muted flex items-center justify-center">
-        <div className="w-full max-w-[430px] bg-background min-h-screen shadow-2xl flex flex-col items-center justify-center gap-3 px-6 text-center">
+        <div className="w-full bg-background min-h-screen flex flex-col items-center justify-center gap-3 px-6 text-center">
           <span className="text-base font-semibold text-foreground">Perfil não encontrado</span>
           <button onClick={() => navigate('/home')} className="mt-2 text-sm font-medium text-primary">Voltar para o início</button>
         </div>
