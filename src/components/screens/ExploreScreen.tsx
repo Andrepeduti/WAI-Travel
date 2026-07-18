@@ -176,12 +176,12 @@ export function ExploreScreen({ onSearchClick, onSeeDestinationItineraries }: Ex
 
         publicItineraries.forEach(it => {
           if (!it.destinations || it.destinations.length === 0) return;
-          
+
           let mappedCountry = null;
           for (const d of it.destinations) {
             const countryPart = d.split(',').pop()?.trim().toLowerCase() || d.toLowerCase();
-            const match = ALL_COUNTRIES.find(c => 
-              c.name.toLowerCase() === countryPart || 
+            const match = ALL_COUNTRIES.find(c =>
+              c.name.toLowerCase() === countryPart ||
               c.aliases?.some(a => a.toLowerCase() === countryPart)
             );
             if (match) {
@@ -200,7 +200,7 @@ export function ExploreScreen({ onSearchClick, onSeeDestinationItineraries }: Ex
           } else {
             const lastDest = it.destinations[it.destinations.length - 1];
             if (lastDest) {
-               countryName = lastDest.split(',').pop()?.trim() || lastDest;
+              countryName = lastDest.split(',').pop()?.trim() || lastDest;
             }
           }
 
@@ -216,15 +216,17 @@ export function ExploreScreen({ onSearchClick, onSeeDestinationItineraries }: Ex
 
           existing.itinerariesCount += 1;
           existing.salesCount += (salesCountByItinerary[it.id] || 0);
-          
+
           if (!existing.firstImage && it.images && it.images[0]) {
             existing.firstImage = it.images[0];
           }
 
-          
+
           if (it.tags) {
             it.tags.forEach(t => {
-              existing.tags[t] = (existing.tags[t] || 0) + 1;
+              if (t !== '_FLEXIBLE_DATES_') {
+                existing.tags[t] = (existing.tags[t] || 0) + 1;
+              }
             });
           }
 
@@ -244,10 +246,10 @@ export function ExploreScreen({ onSearchClick, onSeeDestinationItineraries }: Ex
             .sort((a, b) => b[1] - a[1])
             .slice(0, 2)
             .map(t => t[0].replace('#', ''));
-          
+
           let coverImage = data.firstImage;
           if (!coverImage || coverImage.includes('placeholder')) {
-             coverImage = resolveCoverImage([name]).url;
+            coverImage = resolveCoverImage([name]).url;
           }
 
           // Enhance image resolution for fullscreen display
@@ -378,7 +380,7 @@ export function ExploreScreen({ onSearchClick, onSeeDestinationItineraries }: Ex
           >
             <Icon name="search" size={18} className="text-muted-foreground" />
             <span className="text-[14px] text-muted-foreground font-medium">
-              Buscar lugar, pessoas, roteiros...
+              Comece a buscar
             </span>
           </button>
         </div>
@@ -400,15 +402,15 @@ export function ExploreScreen({ onSearchClick, onSeeDestinationItineraries }: Ex
                 style={
                   active
                     ? {
-                        backgroundColor: '#1A1C40',
-                        color: '#FFFFFF',
-                        borderColor: 'transparent',
-                      }
+                      backgroundColor: '#1A1C40',
+                      color: '#FFFFFF',
+                      borderColor: 'transparent',
+                    }
                     : {
-                        background: 'hsl(var(--card))',
-                        color: 'hsl(var(--foreground))',
-                        borderColor: 'hsl(var(--border))',
-                      }
+                      background: 'hsl(var(--card))',
+                      color: 'hsl(var(--foreground))',
+                      borderColor: 'hsl(var(--border))',
+                    }
                 }
               >
                 <Icon name={filter.icon} size={14} className={active ? 'text-white' : ''} />
@@ -438,17 +440,17 @@ export function ExploreScreen({ onSearchClick, onSeeDestinationItineraries }: Ex
             ))
           ) : (
             filteredStories.map((dest) => (
-            <div
-              key={dest.id}
-              className="relative w-full overflow-hidden rounded-3xl"
-              style={{
-                aspectRatio: '4 / 5',
-                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.12)',
-              }}
-            >
-              <DestinationContent dest={dest} onSeeItineraries={() => openDestinationList(dest)} />
-            </div>
-          )))}
+              <div
+                key={dest.id}
+                className="relative w-full overflow-hidden rounded-3xl"
+                style={{
+                  aspectRatio: '4 / 5',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.12)',
+                }}
+              >
+                <DestinationContent dest={dest} onSeeItineraries={() => openDestinationList(dest)} />
+              </div>
+            )))}
         </div>
       </div>
     </div>

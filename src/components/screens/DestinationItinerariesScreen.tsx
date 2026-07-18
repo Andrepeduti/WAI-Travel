@@ -24,6 +24,11 @@ interface DestinationItinerariesScreenProps {
   onItineraryClick: (id: number | string, item?: DisplayItinerary) => void;
 }
 
+type SortOption = 'recent' | 'rating' | 'price_asc';
+
+const norm = (s: string) =>
+  s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
 import { resolveCoverImage } from '@/lib/coverImageResolver';
 
 export interface DisplayItinerary {
@@ -37,8 +42,10 @@ export interface DisplayItinerary {
   author: string;
   authorImage: string;
   category?: string;
+  season?: string;
   isPopular?: boolean;
   isNew?: boolean;
+  userItinerary?: import('@/lib/itinerariesApi').UserItinerary;
 }
 
 const CATEGORIES: Record<string, string> = {
@@ -69,21 +76,27 @@ export function DestinationItinerariesScreen({
   });
 
   const allItineraries = useMemo<DisplayItinerary[]>(() => {
-    const needle = country.toLowerCase();
+    const needle = norm(country);
 
     // Roteiros do marketplace (backend)
     const marketplaceItineraries = (publicItineraries ?? [])
       .filter((it) => {
         return it.destinations.some((d) => {
-          const countryPart = d.split(',').pop()?.trim().toLowerCase() || d.toLowerCase();
-          const match = ALL_COUNTRIES.find(c => 
-            c.name.toLowerCase() === countryPart || 
-            c.aliases?.some(a => a.toLowerCase() === countryPart)
+          const lowerD = norm(d);
+          // First check exact includes
+          if (lowerD.includes(needle)) return true;
+
+          // Then try to match by country alias or name to handle variations
+          const countryPart = d.split(',').pop()?.trim() || lowerD;
+          const normCountryPart = norm(countryPart);
+          const match = ALL_COUNTRIES.find(c =>
+            norm(c.name) === normCountryPart ||
+            c.aliases?.some(a => norm(a) === normCountryPart)
           );
           if (match) {
-            return match.name.toLowerCase() === needle;
+            return norm(match.name) === needle || (match.aliases && match.aliases.some(a => norm(a) === needle));
           }
-          return d.toLowerCase().includes(needle);
+          return false;
         });
       })
       .map<DisplayItinerary>((it) => {
@@ -114,7 +127,8 @@ export function DestinationItinerariesScreen({
           categoryEmoji: CATEGORIES[it.tags.filter(t => t !== '_FLEXIBLE_DATES_')[0] || ''] || '🗺️',
           season: undefined, // Poderia ser extraído de tags se suportado
           isNew,
-          isPopular
+          isPopular,
+          userItinerary: it
         };
       });
 
@@ -126,7 +140,7 @@ export function DestinationItinerariesScreen({
       // Days filter (if max is 30, it means 30+ days)
       if (it.days < filters.daysRange[0]) return false;
       if (filters.daysRange[1] < 30 && it.days > filters.daysRange[1]) return false;
-      
+
       // Price filter (if max is 2000, it means R$ 2000+)
       if (it.price < filters.priceRange[0]) return false;
       if (filters.priceRange[1] < 2000 && it.price > filters.priceRange[1]) return false;
@@ -156,7 +170,7 @@ export function DestinationItinerariesScreen({
   const toggleSave = (item: DisplayItinerary, e: React.MouseEvent) => {
     e.stopPropagation();
     toggleFavorite({
-      id: item.id,
+      id: item.id as number | string,
       title: item.title,
       image: item.image,
       creator: item.author,
@@ -264,8 +278,14 @@ export function DestinationItinerariesScreen({
               <div className="relative w-full aspect-[16/6] overflow-hidden p-2">
                 <img src={item.image} alt={item.title} className="w-full h-full object-cover rounded-xl" />
                 {(item.isPopular || item.isNew) && (
-                  <div className="absolute top-4 left-4 flex items-center gap-1 rounded-full px-2.5 py-1 shadow-sm" style={{ backgroundColor: '#9DCC36' }}>
-                    <span className="text-[11px] font-bold" style={{ color: '#1A1C40' }}>
+                  <div
+                    className="absolute top-4 left-4 flex items-center gap-1 rounded-full px-2.5 py-1 shadow-sm"
+                    style={{ backgroundColor: item.isPopular ? '#9DCC36' : '#16A34A' }}
+                  >
+                    <span
+                      className="text-[11px] font-bold"
+                      style={{ color: item.isPopular ? '#1A1C40' : '#FFFFFF' }}
+                    >
                       {item.isPopular ? 'Popular' : 'Novo roteiro'}
                     </span>
                   </div>
@@ -278,9 +298,9 @@ export function DestinationItinerariesScreen({
                   <Icon
                     name="favorite"
                     size={18}
-                    filled={isFavorite(item.id)}
-                    className={isFavorite(item.id) ? 'text-florida' : ''}
-                    style={!isFavorite(item.id) ? { color: '#1E293B' } : undefined}
+                    filled={isFavorite(item.id as number | string)}
+                    className={isFavorite(item.id as number | string) ? 'text-florida' : ''}
+                    style={!isFavorite(item.id as number | string) ? { color: '#1E293B' } : undefined}
                   />
                 </button>
               </div>

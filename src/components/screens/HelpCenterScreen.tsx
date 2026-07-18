@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 
 interface HelpCenterScreenProps {
   onBack: () => void;
+  hideTourGuide?: boolean;
 }
 
 const faqSections = [
@@ -42,7 +43,7 @@ const faqSections = [
   },
 ];
 
-export function HelpCenterScreen({ onBack }: HelpCenterScreenProps) {
+export function HelpCenterScreen({ onBack, hideTourGuide }: HelpCenterScreenProps) {
   const navigate = useNavigate();
 
   return (
@@ -57,26 +58,28 @@ export function HelpCenterScreen({ onBack }: HelpCenterScreenProps) {
       </div>
 
       <div className="px-5 pt-2">
-        <button
-          onClick={() => {
-            navigate('/home');
-            setTimeout(() => {
-              window.dispatchEvent(new CustomEvent('wai:restart-tour'));
-            }, 100);
-          }}
-          className="w-full flex items-center justify-between gap-3 p-4 rounded-2xl border border-border hover:bg-muted/50 transition-colors text-left mb-6"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
-              <Icon name="play_circle" size={22} className="text-foreground" />
+        {!hideTourGuide && (
+          <button
+            onClick={() => {
+              navigate('/home');
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('wai:restart-tour'));
+              }, 100);
+            }}
+            className="w-full flex items-center justify-between gap-3 p-4 rounded-2xl border border-border hover:bg-muted/50 transition-colors text-left mb-6"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
+                <Icon name="play_circle" size={22} className="text-foreground" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Refazer tour guiado</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Reveja as principais funções do app</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-sm font-semibold text-foreground">Refazer tour guiado</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Reveja as principais funções do app</p>
-            </div>
-          </div>
-          <Icon name="chevron_right" size={20} className="text-muted-foreground" />
-        </button>
+            <Icon name="chevron_right" size={20} className="text-muted-foreground" />
+          </button>
+        )}
 
 
         {faqSections.map(section => (

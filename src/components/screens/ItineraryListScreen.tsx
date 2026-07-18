@@ -13,6 +13,10 @@ export interface ItineraryListItem {
   authorImage: string;
   price: number;
   category?: string;
+  /** UUID do roteiro no banco (roteiros recomendados do banco, sem dataset estático) */
+  itineraryUuid?: string;
+  /** ID do dataset estático (sourceDatasetId) se disponível */
+  sourceDatasetId?: number | null;
 }
 
 interface ItineraryListScreenProps {
@@ -20,10 +24,12 @@ interface ItineraryListScreenProps {
   items: ItineraryListItem[];
   onBack: () => void;
   onItineraryClick: (id: number) => void;
+  /** Chamado quando o item tem UUID (roteiro do banco sem dataset estático) */
+  onPublicItineraryClick?: (uuid: string, item: ItineraryListItem) => void;
   onGoToExplore?: () => void;
 }
 
-export function ItineraryListScreen({ title, items, onBack, onItineraryClick, onGoToExplore }: ItineraryListScreenProps) {
+export function ItineraryListScreen({ title, items, onBack, onItineraryClick, onPublicItineraryClick, onGoToExplore }: ItineraryListScreenProps) {
   const { toggleFavorite, isFavorite } = useFavorites();
 
   const toggleSave = (item: ItineraryListItem, e: React.MouseEvent) => {
@@ -43,7 +49,7 @@ export function ItineraryListScreen({ title, items, onBack, onItineraryClick, on
 
   return (
     <div className="min-h-screen flex flex-col pb-8" style={{ backgroundColor: '#F2F2F2' }}>
- <header className="sticky top-0 z-20 px-4 pb-3" style={{ backgroundColor: '#F2F2F2' }}>
+      <header className="sticky top-0 z-20 px-4 pb-3" style={{ backgroundColor: '#F2F2F2' }}>
         <div className="flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />
           <h1
@@ -59,8 +65,16 @@ export function ItineraryListScreen({ title, items, onBack, onItineraryClick, on
         <div className="flex flex-col gap-4">
           {items.map((item) => (
             <button
-              key={item.id}
-              onClick={() => onItineraryClick(item.id)}
+              key={item.itineraryUuid ?? item.id}
+              onClick={() => {
+                if (item.itineraryUuid && item.sourceDatasetId == null && onPublicItineraryClick) {
+                  onPublicItineraryClick(item.itineraryUuid, item);
+                } else if (item.sourceDatasetId != null) {
+                  onItineraryClick(item.sourceDatasetId);
+                } else {
+                  onItineraryClick(item.id);
+                }
+              }}
               className="w-full flex flex-col text-left bg-card rounded-2xl overflow-hidden"
               style={{ boxShadow: '0 2px 16px rgba(0, 0, 0, 0.07)' }}
             >

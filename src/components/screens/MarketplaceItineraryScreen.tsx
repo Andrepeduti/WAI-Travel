@@ -127,7 +127,7 @@ export interface MarketplaceItineraryScreenProps {
  * locais incluídos, reviews e botão de compra.
  */
 export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchasedItinerary, onViewCreator, authorOverride, authorImageOverride, datasetOverride, isOwner = false, onManageItinerary, onViewSalesDashboard, onUnpublish, onDownloadPdf, onDeleteItinerary, onOpenChat, autoOpenCheckout }: MarketplaceItineraryScreenProps) {
-  
+
   const idStr = String(itineraryId);
 
   const { data: marketplaceData, isLoading: isLoadingItinerary } = useQuery({
@@ -150,15 +150,15 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
 
   const itineraryData = useMemo(() => {
     if (!marketplaceData) return null;
-    
+
     // We only have startDate and endDate strings in marketplaceData
     let totalDays = 3;
     if (marketplaceData.startDate && marketplaceData.endDate) {
       try {
         totalDays = Math.max(1, differenceInDays(parseISO(marketplaceData.endDate), parseISO(marketplaceData.startDate)) + 1);
-      } catch (e) {}
+      } catch (e) { }
     }
-    
+
     const uniqueCities = new Set(marketplaceData.destinations.map(d => d.split(',')[0].trim()));
     const rCount = reviewsData?.length || 0;
     const avgRating = rCount > 0 ? (reviewsData!.reduce((acc, curr) => acc + curr.rating, 0) / rCount).toFixed(1) : '0';
@@ -189,7 +189,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
 
   const derivedDays = useMemo<DayItinerary[]>(() => {
     if (!plannerData || !plannerData.activities) return [];
-    
+
     const days: DayItinerary[] = [];
     Object.keys(plannerData.activities).forEach(dayKey => {
       const day = Number(dayKey);
@@ -421,14 +421,14 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
             priceBRL: itineraryData.price,
             snapshot: itineraryData
               ? {
-                  title: itineraryData.title,
-                  destinations: itineraryData.destinations,
-                  images: itineraryData.image ? [itineraryData.image] : [],
-                  places: itineraryData.places,
-                  description: itineraryData.description ?? '',
-                  tags: itineraryData.tags ?? [],
-                  days: totalDaysCount,
-                }
+                title: itineraryData.title,
+                destinations: itineraryData.destinations,
+                images: itineraryData.image ? [itineraryData.image] : [],
+                places: itineraryData.places,
+                description: itineraryData.description ?? '',
+                tags: itineraryData.tags ?? [],
+                days: totalDaysCount,
+              }
               : undefined,
           });
           if (!result.ok && !result.skipped) {
@@ -485,17 +485,17 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
     <div className="min-h-screen bg-[#F2F2F2] pb-32">
       {/* Hero image */}
       <div className="relative h-[230px]">
-        <img 
-          src={itineraryData.image} 
+        <img
+          src={itineraryData.image}
           alt={itineraryData.title}
           className="w-full h-full object-cover"
         />
-        
+
         {/* Navigation buttons */}
         <div className="absolute top-0 left-0 right-0 px-4 flex items-center justify-between z-10" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />
           <div className="flex gap-2">
-            <button 
+            <button
               onClick={() => toggleFavorite({
                 id: itineraryData.id,
                 title: itineraryData.title,
@@ -510,9 +510,9 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
               })}
               className="btn-icon bg-white shadow-md"
             >
-              <Icon 
-                name="favorite" 
-                size={20} 
+              <Icon
+                name="favorite"
+                size={20}
                 filled={isFavorited}
                 className={isFavorited ? 'text-florida-normal' : ''}
               />
@@ -562,7 +562,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
             className="flex items-center gap-3"
             onClick={() => onViewCreator?.(itineraryData.author, itineraryData.authorImage)}
           >
-            <img 
+            <img
               src={itineraryData.authorImage}
               alt={itineraryData.author}
               className="w-11 h-11 rounded-full object-cover"
@@ -571,7 +571,9 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
               <div className="flex items-center gap-1">
                 <p className="text-[15px] font-semibold">{itineraryData.author}</p>
               </div>
-              <p className="text-xs text-muted-foreground">{itineraryData.authorUsername}</p>
+              <p className="text-xs text-muted-foreground">
+                {itineraryData.authorUsername ? (itineraryData.authorUsername.startsWith('@') ? itineraryData.authorUsername : `@${itineraryData.authorUsername}`) : ''}
+              </p>
             </div>
           </button>
           {!isOwner && (
@@ -672,7 +674,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
             {(showAllDays ? derivedDays : derivedDays.slice(0, 4)).map((day) => {
               const isLocked = day.day > 1;
               const isExpanded = expandedDays.has(day.day);
-              
+
               return (
                 <div key={day.day} className="card-base overflow-hidden">
                   <button
@@ -689,13 +691,13 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
                         </p>
                       )}
                     </div>
-                    <Icon 
-                      name={isExpanded ? 'chevron_up' : 'chevron_down'} 
-                      size={20} 
-                      className="text-muted-foreground flex-shrink-0 ml-2" 
+                    <Icon
+                      name={isExpanded ? 'chevron_up' : 'chevron_down'}
+                      size={20}
+                      className="text-muted-foreground flex-shrink-0 ml-2"
                     />
                   </button>
-                  
+
                   {isExpanded && (
                     <div className="relative px-4 pb-4 pt-2">
                       {isLocked && (
@@ -839,9 +841,9 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
       </div>
 
       {/* Fixed footer */}
-      <div 
+      <div
         className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full w-full bg-card border-t border-border z-30"
-        style={{ 
+        style={{
           boxShadow: 'var(--shadow-bottom-nav)',
           paddingBottom: 'max(12px, env(safe-area-inset-bottom))'
         }}
@@ -851,8 +853,8 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
             <span className="text-xs text-muted-foreground">Preço total</span>
             <p className="text-[20px] font-bold" style={{ color: '#1A1C40' }}>R$ {itineraryData.price.toFixed(2).replace('.', ',')}</p>
           </div>
-          <button 
-            onClick={() => setShowPurchaseRules(true)} 
+          <button
+            onClick={() => setShowPurchaseRules(true)}
             className="btn-primary px-8"
             disabled={isOwner}
             style={isOwner ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
@@ -1045,7 +1047,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
                 .ilike('username', usernameRaw)
                 .maybeSingle();
               if (data?.user_id) authorUserId = data.user_id as string;
-            } catch {/* segue */}
+            } catch {/* segue */ }
           }
           const reason = `Roteiro denunciado: ${reasonLabel}`;
           const composedDetails = `Roteiro: ${itineraryData.title} (id: ${itineraryData.id})\n\n${details || '(sem detalhes adicionais)'}`;

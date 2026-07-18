@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, DollarSign, TrendingUp, Star, ShieldCheck, Sparkles, Users, Check, Copy, Loader2 } from 'lucide-react';
+import { ArrowLeft, DollarSign, TrendingUp, Star, ShieldCheck, Sparkles, Users, Check, Copy, Loader2, HelpCircle, Flower, Calendar, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { HelpCenterScreen } from '../screens/HelpCenterScreen';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
@@ -11,6 +12,7 @@ export interface PublishItineraryResult {
   price: number;
   description: string;
   tags: string[];
+  mainTag?: string;
 }
 
 interface PublishItineraryFlowProps {
@@ -25,16 +27,20 @@ interface PublishItineraryFlowProps {
   onClose: () => void;
   onPublished?: (result: PublishItineraryResult) => void | Promise<void>;
   onNavigateToSales?: () => void;
+  onNavigateToFAQ?: () => void;
+  startDate?: Date;
+  endDate?: Date;
+  initialMainTag?: string;
 }
 
-import { TRIP_TYPES } from '../screens/FiltersScreen';
+
 
 export const SEASONS_OPTIONS = [
   { id: 'verao', label: 'Verão', emoji: '☀️' },
   { id: 'inverno', label: 'Inverno', emoji: '❄️' },
   { id: 'primavera', label: 'Primavera', emoji: '🌸' },
   { id: 'outono', label: 'Outono', emoji: '🍂' },
-  { id: 'qualquer', label: 'Qualquer época', emoji: '📅' },
+  { id: 'qualquer', label: 'O ano todo', emoji: '📅' },
 ];
 import { Icon } from '@/components/ui/Icon';
 
@@ -68,6 +74,10 @@ export function PublishItineraryFlow({
   onClose,
   onPublished,
   onNavigateToSales,
+  onNavigateToFAQ,
+  startDate,
+  endDate,
+  initialMainTag,
 }: PublishItineraryFlowProps) {
   const [step, setStep] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -83,6 +93,7 @@ export function PublishItineraryFlow({
   const [tags, setTags] = useState<string[]>(initialTags);
   const [isReviewingTerms, setIsReviewingTerms] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [showFAQ, setShowFAQ] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -95,6 +106,14 @@ export function PublishItineraryFlow({
   }, [open]);
 
   if (!open) return null;
+
+  if (showFAQ) {
+    return (
+      <div className="fixed inset-0 z-[220] bg-background w-full h-full overflow-y-auto pb-safe">
+        <HelpCenterScreen onBack={() => setShowFAQ(false)} hideTourGuide={true} />
+      </div>
+    );
+  }
 
   const numericPrice = isFree ? 0 : Number(price.replace(/\D/g, '')) / 100;
   const platformFee = numericPrice * 0.10;
@@ -174,6 +193,7 @@ export function PublishItineraryFlow({
     setSeason('');
     setTags(initialTags);
     setIsReviewingTerms(false);
+    setShowFAQ(false);
     onClose();
   };
 
@@ -204,13 +224,20 @@ export function PublishItineraryFlow({
         {/* Top bar — only back button */}
         <div className={cn('absolute top-0 left-0 right-0 z-30', step <= 0 ? 'pt-[68px]' : 'pt-safe-top pb-3 bg-[#F2F2F2]')}>
           <div className={step <= 0 ? 'px-3' : 'px-7'}>
-            <div className={cn('flex items-center', step <= 0 && 'w-full max-w-[396px] mx-auto px-7')}>
+            <div className={cn('flex items-center justify-between', step <= 0 && 'w-full max-w-[396px] mx-auto px-7')}>
               <button
                 onClick={back}
                 className="w-10 h-10 -ml-2 rounded-full flex items-center justify-center transition-all bg-[#0A0A0A]/5 text-[#0A0A0A] hover:bg-[#0A0A0A]/10 shrink-0"
                 aria-label="Voltar"
               >
                 <ArrowLeft size={18} />
+              </button>
+              <button
+                onClick={() => setShowFAQ(true)}
+                className="w-10 h-10 -mr-2 rounded-full flex items-center justify-center transition-all bg-[#0A0A0A]/5 text-[#0A0A0A] hover:bg-[#0A0A0A]/10 shrink-0"
+                aria-label="Ajuda"
+              >
+                <HelpCircle size={18} />
               </button>
             </div>
           </div>
@@ -291,6 +318,9 @@ export function PublishItineraryFlow({
                 setIsReviewingTerms(true);
                 setStep(0);
               }}
+              season={season}
+              startDate={startDate}
+              endDate={endDate}
             />
           )}
         </AnimatePresence>
@@ -354,7 +384,7 @@ function HowItWorksScreen({ onNext, hideCheckbox }: { onNext: () => void; hideCh
 
         </div>
 
-        <div className="flex-1 px-6 pt-6 pb-28 overflow-y-auto">
+        <div className="flex-1 px-6 pt-6 pb-36 overflow-y-auto">
           <div className="space-y-3">
             {items.map(({ icon: Icon, title, desc, color }, i) => (
               <motion.div
@@ -379,7 +409,8 @@ function HowItWorksScreen({ onNext, hideCheckbox }: { onNext: () => void; hideCh
           </div>
         </div>
 
-        <div className="absolute left-0 right-0 bottom-0 px-6 pb-6 pt-4 bg-gradient-to-t from-white via-white to-transparent flex flex-col gap-4">
+        <div className="absolute left-0 right-0 bottom-0 px-6 pb-6 pt-2 bg-white flex flex-col gap-4">
+          <div className="absolute left-0 right-0 h-8 -top-8 bg-gradient-to-t from-white to-transparent pointer-events-none" />
           {!hideCheckbox && (
             <label className="flex items-center gap-2 cursor-pointer self-center">
               <input
@@ -446,120 +477,121 @@ function PriceScreen({
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       className="absolute inset-0 flex flex-col bg-[#F2F2F2]"
     >
-      <div className="flex-1" />
-      <div className="px-7 pb-32">
-        <StepDots current={0} total={TOTAL_QUESTION_STEPS} />
-        <h1
-          className="text-[#0A0A0A] leading-[1.1] tracking-[-0.02em]"
-          style={{ fontSize: '28px', fontWeight: 800 }}
-        >
-          Quanto deseja<br />cobrar?
-        </h1>
-        <p className="mt-2 text-[#6B6B6B] text-[13px] leading-snug max-w-[300px]">
-          Defina o preço de venda do seu roteiro no marketplace.
-        </p>
-
-        <div className="mt-6 relative">
-          <div
-            className={cn(
-              "flex items-center rounded-2xl bg-white px-5 transition-all shadow-[0_2px_8px_-2px_rgba(10,10,10,0.06)] overflow-hidden",
-              error ? "ring-1 ring-[#E5484D] border border-[#E5484D]" : "border border-transparent focus-within:ring-2 focus-within:ring-[#9DCC36]",
-              isFree && "opacity-50"
-            )}
-            style={{ height: '64px' }}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="flex flex-col justify-end min-h-full px-7 pt-20 pb-32">
+          <StepDots current={0} total={TOTAL_QUESTION_STEPS} />
+          <h1
+            className="text-[#0A0A0A] leading-[1.1] tracking-[-0.02em]"
+            style={{ fontSize: '28px', fontWeight: 800 }}
           >
-            <span className={cn(
-              "font-semibold text-[20px] mr-2 shrink-0 select-none",
-              isFree ? "text-[#0A0A0A]/20" : "text-[#0A0A0A]/40"
-            )}>
-              R$
-            </span>
-            <input
-              value={isFree ? '' : displayValue}
-              onChange={(e) => onChange(e.target.value)}
-              onBlur={onBlur}
-              placeholder={isFree ? 'Grátis' : '0,00'}
-              inputMode="numeric"
-              autoFocus={!isFree}
-              disabled={isFree}
-              className="flex-1 w-full h-full bg-transparent text-[#0A0A0A] font-semibold placeholder:text-[#0A0A0A]/25 outline-none"
-              style={{ fontSize: '20px' }}
-            />
+            Quanto deseja<br />cobrar?
+          </h1>
+          <p className="mt-2 text-[#6B6B6B] text-[13px] leading-snug max-w-[300px]">
+            Defina o preço de venda do seu roteiro no marketplace.
+          </p>
+
+          <div className="mt-6 relative">
+            <div
+              className={cn(
+                "flex items-center rounded-2xl bg-white px-5 transition-all shadow-[0_2px_8px_-2px_rgba(10,10,10,0.06)] overflow-hidden",
+                error ? "ring-1 ring-[#E5484D] border border-[#E5484D]" : "border border-transparent focus-within:ring-2 focus-within:ring-[#9DCC36]",
+                isFree && "opacity-50"
+              )}
+              style={{ height: '64px' }}
+            >
+              <span className={cn(
+                "font-semibold text-[20px] mr-2 shrink-0 select-none",
+                isFree ? "text-[#0A0A0A]/20" : "text-[#0A0A0A]/40"
+              )}>
+                R$
+              </span>
+              <input
+                value={isFree ? '' : displayValue}
+                onChange={(e) => onChange(e.target.value)}
+                onBlur={onBlur}
+                placeholder={isFree ? 'Grátis' : '0,00'}
+                inputMode="numeric"
+                autoFocus={!isFree}
+                disabled={isFree}
+                className="flex-1 w-full h-full bg-transparent text-[#0A0A0A] font-semibold placeholder:text-[#0A0A0A]/25 outline-none"
+                style={{ fontSize: '20px' }}
+              />
+            </div>
+            <AnimatePresence>
+              {error && !isFree && (
+                <motion.p
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.18 }}
+                  className="mt-2 text-[13px] text-[#E5484D] font-medium"
+                  role="alert"
+                >
+                  {error}
+                </motion.p>
+              )}
+            </AnimatePresence>
           </div>
+
+          {/* Free toggle */}
+          <button
+            type="button"
+            onClick={() => onToggleFree(!isFree)}
+            className="mt-3 inline-flex items-center gap-2.5 px-1 py-1.5 active:opacity-70 transition-opacity text-left"
+          >
+            <div
+              className={cn(
+                'w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-colors border-2',
+                isFree ? 'bg-[#9DCC36] border-[#9DCC36]' : 'border-[#0A0A0A]/25 bg-transparent'
+              )}
+            >
+              {isFree && <div className="w-2 h-2 rounded-full bg-[#0A0A0A]" />}
+            </div>
+            <span className="text-[14px] font-semibold text-[#0A0A0A] leading-tight">
+              Quero disponibilizar de graça
+            </span>
+          </button>
+
           <AnimatePresence>
-            {error && !isFree && (
-              <motion.p
-                initial={{ opacity: 0, y: -4 }}
+            {!isFree && numericPrice > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.18 }}
-                className="mt-2 text-[13px] text-[#E5484D] font-medium"
-                role="alert"
+                transition={{ duration: 0.2 }}
+                className="mt-4 rounded-2xl bg-white p-4 shadow-[0_2px_8px_-2px_rgba(10,10,10,0.06)]"
               >
-                {error}
-              </motion.p>
+                <div className="flex items-center justify-between text-[13px]">
+                  <span className="text-[#6B6B6B]">Preço de venda</span>
+                  <span className="font-semibold text-[#0A0A0A]">{formatBRL(numericPrice)}</span>
+                </div>
+                <div className="mt-2 flex items-center justify-between text-[13px]">
+                  <span className="text-[#6B6B6B]">Taxa de serviço (10%)</span>
+                  <span className="font-semibold text-[#E5484D]">− {formatBRL(platformFee)}</span>
+                </div>
+                <div className="mt-3 pt-3 border-t border-[#0A0A0A]/5 flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className="text-[13px] font-semibold text-[#0A0A0A] leading-tight">Você recebe</span>
+                    <span className="text-[11px] text-[#6B6B6B] leading-tight mt-0.5">por roteiro vendido</span>
+                  </div>
+                  <span className="text-[15px] font-bold text-[#0A0A0A]">{formatBRL(earning)}</span>
+                </div>
+                <div className="mt-3 pt-3 border-t border-[#0A0A0A]/5 flex items-center gap-2 text-[12px] text-[#6B6B6B]">
+                  <TrendingUp size={14} className="text-[#9DCC36] shrink-0" />
+                  <span>Cobramos uma taxa de serviço de 10% apenas sobre cada venda realizada.</span>
+                </div>
+              </motion.div>
             )}
           </AnimatePresence>
         </div>
-
-        {/* Free toggle */}
-        <button
-          type="button"
-          onClick={() => onToggleFree(!isFree)}
-          className="mt-3 inline-flex items-center gap-2.5 px-1 py-1.5 active:opacity-70 transition-opacity text-left"
-        >
-          <div
-            className={cn(
-              'w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-colors border-2',
-              isFree ? 'bg-[#9DCC36] border-[#9DCC36]' : 'border-[#0A0A0A]/25 bg-transparent'
-            )}
-          >
-            {isFree && <div className="w-2 h-2 rounded-full bg-[#0A0A0A]" />}
-          </div>
-          <span className="text-[14px] font-semibold text-[#0A0A0A] leading-tight">
-            Quero disponibilizar de graça
-          </span>
-        </button>
-
-        <AnimatePresence>
-          {!isFree && numericPrice > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.2 }}
-              className="mt-4 rounded-2xl bg-white p-4 shadow-[0_2px_8px_-2px_rgba(10,10,10,0.06)]"
-            >
-              <div className="flex items-center justify-between text-[13px]">
-                <span className="text-[#6B6B6B]">Preço de venda</span>
-                <span className="font-semibold text-[#0A0A0A]">{formatBRL(numericPrice)}</span>
-              </div>
-              <div className="mt-2 flex items-center justify-between text-[13px]">
-                <span className="text-[#6B6B6B]">Taxa de serviço (10%)</span>
-                <span className="font-semibold text-[#E5484D]">− {formatBRL(platformFee)}</span>
-              </div>
-              <div className="mt-3 pt-3 border-t border-[#0A0A0A]/5 flex items-center justify-between">
-                <div className="flex flex-col">
-                  <span className="text-[13px] font-semibold text-[#0A0A0A] leading-tight">Você recebe</span>
-                  <span className="text-[11px] text-[#6B6B6B] leading-tight mt-0.5">por roteiro vendido</span>
-                </div>
-                <span className="text-[15px] font-bold text-[#0A0A0A]">{formatBRL(earning)}</span>
-              </div>
-              <div className="mt-3 pt-3 border-t border-[#0A0A0A]/5 flex items-center gap-2 text-[12px] text-[#6B6B6B]">
-                <TrendingUp size={14} className="text-[#9DCC36] shrink-0" />
-                <span>Cobramos uma taxa de serviço de 10% apenas sobre cada venda realizada.</span>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
 
-      <div className="absolute left-0 right-0 bottom-0 px-6 pb-8 pt-4 bg-gradient-to-t from-[#F2F2F2] via-[#F2F2F2] to-transparent">
+      <div className="absolute left-0 right-0 bottom-0 px-6 pb-8 pt-4 bg-gradient-to-t from-[#F2F2F2] via-[#F2F2F2] to-transparent pointer-events-none z-10">
         <button
           onClick={onNext}
           disabled={!canAdvance}
           className={cn(
-            'w-full h-14 rounded-2xl font-bold text-[15px] tracking-[-0.01em] transition-all',
+            'w-full h-14 rounded-2xl font-bold text-[15px] tracking-[-0.01em] transition-all pointer-events-auto',
             !canAdvance
               ? 'bg-[#E5E7DD] text-[#0A0A0A]/25 cursor-not-allowed opacity-60 pointer-events-none shadow-none'
               : 'bg-[#9DCC36] text-[#0A0A0A] hover:brightness-105 active:scale-[0.99] shadow-[0_8px_22px_-8px_rgba(157,204,54,0.5)]'
@@ -568,7 +600,7 @@ function PriceScreen({
           Próximo
         </button>
       </div>
-    </motion.div>
+    </motion.div >
   );
 }
 
@@ -588,6 +620,9 @@ function ReviewScreen({
   onPublish,
   isPublishing,
   onReviewTerms,
+  season,
+  startDate,
+  endDate,
 }: {
   tripName?: string;
   coverImage?: string;
@@ -602,15 +637,38 @@ function ReviewScreen({
   onPublish: () => void;
   isPublishing?: boolean;
   onReviewTerms: () => void;
+  season?: string;
+  startDate?: Date;
+  endDate?: Date;
 }) {
   const today = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  const receiptId = `#${Math.floor(100000 + Math.random() * 900000)}`;
   const platformFee = numericPrice - earning;
 
   // Cover fallback
   const cover =
     coverImage ||
     'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=800&q=80';
+
+  const formatTripPeriod = (start?: Date, end?: Date): string => {
+    if (!start || !end) return '';
+    const startDay = start.getDate();
+    const endDay = end.getDate();
+    const startMonth = start.toLocaleDateString('pt-BR', { month: 'long' }).toLowerCase();
+    const endMonth = end.toLocaleDateString('pt-BR', { month: 'long' }).toLowerCase();
+    const startYear = start.getFullYear();
+    const endYear = end.getFullYear();
+
+    if (startYear !== endYear) {
+      return `${startDay} de ${startMonth} de ${startYear} a ${endDay} de ${endMonth} de ${endYear}`;
+    }
+    if (startMonth !== endMonth) {
+      return `${startDay} de ${startMonth} a ${endDay} de ${endMonth} de ${endYear}`;
+    }
+    return `${startDay} a ${endDay} de ${endMonth} de ${endYear}`;
+  };
+
+  const selectedSeasonOption = SEASONS_OPTIONS.find(s => s.id === season);
+  const seasonLabel = selectedSeasonOption ? selectedSeasonOption.label : 'O ano todo';
 
   return (
     <motion.div
@@ -678,6 +736,33 @@ function ReviewScreen({
             </div>
           </div>
 
+          {/* Melhor época & Período da viagem metadata list */}
+          <div className="mx-5 mt-4 pt-4 border-t border-[#0A0A0A]/5 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-[#FDF2F8] text-[#DB2777]">
+                <Flower className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[13px] font-bold text-[#0A0A0A] leading-tight">Melhor época</p>
+                <p className="text-[12px] text-[#6B6B6B] mt-0.5 leading-none">{seasonLabel}</p>
+              </div>
+            </div>
+
+            {!tags.includes('_FLEXIBLE_DATES_') && startDate && endDate && (
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-[#EFF6FF] text-[#2563EB]">
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-[13px] font-bold text-[#0A0A0A] leading-tight">Período da viagem</p>
+                  <p className="text-[12px] text-[#6B6B6B] mt-0.5 leading-none">
+                    {formatTripPeriod(startDate, endDate)}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Description + tags */}
           {(description || tags.length > 0) && (
             <div className="mx-5 mt-4 pt-4 border-t border-[#0A0A0A]/8 space-y-3">
@@ -707,36 +792,23 @@ function ReviewScreen({
 
           <div className="pb-5" />
         </motion.div>
-
-
-
-        <div className="mt-4 flex items-center justify-between p-4 rounded-xl bg-[#F2F2F2]">
-          <div className="flex flex-col gap-1 pr-4">
-            <span className="text-[14px] font-semibold text-[#1A1C40]">Configuração de datas</span>
-            <span className="text-[12px] text-[#6B6B6B] leading-tight">
-              {tags.includes('_FLEXIBLE_DATES_') 
-                ? `Seu roteiro não tem datas fixas. Os compradores verão apenas a duração de ${totalDays} dias.`
-                : `Seu roteiro tem datas fixas. Os compradores verão os dias específicos da viagem.`}
-            </span>
-          </div>
-        </div>
-
-        <div
-          onClick={onReviewTerms}
-          className="mt-4 flex items-center gap-3 p-3.5 rounded-xl bg-[#9DCC36]/10 cursor-pointer active:scale-[0.98] transition-transform"
-        >
-          <Check size={16} strokeWidth={2.5} className="text-[#9DCC36] shrink-0" />
-          <p className="text-[12.5px] text-[#1A1C40] leading-snug flex-1">
-            Ao publicar você concorda com os termos do programa de criadores.
-            Você pode despublicar a qualquer momento.
-          </p>
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#9DCC36] shrink-0">
-            <path d="m9 18 6-6-6-6" />
-          </svg>
-        </div>
       </div>
 
       <div className="sticky bottom-0 px-6 pb-8 pt-4 mt-4 bg-gradient-to-t from-[#F2F2F2] via-[#F2F2F2] to-transparent">
+        <div className="flex items-start gap-2.5 px-1 pb-4">
+          <Info size={16} strokeWidth={2} className="text-[#6B6B6B] shrink-0 mt-0.5" />
+          <p className="text-[12px] text-[#6B6B6B] leading-normal flex-1">
+            Ao publicar este roteiro, você concorda com os nossos{' '}
+            <button
+              onClick={onReviewTerms}
+              className="text-[#6B6B6B] font-semibold underline decoration-[#6B6B6B]/40 hover:decoration-[#6B6B6B] transition-colors"
+            >
+              Termos de Uso para Criadores
+            </button>
+            .
+          </p>
+        </div>
+
         <button
           onClick={onPublish}
           disabled={isPublishing}
@@ -787,44 +859,45 @@ function DescriptionScreen({
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -24 }}
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-      className="absolute inset-0 flex flex-col bg-[#F2F2F2] overflow-y-auto"
+      className="absolute inset-0 flex flex-col bg-[#F2F2F2]"
     >
-      <div className="flex-1 min-h-0" />
-      <div className="px-7 pb-40">
-        <StepDots current={1} total={TOTAL_QUESTION_STEPS} />
-        <h1
-          className="text-[#0A0A0A] leading-[1.1] tracking-[-0.02em]"
-          style={{ fontSize: '28px', fontWeight: 800 }}
-        >
-          Adicione uma<br />descrição
-        </h1>
-        <p className="mt-2 text-[#6B6B6B] text-[13px] leading-snug max-w-[320px]">
-          Conte aos viajantes o que torna esse roteiro especial. Você pode editar essa descrição depois.
-        </p>
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="flex flex-col justify-end min-h-full px-7 pt-20 pb-40">
+          <StepDots current={1} total={TOTAL_QUESTION_STEPS} />
+          <h1
+            className="text-[#0A0A0A] leading-[1.1] tracking-[-0.02em]"
+            style={{ fontSize: '28px', fontWeight: 800 }}
+          >
+            Adicione uma<br />descrição
+          </h1>
+          <p className="mt-2 text-[#6B6B6B] text-[13px] leading-snug max-w-[320px]">
+            Conte aos viajantes o que torna esse roteiro especial. Você pode editar essa descrição depois.
+          </p>
 
-        <div className="mt-6">
-          <Textarea
-            ref={textareaRef}
-            value={value}
-            onChange={(e) => onChange(e.target.value.slice(0, MAX))}
-            placeholder="Ex: Um roteiro de 5 dias por Lisboa com os melhores miradouros, restaurantes locais e dicas para fugir das multidões..."
-            autoFocus
-            className="rounded-2xl bg-white border-0 text-[#0A0A0A] placeholder:text-[#0A0A0A]/30 focus-visible:ring-2 focus-visible:ring-[#9DCC36] focus-visible:ring-offset-0 shadow-[0_2px_8px_-2px_rgba(10,10,10,0.06)] resize-none p-5"
-            style={{ fontSize: '16px', minHeight: '180px', lineHeight: '1.5', overflow: 'hidden' }}
-          />
-          <div className="mt-2 flex justify-between text-[12px] text-[#6B6B6B]">
-            <span>Mínimo 20 caracteres</span>
-            <span>{remaining} restantes</span>
+          <div className="mt-6">
+            <Textarea
+              ref={textareaRef}
+              value={value}
+              onChange={(e) => onChange(e.target.value.slice(0, MAX))}
+              placeholder="Ex: Um roteiro de 5 dias por Lisboa com os melhores miradouros, restaurantes locais e dicas para fugir das multidões..."
+              autoFocus
+              className="rounded-2xl bg-white border-0 text-[#0A0A0A] placeholder:text-[#0A0A0A]/30 focus-visible:ring-2 focus-visible:ring-[#9DCC36] focus-visible:ring-offset-0 shadow-[0_2px_8px_-2px_rgba(10,10,10,0.06)] resize-none p-5"
+              style={{ fontSize: '16px', minHeight: '180px', lineHeight: '1.5', overflow: 'hidden' }}
+            />
+            <div className="mt-2 flex justify-between text-[12px] text-[#6B6B6B]">
+              <span>Mínimo 20 caracteres</span>
+              <span>{remaining} restantes</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="absolute left-0 right-0 bottom-0 px-6 pb-8 pt-4 bg-gradient-to-t from-[#F2F2F2] via-[#F2F2F2] to-transparent">
+      <div className="absolute left-0 right-0 bottom-0 px-6 pb-8 pt-4 bg-gradient-to-t from-[#F2F2F2] via-[#F2F2F2] to-transparent pointer-events-none z-10">
         <button
           onClick={onNext}
           disabled={!canAdvance}
           className={cn(
-            'w-full h-14 rounded-2xl font-bold text-[15px] tracking-[-0.01em] transition-all',
+            'w-full h-14 rounded-2xl font-bold text-[15px] tracking-[-0.01em] transition-all pointer-events-auto',
             !canAdvance
               ? 'bg-[#E5E7DD] text-[#0A0A0A]/25 cursor-not-allowed opacity-60 pointer-events-none shadow-none'
               : 'bg-[#9DCC36] text-[#0A0A0A] hover:brightness-105 active:scale-[0.99] shadow-[0_8px_22px_-8px_rgba(157,204,54,0.5)]'
@@ -833,11 +906,69 @@ function DescriptionScreen({
           Próximo
         </button>
       </div>
-    </motion.div>
+    </motion.div >
   );
 }
 
 /* ---------------- Tags ---------------- */
+
+const TAG_CATEGORIES = [
+  {
+    title: 'Ambiente',
+    tags: [
+      { id: 'praia', label: 'Praia', emoji: '🏖️' },
+      { id: 'montanha', label: 'Montanha', emoji: '⛰️' },
+      { id: 'urbano', label: 'Urbano', emoji: '🏙️' },
+      { id: 'natureza', label: 'Natureza', emoji: '🌿' },
+      { id: 'neve', label: 'Neve', emoji: '❄️' },
+    ]
+  },
+  {
+    title: 'Estilo da viagem',
+    tags: [
+      { id: 'cultural', label: 'Cultural', emoji: '🏛️' },
+      { id: 'gastronomia', label: 'Gastronomia', emoji: '🍽️' },
+      { id: 'aventura', label: 'Aventura', emoji: '🧗' },
+      { id: 'vida-noturna', label: 'Vida noturna', emoji: '🌃' },
+      { id: 'relax', label: 'Relax', emoji: '🧘' },
+      { id: 'romance', label: 'Romance', emoji: '💕' },
+      { id: 'roadtrip', label: 'Roadtrip', emoji: '🚗' },
+      { id: 'compras', label: 'Compras', emoji: '🛍️' },
+      { id: 'bem-estar', label: 'Bem-estar', emoji: '💆' },
+      { id: 'vinhos', label: 'Vinhos', emoji: '🍷' },
+      { id: 'cafes', label: 'Cafés', emoji: '☕' },
+      { id: 'festivais', label: 'Festivais', emoji: '🎪' },
+    ]
+  },
+  {
+    title: 'Perfil do viajante',
+    tags: [
+      { id: 'familia', label: 'Família', emoji: '👨‍👩‍👧‍👦' },
+      { id: 'amigos', label: 'Amigos', emoji: '🍻' },
+      { id: 'solo', label: 'Solo', emoji: '🚶' },
+      { id: 'mochilao', label: 'Mochilão', emoji: '🎒' },
+      { id: 'economico', label: 'Econômico', emoji: '💸' },
+      { id: 'luxo', label: 'Luxo', emoji: '💎' },
+      { id: 'criancas', label: 'Crianças', emoji: '🧒' },
+      { id: 'pet-friendly', label: 'Pet friendly', emoji: '🐾' },
+      { id: 'acessivel', label: 'Acessível', emoji: '♿' },
+      { id: 'trabalho-remoto', label: 'Trabalho remoto', emoji: '💻' },
+    ]
+  },
+  {
+    title: 'Experiências',
+    tags: [
+      { id: 'fotogenico', label: 'Fotogênico', emoji: '📸' },
+      { id: 'arquitetura', label: 'Arquitetura', emoji: '🏢' },
+      { id: 'arte', label: 'Arte', emoji: '🎨' },
+      { id: 'trilhas', label: 'Trilhas', emoji: '🥾' },
+      { id: 'cachoeiras', label: 'Cachoeiras', emoji: '🌊' },
+      { id: 'parques-nacionais', label: 'Parques nacionais', emoji: '🏞️' },
+      { id: 'ilhas', label: 'Ilhas', emoji: '🏝️' },
+      { id: 'mergulho', label: 'Mergulho', emoji: '🤿' },
+    ]
+  }
+];
 
 function TagsScreen({
   selected,
@@ -860,55 +991,67 @@ function TagsScreen({
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       className="absolute inset-0 flex flex-col bg-[#F2F2F2]"
     >
-      <div className="flex-1" />
-      <div className="px-7 pb-40">
-        <StepDots current={3} total={TOTAL_QUESTION_STEPS} />
-        <h1
-          className="text-[#0A0A0A] leading-[1.1] tracking-[-0.02em]"
-          style={{ fontSize: '28px', fontWeight: 800 }}
-        >
-          Sobre o que é<br />seu roteiro?
-        </h1>
-        <p className="mt-2 text-[#6B6B6B] text-[13px] leading-snug max-w-[320px]">
-          Selecione até 5 tags que descrevam a experiência.
-        </p>
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="flex flex-col min-h-full px-7 pt-20 pb-40">
+          <div className="mt-auto">
+            <StepDots current={3} total={TOTAL_QUESTION_STEPS} />
+            <h1
+              className="text-[#0A0A0A] leading-[1.1] tracking-[-0.02em]"
+              style={{ fontSize: '28px', fontWeight: 800 }}
+            >
+              Sobre o que é<br />seu roteiro?
+            </h1>
+            <p className="mt-2 text-[#6B6B6B] text-[13px] leading-snug max-w-[320px]">
+              Selecione até 5 tags que descrevam a experiência.
+            </p>
 
-        <div className="mt-6 flex flex-wrap gap-2">
-          {TRIP_TYPES.map((t) => {
-            const isSelected = selected.includes(t.label);
-            const disabled = !isSelected && limitReached;
-            return (
-              <button
-                key={t.id}
-                onClick={() => onToggle(t.label)}
-                disabled={disabled}
-                className={cn(
-                  'px-4 h-10 rounded-full text-[13px] font-semibold transition-all border flex items-center gap-1.5',
-                  isSelected
-                    ? 'bg-[#1A1C40] text-white border-[#1A1C40]'
-                    : disabled
-                      ? 'bg-white text-[#0A0A0A]/30 border-[#0A0A0A]/5 cursor-not-allowed'
-                      : 'bg-white text-[#1A1C40] border-[#0A0A0A]/8 hover:border-[#9DCC36]'
-                )}
-              >
-                <span>{t.emoji}</span>
-                <span>{t.label}</span>
-              </button>
-            );
-          })}
+            <div className="mt-8 flex flex-col gap-6">
+              {TAG_CATEGORIES.map((category) => (
+                <div key={category.title}>
+                  <h3 className="text-[15px] font-semibold text-[#0A0A0A] mb-3">
+                    {category.title}
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {category.tags.map((t) => {
+                      const isSelected = selected.includes(t.label);
+                      const disabled = !isSelected && limitReached;
+                      return (
+                        <button
+                          key={t.id}
+                          onClick={() => onToggle(t.label)}
+                          disabled={disabled}
+                          className={cn(
+                            'px-4 h-10 rounded-full text-[13px] font-semibold transition-all border flex items-center gap-1.5',
+                            isSelected
+                              ? 'bg-[#1A1C40] text-white border-[#1A1C40]'
+                              : disabled
+                                ? 'bg-white text-[#0A0A0A]/30 border-[#0A0A0A]/5 cursor-not-allowed'
+                                : 'bg-white text-[#1A1C40] border-[#0A0A0A]/8 hover:border-[#9DCC36]'
+                          )}
+                        >
+                          <span>{t.emoji}</span>
+                          <span>{t.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <p className="mt-8 text-[12px] text-[#6B6B6B]">
+              {selected.length}/5 selecionadas
+            </p>
+          </div>
         </div>
-
-        <p className="mt-6 text-[12px] text-[#6B6B6B]">
-          {selected.length}/5 selecionadas
-        </p>
       </div>
 
-      <div className="absolute left-0 right-0 bottom-0 px-6 pb-8 pt-4 bg-gradient-to-t from-[#F2F2F2] via-[#F2F2F2] to-transparent">
+      <div className="absolute left-0 right-0 bottom-0 px-6 pb-8 pt-4 bg-gradient-to-t from-[#F2F2F2] via-[#F2F2F2] to-transparent pointer-events-none z-10">
         <button
           onClick={onNext}
           disabled={!canAdvance}
           className={cn(
-            'w-full h-14 rounded-2xl font-bold text-[15px] tracking-[-0.01em] transition-all',
+            'w-full h-14 rounded-2xl font-bold text-[15px] tracking-[-0.01em] transition-all pointer-events-auto',
             !canAdvance
               ? 'bg-[#E5E7DD] text-[#0A0A0A]/25 cursor-not-allowed opacity-60 pointer-events-none shadow-none'
               : 'bg-[#9DCC36] text-[#0A0A0A] hover:brightness-105 active:scale-[0.99] shadow-[0_8px_22px_-8px_rgba(157,204,54,0.5)]'
@@ -917,7 +1060,7 @@ function TagsScreen({
           Próximo
         </button>
       </div>
-    </motion.div>
+    </motion.div >
   );
 }
 
@@ -942,55 +1085,56 @@ function SeasonScreen({
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       className="absolute inset-0 flex flex-col bg-[#F2F2F2]"
     >
-      <div className="flex-1" />
-      <div className="px-7 pb-40">
-        <StepDots current={2} total={TOTAL_QUESTION_STEPS} />
-        <h1
-          className="text-[#0A0A0A] leading-[1.1] tracking-[-0.02em]"
-          style={{ fontSize: '28px', fontWeight: 800 }}
-        >
-          Qual a melhor<br />época?
-        </h1>
-        <p className="mt-2 text-[#6B6B6B] text-[13px] leading-snug max-w-[320px]">
-          Ajude os viajantes a saberem quando é a melhor época para fazer essa viagem.
-        </p>
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="flex flex-col justify-end min-h-full px-7 pt-20 pb-40">
+          <StepDots current={2} total={TOTAL_QUESTION_STEPS} />
+          <h1
+            className="text-[#0A0A0A] leading-[1.1] tracking-[-0.02em]"
+            style={{ fontSize: '28px', fontWeight: 800 }}
+          >
+            Esse roteiro é ideal para qual época do ano?
+          </h1>
+          <p className="mt-2 text-[#6B6B6B] text-[13px] leading-snug max-w-[320px]">
+            Selecione a estação mais indicada para fazer esta viagem
+          </p>
 
-        <div className="mt-6 flex flex-col gap-2.5">
-          {SEASONS_OPTIONS.map((s) => {
-            const isSelected = value === s.label;
-            return (
-              <button
-                key={s.id}
-                onClick={() => onSelect(s.label)}
-                className={cn(
-                  'h-14 rounded-2xl px-5 flex items-center gap-3 transition-all border-2 text-[15px] font-semibold text-left',
-                  isSelected
-                    ? 'border-[#9DCC36] bg-[#9DCC36]/10 text-[#0A0A0A]'
-                    : 'border-transparent bg-white text-[#0A0A0A] hover:border-[#0A0A0A]/10 shadow-[0_2px_8px_-2px_rgba(10,10,10,0.04)]'
-                )}
-              >
-                <span className="text-[18px]">{s.emoji}</span>
-                <span className="flex-1">{s.label}</span>
-                <div
+          <div className="mt-6 flex flex-col gap-2.5">
+            {SEASONS_OPTIONS.map((s) => {
+              const isSelected = value === s.label;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => onSelect(s.label)}
                   className={cn(
-                    'w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-colors border-2',
-                    isSelected ? 'bg-[#9DCC36] border-[#9DCC36]' : 'border-[#0A0A0A]/25 bg-transparent'
+                    'h-14 rounded-2xl px-5 flex items-center gap-3 transition-all border-2 text-[15px] font-semibold text-left',
+                    isSelected
+                      ? 'border-[#9DCC36] bg-[#9DCC36]/10 text-[#0A0A0A]'
+                      : 'border-transparent bg-white text-[#0A0A0A] hover:border-[#0A0A0A]/10 shadow-[0_2px_8px_-2px_rgba(10,10,10,0.04)]'
                   )}
                 >
-                  {isSelected && <div className="w-2 h-2 rounded-full bg-[#0A0A0A]" />}
-                </div>
-              </button>
-            );
-          })}
+                  <span className="text-[18px]">{s.emoji}</span>
+                  <span className="flex-1">{s.label}</span>
+                  <div
+                    className={cn(
+                      'w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-colors border-2',
+                      isSelected ? 'bg-[#9DCC36] border-[#9DCC36]' : 'border-[#0A0A0A]/25 bg-transparent'
+                    )}
+                  >
+                    {isSelected && <div className="w-2 h-2 rounded-full bg-[#0A0A0A]" />}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      <div className="absolute left-0 right-0 bottom-0 px-6 pb-8 pt-4 bg-gradient-to-t from-[#F2F2F2] via-[#F2F2F2] to-transparent">
+      <div className="absolute left-0 right-0 bottom-0 px-6 pb-8 pt-4 bg-gradient-to-t from-[#F2F2F2] via-[#F2F2F2] to-transparent pointer-events-none z-10">
         <button
           onClick={onNext}
           disabled={!canAdvance}
           className={cn(
-            'w-full h-14 rounded-2xl font-bold text-[15px] tracking-[-0.01em] transition-all',
+            'w-full h-14 rounded-2xl font-bold text-[15px] tracking-[-0.01em] transition-all pointer-events-auto',
             !canAdvance
               ? 'bg-[#E5E7DD] text-[#0A0A0A]/25 cursor-not-allowed opacity-60 pointer-events-none shadow-none'
               : 'bg-[#9DCC36] text-[#0A0A0A] hover:brightness-105 active:scale-[0.99] shadow-[0_8px_22px_-8px_rgba(157,204,54,0.5)]'
@@ -999,7 +1143,7 @@ function SeasonScreen({
           Próximo
         </button>
       </div>
-    </motion.div>
+    </motion.div >
   );
 }
 

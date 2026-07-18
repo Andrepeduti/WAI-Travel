@@ -310,7 +310,10 @@ export interface PublicItinerarySearchRow extends UserItinerary {
   authorName: string;
   authorUsername: string;
   authorAvatar: string;
+  /** ISO timestamp da última atualização do roteiro */
+  updatedAt: string | null;
 }
+
 
 export async function listPublicItineraries(limit = 200): Promise<PublicItinerarySearchRow[]> {
   const { data, error } = await supabase
@@ -354,9 +357,11 @@ export async function listPublicItineraries(limit = 200): Promise<PublicItinerar
       authorName: profile?.name || profile?.username || 'Viajante',
       authorUsername: profile?.username || '',
       authorAvatar: profile?.avatar_url || '',
+      updatedAt: row.updated_at ? String(row.updated_at) : null,
     };
   });
 }
+
 
 /**
  * Publica uma cópia independente do roteiro: cria um novo registro com

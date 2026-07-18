@@ -56,6 +56,7 @@ interface NewItineraryScreenProps {
   onDelete?: () => void;
   onNavigateToSales?: () => void;
   onUpgrade?: () => void;
+  onNavigateToFAQ?: () => void;
 }
 
 const activityColors = ['#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EF4444', '#EC4899'];
@@ -84,7 +85,7 @@ function getTransportIcon(type: TransportBetween['type']) {
   }
 }
 
-export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales, onUpgrade }: NewItineraryScreenProps) {
+export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales, onUpgrade, onNavigateToFAQ }: NewItineraryScreenProps) {
   const { session } = useAuth();
   const { itineraries: myItinerariesForLimit } = useMyItineraries();
   const FREE_PLAN_ITINERARY_LIMIT = 3;
@@ -353,9 +354,9 @@ export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales, 
               <div className="flex items-center gap-1.5">
                 <span className="w-4 h-4 rounded-full overflow-hidden inline-flex items-center justify-center flex-shrink-0">
                   <svg viewBox="0 0 20 20" width="16" height="16">
-                    <rect width="20" height="20" fill="#009739"/>
-                    <polygon points="10,3 18,10 10,17 2,10" fill="#FEDD00"/>
-                    <circle cx="10" cy="10" r="3.5" fill="#012169"/>
+                    <rect width="20" height="20" fill="#009739" />
+                    <polygon points="10,3 18,10 10,17 2,10" fill="#FEDD00" />
+                    <circle cx="10" cy="10" r="3.5" fill="#012169" />
                   </svg>
                 </span>
                 <span className="text-[15px] font-medium text-foreground">
@@ -365,8 +366,8 @@ export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales, 
               <div className="flex items-center gap-1.5">
                 <span className="w-4 h-4 rounded-full overflow-hidden inline-flex items-center justify-center flex-shrink-0">
                   <svg viewBox="0 0 20 20" width="16" height="16">
-                    <rect width="20" height="20" fill="#003399"/>
-                    <circle cx="10" cy="10" r="4" fill="none" stroke="#FFCC00" strokeWidth="2"/>
+                    <rect width="20" height="20" fill="#003399" />
+                    <circle cx="10" cy="10" r="4" fill="none" stroke="#FFCC00" strokeWidth="2" />
                   </svg>
                 </span>
                 <span className="text-[15px] font-medium text-foreground">
@@ -400,9 +401,8 @@ export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales, 
             <button
               key={tab.day}
               onClick={() => setSelectedDay(tab.day)}
-              className={`pb-3 px-3 text-center transition-colors relative flex-shrink-0 min-w-fit ${
-                selectedDay === tab.day ? 'text-foreground' : 'text-muted-foreground'
-              }`}
+              className={`pb-3 px-3 text-center transition-colors relative flex-shrink-0 min-w-fit ${selectedDay === tab.day ? 'text-foreground' : 'text-muted-foreground'
+                }`}
             >
               <span className="text-[13px] font-semibold block whitespace-nowrap">
                 Dia {tab.day}{tab.title ? ` - ${tab.title}` : ''}
@@ -585,6 +585,9 @@ export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales, 
           setPublishedMainTag(result.mainTag);
         }}
         onNavigateToSales={onNavigateToSales}
+        onNavigateToFAQ={onNavigateToFAQ}
+        startDate={itineraryData.startDate}
+        endDate={itineraryData.endDate}
       />
       <EditPublishSheet
         open={showEditPublish}

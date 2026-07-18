@@ -6,6 +6,7 @@ import { useCurrentUser } from '@/hooks/use-current-user';
 import { useUserInsights, UserInsight } from '@/hooks/use-user-insights';
 import { useNotifications } from '@/hooks/use-notifications';
 import { useUnreadChatCount } from '@/hooks/use-unread-chat';
+import { useRecommendedItineraries, type RecommendedItinerary } from '@/hooks/use-recommended-itineraries';
 import { Icon } from '@/components/ui/Icon';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { HorizontalCarousel } from '@/components/travel/HorizontalCarousel';
@@ -295,6 +296,8 @@ const categories: CategoryItem[] = [
 
 interface HomeScreenProps {
   onItineraryClick: (id: number) => void;
+  /** Callback para roteiros do banco (UUID). Recebe itineraryId (UUID) e sourceDatasetId (pode ser null). */
+  onPublicItineraryClick?: (itineraryId: string, sourceDatasetId: number | null, item: RecommendedItinerary) => void;
   onExperienceClick?: (id: number) => void;
   onSearchClick?: () => void;
   onFindPeopleClick?: () => void;
@@ -311,6 +314,7 @@ interface HomeScreenProps {
 }
 export function HomeScreen({
   onItineraryClick,
+  onPublicItineraryClick,
   onExperienceClick,
   onSearchClick,
   onFindPeopleClick,
@@ -332,6 +336,7 @@ export function HomeScreen({
   const { unreadCount } = useNotifications();
   const unreadChatCount = useUnreadChatCount();
   const { itineraries: myItineraries, loading: myLoading } = useMyItineraries();
+  const { itineraries: recommendedItineraries, loading: recommendationsLoading } = useRecommendedItineraries(10);
   const ongoingTrips = (() => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     return myItineraries
@@ -409,214 +414,261 @@ export function HomeScreen({
   };
 
   return <div className="min-h-screen pb-24 bg-[#f2f2f2] w-full max-w-full overflow-x-hidden box-border" style={{ paddingLeft: 'max(16px, env(safe-area-inset-left))', paddingRight: 'max(16px, env(safe-area-inset-right))' }}>
-      {/* Header */}
-      <header className="pt-4 bg-[#f2f2f2] pb-[24px] -mx-4" style={{ paddingLeft: 'max(16px, env(safe-area-inset-left))', paddingTop: 'max(16px, env(safe-area-inset-top))' }}>
-        <div className="flex items-center justify-between mb-4 pb-[16px] pr-4">
-          <div className="flex items-center gap-3">
-            <button onClick={onProfileClick} className="focus:outline-none">
-              {currentUserLoading ? (
-                <Skeleton className="w-12 h-12 rounded-full" aria-label="Carregando avatar" />
-              ) : (
-                <UserAvatar
-                  src={avatarUrl}
-                  alt="Avatar"
-                  size={48}
-                  className="border-white shadow-md border-0"
-                />
-              )}
-            </button>
-            <div className="flex flex-col gap-1">
-              {currentUserLoading ? (
-                <>
-                  <Skeleton className="h-3.5 w-10 rounded" />
-                  <Skeleton className="h-5 w-28 rounded" />
-                </>
-              ) : (
-                <>
-                  <span className="text-body-md font-medium text-foreground leading-none">Olá,</span>
-                  <span className="text-title-lg font-semibold text-foreground leading-none">{displayName}</span>
-                </>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={onChatClick} className="w-11 h-11 rounded-full bg-white flex items-center justify-center shadow-sm active:scale-95 active:opacity-80 transition-all" aria-label="Mensagens">
-              <span className="relative inline-flex">
-                <Icon name="chat_bubble_outline" size={22} className="text-foreground" />
-                {unreadChatCount > 0 && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-destructive rounded-full border-[1.5px] border-white" />}
-              </span>
-            </button>
-            <button onClick={onNotificationsClick} className="w-11 h-11 rounded-full bg-white flex items-center justify-center shadow-sm active:scale-95 active:opacity-80 transition-all" aria-label="Notificações">
-              <span className="relative inline-flex">
-                <Icon name="notifications" size={22} className="text-foreground" />
-                {unreadCount > 0 && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-destructive rounded-full border-[1.5px] border-white" />}
-              </span>
-            </button>
+    {/* Header */}
+    <header className="pt-4 bg-[#f2f2f2] pb-[24px] -mx-4" style={{ paddingLeft: 'max(16px, env(safe-area-inset-left))', paddingTop: 'max(16px, env(safe-area-inset-top))' }}>
+      <div className="flex items-center justify-between mb-4 pb-[16px] pr-4">
+        <div className="flex items-center gap-3">
+          <button onClick={onProfileClick} className="focus:outline-none">
+            {currentUserLoading ? (
+              <Skeleton className="w-12 h-12 rounded-full" aria-label="Carregando avatar" />
+            ) : (
+              <UserAvatar
+                src={avatarUrl}
+                alt="Avatar"
+                size={48}
+                className="border-white shadow-md border-0"
+              />
+            )}
+          </button>
+          <div className="flex flex-col gap-1">
+            {currentUserLoading ? (
+              <>
+                <Skeleton className="h-3.5 w-10 rounded" />
+                <Skeleton className="h-5 w-28 rounded" />
+              </>
+            ) : (
+              <>
+                <span className="text-body-md font-medium text-foreground leading-none">Olá,</span>
+                <span className="text-title-lg font-semibold text-foreground leading-none">{displayName}</span>
+              </>
+            )}
           </div>
         </div>
-
-        {currentUserLoading || insightsLoading ? (
-          <div className="w-full flex gap-3 overflow-hidden pb-[8px]">
-            {[0, 1].map((i) => (
-              <div
-                key={i}
-                className="w-[240px] shrink-0 bg-white rounded-lg p-4 flex items-center gap-3 shadow-sm"
-              >
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-3.5 w-full rounded" />
-                  <Skeleton className="h-3.5 w-2/3 rounded" />
-                </div>
-                <Skeleton className="w-10 h-10 rounded-full flex-shrink-0" />
-              </div>
-            ))}
-          </div>
-        ) : insights.length > 0 && (
-          <div className="w-full">
-            <HorizontalCarousel showDots={true} className="w-full pb-[8px]" itemClassName="w-[240px]">
-              {insights.map(banner => (
-                <button
-                  key={banner.id}
-                  type="button"
-                  onClick={() => banner.action && onInsightAction?.(banner)}
-                  disabled={!banner.action}
-                  className="w-[240px] bg-white rounded-lg p-4 flex items-center gap-3 shadow-sm text-left transition-transform active:scale-[0.98] disabled:cursor-default"
-                >
-                  <div className="flex-1">
-                    <p className="text-body-md font-medium text-foreground leading-snug text-sm line-clamp-2">
-                      {banner.text}
-                    </p>
-                  </div>
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(53, 135, 242, 0.12)' }}>
-                    <Icon name={banner.icon} size={22} style={{ color: '#3587F2' }} />
-                  </div>
-                </button>
-              ))}
-            </HorizontalCarousel>
-          </div>
-        )}
-
-      </header>
-
-      {/* Content */}
-      <main className="pt-4 section-stack bg-[#f2f2f2] -mr-4">
-
-        {/* Continue planejando */}
-        {myLoading ? (
-          <section>
-            <h2 className="text-[16px] font-semibold text-foreground mb-3">Continue planejando</h2>
-            <HorizontalCarousel showDots={false} className="w-full pb-1" itemClassName="w-[260px]">
-              {[1, 2].map(i => (
-                <div key={i} className="w-[260px] flex items-center gap-3 bg-card rounded-2xl p-2 pr-3 text-left" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.06)' }}>
-                  <Skeleton className="w-16 h-16 rounded-xl flex-shrink-0" />
-                  <div className="flex-1 min-w-0 flex flex-col gap-1">
-                    <Skeleton className="h-4 w-3/4 rounded" />
-                    <Skeleton className="h-3 w-1/2 rounded" />
-                    <Skeleton className="h-[18px] w-20 rounded-full mt-1" />
-                  </div>
-                </div>
-              ))}
-            </HorizontalCarousel>
-          </section>
-        ) : ongoingTrips.length > 0 && (
-          <section>
-            <h2 className="text-[16px] font-semibold text-foreground mb-3">Continue planejando</h2>
-            <HorizontalCarousel showDots={false} className="w-full pb-1" itemClassName="w-[260px]">
-              {ongoingTrips.map(({ it, start, end }) => {
-                const cover = resolveTripThumbnailImages(
-                  it.destinations,
-                  it.images?.find((image) => image && !image.startsWith('blob:')),
-                )[0];
-                const status = tripStatusLabel(start, end);
-                return (
-                  <button
-                    key={it.id}
-                    type="button"
-                    onClick={() => onContinuePlanning?.(it)}
-                    className="w-[260px] flex items-center gap-3 bg-card rounded-2xl p-2 pr-3 text-left active:scale-[0.98] transition-transform"
-                    style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.06)' }}
-                  >
-                    <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-muted">
-                      {cover && <img src={cover} alt={it.title} className="w-full h-full object-cover" />}
-                    </div>
-                    <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                      <h3 className="text-[14px] font-semibold text-foreground leading-tight line-clamp-1">{it.title}</h3>
-                      <span className="text-[12px] text-muted-foreground leading-tight">{formatTripRange(start, end)}</span>
-                      {status && (
-                        <span className="self-start mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium leading-tight text-[#5C7A2A] bg-[#5C7A2A]/10">{status}</span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </HorizontalCarousel>
-          </section>
-        )}
-
-        {/* Seu próximo destino ideal */}
-        <section>
-          <button
-            onClick={() => onSeeAllItineraries?.('Seu próximo destino ideal', itineraries.map(syncCardWithDataset))}
-            className="flex items-center gap-2 mb-3"
-          >
-            <h2 className="text-[16px] font-semibold text-foreground">Seu próximo destino ideal</h2>
-            <Icon name="chevron_right" size={18} className="text-foreground" />
+        <div className="flex items-center gap-2">
+          <button onClick={onChatClick} className="w-11 h-11 rounded-full bg-white flex items-center justify-center shadow-sm active:scale-95 active:opacity-80 transition-all" aria-label="Mensagens">
+            <span className="relative inline-flex">
+              <Icon name="chat_bubble_outline" size={22} className="text-foreground" />
+              {unreadChatCount > 0 && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-destructive rounded-full border-[1.5px] border-white" />}
+            </span>
           </button>
-          
-          <HorizontalCarousel showDots={false} className="w-full pb-4" itemClassName="w-[240px]">
-            {itineraries.map(syncCardWithDataset).map(item => (
-              <button key={item.id} onClick={() => onItineraryClick(item.id)} className="w-[240px] flex flex-col text-left bg-card rounded-2xl overflow-hidden" style={{ boxShadow: '0 2px 16px rgba(0, 0, 0, 0.07)' }}>
-                <div className="relative w-full aspect-[16/10] overflow-hidden p-2">
-                  <img src={item.image} alt={item.title} className="w-full h-full object-cover rounded-xl" />
-                  {item.category && (
-                    <div className="absolute top-4 left-4 flex items-center gap-1 bg-white rounded-full pl-2 pr-2.5 py-1 shadow-sm">
-                      <span className="text-[13px] leading-none">⛩️</span>
-                      <span className="text-[11px] font-semibold text-foreground">{item.category}</span>
-                    </div>
-                  )}
-                  <div role="button" tabIndex={0} onClick={e => toggleSave(item, e)} onKeyDown={e => e.key === 'Enter' && toggleSave(item, e)} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm cursor-pointer z-10">
-                    <Icon name="favorite" size={18} filled={isFavorite(item.id)} className={isFavorite(item.id) ? 'text-florida' : ''} style={!isFavorite(item.id) ? { color: '#1E293B' } : undefined} />
-                  </div>
+          <button onClick={onNotificationsClick} className="w-11 h-11 rounded-full bg-white flex items-center justify-center shadow-sm active:scale-95 active:opacity-80 transition-all" aria-label="Notificações">
+            <span className="relative inline-flex">
+              <Icon name="notifications" size={22} className="text-foreground" />
+              {unreadCount > 0 && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-destructive rounded-full border-[1.5px] border-white" />}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {currentUserLoading || insightsLoading ? (
+        <div className="w-full flex gap-3 overflow-hidden pb-[8px]">
+          {[0, 1].map((i) => (
+            <div
+              key={i}
+              className="w-[240px] shrink-0 bg-white rounded-lg p-4 flex items-center gap-3 shadow-sm"
+            >
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-3.5 w-full rounded" />
+                <Skeleton className="h-3.5 w-2/3 rounded" />
+              </div>
+              <Skeleton className="w-10 h-10 rounded-full flex-shrink-0" />
+            </div>
+          ))}
+        </div>
+      ) : insights.length > 0 && (
+        <div className="w-full">
+          <HorizontalCarousel showDots={true} className="w-full pb-[8px]" itemClassName="w-[240px]">
+            {insights.map(banner => (
+              <button
+                key={banner.id}
+                type="button"
+                onClick={() => banner.action && onInsightAction?.(banner)}
+                disabled={!banner.action}
+                className="w-[240px] bg-white rounded-lg p-4 flex items-center gap-3 shadow-sm text-left transition-transform active:scale-[0.98] disabled:cursor-default"
+              >
+                <div className="flex-1">
+                  <p className="text-body-md font-medium text-foreground leading-snug text-sm line-clamp-2">
+                    {banner.text}
+                  </p>
                 </div>
-                <div className="px-4 pt-1 pb-4 flex flex-col gap-2">
-                  <h3 className="font-bold text-[15px] text-foreground leading-tight">{item.title}</h3>
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1">
-                      <Icon name="star" size={14} className="text-[#F2B90C]" />
-                      <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{item.rating}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Icon name="location_on" size={14} style={{ color: '#1E293B' }} />
-                      <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{item.places} locais</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Icon name="schedule" size={14} style={{ color: '#1E293B' }} />
-                      <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{item.days} dias</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between pt-1">
-                    <div className="flex items-center gap-2">
-                      <img src={item.authorImage} alt={item.author} className="w-7 h-7 rounded-full object-cover" />
-                      <span className="text-[13px] font-medium" style={{ color: '#171F2C' }}>{item.author}</span>
-                    </div>
-                    <span className="text-[15px] font-bold text-foreground">R$ {item.price}</span>
-                  </div>
+                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(53, 135, 242, 0.12)' }}>
+                  <Icon name={banner.icon} size={22} style={{ color: '#3587F2' }} />
                 </div>
               </button>
             ))}
           </HorizontalCarousel>
+        </div>
+      )}
+
+    </header>
+
+    {/* Content */}
+    <main className="pt-4 section-stack bg-[#f2f2f2] -mr-4">
+
+      {/* Continue planejando */}
+      {myLoading ? (
+        <section>
+          <h2 className="text-[16px] font-semibold text-foreground mb-3">Continue planejando</h2>
+          <HorizontalCarousel showDots={false} className="w-full pb-1" itemClassName="w-[260px]">
+            {[1, 2].map(i => (
+              <div key={i} className="w-[260px] flex items-center gap-3 bg-card rounded-2xl p-2 pr-3 text-left" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.06)' }}>
+                <Skeleton className="w-16 h-16 rounded-xl flex-shrink-0" />
+                <div className="flex-1 min-w-0 flex flex-col gap-1">
+                  <Skeleton className="h-4 w-3/4 rounded" />
+                  <Skeleton className="h-3 w-1/2 rounded" />
+                  <Skeleton className="h-[18px] w-20 rounded-full mt-1" />
+                </div>
+              </div>
+            ))}
+          </HorizontalCarousel>
         </section>
+      ) : ongoingTrips.length > 0 && (
+        <section>
+          <h2 className="text-[16px] font-semibold text-foreground mb-3">Continue planejando</h2>
+          <HorizontalCarousel showDots={false} className="w-full pb-1" itemClassName="w-[260px]">
+            {ongoingTrips.map(({ it, start, end }) => {
+              const cover = resolveTripThumbnailImages(
+                it.destinations,
+                it.images?.find((image) => image && !image.startsWith('blob:')),
+              )[0];
+              const status = tripStatusLabel(start, end);
+              return (
+                <button
+                  key={it.id}
+                  type="button"
+                  onClick={() => onContinuePlanning?.(it)}
+                  className="w-[260px] flex items-center gap-3 bg-card rounded-2xl p-2 pr-3 text-left active:scale-[0.98] transition-transform"
+                  style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.06)' }}
+                >
+                  <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-muted">
+                    {cover && <img src={cover} alt={it.title} className="w-full h-full object-cover" />}
+                  </div>
+                  <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                    <h3 className="text-[14px] font-semibold text-foreground leading-tight line-clamp-1">{it.title}</h3>
+                    <span className="text-[12px] text-muted-foreground leading-tight">{formatTripRange(start, end)}</span>
+                    {status && (
+                      <span className="self-start mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium leading-tight text-[#5C7A2A] bg-[#5C7A2A]/10">{status}</span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </HorizontalCarousel>
+        </section>
+      )}
 
-        {/* Viajantes com mesmo interesse — perfis reais */}
-        {(travelersLoading || realTravelers.length > 0) && (
-          <section>
-            <button onClick={onFindPeopleClick} className="flex items-center gap-2 mb-3">
-              <h2 className="text-[16px] font-semibold text-foreground">Viajantes com mesmo interesse</h2>
-              <Icon name="chevron_right" size={18} className="text-foreground" />
-            </button>
+      {/* Seu próximo destino ideal */}
+      <section>
+        <button
+          onClick={() => onSeeAllItineraries?.('Seu próximo destino ideal', recommendedItineraries.map(item => ({
+            id: item.sourceDatasetId ?? 0,
+            itineraryUuid: item.itineraryId,
+            sourceDatasetId: item.sourceDatasetId,
+            title: item.title,
+            image: item.image,
+            rating: item.rating,
+            places: item.places,
+            days: item.days,
+            author: item.author,
+            authorImage: item.authorImage,
+            price: item.price,
+            category: item.salesCount >= 5 ? 'Popular' : (item.score > 0 && item.salesCount === 0 ? 'Novo roteiro' : undefined),
+          })))}
+          className="flex items-center gap-2 mb-3"
+        >
+          <h2 className="text-[16px] font-semibold text-foreground">Seu próximo destino ideal</h2>
+          <Icon name="chevron_right" size={18} className="text-foreground" />
+        </button>
 
-            {travelersLoading ? (
-              <SimilarTravelersCarouselSkeleton count={4} />
-            ) : (
+        {recommendationsLoading ? (
+          <HorizontalCarousel showDots={false} className="w-full pb-4" itemClassName="w-[240px]">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="w-[240px] flex flex-col bg-card rounded-2xl overflow-hidden" style={{ boxShadow: '0 2px 16px rgba(0,0,0,0.07)' }}>
+                <Skeleton className="w-full aspect-[16/10] rounded-t-2xl" />
+                <div className="px-4 pt-3 pb-4 flex flex-col gap-2">
+                  <Skeleton className="h-4 w-[80%]" />
+                  <Skeleton className="h-3 w-[60%]" />
+                  <Skeleton className="h-3 w-[40%]" />
+                </div>
+              </div>
+            ))}
+          </HorizontalCarousel>
+        ) : (
+          <HorizontalCarousel showDots={false} className="w-full pb-4" itemClassName="w-[240px]">
+            {recommendedItineraries.map(item => {
+              // Badge: "Popular" se tiver ≥5 vendas, "Novo roteiro" se criado há ≤30 dias
+              const badge = item.salesCount >= 5 ? 'Popular' : item.score > 0 && item.salesCount === 0 ? 'Novo roteiro' : null;
+              return (
+                <button
+                  key={item.itineraryId}
+                  onClick={() => {
+                    if (onPublicItineraryClick) {
+                      onPublicItineraryClick(item.itineraryId, item.sourceDatasetId, item);
+                    } else if (item.sourceDatasetId != null) {
+                      onItineraryClick(item.sourceDatasetId);
+                    }
+                  }}
+                  className="w-[240px] flex flex-col text-left bg-card rounded-2xl overflow-hidden"
+                  style={{ boxShadow: '0 2px 16px rgba(0, 0, 0, 0.07)' }}
+                >
+                  <div className="relative w-full aspect-[16/10] overflow-hidden p-2">
+                    <img src={item.image} alt={item.title} className="w-full h-full object-cover rounded-xl" />
+                    {badge && (
+                      <div className="absolute top-4 left-4 flex items-center gap-1 bg-white rounded-full pl-2 pr-2.5 py-1 shadow-sm">
+                        <span className="text-[11px] font-semibold text-foreground">{badge}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="px-4 pt-1 pb-4 flex flex-col gap-2">
+                    <h3 className="font-bold text-[15px] text-foreground leading-tight">{item.title}</h3>
+                    <div className="flex items-center gap-3">
+                      {item.rating > 0 && (
+                        <div className="flex items-center gap-1">
+                          <Icon name="star" size={14} className="text-[#F2B90C]" />
+                          <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{item.rating.toFixed(1)}</span>
+                        </div>
+                      )}
+                      {item.places > 0 && (
+                        <div className="flex items-center gap-1">
+                          <Icon name="location_on" size={14} style={{ color: '#1E293B' }} />
+                          <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{item.places} locais</span>
+                        </div>
+                      )}
+                      {item.days > 0 && (
+                        <div className="flex items-center gap-1">
+                          <Icon name="schedule" size={14} style={{ color: '#1E293B' }} />
+                          <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{item.days} dias</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between pt-1">
+                      <div className="flex items-center gap-2">
+                        <img src={item.authorImage} alt={item.author} className="w-7 h-7 rounded-full object-cover" />
+                        <span className="text-[13px] font-medium" style={{ color: '#171F2C' }}>{item.author}</span>
+                      </div>
+                      {item.price > 0 && (
+                        <span className="text-[15px] font-bold text-foreground">R$ {item.price.toFixed(0)}</span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </HorizontalCarousel>
+        )}
+      </section>
+
+      {/* Viajantes com mesmo interesse — perfis reais */}
+      {(travelersLoading || realTravelers.length > 0) && (
+        <section>
+          <button onClick={onFindPeopleClick} className="flex items-center gap-2 mb-3">
+            <h2 className="text-[16px] font-semibold text-foreground">Viajantes com mesmo interesse</h2>
+            <Icon name="chevron_right" size={18} className="text-foreground" />
+          </button>
+
+          {travelersLoading ? (
+            <SimilarTravelersCarouselSkeleton count={4} />
+          ) : (
             <HorizontalCarousel showDots={false} className="w-full pb-2" itemClassName="w-[240px]">
               {realTravelers.map((traveler) => (
                 <button
@@ -680,151 +732,151 @@ export function HomeScreen({
                 </button>
               ))}
             </HorizontalCarousel>
-            )}
-          </section>
-        )}
-
-
-        {/* Roteiros Mais Populares */}
-        <section>
-          <button
-            onClick={() => onSeeAllItineraries?.('Roteiros à venda mais populares', popularItineraries.map(syncCardWithDataset))}
-            className="flex items-center gap-2 mb-3"
-          >
-            <h2 className="text-[16px] font-semibold text-foreground">Roteiros à venda mais populares</h2>
-            <Icon name="chevron_right" size={18} className="text-foreground" />
-          </button>
-
-          <HorizontalCarousel showDots={false} className="w-full pb-4" itemClassName="w-[240px]">
-            {popularItineraries.map(syncCardWithDataset).map(item => (
-              <button key={item.id} onClick={() => onItineraryClick(item.id)} className="w-[240px] flex flex-col text-left bg-card rounded-2xl overflow-hidden" style={{ boxShadow: '0 2px 16px rgba(0, 0, 0, 0.07)' }}>
-                <div className="relative w-full aspect-[16/10] overflow-hidden p-2">
-                  <img src={item.image} alt={item.title} className="w-full h-full object-cover rounded-xl" />
-                  {item.category && (
-                    <div className="absolute top-4 left-4 flex items-center gap-1 bg-white rounded-full pl-2 pr-2.5 py-1 shadow-sm">
-                      <span className="text-[13px] leading-none">⛩️</span>
-                      <span className="text-[11px] font-semibold text-foreground">{item.category}</span>
-                    </div>
-                  )}
-                  <div role="button" tabIndex={0} onClick={e => toggleSave(item, e)} onKeyDown={e => e.key === 'Enter' && toggleSave(item, e)} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm cursor-pointer z-10">
-                    <Icon name="favorite" size={18} filled={isFavorite(item.id)} className={isFavorite(item.id) ? 'text-florida' : ''} style={!isFavorite(item.id) ? { color: '#1E293B' } : undefined} />
-                  </div>
-                </div>
-                <div className="px-4 pt-1 pb-4 flex flex-col gap-2">
-                  <h3 className="font-bold text-[15px] text-foreground leading-tight">{item.title}</h3>
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1">
-                      <Icon name="star" size={14} className="text-[#F2B90C]" />
-                      <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{item.rating}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Icon name="location_on" size={14} style={{ color: '#1E293B' }} />
-                      <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{item.places} locais</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Icon name="schedule" size={14} style={{ color: '#1E293B' }} />
-                      <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{item.days} dias</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between pt-1">
-                    <div className="flex items-center gap-2">
-                      <img src={item.authorImage} alt={item.author} className="w-7 h-7 rounded-full object-cover" />
-                      <span className="text-[13px] font-medium" style={{ color: '#171F2C' }}>{item.author}</span>
-                    </div>
-                    <span className="text-[15px] font-bold text-foreground">R$ {item.price}</span>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </HorizontalCarousel>
+          )}
         </section>
+      )}
 
-        {/* Promotional Banners - oculto por enquanto */}
-        {false && (
+
+      {/* Roteiros Mais Populares */}
+      <section>
+        <button
+          onClick={() => onSeeAllItineraries?.('Roteiros à venda mais populares', popularItineraries.map(syncCardWithDataset))}
+          className="flex items-center gap-2 mb-3"
+        >
+          <h2 className="text-[16px] font-semibold text-foreground">Roteiros à venda mais populares</h2>
+          <Icon name="chevron_right" size={18} className="text-foreground" />
+        </button>
+
+        <HorizontalCarousel showDots={false} className="w-full pb-4" itemClassName="w-[240px]">
+          {popularItineraries.map(syncCardWithDataset).map(item => (
+            <button key={item.id} onClick={() => onItineraryClick(item.id)} className="w-[240px] flex flex-col text-left bg-card rounded-2xl overflow-hidden" style={{ boxShadow: '0 2px 16px rgba(0, 0, 0, 0.07)' }}>
+              <div className="relative w-full aspect-[16/10] overflow-hidden p-2">
+                <img src={item.image} alt={item.title} className="w-full h-full object-cover rounded-xl" />
+                {item.category && (
+                  <div className="absolute top-4 left-4 flex items-center gap-1 bg-white rounded-full pl-2 pr-2.5 py-1 shadow-sm">
+                    <span className="text-[13px] leading-none">⛩️</span>
+                    <span className="text-[11px] font-semibold text-foreground">{item.category}</span>
+                  </div>
+                )}
+                <div role="button" tabIndex={0} onClick={e => toggleSave(item, e)} onKeyDown={e => e.key === 'Enter' && toggleSave(item, e)} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm cursor-pointer z-10">
+                  <Icon name="favorite" size={18} filled={isFavorite(item.id)} className={isFavorite(item.id) ? 'text-florida' : ''} style={!isFavorite(item.id) ? { color: '#1E293B' } : undefined} />
+                </div>
+              </div>
+              <div className="px-4 pt-1 pb-4 flex flex-col gap-2">
+                <h3 className="font-bold text-[15px] text-foreground leading-tight">{item.title}</h3>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1">
+                    <Icon name="star" size={14} className="text-[#F2B90C]" />
+                    <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{item.rating}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Icon name="location_on" size={14} style={{ color: '#1E293B' }} />
+                    <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{item.places} locais</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Icon name="schedule" size={14} style={{ color: '#1E293B' }} />
+                    <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{item.days} dias</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between pt-1">
+                  <div className="flex items-center gap-2">
+                    <img src={item.authorImage} alt={item.author} className="w-7 h-7 rounded-full object-cover" />
+                    <span className="text-[13px] font-medium" style={{ color: '#171F2C' }}>{item.author}</span>
+                  </div>
+                  <span className="text-[15px] font-bold text-foreground">R$ {item.price}</span>
+                </div>
+              </div>
+            </button>
+          ))}
+        </HorizontalCarousel>
+      </section>
+
+      {/* Promotional Banners - oculto por enquanto */}
+      {false && (
         <section>
           <HorizontalCarousel showDots={true} className="w-full pb-2" itemClassName="w-[280px]">
             {promoBanners.map(banner => <div key={banner.id} className="w-[280px] h-[120px] rounded-lg p-4 relative overflow-hidden" style={{
-            background: banner.gradient
-          }}>
-                <div className="relative z-10">
-                  <span className="text-[10px] font-bold text-white/70 uppercase tracking-wider">{banner.label}</span>
-                  <h3 className="text-white font-bold text-[15px] mt-1 leading-tight">{banner.title}</h3>
-                  <p className="text-white/70 text-xs mt-1 max-w-[180px]">{banner.description}</p>
-                </div>
-              </div>)}
+              background: banner.gradient
+            }}>
+              <div className="relative z-10">
+                <span className="text-[10px] font-bold text-white/70 uppercase tracking-wider">{banner.label}</span>
+                <h3 className="text-white font-bold text-[15px] mt-1 leading-tight">{banner.title}</h3>
+                <p className="text-white/70 text-xs mt-1 max-w-[180px]">{banner.description}</p>
+              </div>
+            </div>)}
           </HorizontalCarousel>
         </section>
-        )}
+      )}
 
-        <section className="pb-4">
-          <button onClick={onFindPeopleClick} className="flex items-center gap-2 mb-3">
-            <h2 className="text-[16px] font-semibold text-foreground">Criadores de roteiro em alta</h2>
-            <Icon name="chevron_right" size={18} className="text-foreground" />
-          </button>
+      <section className="pb-4">
+        <button onClick={onFindPeopleClick} className="flex items-center gap-2 mb-3">
+          <h2 className="text-[16px] font-semibold text-foreground">Criadores de roteiro em alta</h2>
+          <Icon name="chevron_right" size={18} className="text-foreground" />
+        </button>
 
-          <HorizontalCarousel showDots={false} className="w-full pb-4" itemClassName="w-[155px]">
-            {topCreators.map((creator, idx) => {
-              const isTop3 = idx < 3;
-              const medalGradient = idx === 0
-                ? 'linear-gradient(135deg, #FFD86B 0%, #E0A82E 100%)'
-                : idx === 1
+        <HorizontalCarousel showDots={false} className="w-full pb-4" itemClassName="w-[155px]">
+          {topCreators.map((creator, idx) => {
+            const isTop3 = idx < 3;
+            const medalGradient = idx === 0
+              ? 'linear-gradient(135deg, #FFD86B 0%, #E0A82E 100%)'
+              : idx === 1
                 ? 'linear-gradient(135deg, #E2E6EC 0%, #A8B0BC 100%)'
                 : 'linear-gradient(135deg, #E8A87C 0%, #B87333 100%)';
 
-              return (
-                <div
-                  key={creator.id}
-                  className="w-[155px] flex flex-col items-center rounded-2xl py-5 px-3 bg-white transition-transform"
-                  style={{ boxShadow: '0 2px 16px rgba(0, 0, 0, 0.07)' }}
+            return (
+              <div
+                key={creator.id}
+                className="w-[155px] flex flex-col items-center rounded-2xl py-5 px-3 bg-white transition-transform"
+                style={{ boxShadow: '0 2px 16px rgba(0, 0, 0, 0.07)' }}
+              >
+                <button
+                  onClick={() => onCreatorClick?.(creator)}
+                  className="flex flex-col items-center w-full active:scale-[0.97] transition-transform"
                 >
-                  <button
-                    onClick={() => onCreatorClick?.(creator)}
-                    className="flex flex-col items-center w-full active:scale-[0.97] transition-transform"
-                  >
-                    <div className="relative mb-3">
-                      <img
-                        src={creator.image}
-                        alt={creator.name}
-                        className="w-[72px] h-[72px] rounded-full object-cover"
-                      />
-                      {isTop3 && (
-                        <div
-                          className="absolute -bottom-0.5 -right-0.5 w-7 h-7 rounded-full flex items-center justify-center shadow-md ring-2 ring-white"
-                          style={{ background: medalGradient }}
-                        >
-                          <span className="text-white text-[12px] font-bold drop-shadow">{idx + 1}</span>
-                        </div>
-                      )}
-                    </div>
-                    <p className="font-semibold text-[14px] text-[#1A1C40] truncate w-full text-center">{creator.name}</p>
-                    <div className="flex items-center gap-1 mb-3">
-                      <Icon name="star" size={12} className="text-[#F2B90C]" />
-                      <p className="text-[12px] text-[#1A1C40]/60">{formatSold(creator.soldItineraries)} roteiros vendidos</p>
-                    </div>
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setFollowedCreatorIds(prev => {
-                        const next = new Set(prev);
-                        if (next.has(creator.id)) next.delete(creator.id); else next.add(creator.id);
-                        return next;
-                      });
-                    }}
-                    className="text-[12px] font-medium px-5 py-1.5 rounded-full transition-all active:scale-95"
-                    style={
-                      followedCreatorIds.has(creator.id)
-                        ? { background: '#141530', color: '#FFFFFF', border: '1px solid #141530' }
-                        : { background: 'transparent', color: '#141530', border: '1px solid #141530' }
-                    }
-                  >
-                    {followedCreatorIds.has(creator.id) ? 'Seguindo' : 'Seguir'}
-                  </button>
-                </div>
-              );
-            })}
-          </HorizontalCarousel>
-        </section>
-      </main>
-    </div>;
+                  <div className="relative mb-3">
+                    <img
+                      src={creator.image}
+                      alt={creator.name}
+                      className="w-[72px] h-[72px] rounded-full object-cover"
+                    />
+                    {isTop3 && (
+                      <div
+                        className="absolute -bottom-0.5 -right-0.5 w-7 h-7 rounded-full flex items-center justify-center shadow-md ring-2 ring-white"
+                        style={{ background: medalGradient }}
+                      >
+                        <span className="text-white text-[12px] font-bold drop-shadow">{idx + 1}</span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="font-semibold text-[14px] text-[#1A1C40] truncate w-full text-center">{creator.name}</p>
+                  <div className="flex items-center gap-1 mb-3">
+                    <Icon name="star" size={12} className="text-[#F2B90C]" />
+                    <p className="text-[12px] text-[#1A1C40]/60">{formatSold(creator.soldItineraries)} roteiros vendidos</p>
+                  </div>
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFollowedCreatorIds(prev => {
+                      const next = new Set(prev);
+                      if (next.has(creator.id)) next.delete(creator.id); else next.add(creator.id);
+                      return next;
+                    });
+                  }}
+                  className="text-[12px] font-medium px-5 py-1.5 rounded-full transition-all active:scale-95"
+                  style={
+                    followedCreatorIds.has(creator.id)
+                      ? { background: '#141530', color: '#FFFFFF', border: '1px solid #141530' }
+                      : { background: 'transparent', color: '#141530', border: '1px solid #141530' }
+                  }
+                >
+                  {followedCreatorIds.has(creator.id) ? 'Seguindo' : 'Seguir'}
+                </button>
+              </div>
+            );
+          })}
+        </HorizontalCarousel>
+      </section>
+    </main>
+  </div>;
 }

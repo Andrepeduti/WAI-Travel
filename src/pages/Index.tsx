@@ -583,7 +583,7 @@ const Index = () => {
       console.log('Adding', placesFromVideo.length, 'places from video to new itinerary:', created.id);
       setPendingVideoPlaces(null);
     }
-    
+
     setNewItineraryData(data);
     resetStack();
     setActiveUserItineraryId(created.id);
@@ -957,9 +957,9 @@ const Index = () => {
     return (
       <div className="min-h-screen bg-background w-full">
         <div className="w-full bg-background min-h-screen overflow-x-clip">
-          <ExperienceDetailScreen 
-            experienceId={selectedExperienceId} 
-            onBack={wrapBack(() => setSelectedExperienceId(null))} 
+          <ExperienceDetailScreen
+            experienceId={selectedExperienceId}
+            onBack={wrapBack(() => setSelectedExperienceId(null))}
           />
         </div>
       </div>
@@ -1038,8 +1038,8 @@ const Index = () => {
       return (
         <div className="min-h-screen bg-background w-full">
           <div className="w-full bg-background min-h-screen overflow-x-clip">
-            <MarketplaceItineraryScreen 
-              itineraryId={selectedItinerary.id} 
+            <MarketplaceItineraryScreen
+              itineraryId={selectedItinerary.id}
               autoOpenCheckout={resumeCheckoutId === selectedItinerary.id}
               datasetOverride={injectedMarketplaceDataset && injectedMarketplaceDataset === selectedItinerary ? injectedMarketplaceDataset : null}
               isOwner={!!ownedPublicUserItinerary}
@@ -1158,7 +1158,7 @@ const Index = () => {
     return (
       <div className="min-h-screen bg-background w-full">
         <div className="w-full bg-background min-h-screen overflow-x-clip">
-          <PlannerItineraryScreen 
+          <PlannerItineraryScreen
             data={plannerData}
             itineraryDataset={selectedItinerary}
             itineraryId={selectedItinerary.id}
@@ -1200,6 +1200,7 @@ const Index = () => {
             onOpenItinerary={(dataset) => {
               setSelectedItinerary(dataset);
             }}
+            onNavigateToFAQ={() => setProfileSubScreen('help-center')}
           />
         </div>
       </div>
@@ -1211,7 +1212,7 @@ const Index = () => {
     return (
       <div className="min-h-screen bg-background w-full">
         <div className="w-full bg-background min-h-screen overflow-x-clip">
-          <PlannerItineraryScreen 
+          <PlannerItineraryScreen
             data={newItineraryData}
             itineraryDataset={activeUserItineraryDataset ?? undefined}
             itineraryId={activeUserItineraryId ?? undefined}
@@ -1252,20 +1253,21 @@ const Index = () => {
             onNavigateToAI={() => { setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryIsPurchased(false); setShowAIAssistant(true); }}
             onNavigateToSales={() => { setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryIsPurchased(false); setCreatorEditingItinerary(null); setReturnToPublic(true); setActiveTab('trips'); }}
             onUpgrade={() => {
-              setNewItineraryData(null); 
-              setActiveUserItineraryId(null); 
-              setActiveUserItineraryDataset(null); 
-              setActiveUserItineraryIsPurchased(false); 
+              setNewItineraryData(null);
+              setActiveUserItineraryId(null);
+              setActiveUserItineraryDataset(null);
+              setActiveUserItineraryIsPurchased(false);
               setCreatorEditingItinerary(null);
               setSubscriptionOrigin('trips');
               setActiveTab('home');
               setProfileSubScreen('subscription');
             }}
+            onNavigateToFAQ={() => setProfileSubScreen('help-center')}
           />
         </div>
-        <SuccessToast 
-          isVisible={showSuccessToast} 
-          onClose={() => setShowSuccessToast(false)} 
+        <SuccessToast
+          isVisible={showSuccessToast}
+          onClose={() => setShowSuccessToast(false)}
         />
       </div>
     );
@@ -1276,8 +1278,8 @@ const Index = () => {
     return (
       <div className="min-h-screen bg-background w-full">
         <div className="w-full bg-background min-h-screen overflow-x-clip">
-          <CollectionDetailScreen 
-            collectionId={selectedCollectionId} 
+          <CollectionDetailScreen
+            collectionId={selectedCollectionId}
             collectionName={newCollectionName}
             sharedWithIds={newCollectionSharedWith}
             onBack={wrapBack(() => { setSelectedCollectionId(null); setNewCollectionName(null); setNewCollectionSharedWith([]); setActiveTab('trips'); setReturnToCollections(true); })}
@@ -1368,8 +1370,8 @@ const Index = () => {
         <div className="w-full bg-background min-h-screen overflow-x-clip">
           <NotificationsScreen
             onBack={wrapBack(() => setShowNotifications(false))}
-            onNavigateToItinerary={(id) => { 
-              setShowNotifications(false); 
+            onNavigateToItinerary={(id) => {
+              setShowNotifications(false);
               if (typeof id === 'string') {
                 const found = myItinerariesForLimit.find(it => it.id === id);
                 if (found) {
@@ -1394,7 +1396,7 @@ const Index = () => {
               } else {
                 handleItineraryClick(id);
               }
-              setNavigatedFromNotifications(true); 
+              setNavigatedFromNotifications(true);
             }}
             onNavigateToSales={() => { setShowNotifications(false); setProfileSubScreen('sales'); setNavigatedFromNotifications(true); }}
             onNavigateToAI={() => { setShowNotifications(false); setShowAIAssistant(true); setNavigatedFromNotifications(true); }}
@@ -1419,6 +1421,32 @@ const Index = () => {
             items={itineraryList.items}
             onBack={wrapBack(() => setItineraryList(null))}
             onItineraryClick={(id) => { setItineraryList(null); handleMarketplaceItineraryClick(id); }}
+            onPublicItineraryClick={(uuid, item) => {
+              setItineraryList(null);
+              if (item.sourceDatasetId != null) {
+                handleMarketplaceItineraryClick(item.sourceDatasetId);
+                return;
+              }
+              const synthetic = buildSyntheticMarketplaceDataset({
+                id: 0,
+                title: item.title,
+                image: item.image,
+                rating: item.rating,
+                places: item.places,
+                days: item.days,
+                author: item.author,
+                authorImage: item.authorImage,
+                price: item.price,
+                reviewCount: 0,
+                category: item.category,
+                destinations: [],
+              } as any);
+              const dataset = { ...synthetic, id: uuid, type: 'marketplace' as const };
+              setInjectedMarketplaceDataset(dataset);
+              setOwnedPublicUserItinerary(null);
+              setSelectedItinerary(dataset);
+              window.scrollTo(0, 0);
+            }}
             onGoToExplore={() => { setItineraryList(null); setActiveTab('explore'); }}
           />
         </div>
@@ -1454,8 +1482,8 @@ const Index = () => {
     return (
       <div className="min-h-screen bg-background w-full">
         <div className="w-full bg-background min-h-screen overflow-x-clip">
-          <SearchScreen 
-            onClose={handleSearchClose} 
+          <SearchScreen
+            onClose={handleSearchClose}
             onItineraryClick={handleItineraryClick}
             onPublicUserItineraryClick={(it) => { setShowSearch(false); handleUserPublicItineraryClick(it); }}
             onPlaceClick={(place) => { setShowSearch(false); setDestinationList(place); }}
@@ -1471,7 +1499,7 @@ const Index = () => {
       return (
         <div className="min-h-screen bg-background w-full">
           <div className="w-full bg-background min-h-screen overflow-x-clip">
-            <UserProfileScreen 
+            <UserProfileScreen
               onBack={wrapBack(() => setProfileSubScreen('main'))}
               onEditProfile={() => setProfileSubScreen('edit')}
               onViewCreatorProgram={() => { setCreatorProgramOrigin('profile'); setProfileSubScreen('creator-program'); }}
@@ -1488,7 +1516,7 @@ const Index = () => {
       return (
         <div className="min-h-screen bg-background w-full">
           <div className="w-full bg-background min-h-screen overflow-x-clip">
-            <CreatorDashboardScreen 
+            <CreatorDashboardScreen
               onBack={wrapBack(() => setProfileSubScreen('main'))}
               onEditProfile={() => setProfileSubScreen('edit')}
               onViewSales={() => setProfileSubScreen('sales')}
@@ -1552,7 +1580,7 @@ const Index = () => {
       return (
         <div className="min-h-screen bg-background w-full">
           <div className="w-full bg-background min-h-screen overflow-x-clip">
-            <EditProfileScreen 
+            <EditProfileScreen
               onBack={wrapBack(() => setProfileSubScreen('user'))}
               onSave={() => setProfileSubScreen('user')}
             />
@@ -1603,14 +1631,16 @@ const Index = () => {
       'language': { component: <LanguageScreen onBack={wrapBack(() => setProfileSubScreen('user'))} /> },
       'help-center': { component: <HelpCenterScreen onBack={wrapBack(() => setProfileSubScreen('user'))} /> },
       'purchases': { component: <PurchasesScreen onBack={wrapBack(() => setProfileSubScreen('user'))} onNavigateToItinerary={(id) => { setProfileSubScreen('main'); handleItineraryClick(id); setNavigatedFromPurchases(true); }} onResumeCheckout={(id) => { setResumeCheckoutId(id); handleItineraryClick(id); setNavigatedFromPurchases(true); }} /> },
-      'subscription': { component: <SubscriptionScreen onBack={wrapBack(() => {
-        if (subscriptionOrigin === 'trips') {
-          setProfileSubScreen('main');
-          setActiveTab('trips');
-        } else {
-          setProfileSubScreen('user');
-        }
-      })} /> },
+      'subscription': {
+        component: <SubscriptionScreen onBack={wrapBack(() => {
+          if (subscriptionOrigin === 'trips') {
+            setProfileSubScreen('main');
+            setActiveTab('trips');
+          } else {
+            setProfileSubScreen('user');
+          }
+        })} />
+      },
     };
     const settingsEntry = settingsScreenMap[profileSubScreen];
     if (settingsEntry) {
@@ -1626,178 +1656,206 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background w-full relative overflow-x-clip">
-        {activeTab === 'home' && (
-          <HomeScreen 
-            onItineraryClick={handleMarketplaceItineraryClick} 
-            onExperienceClick={(id) => setSelectedExperienceId(id)}
-            onSearchClick={handleSearchOpen}
-            onProfileClick={() => navigate('/user')}
-            onCreatorClick={() => navigate('/profile')}
-            onChatClick={() => setShowChat(true)}
-            onNotificationsClick={() => setShowNotifications(true)}
-            onCartClick={() => setShowCart(true)}
-            onFindPeopleClick={() => setShowSimilarTravelers(true)}
-            onSeeAllItineraries={(title, items) => setItineraryList({ title, items })}
-            onContinuePlanning={(it) => handleUserItineraryClick(it)}
-            onInsightAction={(insight) => {
-              const action = insight.action;
-              if (!action) return;
-              switch (action.type) {
-                case 'open-itinerary': {
-                  const target = myItinerariesForLimit.find((it) => String(it.id) === action.itineraryId);
-                  if (target) {
-                    handleUserItineraryClick(target);
-                  } else {
-                    setActiveTab('trips');
-                  }
-                  break;
-                }
-                case 'open-trips':
+      {activeTab === 'home' && (
+        <HomeScreen
+          onItineraryClick={handleMarketplaceItineraryClick}
+          onPublicItineraryClick={(itineraryId, sourceDatasetId, item) => {
+            // Se tem sourceDatasetId (roteiro baseado em dataset estático), usa o fluxo normal
+            if (sourceDatasetId != null) {
+              handleMarketplaceItineraryClick(sourceDatasetId);
+              return;
+            }
+            // Roteiro purely do banco — constroi um dataset sintético de marketplace
+            const synthetic = buildSyntheticMarketplaceDataset({
+              id: 0, // não usado no fluxo injected
+              title: item.title,
+              image: item.image,
+              rating: item.rating,
+              places: item.places,
+              days: item.days,
+              author: item.author,
+              authorImage: item.authorImage,
+              price: item.price,
+              reviewCount: 0,
+              category: item.category,
+              destinations: item.destinations,
+            } as any);
+            const dataset = { ...synthetic, id: itineraryId, type: 'marketplace' as const };
+            setInjectedMarketplaceDataset(dataset);
+            setOwnedPublicUserItinerary(null);
+            setSelectedItinerary(dataset);
+            window.scrollTo(0, 0);
+          }}
+          onExperienceClick={(id) => setSelectedExperienceId(id)}
+          onSearchClick={handleSearchOpen}
+          onProfileClick={() => navigate('/user')}
+          onCreatorClick={() => navigate('/profile')}
+          onChatClick={() => setShowChat(true)}
+          onNotificationsClick={() => setShowNotifications(true)}
+          onCartClick={() => setShowCart(true)}
+          onFindPeopleClick={() => setShowSimilarTravelers(true)}
+          onSeeAllItineraries={(title, items) => setItineraryList({ title, items })}
+          onContinuePlanning={(it) => handleUserItineraryClick(it)}
+
+          onInsightAction={(insight) => {
+            const action = insight.action;
+            if (!action) return;
+            switch (action.type) {
+              case 'open-itinerary': {
+                const target = myItinerariesForLimit.find((it) => String(it.id) === action.itineraryId);
+                if (target) {
+                  handleUserItineraryClick(target);
+                } else {
                   setActiveTab('trips');
-                  break;
-                case 'open-explore':
-                  setActiveTab('explore');
-                  break;
-                case 'open-edit-profile':
-                  navigate('/user');
-                  setProfileSubScreen('edit');
-                  break;
-                case 'create-itinerary':
-                  setShowItinerarySheet(true);
-                  break;
+                }
+                break;
               }
-            }}
+              case 'open-trips':
+                setActiveTab('trips');
+                break;
+              case 'open-explore':
+                setActiveTab('explore');
+                break;
+              case 'open-edit-profile':
+                navigate('/user');
+                setProfileSubScreen('edit');
+                break;
+              case 'create-itinerary':
+                setShowItinerarySheet(true);
+                break;
+            }
+          }}
+        />
+      )}
+      {activeTab === 'explore' && (
+        <Suspense fallback={<ScreenFallback />}>
+          <ExploreScreen
+            onItineraryClick={handleMarketplaceItineraryClick}
+            onSearchClick={handleSearchOpen}
+            onProfileClick={() => navigate('/profile')}
+            onSeeDestinationItineraries={(d) => setDestinationList(d)}
+          />
+        </Suspense>
+      )}
+      {activeTab === 'trips' && (
+        <Suspense fallback={<ScreenFallback />}>
+          <TripsScreen
+            key={returnToPublic ? 'public' : returnToCollections ? 'collections' : 'default'}
+            onItineraryClick={handleItineraryClick}
+            onPrivateItineraryClick={handleItineraryClick}
+            onUserItineraryClick={handleUserItineraryClick}
+            onUserPublicItineraryClick={(it) => setCreatorDashboardItinerary(it)}
+            onCollectionClick={(id) => { setSelectedCollectionId(id); setReturnToCollections(false); }}
+            onCreateItinerary={() => tryOpenItinerarySheet()}
+            onBecomeCreator={() => { setCreatorProgramOrigin('trips'); setActiveTab('home'); setProfileSubScreen('creator-program'); }}
+            onExplore={() => setActiveTab('explore')}
+            onUpgrade={() => { setSubscriptionOrigin('trips'); setActiveTab('home'); setProfileSubScreen('subscription'); }}
+            itineraryUsedCount={ownCreatedCount}
+            itineraryLimit={FREE_PLAN_ITINERARY_LIMIT}
+            defaultTab={returnToPublic ? 'public' : returnToCollections ? 'collections' : 'private'}
+          />
+        </Suspense>
+      )}
+      {activeTab === 'ai' && null}
+
+      <BottomNavigation activeTab={activeTab} onTabChange={handleTabChange} />
+
+      <CreateBottomSheet
+        isOpen={showCreateSheet}
+        onClose={() => setShowCreateSheet(false)}
+        onOptionSelect={handleCreateOptionSelect}
+      />
+
+      {/* Sheets lazy: só montam (e baixam o chunk) quando abertos pela primeira vez. */}
+      <Suspense fallback={null}>
+        {showItinerarySheet && (
+          <CreateItinerarySheet
+            isOpen={showItinerarySheet}
+            onClose={() => { setShowItinerarySheet(false); setPendingVideoPlaces(null); }}
+            onSubmit={handleItinerarySubmit}
+            initialDestinations={pendingVideoPlaces ? [...new Set(pendingVideoPlaces.map((p: any) => p.location as string))] : undefined}
           />
         )}
-        {activeTab === 'explore' && (
-          <Suspense fallback={<ScreenFallback />}>
-            <ExploreScreen 
-              onItineraryClick={handleMarketplaceItineraryClick}
-              onSearchClick={handleSearchOpen}
-              onProfileClick={() => navigate('/profile')}
-              onSeeDestinationItineraries={(d) => setDestinationList(d)}
-            />
-          </Suspense>
+
+        {showPlanLimitSheet && (
+          <PlanLimitReachedSheet
+            isOpen={showPlanLimitSheet}
+            onClose={() => setShowPlanLimitSheet(false)}
+            onUpgrade={() => {
+              setShowPlanLimitSheet(false);
+              setSubscriptionOrigin('trips');
+              setActiveTab('home');
+              setProfileSubScreen('subscription');
+            }}
+            currentCount={ownCreatedCount}
+            limit={FREE_PLAN_ITINERARY_LIMIT}
+          />
         )}
-        {activeTab === 'trips' && (
-          <Suspense fallback={<ScreenFallback />}>
-            <TripsScreen 
-              key={returnToPublic ? 'public' : returnToCollections ? 'collections' : 'default'}
-              onItineraryClick={handleItineraryClick} 
-              onPrivateItineraryClick={handleItineraryClick}
-              onUserItineraryClick={handleUserItineraryClick}
-              onUserPublicItineraryClick={(it) => setCreatorDashboardItinerary(it)}
-              onCollectionClick={(id) => { setSelectedCollectionId(id); setReturnToCollections(false); }}
-              onCreateItinerary={() => tryOpenItinerarySheet()}
-              onBecomeCreator={() => { setCreatorProgramOrigin('trips'); setActiveTab('home'); setProfileSubScreen('creator-program'); }}
-              onExplore={() => setActiveTab('explore')}
-              onUpgrade={() => { setSubscriptionOrigin('trips'); setActiveTab('home'); setProfileSubScreen('subscription'); }}
-              itineraryUsedCount={ownCreatedCount}
-              itineraryLimit={FREE_PLAN_ITINERARY_LIMIT}
-              defaultTab={returnToPublic ? 'public' : returnToCollections ? 'collections' : 'private'}
-            />
-          </Suspense>
+
+        {showAddVideoSheet && (
+          <AddVideoSheet
+            isOpen={showAddVideoSheet}
+            onClose={() => setShowAddVideoSheet(false)}
+            onOptionSelect={handleAddVideoOptionSelect}
+          />
         )}
-        {activeTab === 'ai' && null}
 
-        <BottomNavigation activeTab={activeTab} onTabChange={handleTabChange} />
-        
-        <CreateBottomSheet 
-          isOpen={showCreateSheet}
-          onClose={() => setShowCreateSheet(false)}
-          onOptionSelect={handleCreateOptionSelect}
-        />
-        
-        {/* Sheets lazy: só montam (e baixam o chunk) quando abertos pela primeira vez. */}
-        <Suspense fallback={null}>
-          {showItinerarySheet && (
-            <CreateItinerarySheet
-              isOpen={showItinerarySheet}
-              onClose={() => { setShowItinerarySheet(false); setPendingVideoPlaces(null); }}
-              onSubmit={handleItinerarySubmit}
-              initialDestinations={pendingVideoPlaces ? [...new Set(pendingVideoPlaces.map((p: any) => p.location as string))] : undefined}
-            />
-          )}
+        {showAddVideoByLinkSheet && (
+          <AddVideoByLinkSheet
+            isOpen={showAddVideoByLinkSheet}
+            onClose={() => setShowAddVideoByLinkSheet(false)}
+            onBack={wrapBack(handleBackToAddVideoSheet)}
+            onSubmit={handleVideoLinkSubmit}
+            onCreateNewItinerary={handleCreateNewItineraryFromVideo}
+            onCollectionCreated={(id) => { setSelectedCollectionId(id); setReturnToCollections(false); }}
+          />
+        )}
 
-          {showPlanLimitSheet && (
-            <PlanLimitReachedSheet
-              isOpen={showPlanLimitSheet}
-              onClose={() => setShowPlanLimitSheet(false)}
-              onUpgrade={() => {
-                setShowPlanLimitSheet(false);
-                setSubscriptionOrigin('trips');
-                setActiveTab('home');
-                setProfileSubScreen('subscription');
-              }}
-              currentCount={ownCreatedCount}
-              limit={FREE_PLAN_ITINERARY_LIMIT}
-            />
-          )}
+        {showAddVideoFromGallery && (
+          <AddVideoFromGallerySheet
+            isOpen={showAddVideoFromGallery}
+            onClose={() => setShowAddVideoFromGallery(false)}
+            onBack={wrapBack(handleBackToAddVideoSheet)}
+            onSubmit={handleVideoGallerySubmit}
+            onCreateNewItinerary={handleCreateNewItineraryFromVideo}
+            onCollectionCreated={(id) => { setSelectedCollectionId(id); setReturnToCollections(false); }}
+          />
+        )}
 
-          {showAddVideoSheet && (
-            <AddVideoSheet
-              isOpen={showAddVideoSheet}
-              onClose={() => setShowAddVideoSheet(false)}
-              onOptionSelect={handleAddVideoOptionSelect}
-            />
-          )}
+        {showCollectionSheet && (
+          <CreateCollectionSheet
+            isOpen={showCollectionSheet}
+            onClose={() => setShowCollectionSheet(false)}
+            onSubmit={handleCollectionSubmit}
+          />
+        )}
 
-          {showAddVideoByLinkSheet && (
-            <AddVideoByLinkSheet
-              isOpen={showAddVideoByLinkSheet}
-              onClose={() => setShowAddVideoByLinkSheet(false)}
-              onBack={wrapBack(handleBackToAddVideoSheet)}
-              onSubmit={handleVideoLinkSubmit}
-              onCreateNewItinerary={handleCreateNewItineraryFromVideo}
-              onCollectionCreated={(id) => { setSelectedCollectionId(id); setReturnToCollections(false); }}
-            />
-          )}
+        {showGuideSheet && (
+          <CreateGuideSheet
+            isOpen={showGuideSheet}
+            onClose={() => setShowGuideSheet(false)}
+            onSubmit={handleGuideSubmit}
+          />
+        )}
+      </Suspense>
 
-          {showAddVideoFromGallery && (
-            <AddVideoFromGallerySheet
-              isOpen={showAddVideoFromGallery}
-              onClose={() => setShowAddVideoFromGallery(false)}
-              onBack={wrapBack(handleBackToAddVideoSheet)}
-              onSubmit={handleVideoGallerySubmit}
-              onCreateNewItinerary={handleCreateNewItineraryFromVideo}
-              onCollectionCreated={(id) => { setSelectedCollectionId(id); setReturnToCollections(false); }}
-            />
-          )}
-
-          {showCollectionSheet && (
-            <CreateCollectionSheet
-              isOpen={showCollectionSheet}
-              onClose={() => setShowCollectionSheet(false)}
-              onSubmit={handleCollectionSubmit}
-            />
-          )}
-
-          {showGuideSheet && (
-            <CreateGuideSheet
-              isOpen={showGuideSheet}
-              onClose={() => setShowGuideSheet(false)}
-              onSubmit={handleGuideSubmit}
-            />
-          )}
-        </Suspense>
-
-        <SuccessToast 
-          isVisible={showSuccessToast} 
-          onClose={() => setShowSuccessToast(false)} 
-        />
-        <SuccessToast 
-          isVisible={showDeleteSuccessToast} 
-          onClose={() => setShowDeleteSuccessToast(false)}
-          title="Roteiro excluído!"
-          description="O roteiro foi removido com sucesso."
-        />
-        <SuccessToast 
-          isVisible={showDeleteCollectionToast} 
-          onClose={() => setShowDeleteCollectionToast(false)}
-          title="Coleção excluída!"
-          description="A coleção foi removida com sucesso."
-        />
-      </div>
+      <SuccessToast
+        isVisible={showSuccessToast}
+        onClose={() => setShowSuccessToast(false)}
+      />
+      <SuccessToast
+        isVisible={showDeleteSuccessToast}
+        onClose={() => setShowDeleteSuccessToast(false)}
+        title="Roteiro excluído!"
+        description="O roteiro foi removido com sucesso."
+      />
+      <SuccessToast
+        isVisible={showDeleteCollectionToast}
+        onClose={() => setShowDeleteCollectionToast(false)}
+        title="Coleção excluída!"
+        description="A coleção foi removida com sucesso."
+      />
+    </div>
   );
 };
 

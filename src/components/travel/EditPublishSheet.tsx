@@ -24,11 +24,13 @@ interface EditPublishSheetProps {
     priceCents?: number;
     description?: string;
     tags?: string[];
+    mainTag?: string;
   }) => void;
   onUnpublish: () => void;
   onEditItinerary?: () => void;
   isPaused?: boolean;
   onTogglePause?: (next: boolean) => void;
+  initialMainTag?: string;
 }
 
 type View = 'summary' | 'title' | 'price' | 'description' | 'tags';
@@ -68,6 +70,7 @@ export function EditPublishSheet({
   onEditItinerary,
   isPaused = false,
   onTogglePause,
+  initialMainTag,
 }: EditPublishSheetProps) {
   const [view, setView] = useState<View>('summary');
   const [title, setTitle] = useState(initialTitle);

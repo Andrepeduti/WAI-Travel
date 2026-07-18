@@ -76,8 +76,8 @@ const SEASONS = [
 ];
 
 const SEARCH_TYPES: { id: ExploreFilters['searchType']; label: string; icon?: string }[] = [
+  { id: 'roteiros', label: 'Roteiros' },
   { id: 'lugares', label: 'Lugares' },
-  { id: 'roteiros', label: 'Roteiros à venda' },
   { id: 'pessoas', label: 'Pessoas' },
 ];
 
@@ -92,7 +92,9 @@ const formatBRL = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 
 export function FiltersScreen({ onClose, initial = DEFAULT_FILTERS, onApply, countResults }: FiltersScreenProps) {
-  const [filters, setFilters] = useState<ExploreFilters>(initial);
+  const [filters, setFilters] = useState<ExploreFilters>(() => {
+    return initial.searchType === null ? { ...initial, searchType: 'roteiros' } : initial;
+  });
 
   const toggleArr = <T extends string>(arr: T[], value: T): T[] =>
     arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];
@@ -121,7 +123,7 @@ export function FiltersScreen({ onClose, initial = DEFAULT_FILTERS, onApply, cou
 
   // Count active filters (excl. defaults)
   const activeCount =
-    (filters.searchType !== 'todos' ? 1 : 0) +
+    (filters.searchType !== null ? 1 : 0) +
     filters.regions.length +
     filters.countries.length +
     filters.tripTypes.length +
@@ -139,7 +141,7 @@ export function FiltersScreen({ onClose, initial = DEFAULT_FILTERS, onApply, cou
   const showPriceAndDuration = isRoteiros;
   const showCountries = isPeople;
 
-  const isUnchanged = JSON.stringify(filters) === JSON.stringify(initial);
+  const isUnchanged = JSON.stringify(filters) === JSON.stringify(initial.searchType === null ? { ...initial, searchType: 'roteiros' } : initial);
 
   return (
     <div
@@ -416,8 +418,8 @@ function RangeSliderWithInputs({ min, max, step, value, onValueChange, labelMin,
 
   useEffect(() => {
     setLocalMin(value[0].toString());
-    setLocalMax(value[1].toString());
-  }, [value]);
+    setLocalMax(value[1] === max && maxSuffix ? `${value[1]}+` : value[1].toString());
+  }, [value, max, maxSuffix]);
 
   const handleMinBlur = () => {
     let val = parseInt(localMin.replace(/\D/g, ''), 10);
@@ -431,10 +433,9 @@ function RangeSliderWithInputs({ min, max, step, value, onValueChange, labelMin,
   const handleMaxBlur = () => {
     let val = parseInt(localMax.replace(/\D/g, ''), 10);
     if (isNaN(val)) val = max;
-    if (val > max) val = max;
     if (val < value[0]) val = value[0];
     onValueChange([value[0], val]);
-    setLocalMax(val.toString());
+    setLocalMax(val === max && maxSuffix ? `${val}+` : val.toString());
   };
 
   return (
@@ -454,8 +455,8 @@ function RangeSliderWithInputs({ min, max, step, value, onValueChange, labelMin,
           <div className="text-[11px] text-muted-foreground mb-0.5">{labelMax}</div>
           <div className="flex items-center gap-1">
             {prefix && <span className="text-[14px] text-foreground font-semibold">{prefix}</span>}
-            <input type="number" value={localMax} onChange={e => setLocalMax(e.target.value)} onBlur={handleMaxBlur} className="w-full bg-transparent text-[14px] font-semibold outline-none -ml-1" />
-            {(suffix || maxSuffix) && <span className="text-[14px] text-muted-foreground ml-1">{value[1] === max && maxSuffix ? maxSuffix : suffix}</span>}
+            <input type="text" inputMode="numeric" value={localMax} onChange={e => setLocalMax(e.target.value)} onBlur={handleMaxBlur} className="w-full bg-transparent text-[14px] font-semibold outline-none -ml-1" />
+            {suffix && <span className="text-[14px] text-muted-foreground ml-1">{suffix}</span>}
           </div>
         </div>
       </div>
