@@ -119,14 +119,19 @@ export const getFollowers = async (profileUserId: string): Promise<FollowListEnt
     .select('follower_id')
     .eq('following_id', profileUserId)
     .order('created_at', { ascending: false });
+  console.log('[DEBUG getFollowers] profile_follows rows:', rows, 'error:', error);
   if (error) { console.error('[social] getFollowers', error); return []; }
   const ids = (rows || []).map((r: any) => r.follower_id).filter(Boolean);
+  console.log('[DEBUG getFollowers] Extracted ids:', ids);
   if (ids.length === 0) return [];
-  const { data: profs } = await db.from('profiles_public')
+  const { data: profs, error: pErr } = await db.from('profiles_public')
     .select('user_id, name, username, avatar_url, location, bio')
     .in('user_id', ids);
+  console.log('[DEBUG getFollowers] profiles_public rows:', profs, 'error:', pErr);
   const byId = new Map<string, any>((profs || []).map((p: any) => [p.user_id, p]));
-  return ids.map((id: string) => byId.get(id)).filter(Boolean).map(profileRowToEntry);
+  const final = ids.map((id: string) => byId.get(id)).filter(Boolean).map(profileRowToEntry);
+  console.log('[DEBUG getFollowers] final mapped array:', final);
+  return final;
 };
 
 /** Lista pessoas que o usuário informado SEGUE. */
@@ -136,14 +141,19 @@ export const getFollowing = async (profileUserId: string): Promise<FollowListEnt
     .select('following_id')
     .eq('follower_id', profileUserId)
     .order('created_at', { ascending: false });
+  console.log('[DEBUG getFollowing] profile_follows rows:', rows, 'error:', error);
   if (error) { console.error('[social] getFollowing', error); return []; }
   const ids = (rows || []).map((r: any) => r.following_id).filter(Boolean);
+  console.log('[DEBUG getFollowing] Extracted ids:', ids);
   if (ids.length === 0) return [];
-  const { data: profs } = await db.from('profiles_public')
+  const { data: profs, error: pErr } = await db.from('profiles_public')
     .select('user_id, name, username, avatar_url, location, bio')
     .in('user_id', ids);
+  console.log('[DEBUG getFollowing] profiles_public rows:', profs, 'error:', pErr);
   const byId = new Map<string, any>((profs || []).map((p: any) => [p.user_id, p]));
-  return ids.map((id: string) => byId.get(id)).filter(Boolean).map(profileRowToEntry);
+  const final = ids.map((id: string) => byId.get(id)).filter(Boolean).map(profileRowToEntry);
+  console.log('[DEBUG getFollowing] final mapped array:', final);
+  return final;
 };
 
 /**

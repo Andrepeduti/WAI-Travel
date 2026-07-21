@@ -190,6 +190,7 @@ const iconMap: Record<string, [React.ComponentType<React.SVGProps<SVGSVGElement>
   chevron_down: [ChevronDownIcon],
   expand_more: [ChevronDownIcon],
   chevron_up: [ChevronUpIcon],
+  expand_less: [ChevronUpIcon],
   close: [XMarkIcon],
   more_vert: [EllipsisVerticalIcon],
   more_horiz: [EllipsisHorizontalIcon],

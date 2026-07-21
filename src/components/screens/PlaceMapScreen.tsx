@@ -219,6 +219,16 @@ export function PlaceMapScreen({ place, onBack }: PlaceMapScreenProps) {
                   {place.address}
                 </p>
               )}
+              <button
+                onClick={() => {
+                  const query = encodeURIComponent(`${place.name} ${place.address || place.category || ''}`);
+                  window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
+                }}
+                className="mt-2.5 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/50 hover:bg-muted active:scale-95 transition-transform w-fit"
+              >
+                <Icon name="directions" size={14} className="text-primary" />
+                <span className="text-[12px] font-semibold text-foreground">Como chegar</span>
+              </button>
             </div>
           </div>
         </div>

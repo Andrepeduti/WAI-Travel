@@ -208,7 +208,7 @@ export function FollowListScreen({ profileUserId, profileLabel, initialTab, init
     if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
     longPressTimer.current = window.setTimeout(() => {
       longPressFired.current = true;
-      try { (navigator as any)?.vibrate?.(20); } catch {}
+      try { (navigator as any)?.vibrate?.(20); } catch { }
       setModerateSheet({ kind: 'moderate', entry });
     }, 500);
   };
@@ -243,107 +243,108 @@ export function FollowListScreen({ profileUserId, profileLabel, initialTab, init
         ) : (
           <>
             {/* Tabs */}
-        <div className="flex border-b border-border bg-background sticky top-[57px] z-10">
-          {(['followers', 'following'] as Tab[]).map(t => {
-            const active = tab === t;
-            let count: string | number = '-';
-            if (!loading) {
-              count = t === 'followers' ? followers.length : following.length;
-            } else if (t === 'followers' && initialFollowersCount !== undefined) {
-              count = initialFollowersCount;
-            } else if (t === 'following' && initialFollowingCount !== undefined) {
-              count = initialFollowingCount;
-            }
-            const label = t === 'followers' ? 'Seguidores' : 'Seguindo';
-            return (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className="flex-1 py-3 text-center relative active:opacity-70"
-                style={{ fontSize: 14, fontWeight: 600, color: active ? '#1A1C40' : '#8E8E93' }}
-              >
-                {count} {label}
-                {active && (
-                  <span className="absolute left-0 right-0 bottom-0 h-[2px]" style={{ background: '#1A1C40' }} />
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Search */}
-        <div className="px-4 py-3">
-          <div className="flex items-center gap-2 rounded-full px-3 h-10" style={{ background: '#F2F2F7' }}>
-            <Icon name="search" size={16} style={{ color: '#8E8E93' }} />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar"
-              className="flex-1 bg-transparent outline-none"
-              style={{ fontSize: 16, color: '#1A1C40' }}
-            />
-          </div>
-        </div>
-
-        {/* List */}
-        <div className="flex-1 px-2 pb-8">
-          {filtered.length === 0 ? (
-            <div className="px-4 py-10 flex flex-col items-center gap-2">
-              <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: '#F2F2F2' }}>
-                <Icon name="group" size={22} className="text-muted-foreground" />
-              </div>
-              <p className="text-muted-foreground text-center" style={{ fontSize: 14 }}>
-                {tab === 'followers' ? 'Sem seguidores ainda' : 'Não está seguindo ninguém ainda'}
-              </p>
-            </div>
-          ) : (
-            <ul className="flex flex-col">
-              {filtered.map(entry => {
-                const isMe = entry.userId === myId;
-                const iFollow = followingMe.has(entry.userId);
-                const busy = busyIds.has(entry.userId);
-
-                // Texto/estilo do botão principal: Seguir / Seguindo
-                const btnLabel = iFollow ? 'Seguindo' : 'Seguir';
-                const btnBg = iFollow ? '#F2F2F7' : '#1A1C40';
-                const btnColor = iFollow ? '#1A1C40' : '#FFFFFF';
-
+            <div className="flex border-b border-border bg-background sticky top-[57px] z-10">
+              {(['followers', 'following'] as Tab[]).map(t => {
+                const active = tab === t;
+                let count: string | number = '-';
+                if (!loading) {
+                  const sourceList = t === 'followers' ? followers : following;
+                  count = sourceList.filter(e => !removedIds.has(e.userId)).length;
+                } else if (t === 'followers' && initialFollowersCount !== undefined) {
+                  count = initialFollowersCount;
+                } else if (t === 'following' && initialFollowingCount !== undefined) {
+                  count = initialFollowingCount;
+                }
+                const label = t === 'followers' ? 'Seguidores' : 'Seguindo';
                 return (
-                  <li key={entry.userId} className="flex items-center gap-3 px-3 py-2.5">
-                    <button
-                      onClick={() => goToProfile(entry)}
-                      onPointerDown={() => startLongPress(entry)}
-                      onPointerUp={cancelLongPress}
-                      onPointerLeave={cancelLongPress}
-                      onPointerCancel={cancelLongPress}
-                      onContextMenu={(e) => { e.preventDefault(); if (!isMe) setModerateSheet({ kind: 'moderate', entry }); }}
-                      className="flex items-center gap-3 flex-1 min-w-0 text-left active:opacity-70 select-none"
-                      style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none' }}
-                    >
-                      <UserAvatar src={entry.avatar} alt={entry.name} size={44} />
-                      <div className="flex-1 min-w-0">
-                        <p className="truncate text-foreground" style={{ fontSize: 14, fontWeight: 600 }}>{entry.name}</p>
-                        <p className="truncate text-muted-foreground" style={{ fontSize: 12 }}>{entry.username}</p>
-                      </div>
-                    </button>
-
-                    {!isMe && (
-                      <button
-                        disabled={busy}
-                        onClick={() => handleFollowButton(entry)}
-                        className="rounded-full px-3 h-8 active:opacity-70 flex-shrink-0"
-                        style={{ fontSize: 12, fontWeight: 700, background: btnBg, color: btnColor }}
-                      >
-                        {btnLabel}
-                      </button>
+                  <button
+                    key={t}
+                    onClick={() => setTab(t)}
+                    className="flex-1 py-3 text-center relative active:opacity-70"
+                    style={{ fontSize: 14, fontWeight: 600, color: active ? '#1A1C40' : '#8E8E93' }}
+                  >
+                    {count} {label}
+                    {active && (
+                      <span className="absolute left-0 right-0 bottom-0 h-[2px]" style={{ background: '#1A1C40' }} />
                     )}
-                  </li>
+                  </button>
                 );
               })}
-            </ul>
-          )}
-        </div>
-        </>
+            </div>
+
+            {/* Search */}
+            <div className="px-4 py-3">
+              <div className="flex items-center gap-2 rounded-full px-3 h-10" style={{ background: '#F2F2F7' }}>
+                <Icon name="search" size={16} style={{ color: '#8E8E93' }} />
+                <input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Buscar"
+                  className="flex-1 bg-transparent outline-none"
+                  style={{ fontSize: 16, color: '#1A1C40' }}
+                />
+              </div>
+            </div>
+
+            {/* List */}
+            <div className="flex-1 px-2 pb-8">
+              {filtered.length === 0 ? (
+                <div className="px-4 py-10 flex flex-col items-center gap-2">
+                  <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: '#F2F2F2' }}>
+                    <Icon name="group" size={22} className="text-muted-foreground" />
+                  </div>
+                  <p className="text-muted-foreground text-center" style={{ fontSize: 14 }}>
+                    {tab === 'followers' ? 'Sem seguidores ainda' : 'Não está seguindo ninguém ainda'}
+                  </p>
+                </div>
+              ) : (
+                <ul className="flex flex-col">
+                  {filtered.map(entry => {
+                    const isMe = entry.userId === myId;
+                    const iFollow = followingMe.has(entry.userId);
+                    const busy = busyIds.has(entry.userId);
+
+                    // Texto/estilo do botão principal: Seguir / Seguindo
+                    const btnLabel = iFollow ? 'Seguindo' : 'Seguir';
+                    const btnBg = iFollow ? '#F2F2F7' : '#1A1C40';
+                    const btnColor = iFollow ? '#1A1C40' : '#FFFFFF';
+
+                    return (
+                      <li key={entry.userId} className="flex items-center gap-3 px-3 py-2.5">
+                        <button
+                          onClick={() => goToProfile(entry)}
+                          onPointerDown={() => startLongPress(entry)}
+                          onPointerUp={cancelLongPress}
+                          onPointerLeave={cancelLongPress}
+                          onPointerCancel={cancelLongPress}
+                          onContextMenu={(e) => { e.preventDefault(); if (!isMe) setModerateSheet({ kind: 'moderate', entry }); }}
+                          className="flex items-center gap-3 flex-1 min-w-0 text-left active:opacity-70 select-none"
+                          style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none' }}
+                        >
+                          <UserAvatar src={entry.avatar} alt={entry.name} size={44} />
+                          <div className="flex-1 min-w-0">
+                            <p className="truncate text-foreground" style={{ fontSize: 14, fontWeight: 600 }}>{entry.name}</p>
+                            <p className="truncate text-muted-foreground" style={{ fontSize: 12 }}>{entry.username}</p>
+                          </div>
+                        </button>
+
+                        {!isMe && (
+                          <button
+                            disabled={busy}
+                            onClick={() => handleFollowButton(entry)}
+                            className="rounded-full px-3 h-8 active:opacity-70 flex-shrink-0"
+                            style={{ fontSize: 12, fontWeight: 700, background: btnBg, color: btnColor }}
+                          >
+                            {btnLabel}
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </>
         )}
 
         {/* Bottom sheet: ações de follow (remover seguidor / deixar de seguir) */}

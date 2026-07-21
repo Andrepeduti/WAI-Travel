@@ -303,22 +303,6 @@ export function FolderDetailScreen({
               className="w-full flex items-center gap-4 py-4 active:bg-muted/30 transition-colors"
               onClick={() => {
                 setFolderActionsOpen(false);
-                setTimeout(() => setShareOpen(true), 300);
-              }}
-            >
-              <Icon name="share" size={22} style={{ color: '#1A1C40' }} />
-              <span className="flex-1 text-[15px] font-medium text-left" style={{ color: '#1A1C40' }}>
-                Compartilhar
-              </span>
-              <Icon name="chevron_right" size={18} style={{ color: '#C0C0C0' }} />
-            </button>
-
-            <div className="h-px" style={{ background: '#F0F0F0' }} />
-
-            <button
-              className="w-full flex items-center gap-4 py-4 active:bg-muted/30 transition-colors"
-              onClick={() => {
-                setFolderActionsOpen(false);
                 setTimeout(() => setDeleteConfirmOpen(true), 300);
               }}
             >

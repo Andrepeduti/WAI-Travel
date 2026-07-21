@@ -82,6 +82,20 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
     setAvatar(user.avatar ?? '');
   }, [user.name, user.username, user.location, user.avatar, user.bio, user.instagram, user.tiktok, user.youtube]);
 
+  const hasChanges = useMemo(() => {
+    return (
+      formData.name.trim() !== (user.name ?? '').trim() ||
+      formData.username.trim() !== (user.username ?? '').replace(/^@/, '').trim() ||
+      formData.location.trim() !== (user.location ?? '').trim() ||
+      formData.bio.trim() !== (user.bio ?? '').trim() ||
+      formData.instagram.trim() !== (user.instagram ?? '').trim() ||
+      formData.tiktok.trim() !== (user.tiktok ?? '').trim() ||
+      formData.youtube.trim() !== (user.youtube ?? '').trim() ||
+      avatarFile !== null ||
+      JSON.stringify(interests.map((i) => i.label)) !== JSON.stringify(interestsFromProfile.map((i) => i.label))
+    );
+  }, [formData, user, avatarFile, interests, interestsFromProfile]);
+
   // Busca cidades via Google Places com debounce
   useEffect(() => {
     const query = locationInput.trim();
@@ -96,13 +110,13 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
     const timeout = setTimeout(async () => {
       try {
         const predictions = await searchGooglePlacesAutocomplete(query, ['(cities)']);
-        
+
         const mapped = predictions.map(p => ({
-            label: p.name,
-            sub: p.location || '',
-            full: p.location ? `${p.name}, ${p.location}` : p.name
+          label: p.name,
+          sub: p.location || '',
+          full: p.location ? `${p.name}, ${p.location}` : p.name
         }));
-        
+
         if (active) setLocationResults(mapped);
       } catch (err) {
         if (active) setLocationResults([]);
@@ -348,9 +362,8 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
                   handleChange('username', e.target.value.replace(/^@/, '').toLowerCase());
                 }}
                 placeholder="seunome"
-                className={`w-full rounded-xl border bg-background pl-9 pr-4 py-3 text-foreground outline-none transition-colors ${
-                  usernameError ? 'border-destructive focus:border-destructive' : 'border-border focus:border-primary'
-                }`}
+                className={`w-full rounded-xl border bg-background pl-9 pr-4 py-3 text-foreground outline-none transition-colors ${usernameError ? 'border-destructive focus:border-destructive' : 'border-border focus:border-primary'
+                  }`}
                 style={{ fontSize: 'var(--text-base)' }}
               />
             </div>
@@ -510,74 +523,74 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
 
         {/* TODO: Temporariamente oculto — reativar quando fluxo de verificação estiver pronto */}
         {false && (
-        <div className="mt-8">
-          <h2
-            className="text-foreground mb-3"
-            style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-weight-bold)' }}
-          >
-            Verificação de identidade
-          </h2>
-
-          <button
-            type="button"
-            onClick={() => { if (verification !== 'verified') { setVerifyStep(0); setDocFileName(null); setSelfieTaken(false); setVerifyOpen(true); } }}
-            disabled={verification === 'verified'}
-            className="w-full text-left rounded-2xl border border-border bg-card p-4 flex items-start gap-3 transition-colors hover:bg-muted/40 disabled:cursor-default disabled:hover:bg-card"
-          >
-            <div
-              className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ background: '#1D9BF0' }}
+          <div className="mt-8">
+            <h2
+              className="text-foreground mb-3"
+              style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-weight-bold)' }}
             >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path
-                  d="M12 1.5l2.39 2.05 3.13-.36.79 3.06 2.84 1.42-1.4 2.83.79 3.07-2.84 1.41-.79 3.07-3.13-.36L12 19.74l-2.39-2.05-3.13.36-.79-3.07L2.85 13.57l1.4-2.83-.79-3.07L6.3 6.25l.79-3.06 3.13.36L12 1.5z"
-                  fill="#FFFFFF"
-                />
-                <path
-                  d="M9 12.2l2.1 2.1L15.5 9.9"
-                  stroke="#1D9BF0"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between gap-2">
-                <span
-                  className="text-foreground"
-                  style={{
-                    fontSize: 'var(--text-base)',
-                    fontWeight: 'var(--font-weight-semibold)',
-                  }}
+              Verificação de identidade
+            </h2>
+
+            <button
+              type="button"
+              onClick={() => { if (verification !== 'verified') { setVerifyStep(0); setDocFileName(null); setSelfieTaken(false); setVerifyOpen(true); } }}
+              disabled={verification === 'verified'}
+              className="w-full text-left rounded-2xl border border-border bg-card p-4 flex items-start gap-3 transition-colors hover:bg-muted/40 disabled:cursor-default disabled:hover:bg-card"
+            >
+              <div
+                className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{ background: '#1D9BF0' }}
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path
+                    d="M12 1.5l2.39 2.05 3.13-.36.79 3.06 2.84 1.42-1.4 2.83.79 3.07-2.84 1.41-.79 3.07-3.13-.36L12 19.74l-2.39-2.05-3.13.36-.79-3.07L2.85 13.57l1.4-2.83-.79-3.07L6.3 6.25l.79-3.06 3.13.36L12 1.5z"
+                    fill="#FFFFFF"
+                  />
+                  <path
+                    d="M9 12.2l2.1 2.1L15.5 9.9"
+                    stroke="#1D9BF0"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span
+                    className="text-foreground"
+                    style={{
+                      fontSize: 'var(--text-base)',
+                      fontWeight: 'var(--font-weight-semibold)',
+                    }}
+                  >
+                    {verification === 'verified'
+                      ? 'Conta verificada'
+                      : verification === 'pending'
+                        ? 'Verificação em análise'
+                        : 'Conquistar selo verificado'}
+                  </span>
+                  {verification !== 'verified' && (
+                    <Icon
+                      name="chevron_right"
+                      size={20}
+                      className="text-muted-foreground flex-shrink-0"
+                    />
+                  )}
+                </div>
+                <p
+                  className="text-muted-foreground mt-1"
+                  style={{ fontSize: 'var(--text-xs)', lineHeight: 1.4 }}
                 >
                   {verification === 'verified'
-                    ? 'Conta verificada'
+                    ? 'Você ganhou o selo oficial. Agora viajantes confiam ainda mais nos seus roteiros.'
                     : verification === 'pending'
-                      ? 'Verificação em análise'
-                      : 'Conquistar selo verificado'}
-                </span>
-                {verification !== 'verified' && (
-                  <Icon
-                    name="chevron_right"
-                    size={20}
-                    className="text-muted-foreground flex-shrink-0"
-                  />
-                )}
+                      ? 'Sua solicitação está em análise. Você receberá uma notificação em até 48h.'
+                      : 'Mostre que é você de verdade e ganhe o selo azul. Criadores verificados têm mais alcance e credibilidade.'}
+                </p>
               </div>
-              <p
-                className="text-muted-foreground mt-1"
-                style={{ fontSize: 'var(--text-xs)', lineHeight: 1.4 }}
-              >
-                {verification === 'verified'
-                  ? 'Você ganhou o selo oficial. Agora viajantes confiam ainda mais nos seus roteiros.'
-                  : verification === 'pending'
-                    ? 'Sua solicitação está em análise. Você receberá uma notificação em até 48h.'
-                    : 'Mostre que é você de verdade e ganhe o selo azul. Criadores verificados têm mais alcance e credibilidade.'}
-              </p>
-            </div>
-          </button>
-        </div>
+            </button>
+          </div>
         )}
 
       </div>
@@ -587,7 +600,7 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
         <button
           type="button"
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || !hasChanges}
           className="btn-primary w-full disabled:opacity-60"
           style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-weight-semibold)' }}
         >
@@ -670,8 +683,8 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
                 <>
                   <div className="flex flex-col items-center text-center py-4">
                     <svg width="64" height="64" viewBox="0 0 24 24" fill="none" className="mb-3 flex-shrink-0">
-                      <circle cx="12" cy="12" r="10" fill="#1D9BF0"/>
-                      <path d="M9 12l2 2 4-4" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      <circle cx="12" cy="12" r="10" fill="#1D9BF0" />
+                      <path d="M9 12l2 2 4-4" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                     <p
                       className="text-foreground"

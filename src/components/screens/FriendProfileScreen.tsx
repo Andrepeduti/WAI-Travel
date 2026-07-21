@@ -248,7 +248,7 @@ function getTravelerRank(totalSales: number, totalReviews: number): { rank: Trav
 const walletItems: { icon: string; label: string; key: SettingsSubScreen }[] = [
   { icon: 'workspace_premium', label: 'Assinatura', key: 'subscription' },
   { icon: 'shopping_bag', label: 'Compras', key: 'purchases' },
-  
+
   { icon: 'account_balance_wallet', label: 'Forma de recebimento', key: 'payment' },
 ];
 
@@ -333,17 +333,29 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
   const selectedHighlight =
     AVAILABLE_HIGHLIGHTS.find(h => h.id === selectedHighlightId) || AVAILABLE_HIGHLIGHTS[0];
 
+  const [isFetchingSocialState, setIsFetchingSocialState] = useState(!isSelf && !!friend.userId);
+
   useEffect(() => {
-    if (isSelf || !friend.userId) return;
+    if (isSelf || !friend.userId) {
+      setIsFetchingSocialState(false);
+      return;
+    }
     let cancelled = false;
+    setIsFetchingSocialState(true);
     getProfileSocialState(friend.userId)
       .then((state) => {
         if (!cancelled) {
           setIsFollowing(state.isFollowing);
           setIsBlocked(state.isBlocked);
+          setIsFetchingSocialState(false);
         }
       })
-      .catch((error) => console.error('[FriendProfileScreen] social state failed', error));
+      .catch((error) => {
+        console.error('[FriendProfileScreen] social state failed', error);
+        if (!cancelled) {
+          setIsFetchingSocialState(false);
+        }
+      });
     return () => { cancelled = true; };
   }, [friend.userId, isSelf]);
 
@@ -611,11 +623,11 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
   const addDreamTrip = async () => {
     if (!newDreamDest.trim() || !newDreamWhen) return;
     setIsAddingDreamTrip(true);
-    
+
     const preset = DREAM_TRIP_PRESETS[newDreamPresetIdx];
     const destination = newDreamDest.trim();
     let placeImage = resolveCoverImage([destination]).url; // fallback
-    
+
     try {
       // Usa Google Places diretamente para buscar a melhor foto do lugar escolhido
       const places = await searchGooglePlacesText(`${destination} tourist destination`);
@@ -796,7 +808,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
   }
 
 
-  const handleUpdatePhotos = (_countryCode: string, _photos: string[]) => {};
+  const handleUpdatePhotos = (_countryCode: string, _photos: string[]) => { };
 
   const handleDeleteCountry = async (countryCode: string) => {
     if (!isSelf) return;
@@ -854,7 +866,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
     if (settingsScreen === 'subscription') return <SubscriptionScreen onBack={closeSub} />;
     if (settingsScreen === 'purchases') return <PurchasesScreen onBack={closeSub} onNavigateToItinerary={(id) => { setShowSettings(false); setSettingsScreen(null); onItineraryClick?.(id); }} />;
     if (settingsScreen === 'payment') return <PaymentSettingsScreen onBack={closeSub} />;
-    
+
     if (settingsScreen === 'login-security') return <LoginSecurityScreen onBack={closeSub} />;
     if (settingsScreen === 'notifications') return <NotificationSettingsScreen onBack={closeSub} />;
     if (settingsScreen === 'help-center') return <HelpCenterScreen onBack={closeSub} />;
@@ -946,7 +958,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
     );
   }
 
-  const isScreenLoading = isLoading || isFetchingPublicItineraries || (isSelf && myItinerariesLoading);
+  const isScreenLoading = isLoading || isFetchingPublicItineraries || isFetchingSocialState || (isSelf && myItinerariesLoading);
 
   if (isScreenLoading) {
     return (
@@ -1096,8 +1108,8 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
                   {friend.name}
                 </h2>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="flex-shrink-0" style={{ marginTop: '1px' }}>
-                  <circle cx="12" cy="12" r="10" fill="#1D9BF0"/>
-                  <path d="M9 12l2 2 4-4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <circle cx="12" cy="12" r="10" fill="#1D9BF0" />
+                  <path d="M9 12l2 2 4-4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </div>
               <div className="flex items-center gap-1.5 flex-wrap" style={{ marginTop: 1 }}>
@@ -1113,8 +1125,24 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
                   type="button"
                   onClick={() => {
                     const handle = friend.username?.replace(/^@/, '');
-                    if (isSelf) navigate('/me/seguindo', { state: { friend } });
-                    else if (handle) navigate(`/u/${handle}/seguindo`, { state: { friend } });
+                    const currentFollowing = liveCounts ? liveCounts.following : friend.following;
+
+                    const currentFollowers = (() => {
+                      if (liveCounts) return Math.max(0, liveCounts.followers + followersDelta).toString();
+                      const raw = String(friend.followers ?? '0');
+                      const n = parseInt(raw.replace(/\D/g, ''), 10);
+                      if (!Number.isFinite(n) || /[a-zA-Z]/.test(raw)) return raw;
+                      return Math.max(0, n + followersDelta).toString();
+                    })();
+
+                    const updatedFriend = {
+                      ...friend,
+                      following: currentFollowing,
+                      followers: currentFollowers
+                    };
+
+                    if (isSelf) navigate('/me/seguindo', { state: { friend: updatedFriend } });
+                    else if (handle) navigate(`/u/${handle}/seguindo`, { state: { friend: updatedFriend } });
                   }}
                   className="flex items-center gap-1 active:opacity-70"
                 >
@@ -1125,8 +1153,24 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
                   type="button"
                   onClick={() => {
                     const handle = friend.username?.replace(/^@/, '');
-                    if (isSelf) navigate('/me/seguidores', { state: { friend } });
-                    else if (handle) navigate(`/u/${handle}/seguidores`, { state: { friend } });
+                    const currentFollowing = liveCounts ? liveCounts.following : friend.following;
+
+                    const currentFollowers = (() => {
+                      if (liveCounts) return Math.max(0, liveCounts.followers + followersDelta).toString();
+                      const raw = String(friend.followers ?? '0');
+                      const n = parseInt(raw.replace(/\D/g, ''), 10);
+                      if (!Number.isFinite(n) || /[a-zA-Z]/.test(raw)) return raw;
+                      return Math.max(0, n + followersDelta).toString();
+                    })();
+
+                    const updatedFriend = {
+                      ...friend,
+                      following: currentFollowing,
+                      followers: currentFollowers
+                    };
+
+                    if (isSelf) navigate('/me/seguidores', { state: { friend: updatedFriend } });
+                    else if (handle) navigate(`/u/${handle}/seguidores`, { state: { friend: updatedFriend } });
                   }}
                   className="flex items-center gap-1 ml-2 active:opacity-70"
                 >
@@ -1170,11 +1214,11 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
                   className="inline-flex items-center gap-1.5 active:opacity-70"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={navy} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <circle cx="18" cy="5" r="3"/>
-                    <circle cx="6" cy="12" r="3"/>
-                    <circle cx="18" cy="19" r="3"/>
-                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                    <circle cx="18" cy="5" r="3" />
+                    <circle cx="6" cy="12" r="3" />
+                    <circle cx="18" cy="19" r="3" />
+                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
                   </svg>
                   <span style={{ fontSize: '13px', fontWeight: 700, color: navy }}>Redes sociais</span>
                 </button>
@@ -1305,7 +1349,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
                     key={h.id}
                     onClick={() => {
                       setSelectedHighlightId(h.id);
-                      try { localStorage.setItem(HIGHLIGHT_STORAGE_KEY, h.id); } catch {}
+                      try { localStorage.setItem(HIGHLIGHT_STORAGE_KEY, h.id); } catch { }
                       setHighlightPickerOpen(false);
                     }}
                     className="w-full flex items-center gap-3 px-3 py-3 rounded-xl mb-1 active:opacity-70"
@@ -1365,170 +1409,170 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
 
       {(isSelf || publicItineraries.length > 0) && (
 
-      <div className="mb-8">
-        <button
-          onClick={() => publicItineraries.length > 0 && setShowAllItineraries(true)}
-          className="flex items-center gap-1 mb-3 px-5 active:opacity-70"
-          disabled={publicItineraries.length === 0 && myPublicItineraries.length === 0}
-        >
-          <h3 className="text-foreground" style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-weight-bold)' }}>
-            Roteiros à venda
-          </h3>
-          {publicItineraries.length > 0 && (
-            <Icon name="chevron_right" size={18} style={{ color: '#1A1C40' }} />
-          )}
-        </button>
-
-        {isSelf && myPublicItineraries.length > 0 ? (
-          <div className="pl-5">
-            <HorizontalCarousel showDots={false} itemClassName="w-[240px]">
-              {myPublicItineraries.map(it => {
-                const customCover = it.images?.find(img => img && !img.startsWith('blob:'));
-                const cover = resolveTripThumbnailImages(it.destinations || [], customCover)[0];
-                const primaryDest = (it.destinations?.[0] || '').split(',')[0];
-                const cities = (it.destinations || []).length;
-                const days = it.startDate && it.endDate
-                  ? Math.max(1, differenceInDays(new Date(it.endDate), new Date(it.startDate)) + 1)
-                  : null;
-                const priceReais = it.priceCents != null ? it.priceCents / 100 : null;
-                return (
-                  <button
-                    key={it.id}
-                    onClick={() => {
-                      if (isSelf) {
-                        navigate('/home', { state: { openCreatorDashboardItinerary: it } });
-                      } else {
-                        navigate(`/itinerary/${it.id}`);
-                      }
-                    }}
-                    className="w-[240px] flex flex-col text-left bg-card rounded-2xl overflow-hidden"
-                    style={{ boxShadow: '0 2px 16px rgba(0, 0, 0, 0.07)' }}
-                  >
-                    <div className="relative w-full aspect-[16/10] overflow-hidden p-2">
-                      <img src={cover} alt={it.title} className="w-full h-full object-cover rounded-xl" />
-                      {primaryDest && (
-                        <div className="absolute top-4 left-4 flex items-center gap-1 bg-white rounded-full pl-2 pr-2.5 py-1 shadow-sm">
-                          <span className="text-[13px] leading-none">📍</span>
-                          <span className="text-[11px] font-semibold text-foreground">{primaryDest}</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="px-4 pt-3 pb-4 flex flex-col gap-2">
-                      <h3 className="font-bold text-[15px] text-foreground leading-tight line-clamp-1">{it.title}</h3>
-                      <div className="flex items-center gap-1.5">
-                        <Icon name="location_on" size={14} style={{ color: '#1E293B' }} />
-                        <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{cities} {cities === 1 ? 'cidade' : 'cidades'}</span>
-                        {days && (
-                          <>
-                            <Icon name="schedule" size={14} style={{ color: '#1E293B' }} className="ml-2" />
-                            <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{days} {days === 1 ? 'dia' : 'dias'}</span>
-                          </>
-                        )}
-                      </div>
-                      <div className="flex items-center justify-start pt-1">
-                        {priceReais !== null && priceReais > 0 ? (
-                          <span className="text-[15px] font-bold text-foreground">R$ {priceReais.toFixed(0)}</span>
-                        ) : (
-                          <span className="text-muted-foreground font-semibold" style={{ fontSize: '12px' }}>Grátis</span>
-                        )}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </HorizontalCarousel>
-          </div>
-        ) : publicItineraries.length === 0 ? (
-          <div className="px-5">
-            {isSelf ? (
-              <button
-                onClick={onCreatorProgram}
-                className="w-full text-left rounded-2xl flex items-center gap-3 px-4 py-3 active:opacity-80 transition-opacity"
-                style={{ background: '#FFFFFF' }}
-              >
-                <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                  style={{ background: 'rgba(157, 204, 54, 0.15)' }}
-                >
-                  <Icon name="map" size={18} style={{ color: '#9DCC36' }} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p style={{ fontSize: 14, fontWeight: 700, color: '#1A1C40', lineHeight: 1.2 }}>
-                    Torne-se um criador
-                  </p>
-                  <p style={{ fontSize: 12, color: '#8E8E93', marginTop: 2, lineHeight: 1.3 }}>
-                    Publique roteiros e ganhe dinheiro
-                  </p>
-                </div>
-                <Icon name="chevron_right" size={20} style={{ color: '#1A1C40' }} className="flex-shrink-0" />
-              </button>
-            ) : (
-              <div className="card-base flex items-center gap-3 px-4" style={{ minHeight: 88 }}>
-                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#F2F2F2' }}>
-                  <Icon name="map" size={20} className="text-muted-foreground" />
-                </div>
-                <div className="flex flex-col items-start text-left">
-                  <h4 className="text-foreground font-semibold" style={{ fontSize: 'var(--text-sm)' }}>
-                    Sem roteiros publicados
-                  </h4>
-                  <p className="text-muted-foreground" style={{ fontSize: 'var(--text-xs)', lineHeight: 1.3 }}>
-                    Esse perfil ainda não publicou nenhum roteiro.
-                  </p>
-                </div>
-              </div>
+        <div className="mb-8">
+          <button
+            onClick={() => publicItineraries.length > 0 && setShowAllItineraries(true)}
+            className="flex items-center gap-1 mb-3 px-5 active:opacity-70"
+            disabled={publicItineraries.length === 0 && myPublicItineraries.length === 0}
+          >
+            <h3 className="text-foreground" style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-weight-bold)' }}>
+              Roteiros à venda
+            </h3>
+            {publicItineraries.length > 0 && (
+              <Icon name="chevron_right" size={18} style={{ color: '#1A1C40' }} />
             )}
-          </div>
-        ) : (
-          <div className="pl-5">
-            <HorizontalCarousel showDots={false} itemClassName="w-[240px]">
-              {publicItineraries.map(it => {
-                const isAcquired = duplicatedIds.has(it.id);
-                return (
-                  <button
-                    key={it.id}
-                    onClick={() => onItineraryClick?.(it.id)}
-                    className="w-[240px] flex flex-col text-left bg-card rounded-2xl overflow-hidden"
-                    style={{ boxShadow: '0 2px 16px rgba(0, 0, 0, 0.07)' }}
-                  >
-                    <div className="relative w-full aspect-[16/10] overflow-hidden p-2">
-                      <img src={it.image} alt={it.title} className="w-full h-full object-cover rounded-xl" />
-                      {it.theme && (
-                        <div className="absolute top-4 left-4 flex items-center gap-1 bg-white rounded-full pl-2 pr-2.5 py-1 shadow-sm">
-                          <span className="text-[13px] leading-none">{it.theme.emoji}</span>
-                          <span className="text-[11px] font-semibold text-foreground">{it.theme.label}</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="px-4 pt-3 pb-4 flex flex-col gap-2">
-                      <h3 className="font-bold text-[15px] text-foreground leading-tight line-clamp-1">{it.title}</h3>
-                      <div className="flex items-center gap-1.5">
-                        <Icon name="star" size={14} filled className="text-[#F2B90C]" />
-                        <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{it.rating}</span>
-                        <Icon name="location_on" size={14} style={{ color: '#1E293B' }} className="ml-2" />
-                        <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{it.cities} cidades</span>
-                        <Icon name="schedule" size={14} style={{ color: '#1E293B' }} className="ml-2" />
-                        <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{it.duration}</span>
-                      </div>
-                      <div className="flex items-center justify-start pt-1">
-                        {isAcquired ? (
-                          <div className="inline-flex items-center gap-1 h-6 rounded-full px-2.5" style={{ background: '#F2F2F2' }}>
-                            <Icon name="check_circle" size={12} style={{ color: '#1A1C40' }} />
-                            <span style={{ fontSize: '11px', fontWeight: 600, color: '#1A1C40' }}>Adquirido</span>
+          </button>
+
+          {isSelf && myPublicItineraries.length > 0 ? (
+            <div className="pl-5">
+              <HorizontalCarousel showDots={false} itemClassName="w-[240px]">
+                {myPublicItineraries.map(it => {
+                  const customCover = it.images?.find(img => img && !img.startsWith('blob:'));
+                  const cover = resolveTripThumbnailImages(it.destinations || [], customCover)[0];
+                  const primaryDest = (it.destinations?.[0] || '').split(',')[0];
+                  const cities = (it.destinations || []).length;
+                  const days = it.startDate && it.endDate
+                    ? Math.max(1, differenceInDays(new Date(it.endDate), new Date(it.startDate)) + 1)
+                    : null;
+                  const priceReais = it.priceCents != null ? it.priceCents / 100 : null;
+                  return (
+                    <button
+                      key={it.id}
+                      onClick={() => {
+                        if (isSelf) {
+                          navigate('/home', { state: { openCreatorDashboardItinerary: it } });
+                        } else {
+                          navigate(`/itinerary/${it.id}`);
+                        }
+                      }}
+                      className="w-[240px] flex flex-col text-left bg-card rounded-2xl overflow-hidden"
+                      style={{ boxShadow: '0 2px 16px rgba(0, 0, 0, 0.07)' }}
+                    >
+                      <div className="relative w-full aspect-[16/10] overflow-hidden p-2">
+                        <img src={cover} alt={it.title} className="w-full h-full object-cover rounded-xl" />
+                        {primaryDest && (
+                          <div className="absolute top-4 left-4 flex items-center gap-1 bg-white rounded-full pl-2 pr-2.5 py-1 shadow-sm">
+                            <span className="text-[13px] leading-none">📍</span>
+                            <span className="text-[11px] font-semibold text-foreground">{primaryDest}</span>
                           </div>
-                        ) : it.price !== null ? (
-                          <span className="text-[15px] font-bold text-foreground">R$ {it.price.toFixed(0)}</span>
-                        ) : (
-                          <span className="text-muted-foreground font-semibold" style={{ fontSize: '12px' }}>Grátis</span>
                         )}
                       </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </HorizontalCarousel>
-          </div>
-        )}
-      </div>
+                      <div className="px-4 pt-3 pb-4 flex flex-col gap-2">
+                        <h3 className="font-bold text-[15px] text-foreground leading-tight line-clamp-1">{it.title}</h3>
+                        <div className="flex items-center gap-1.5">
+                          <Icon name="location_on" size={14} style={{ color: '#1E293B' }} />
+                          <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{cities} {cities === 1 ? 'cidade' : 'cidades'}</span>
+                          {days && (
+                            <>
+                              <Icon name="schedule" size={14} style={{ color: '#1E293B' }} className="ml-2" />
+                              <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{days} {days === 1 ? 'dia' : 'dias'}</span>
+                            </>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-start pt-1">
+                          {priceReais !== null && priceReais > 0 ? (
+                            <span className="text-[15px] font-bold text-foreground">R$ {priceReais.toFixed(0)}</span>
+                          ) : (
+                            <span className="text-muted-foreground font-semibold" style={{ fontSize: '12px' }}>Grátis</span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </HorizontalCarousel>
+            </div>
+          ) : publicItineraries.length === 0 ? (
+            <div className="px-5">
+              {isSelf ? (
+                <button
+                  onClick={onCreatorProgram}
+                  className="w-full text-left rounded-2xl flex items-center gap-3 px-4 py-3 active:opacity-80 transition-opacity"
+                  style={{ background: '#FFFFFF' }}
+                >
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{ background: 'rgba(157, 204, 54, 0.15)' }}
+                  >
+                    <Icon name="map" size={18} style={{ color: '#9DCC36' }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p style={{ fontSize: 14, fontWeight: 700, color: '#1A1C40', lineHeight: 1.2 }}>
+                      Torne-se um criador
+                    </p>
+                    <p style={{ fontSize: 12, color: '#8E8E93', marginTop: 2, lineHeight: 1.3 }}>
+                      Publique roteiros e ganhe dinheiro
+                    </p>
+                  </div>
+                  <Icon name="chevron_right" size={20} style={{ color: '#1A1C40' }} className="flex-shrink-0" />
+                </button>
+              ) : (
+                <div className="card-base flex items-center gap-3 px-4" style={{ minHeight: 88 }}>
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#F2F2F2' }}>
+                    <Icon name="map" size={20} className="text-muted-foreground" />
+                  </div>
+                  <div className="flex flex-col items-start text-left">
+                    <h4 className="text-foreground font-semibold" style={{ fontSize: 'var(--text-sm)' }}>
+                      Sem roteiros publicados
+                    </h4>
+                    <p className="text-muted-foreground" style={{ fontSize: 'var(--text-xs)', lineHeight: 1.3 }}>
+                      Esse perfil ainda não publicou nenhum roteiro.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="pl-5">
+              <HorizontalCarousel showDots={false} itemClassName="w-[240px]">
+                {publicItineraries.map(it => {
+                  const isAcquired = duplicatedIds.has(it.id);
+                  return (
+                    <button
+                      key={it.id}
+                      onClick={() => onItineraryClick?.(it.id)}
+                      className="w-[240px] flex flex-col text-left bg-card rounded-2xl overflow-hidden"
+                      style={{ boxShadow: '0 2px 16px rgba(0, 0, 0, 0.07)' }}
+                    >
+                      <div className="relative w-full aspect-[16/10] overflow-hidden p-2">
+                        <img src={it.image} alt={it.title} className="w-full h-full object-cover rounded-xl" />
+                        {it.theme && (
+                          <div className="absolute top-4 left-4 flex items-center gap-1 bg-white rounded-full pl-2 pr-2.5 py-1 shadow-sm">
+                            <span className="text-[13px] leading-none">{it.theme.emoji}</span>
+                            <span className="text-[11px] font-semibold text-foreground">{it.theme.label}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="px-4 pt-3 pb-4 flex flex-col gap-2">
+                        <h3 className="font-bold text-[15px] text-foreground leading-tight line-clamp-1">{it.title}</h3>
+                        <div className="flex items-center gap-1.5">
+                          <Icon name="star" size={14} filled className="text-[#F2B90C]" />
+                          <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{it.rating}</span>
+                          <Icon name="location_on" size={14} style={{ color: '#1E293B' }} className="ml-2" />
+                          <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{it.cities} cidades</span>
+                          <Icon name="schedule" size={14} style={{ color: '#1E293B' }} className="ml-2" />
+                          <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{it.duration}</span>
+                        </div>
+                        <div className="flex items-center justify-start pt-1">
+                          {isAcquired ? (
+                            <div className="inline-flex items-center gap-1 h-6 rounded-full px-2.5" style={{ background: '#F2F2F2' }}>
+                              <Icon name="check_circle" size={12} style={{ color: '#1A1C40' }} />
+                              <span style={{ fontSize: '11px', fontWeight: 600, color: '#1A1C40' }}>Adquirido</span>
+                            </div>
+                          ) : it.price !== null ? (
+                            <span className="text-[15px] font-bold text-foreground">R$ {it.price.toFixed(0)}</span>
+                          ) : (
+                            <span className="text-muted-foreground font-semibold" style={{ fontSize: '12px' }}>Grátis</span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </HorizontalCarousel>
+            </div>
+          )}
+        </div>
       )}
 
       {/* ═══ AVALIAÇÕES ═══ */}
@@ -1600,242 +1644,242 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
 
       {/* ═══ PASSAPORTE ═══ */}
       {(isSelf || countries.length > 0) && (
-      <div className="mb-8">
-        <button
-          onClick={() => setShowCountriesMap(true)}
-          className="w-full flex items-center justify-between mb-3 px-5 active:opacity-70"
-        >
-          <div className="flex flex-col items-start">
-            <h3 className="text-foreground" style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-weight-bold)' }}>
-              Passaporte · {countries.length} {countries.length === 1 ? 'país' : 'países'}
-            </h3>
-            <span className="text-muted-foreground text-xs" style={{ fontSize: 'var(--text-xs)', marginTop: 2 }}>
-              Toque para marcar os países que você já visitou
-            </span>
-          </div>
-          <Icon name="chevron_right" size={18} style={{ color: '#1A1C40' }} />
-        </button>
-        {countries.length === 0 ? (
-          <div className="px-5">
-            {isSelf ? (
-              <button
-                type="button"
-                onClick={() => setShowCountriesMap(true)}
-                className="w-full card-base flex items-center gap-3 px-4"
-                style={{ minHeight: 88 }}
-              >
-                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#F2F2F2' }}>
-                  <Icon name="public" size={20} className="text-muted-foreground" />
-                </div>
-                <div className="flex flex-col items-start text-left">
-                  <h4 className="text-foreground font-semibold" style={{ fontSize: 'var(--text-sm)' }}>
-                    Crie seu passaporte
-                  </h4>
-                  <p className="text-muted-foreground" style={{ fontSize: 'var(--text-xs)', lineHeight: 1.3 }}>
-                    Marque os países que você já visitou.
-                  </p>
-                </div>
-              </button>
-            ) : (
-              <div className="card-base flex items-center gap-3 px-4" style={{ minHeight: 88 }}>
-                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#F2F2F2' }}>
-                  <Icon name="public" size={20} className="text-muted-foreground" />
-                </div>
-                <div className="flex flex-col items-start text-left">
-                  <h4 className="text-foreground font-semibold" style={{ fontSize: 'var(--text-sm)' }}>
-                    Passaporte vazio
-                  </h4>
-                  <p className="text-muted-foreground" style={{ fontSize: 'var(--text-xs)', lineHeight: 1.3 }}>
-                    Nenhum país visitado ainda.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="px-5 w-full min-w-0" style={{ overflow: 'hidden' }}>
-            <div style={{ padding: '8px 0', overflow: 'hidden' }}>
-            <HorizontalCarousel
-              showDots={false}
-              itemClassName="w-[100px]"
-            >
-              {countries.map((country, idx) => {
-                const stampColors = [
-                  'hsl(var(--capri-normal))',
-                  'hsl(var(--florida-normal))',
-                  'hsl(var(--violet-normal))',
-                  'hsl(var(--cyan-dark))',
-                  'hsl(var(--sun-dark))',
-                  'hsl(var(--sicilia-dark))',
-                ];
-                const rotations = [-4, 3, -2, 5, -3, 2, -5, 1, -1, 4];
-                const color = stampColors[idx % stampColors.length];
-                const rotation = rotations[idx % rotations.length];
-                return (
-                  <button
-                    key={country.code}
-                    onClick={() => { setSelectedCountry(country); setSheetOpen(true); }}
-                    className="relative w-[100px] h-[100px] rounded-lg flex flex-col items-center justify-center active:scale-95 flex-shrink-0"
-                    style={{
-                      transform: `rotate(${rotation}deg)`,
-                      border: `2px solid ${color}`,
-                      padding: '8px 4px',
-                      transition: 'transform 0.15s ease',
-                      background: 'hsl(32 22% 93%)',
-                    }}
-                  >
-                    {/* Dashed inner border */}
-                    <div
-                      className="absolute inset-[3px] rounded-md pointer-events-none"
-                      style={{ border: `1.5px dashed ${color}`, opacity: 0.3 }}
-                    />
-
-                    <span style={{ fontSize: '28px', lineHeight: 1 }}>{country.flag}</span>
-                    <span
-                      className="mt-1 uppercase tracking-wider text-center"
-                      style={{
-                        fontSize: '9px',
-                        fontWeight: 'var(--font-weight-bold)',
-                        color,
-                        letterSpacing: '0.08em',
-                        lineHeight: 1.1,
-                      }}
-                    >
-                      {country.name}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: '8px',
-                        fontWeight: 'var(--font-weight-semibold)',
-                        color,
-                        opacity: 0.75,
-                      }}
-                    >
-                      {country.year}
-                    </span>
-
-                    {/* Ink smudge */}
-                    <div
-                      className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full pointer-events-none"
-                      style={{
-                        background: color,
-                        opacity: 0.05,
-                        filter: 'blur(4px)',
-                      }}
-                    />
-                  </button>
-                );
-              })}
-            </HorizontalCarousel>
+        <div className="mb-8">
+          <button
+            onClick={() => setShowCountriesMap(true)}
+            className="w-full flex items-center justify-between mb-3 px-5 active:opacity-70"
+          >
+            <div className="flex flex-col items-start">
+              <h3 className="text-foreground" style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-weight-bold)' }}>
+                Passaporte · {countries.length} {countries.length === 1 ? 'país' : 'países'}
+              </h3>
+              <span className="text-muted-foreground text-xs" style={{ fontSize: 'var(--text-xs)', marginTop: 2 }}>
+                Toque para marcar os países que você já visitou
+              </span>
             </div>
-          </div>
-        )}
-      </div>
+            <Icon name="chevron_right" size={18} style={{ color: '#1A1C40' }} />
+          </button>
+          {countries.length === 0 ? (
+            <div className="px-5">
+              {isSelf ? (
+                <button
+                  type="button"
+                  onClick={() => setShowCountriesMap(true)}
+                  className="w-full card-base flex items-center gap-3 px-4"
+                  style={{ minHeight: 88 }}
+                >
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#F2F2F2' }}>
+                    <Icon name="public" size={20} className="text-muted-foreground" />
+                  </div>
+                  <div className="flex flex-col items-start text-left">
+                    <h4 className="text-foreground font-semibold" style={{ fontSize: 'var(--text-sm)' }}>
+                      Crie seu passaporte
+                    </h4>
+                    <p className="text-muted-foreground" style={{ fontSize: 'var(--text-xs)', lineHeight: 1.3 }}>
+                      Marque os países que você já visitou.
+                    </p>
+                  </div>
+                </button>
+              ) : (
+                <div className="card-base flex items-center gap-3 px-4" style={{ minHeight: 88 }}>
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#F2F2F2' }}>
+                    <Icon name="public" size={20} className="text-muted-foreground" />
+                  </div>
+                  <div className="flex flex-col items-start text-left">
+                    <h4 className="text-foreground font-semibold" style={{ fontSize: 'var(--text-sm)' }}>
+                      Passaporte vazio
+                    </h4>
+                    <p className="text-muted-foreground" style={{ fontSize: 'var(--text-xs)', lineHeight: 1.3 }}>
+                      Nenhum país visitado ainda.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="px-5 w-full min-w-0" style={{ overflow: 'hidden' }}>
+              <div style={{ padding: '8px 0', overflow: 'hidden' }}>
+                <HorizontalCarousel
+                  showDots={false}
+                  itemClassName="w-[100px]"
+                >
+                  {countries.map((country, idx) => {
+                    const stampColors = [
+                      'hsl(var(--capri-normal))',
+                      'hsl(var(--florida-normal))',
+                      'hsl(var(--violet-normal))',
+                      'hsl(var(--cyan-dark))',
+                      'hsl(var(--sun-dark))',
+                      'hsl(var(--sicilia-dark))',
+                    ];
+                    const rotations = [-4, 3, -2, 5, -3, 2, -5, 1, -1, 4];
+                    const color = stampColors[idx % stampColors.length];
+                    const rotation = rotations[idx % rotations.length];
+                    return (
+                      <button
+                        key={country.code}
+                        onClick={() => { setSelectedCountry(country); setSheetOpen(true); }}
+                        className="relative w-[100px] h-[100px] rounded-lg flex flex-col items-center justify-center active:scale-95 flex-shrink-0"
+                        style={{
+                          transform: `rotate(${rotation}deg)`,
+                          border: `2px solid ${color}`,
+                          padding: '8px 4px',
+                          transition: 'transform 0.15s ease',
+                          background: 'hsl(32 22% 93%)',
+                        }}
+                      >
+                        {/* Dashed inner border */}
+                        <div
+                          className="absolute inset-[3px] rounded-md pointer-events-none"
+                          style={{ border: `1.5px dashed ${color}`, opacity: 0.3 }}
+                        />
+
+                        <span style={{ fontSize: '28px', lineHeight: 1 }}>{country.flag}</span>
+                        <span
+                          className="mt-1 uppercase tracking-wider text-center"
+                          style={{
+                            fontSize: '9px',
+                            fontWeight: 'var(--font-weight-bold)',
+                            color,
+                            letterSpacing: '0.08em',
+                            lineHeight: 1.1,
+                          }}
+                        >
+                          {country.name}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: '8px',
+                            fontWeight: 'var(--font-weight-semibold)',
+                            color,
+                            opacity: 0.75,
+                          }}
+                        >
+                          {country.year}
+                        </span>
+
+                        {/* Ink smudge */}
+                        <div
+                          className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full pointer-events-none"
+                          style={{
+                            background: color,
+                            opacity: 0.05,
+                            filter: 'blur(4px)',
+                          }}
+                        />
+                      </button>
+                    );
+                  })}
+                </HorizontalCarousel>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* ═══ PRÓXIMAS VIAGENS (Dream trips / Wanderlist) ═══ */}
       {(isSelf || dreamTrips.length > 0) && (
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-3 px-5">
-          <div className="flex flex-col items-start">
-            <h3 className="text-foreground" style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-weight-bold)' }}>
-              Destinos dos sonhos
-            </h3>
-            <span className="text-muted-foreground text-xs" style={{ fontSize: 'var(--text-xs)', marginTop: 2 }}>
-              {isSelf ? 'Salve destinos que você quer viver um dia' : `Destinos que ${friend.name.split(' ')[0]} quer conhecer`}
-            </span>
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-3 px-5">
+            <div className="flex flex-col items-start">
+              <h3 className="text-foreground" style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-weight-bold)' }}>
+                Destinos dos sonhos
+              </h3>
+              <span className="text-muted-foreground text-xs" style={{ fontSize: 'var(--text-xs)', marginTop: 2 }}>
+                {isSelf ? 'Salve destinos que você quer viver um dia' : `Destinos que ${friend.name.split(' ')[0]} quer conhecer`}
+              </span>
+            </div>
+            {isSelf && dreamTrips.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setDreamTripSheetOpen(true)}
+                aria-label="Adicionar destino dos sonhos"
+                className="inline-flex items-center gap-1 flex-shrink-0 transition-transform active:scale-95"
+                style={{
+                  background: 'transparent',
+                  color: '#1A1C40',
+                  padding: 0,
+                  fontSize: '14px',
+                  fontWeight: 'var(--font-weight-semibold)',
+                }}
+              >
+                <Icon name="add" size={14} style={{ color: '#1A1C40' }} />
+                Novo
+              </button>
+            )}
           </div>
-          {isSelf && dreamTrips.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setDreamTripSheetOpen(true)}
-              aria-label="Adicionar destino dos sonhos"
-              className="inline-flex items-center gap-1 flex-shrink-0 transition-transform active:scale-95"
-              style={{
-                background: 'transparent',
-                color: '#1A1C40',
-                padding: 0,
-                fontSize: '14px',
-                fontWeight: 'var(--font-weight-semibold)',
-              }}
-            >
-              <Icon name="add" size={14} style={{ color: '#1A1C40' }} />
-              Novo
-            </button>
+
+          {dreamTrips.length === 0 ? (
+            <div className="px-5">
+              <button
+                type="button"
+                onClick={() => setDreamTripSheetOpen(true)}
+                className="w-full card-base flex items-center gap-3 px-4"
+                style={{ minHeight: 88 }}
+              >
+                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#F2F2F2' }}>
+                  <Icon name="location_on" size={20} className="text-muted-foreground" />
+                </div>
+                <div className="flex flex-col items-start text-left">
+                  <h4 className="text-foreground font-semibold" style={{ fontSize: 'var(--text-sm)' }}>
+                    Adicione seu primeiro destino
+                  </h4>
+                  <p className="text-muted-foreground" style={{ fontSize: 'var(--text-xs)', lineHeight: 1.3 }}>
+                    Salve lugares para suas próximas viagens.
+                  </p>
+                </div>
+              </button>
+            </div>
+          ) : (
+            <div className="pl-5">
+              <HorizontalCarousel showDots={false} itemClassName="w-[180px]">
+                {dreamTrips.map(trip => (
+                  <div
+                    key={trip.id}
+                    className="relative w-full rounded-2xl overflow-hidden"
+                    style={{
+                      aspectRatio: '1 / 1',
+                      boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
+                    }}
+                  >
+                    {/* Background image */}
+                    <img src={trip.image} alt={trip.destination} className="absolute inset-0 w-full h-full object-cover" />
+                    {/* Gradient overlay */}
+                    <div className="absolute inset-0" style={{ background: trip.gradient, mixBlendMode: 'multiply', opacity: 0.55 }} />
+                    <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,0.75) 100%)' }} />
+
+                    {/* Top: remove button */}
+                    {isSelf && (
+                      <div className="absolute top-3 right-3">
+                        <button
+                          onClick={() => setDreamTripToRemove(trip)}
+                          className="w-7 h-7 rounded-full flex items-center justify-center backdrop-blur-md active:scale-90 transition-transform"
+                          style={{ background: 'rgba(0,0,0,0.45)' }}
+                          aria-label="Remover"
+                        >
+                          <Icon name="close" size={14} style={{ color: '#FFFFFF' }} />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Bottom: text */}
+                    <div className="absolute bottom-0 left-0 right-0 p-3.5 text-white">
+                      <p style={{ fontSize: 10, fontWeight: 600, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em', lineHeight: 1 }}>
+                        {trip.when}
+                      </p>
+                      <h4 style={{ fontSize: 17, fontWeight: 800, marginTop: 4, lineHeight: 1.15 }}>
+                        {trip.destination}
+                      </h4>
+                      <p style={{ fontSize: 11, opacity: 0.92, marginTop: 4, lineHeight: 1.25 }}>
+                        {trip.vibe}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </HorizontalCarousel>
+            </div>
           )}
         </div>
-
-        {dreamTrips.length === 0 ? (
-          <div className="px-5">
-            <button
-              type="button"
-              onClick={() => setDreamTripSheetOpen(true)}
-              className="w-full card-base flex items-center gap-3 px-4"
-              style={{ minHeight: 88 }}
-            >
-              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#F2F2F2' }}>
-                <Icon name="location_on" size={20} className="text-muted-foreground" />
-              </div>
-              <div className="flex flex-col items-start text-left">
-                <h4 className="text-foreground font-semibold" style={{ fontSize: 'var(--text-sm)' }}>
-                  Adicione seu primeiro destino
-                </h4>
-                <p className="text-muted-foreground" style={{ fontSize: 'var(--text-xs)', lineHeight: 1.3 }}>
-                  Salve lugares para suas próximas viagens.
-                </p>
-              </div>
-            </button>
-          </div>
-        ) : (
-          <div className="pl-5">
-            <HorizontalCarousel showDots={false} itemClassName="w-[180px]">
-              {dreamTrips.map(trip => (
-                <div
-                  key={trip.id}
-                  className="relative w-full rounded-2xl overflow-hidden"
-                  style={{
-                    aspectRatio: '1 / 1',
-                    boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
-                  }}
-                >
-                  {/* Background image */}
-                  <img src={trip.image} alt={trip.destination} className="absolute inset-0 w-full h-full object-cover" />
-                  {/* Gradient overlay */}
-                  <div className="absolute inset-0" style={{ background: trip.gradient, mixBlendMode: 'multiply', opacity: 0.55 }} />
-                  <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,0.75) 100%)' }} />
-
-                  {/* Top: remove button */}
-                  {isSelf && (
-                    <div className="absolute top-3 right-3">
-                      <button
-                        onClick={() => setDreamTripToRemove(trip)}
-                        className="w-7 h-7 rounded-full flex items-center justify-center backdrop-blur-md active:scale-90 transition-transform"
-                        style={{ background: 'rgba(0,0,0,0.45)' }}
-                        aria-label="Remover"
-                      >
-                        <Icon name="close" size={14} style={{ color: '#FFFFFF' }} />
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Bottom: text */}
-                  <div className="absolute bottom-0 left-0 right-0 p-3.5 text-white">
-                    <p style={{ fontSize: 10, fontWeight: 600, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em', lineHeight: 1 }}>
-                      {trip.when}
-                    </p>
-                    <h4 style={{ fontSize: 17, fontWeight: 800, marginTop: 4, lineHeight: 1.15 }}>
-                      {trip.destination}
-                    </h4>
-                    <p style={{ fontSize: 11, opacity: 0.92, marginTop: 4, lineHeight: 1.25 }}>
-                      {trip.vibe}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </HorizontalCarousel>
-          </div>
-        )}
-      </div>
       )}
 
       {/* Sheet: adicionar próxima viagem */}
@@ -2047,7 +2091,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
                     }}
                   >
                     {isAddingDreamTrip && <Icon name="refresh" className="animate-spin" size={16} />}
-                    {isAddingDreamTrip ? 'Buscando foto perfeita...' : 'Adicionar'}
+                    Adicionar
                   </button>
                 );
               })()}
@@ -2125,52 +2169,52 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
         </div>
       )}
       {(isSelf || interests.length > 0) && (
-      <div className="px-5 mb-8">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-foreground" style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-weight-bold)' }}>
-            Interesses
-          </h3>
-          {isSelf && (
+        <div className="px-5 mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-foreground" style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-weight-bold)' }}>
+              Interesses
+            </h3>
+            {isSelf && (
+              <button
+                onClick={() => setEditInterestsOpen(true)}
+                className="inline-flex items-center gap-1 h-8 px-3 rounded-full"
+                style={{ background: '#F2F2F7', color: '#1A1C40', fontSize: 12, fontWeight: 600 }}
+                aria-label="Editar interesses"
+              >
+                <Icon name="edit" size={14} style={{ color: '#1A1C40' }} />
+                Editar
+              </button>
+            )}
+          </div>
+          {interests.length === 0 ? (
             <button
-              onClick={() => setEditInterestsOpen(true)}
-              className="inline-flex items-center gap-1 h-8 px-3 rounded-full"
-              style={{ background: '#F2F2F7', color: '#1A1C40', fontSize: 12, fontWeight: 600 }}
-              aria-label="Editar interesses"
+              onClick={() => isSelf && setEditInterestsOpen(true)}
+              disabled={!isSelf}
+              className="w-full rounded-2xl py-4 px-3 text-center"
+              style={{
+                background: '#F2F2F7',
+                color: '#8E8E93',
+                fontSize: 13,
+                fontWeight: 500,
+              }}
             >
-              <Icon name="edit" size={14} style={{ color: '#1A1C40' }} />
-              Editar
+              {isSelf ? 'Adicione seus interesses de viagem' : 'Sem interesses ainda'}
             </button>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {interests.map(tag => (
+                <span
+                  key={tag.label}
+                  className="inline-flex items-center gap-1.5 h-7 rounded-2xl px-3"
+                  style={{ background: '#FFFFFF', fontSize: '12px', fontWeight: 500, color: '#1A1C40' }}
+                >
+                  <Icon name={tag.icon} size={14} style={{ color: '#1A1C40' }} />
+                  {tag.label}
+                </span>
+              ))}
+            </div>
           )}
         </div>
-        {interests.length === 0 ? (
-          <button
-            onClick={() => isSelf && setEditInterestsOpen(true)}
-            disabled={!isSelf}
-            className="w-full rounded-2xl py-4 px-3 text-center"
-            style={{
-              background: '#F2F2F7',
-              color: '#8E8E93',
-              fontSize: 13,
-              fontWeight: 500,
-            }}
-          >
-            {isSelf ? 'Adicione seus interesses de viagem' : 'Sem interesses ainda'}
-          </button>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {interests.map(tag => (
-              <span
-                key={tag.label}
-                className="inline-flex items-center gap-1.5 h-7 rounded-2xl px-3"
-                style={{ background: '#FFFFFF', fontSize: '12px', fontWeight: 500, color: '#1A1C40' }}
-              >
-                <Icon name={tag.icon} size={14} style={{ color: '#1A1C40' }} />
-                {tag.label}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
       )}
 
       {isSelf && (
@@ -2232,9 +2276,9 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
           key: 'ig', href: `https://instagram.com/${ig}`, label: 'Instagram', handle: `@${ig}`,
           icon: (
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={navy} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
-              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
-              <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+              <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+              <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
             </svg>
           ),
         });
@@ -2242,7 +2286,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
           key: 'tt', href: `https://www.tiktok.com/@${tt}`, label: 'TikTok', handle: `@${tt}`,
           icon: (
             <svg width="22" height="22" viewBox="0 0 24 24" fill={navy} aria-hidden="true">
-              <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5.8 20.1a6.34 6.34 0 0 0 10.86-4.43V8.93a8.16 8.16 0 0 0 4.77 1.52V7a4.85 4.85 0 0 1-1.84-.31z"/>
+              <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5.8 20.1a6.34 6.34 0 0 0 10.86-4.43V8.93a8.16 8.16 0 0 0 4.77 1.52V7a4.85 4.85 0 0 1-1.84-.31z" />
             </svg>
           ),
         });
@@ -2250,7 +2294,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
           key: 'yt', href: `https://youtube.com/@${yt}`, label: 'YouTube', handle: `@${yt}`,
           icon: (
             <svg width="22" height="22" viewBox="0 0 24 24" fill={navy} aria-hidden="true">
-              <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8zM9.6 15.6V8.4l6.3 3.6-6.3 3.6z"/>
+              <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8zM9.6 15.6V8.4l6.3 3.6-6.3 3.6z" />
             </svg>
           ),
         });

@@ -4,6 +4,7 @@ import { BackButton } from '@/components/ui/BackButton';
 import { Switch } from '@/components/ui/switch';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 interface LoginSecurityScreenProps {
   onBack: () => void;
@@ -19,7 +20,8 @@ export function LoginSecurityScreen({ onBack }: LoginSecurityScreenProps) {
   const [showDeleteSheet, setShowDeleteSheet] = useState(false);
   const [deleteStep, setDeleteStep] = useState<'choose' | 'confirm-delete'>('choose');
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
-  const closeDeleteSheet = () => { setShowDeleteSheet(false); setDeleteStep('choose'); setDeleteConfirmed(false); };
+  const [deleteAction, setDeleteAction] = useState<'deactivate' | 'delete'>('deactivate');
+  const closeDeleteSheet = () => { setShowDeleteSheet(false); setDeleteStep('choose'); setDeleteConfirmed(false); setDeleteAction('deactivate'); };
   const [passwords, setPasswords] = useState({ current: '', newPwd: '', confirm: '' });
   const [blocked, setBlocked] = useState(blockedUsers);
 
@@ -104,7 +106,7 @@ export function LoginSecurityScreen({ onBack }: LoginSecurityScreenProps) {
               className="w-full flex items-center gap-3 py-3"
             >
               <Icon name="delete" size={20} style={{ color: 'hsl(var(--destructive))' }} />
-              <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)', color: 'hsl(var(--destructive))' }}>Excluir conta</span>
+              <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)', color: 'hsl(var(--destructive))' }}>Desativar ou excluir conta</span>
             </button>
           </>
         )}
@@ -140,12 +142,12 @@ export function LoginSecurityScreen({ onBack }: LoginSecurityScreenProps) {
                 Você pode desativar sua conta temporariamente ou excluí-la de forma permanente.
               </p>
 
-              <div className="space-y-3 mb-5">
+              <RadioGroup value={deleteAction} onValueChange={(val) => setDeleteAction(val as 'deactivate' | 'delete')} className="space-y-3 mb-5 gap-0">
                 {/* Deactivate card */}
-                <button
-                  onClick={closeDeleteSheet}
-                  className="w-full text-left rounded-2xl p-4 transition-all duration-200 active:scale-[0.98]"
-                  style={{ border: '1.5px solid hsl(var(--divider))', background: 'hsl(var(--card))' }}
+                <div
+                  onClick={() => setDeleteAction('deactivate')}
+                  className="w-full text-left rounded-2xl p-4 transition-all duration-200 active:scale-[0.98] cursor-pointer flex items-center justify-between gap-3"
+                  style={{ border: `1.5px solid ${deleteAction === 'deactivate' ? 'hsl(var(--primary))' : 'hsl(var(--divider))'}`, background: 'hsl(var(--card))' }}
                 >
                   <div className="flex items-start gap-3">
                     <Icon name="pause" size={22} className="text-foreground mt-0.5 flex-shrink-0" />
@@ -158,13 +160,14 @@ export function LoginSecurityScreen({ onBack }: LoginSecurityScreenProps) {
                       </p>
                     </div>
                   </div>
-                </button>
+                  <RadioGroupItem value="deactivate" id="deactivate" />
+                </div>
 
                 {/* Delete card */}
-                <button
-                  onClick={() => { setDeleteConfirmed(false); setDeleteStep('confirm-delete'); }}
-                  className="w-full text-left rounded-2xl p-4 transition-all duration-200 active:scale-[0.98]"
-                  style={{ border: '1.5px solid hsl(var(--destructive) / 0.35)', background: 'hsl(var(--card))' }}
+                <div
+                  onClick={() => setDeleteAction('delete')}
+                  className="w-full text-left rounded-2xl p-4 transition-all duration-200 active:scale-[0.98] cursor-pointer flex items-center justify-between gap-3"
+                  style={{ border: `1.5px solid ${deleteAction === 'delete' ? 'hsl(var(--destructive))' : 'hsl(var(--divider))'}`, background: 'hsl(var(--card))' }}
                 >
                   <div className="flex items-start gap-3">
                     <Icon name="delete" size={22} style={{ color: 'hsl(var(--destructive))' }} className="mt-0.5 flex-shrink-0" />
@@ -177,15 +180,23 @@ export function LoginSecurityScreen({ onBack }: LoginSecurityScreenProps) {
                       </p>
                     </div>
                   </div>
-                </button>
-              </div>
+                  <RadioGroupItem value="delete" id="delete" />
+                </div>
+              </RadioGroup>
 
               <button
-                onClick={closeDeleteSheet}
-                className="btn-outline w-full"
+                onClick={() => {
+                  if (deleteAction === 'deactivate') {
+                    closeDeleteSheet();
+                  } else {
+                    setDeleteConfirmed(false);
+                    setDeleteStep('confirm-delete');
+                  }
+                }}
+                className="btn-primary w-full"
                 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-weight-semibold)' }}
               >
-                Cancelar
+                Confirmar
               </button>
             </>
           ) : (

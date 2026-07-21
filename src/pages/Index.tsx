@@ -1694,6 +1694,19 @@ const Index = () => {
           onNotificationsClick={() => setShowNotifications(true)}
           onCartClick={() => setShowCart(true)}
           onFindPeopleClick={() => setShowSimilarTravelers(true)}
+          onTravelerClick={(traveler) => {
+            setSelectedFriend({
+              userId: traveler.userId,
+              name: traveler.name,
+              username: traveler.username || traveler.name.toLowerCase().replace(/\s+/g, ''),
+              location: traveler.city || '',
+              avatar: traveler.avatar || '',
+              following: 0,
+              followers: '0',
+              countries: [],
+            });
+            setProfileSubScreen('friend');
+          }}
           onSeeAllItineraries={(title, items) => setItineraryList({ title, items })}
           onContinuePlanning={(it) => handleUserItineraryClick(it)}
 

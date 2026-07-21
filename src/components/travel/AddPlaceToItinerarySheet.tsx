@@ -106,22 +106,13 @@ export function AddPlaceToItinerarySheet({ open, onClose, place }: AddPlaceToIti
     }
   };
 
+  const availableItineraries = itineraries.filter(it => !it.isPublic);
+
   return (
     <BottomSheet
       open={open}
       onClose={onClose}
       title={step === 'itinerary' ? 'Adicionar ao roteiro' : 'Escolher dia'}
-      headerExtra={
-        step === 'day' ? (
-          <button
-            onClick={() => setStep('itinerary')}
-            className="text-[13px] font-semibold"
-            style={{ color: '#1A1C40' }}
-          >
-            Voltar
-          </button>
-        ) : undefined
-      }
       footer={
         step === 'day' ? (
           <button
@@ -144,7 +135,7 @@ export function AddPlaceToItinerarySheet({ open, onClose, place }: AddPlaceToIti
             <div className="py-10 text-center text-[13px]" style={{ color: '#8A8A8A' }}>
               Carregando roteiros…
             </div>
-          ) : itineraries.length === 0 ? (
+          ) : availableItineraries.length === 0 ? (
             <div className="py-10 flex flex-col items-center text-center">
               <div
                 className="w-14 h-14 rounded-full flex items-center justify-center mb-3"
@@ -153,15 +144,15 @@ export function AddPlaceToItinerarySheet({ open, onClose, place }: AddPlaceToIti
                 <Icon name="map" size={24} style={{ color: '#999' }} />
               </div>
               <h3 className="text-[15px] font-bold" style={{ color: '#1A1C40' }}>
-                Você ainda não tem roteiros
+                Você ainda não tem roteiros disponíveis
               </h3>
               <p className="text-[12px] mt-1 max-w-[260px]" style={{ color: '#8A8A8A' }}>
-                Crie um roteiro para começar a adicionar lugares da sua coleção.
+                Crie um roteiro privado para começar a adicionar lugares.
               </p>
             </div>
           ) : (
             <ul className="flex flex-col gap-2 pb-2">
-              {itineraries.map(it => {
+              {availableItineraries.map(it => {
                 const cover = it.images?.[0];
                 const days = diffDays(it.startDate, it.endDate);
                 const range = formatRange(it.startDate, it.endDate);

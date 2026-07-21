@@ -225,37 +225,39 @@ export function CollectionMapScreen({ title, places, onBack }: CollectionMapScre
         </div>
       )}
 
-      {/* Top bar */}
-      <header className="relative z-10 px-5 pt-5 flex items-center gap-3 pointer-events-none">
-        <div className="pointer-events-auto" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
-          <BackButton onClick={onBack} />
-        </div>
-        <div
-          className="pointer-events-auto flex-1 min-w-0 bg-white rounded-full px-4 py-2"
-          style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.12)' }}
-        >
-          <p className="text-[11px] font-medium leading-none" style={{ color: '#8A8A8A' }}>
-            Coleção
-          </p>
-          <p className="text-[14px] font-bold leading-tight truncate mt-0.5" style={{ color: '#1A1C40' }}>
-            {title}
-          </p>
-        </div>
-      </header>
+      {/* Top Controls */}
+      <div
+        className="absolute top-0 left-0 right-0 z-20 px-5 pointer-events-none"
+        style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}
+      >
+        <div className="relative flex justify-center mt-1">
+          {/* Back button wrapper - absolutely positioned to the left */}
+          <div className="absolute left-0 top-0 pointer-events-auto">
+            <BackButton onClick={onBack} />
+          </div>
 
-      {/* Counter */}
-      {hasAnyResolved && (
-        <div
-          className="absolute z-10 left-1/2 -translate-x-1/2 bg-white rounded-full px-3 py-1.5 flex items-center gap-1.5"
-          style={{ top: 92, boxShadow: '0 4px 12px rgba(0,0,0,0.12)' }}
-        >
-          <Icon name="place" size={14} style={{ color: '#9DCC36' }} />
-          <span className="text-[12px] font-semibold" style={{ color: '#1A1C40' }}>
-            {resolved.length} {resolved.length === 1 ? 'lugar' : 'lugares'}
-            {loading && resolved.length < places.length ? ` de ${places.length}` : ''}
-          </span>
+          {/* Centered content */}
+          <div className="flex justify-center pointer-events-none max-w-[68%] shrink-0">
+            <div
+              className="pointer-events-auto bg-white rounded-full px-5 py-2.5 flex items-center gap-2 shadow-lg max-w-full"
+            >
+              <h1 className="text-[15px] font-semibold text-foreground truncate">{title}</h1>
+              {hasAnyResolved && (
+                <>
+                  <div className="w-1 h-1 rounded-full bg-muted-foreground/40 shrink-0" />
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Icon name="place" size={14} className="text-primary" />
+                    <span className="text-[13px] font-semibold text-foreground">
+                      {resolved.length} {resolved.length === 1 ? 'lugar' : 'lugares'}
+                      {loading && resolved.length < places.length ? ` de ${places.length}` : ''}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
-      )}
+      </div>
 
       {/* Selected place info card */}
       {selectedPlace && (
@@ -304,6 +306,16 @@ export function CollectionMapScreen({ title, places, onBack }: CollectionMapScre
                     {selectedPlace.address}
                   </p>
                 )}
+                <button
+                  onClick={() => {
+                    const query = encodeURIComponent(`${selectedPlace.name} ${selectedPlace.address || selectedPlace.category || ''}`);
+                    window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
+                  }}
+                  className="mt-2.5 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/50 hover:bg-muted active:scale-95 transition-transform w-fit"
+                >
+                  <Icon name="directions" size={14} className="text-primary" />
+                  <span className="text-[12px] font-semibold text-foreground">Como chegar</span>
+                </button>
               </div>
               <button
                 onClick={() => setSelectedId(null)}

@@ -114,7 +114,7 @@ export function FiltersScreen({ onClose, initial = DEFAULT_FILTERS, onApply, cou
     });
   };
 
-  const handleClear = () => setFilters(DEFAULT_FILTERS);
+  const handleClear = () => setFilters((f) => ({ ...DEFAULT_FILTERS, searchType: f.searchType }));
 
   const handleApply = () => {
     onApply(filters);

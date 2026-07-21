@@ -301,6 +301,7 @@ interface HomeScreenProps {
   onExperienceClick?: (id: number) => void;
   onSearchClick?: () => void;
   onFindPeopleClick?: () => void;
+  onTravelerClick?: (traveler: { userId: string; name: string; username: string; city: string; avatar: string }) => void;
   onProfileClick?: () => void;
   onCreatorClick?: (creator: TopCreator) => void;
   onChatClick?: () => void;
@@ -318,6 +319,7 @@ export function HomeScreen({
   onExperienceClick,
   onSearchClick,
   onFindPeopleClick,
+  onTravelerClick,
   onProfileClick,
   onCreatorClick,
   onChatClick,
@@ -673,7 +675,7 @@ export function HomeScreen({
               {realTravelers.map((traveler) => (
                 <button
                   key={traveler.userId}
-                  onClick={onFindPeopleClick}
+                  onClick={() => onTravelerClick ? onTravelerClick(traveler) : onFindPeopleClick?.()}
                   className="w-[240px] h-[150px] bg-card rounded-2xl p-3 text-left card-elevated flex flex-col"
                 >
                   <div className="flex items-center gap-2.5 mb-3">

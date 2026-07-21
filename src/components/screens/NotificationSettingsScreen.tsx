@@ -9,7 +9,7 @@ interface NotificationSettingsScreenProps {
 
 const categories = [
   { id: 'followers', label: 'Novos seguidores', icon: 'person_add' },
-  { id: 'likes', label: 'Curtidas e comentários', icon: 'favorite' },
+  { id: 'likes', label: 'Avaliações recebidas', icon: 'favorite' },
   { id: 'sales', label: 'Vendas de roteiros', icon: 'shopping_bag' },
   { id: 'updates', label: 'Atualizações da plataforma', icon: 'campaign' },
   { id: 'reminders', label: 'Lembretes de viagem', icon: 'alarm' },

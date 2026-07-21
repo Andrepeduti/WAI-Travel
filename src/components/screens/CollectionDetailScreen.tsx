@@ -589,7 +589,6 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
         onDeleteFolder={handleDeleteFolder}
         onAddPlace={() => setShowAddPlaceSheetV2(true)}
         onAddVideo={() => setShowVideoSheet(true)}
-        onCreateFolder={() => setShowCreateFolderSheet(true)}
       />
     );
   }
@@ -639,50 +638,50 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
                 <Icon name="map" size={20} style={{ color: '#1A1C40' }} />
               </button>
             )}
-          {/* Collaborators from mock data or shared people */}
-          {(() => {
-            const sharedPeople = shareSelectedIds.map(id => mockPeople.find(p => p.id === id)).filter(Boolean);
-            const collabs = ('collaborators' in collection ? (collection as any).collaborators : []) || [];
-            const hasAvatars = collabs.length > 0 || sharedPeople.length > 0;
-            if (!hasAvatars) return null;
-            return (
-              <div className="flex items-center">
-                <div className="flex -space-x-2.5">
-                  {collabs.slice(0, 4).map((collab) => (
-                    <img
-                      key={collab.id}
-                      src={collab.avatar}
-                      alt={collab.name}
-                      className="w-8 h-8 rounded-full border-[1.5px] border-white object-cover"
-                    />
-                  ))}
-                  {sharedPeople.slice(0, collabs.length > 0 ? 4 - collabs.length : 4).map((person) => (
-                    person!.photo ? (
+            {/* Collaborators from mock data or shared people */}
+            {(() => {
+              const sharedPeople = shareSelectedIds.map(id => mockPeople.find(p => p.id === id)).filter(Boolean);
+              const collabs = ('collaborators' in collection ? (collection as any).collaborators : []) || [];
+              const hasAvatars = collabs.length > 0 || sharedPeople.length > 0;
+              if (!hasAvatars) return null;
+              return (
+                <div className="flex items-center">
+                  <div className="flex -space-x-2.5">
+                    {collabs.slice(0, 4).map((collab) => (
                       <img
-                        key={person!.id}
-                        src={person!.photo}
-                        alt={person!.name}
+                        key={collab.id}
+                        src={collab.avatar}
+                        alt={collab.name}
                         className="w-8 h-8 rounded-full border-[1.5px] border-white object-cover"
                       />
-                    ) : (
-                      <div
-                        key={person!.id}
-                        className="w-8 h-8 rounded-full border-[1.5px] border-white flex items-center justify-center text-[10px] font-bold text-white"
-                        style={{ background: person!.color }}
-                      >
-                        {person!.initials}
-                      </div>
-                    )
-                  ))}
+                    ))}
+                    {sharedPeople.slice(0, collabs.length > 0 ? 4 - collabs.length : 4).map((person) => (
+                      person!.photo ? (
+                        <img
+                          key={person!.id}
+                          src={person!.photo}
+                          alt={person!.name}
+                          className="w-8 h-8 rounded-full border-[1.5px] border-white object-cover"
+                        />
+                      ) : (
+                        <div
+                          key={person!.id}
+                          className="w-8 h-8 rounded-full border-[1.5px] border-white flex items-center justify-center text-[10px] font-bold text-white"
+                          style={{ background: person!.color }}
+                        >
+                          {person!.initials}
+                        </div>
+                      )
+                    ))}
+                  </div>
+                  {(collabs.length + sharedPeople.length) > 4 && (
+                    <span className="text-[12px] font-medium ml-1.5" style={{ color: '#6B7280' }}>
+                      +{(collabs.length + sharedPeople.length) - 4}
+                    </span>
+                  )}
                 </div>
-                {(collabs.length + sharedPeople.length) > 4 && (
-                  <span className="text-[12px] font-medium ml-1.5" style={{ color: '#6B7280' }}>
-                    +{(collabs.length + sharedPeople.length) - 4}
-                  </span>
-                )}
-              </div>
-            );
-          })()}
+              );
+            })()}
           </div>
         </div>
       </header>
@@ -810,11 +809,10 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
         <div className="flex gap-2 overflow-x-auto px-5 pt-2 pb-1 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
           <button
             onClick={() => setActiveFilter(null)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-semibold flex-shrink-0 transition-all ${
-              activeFilter === null
-                ? 'text-white'
-                : 'text-foreground'
-            }`}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-semibold flex-shrink-0 transition-all ${activeFilter === null
+              ? 'text-white'
+              : 'text-foreground'
+              }`}
             style={{
               background: activeFilter === null ? '#1A1C40' : '#F2F2F2',
             }}
@@ -828,11 +826,10 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
               <button
                 key={filter.id}
                 onClick={() => setActiveFilter(activeFilter === filter.id ? null : filter.id)}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-semibold flex-shrink-0 transition-all ${
-                  activeFilter === filter.id
-                    ? 'text-white'
-                    : 'text-foreground'
-                }`}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-semibold flex-shrink-0 transition-all ${activeFilter === filter.id
+                  ? 'text-white'
+                  : 'text-foreground'
+                  }`}
                 style={{
                   background: activeFilter === filter.id ? '#1A1C40' : '#F2F2F2',
                 }}
@@ -877,136 +874,136 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
         {filteredPlaces.map((place) => {
           const isSelected = selectedPlaceIds.includes(place.id);
           return (
-          <div
-            key={place.id}
-            className={`flex gap-3.5 py-4 ${selectionMode ? 'cursor-pointer -mx-2 px-2 rounded-2xl transition-colors' : ''} ${selectionMode && isSelected ? 'bg-[#9DCC36]/10' : ''}`}
-            onClick={selectionMode ? () => togglePlaceSelected(place.id) : undefined}
-          >
-            <div className="flex-shrink-0 relative">
-              <img
-                src={place.image}
-                alt={place.name}
-                className="w-[88px] h-[88px] rounded-2xl object-cover bg-muted"
-              />
-              {selectionMode && (
-                <div
-                  className="absolute top-1.5 left-1.5 w-6 h-6 rounded-full flex items-center justify-center border-2 transition-colors"
-                  style={{
-                    background: isSelected ? '#9DCC36' : 'rgba(255,255,255,0.9)',
-                    borderColor: isSelected ? '#9DCC36' : 'rgba(26,28,64,0.25)',
-                  }}
-                >
-                  {isSelected && <Icon name="check" size={14} style={{ color: '#1A1C40' }} />}
+            <div
+              key={place.id}
+              className={`flex gap-3.5 py-4 ${selectionMode ? 'cursor-pointer -mx-2 px-2 rounded-2xl transition-colors' : ''} ${selectionMode && isSelected ? 'bg-[#9DCC36]/10' : ''}`}
+              onClick={selectionMode ? () => togglePlaceSelected(place.id) : undefined}
+            >
+              <div className="flex-shrink-0 relative">
+                <img
+                  src={place.image}
+                  alt={place.name}
+                  className="w-[88px] h-[88px] rounded-2xl object-cover bg-muted"
+                />
+                {selectionMode && (
+                  <div
+                    className="absolute top-1.5 left-1.5 w-6 h-6 rounded-full flex items-center justify-center border-2 transition-colors"
+                    style={{
+                      background: isSelected ? '#9DCC36' : 'rgba(255,255,255,0.9)',
+                      borderColor: isSelected ? '#9DCC36' : 'rgba(26,28,64,0.25)',
+                    }}
+                  >
+                    {isSelected && <Icon name="check" size={14} style={{ color: '#1A1C40' }} />}
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0 flex flex-col justify-center">
+                <div className="flex items-center gap-1.5">
+                  <h3
+                    className="font-bold text-[15px] leading-tight truncate"
+                    style={{ color: '#1A1C40' }}
+                  >
+                    {place.name}
+                  </h3>
+                  <div className="flex items-center gap-0.5 flex-shrink-0">
+                    <Icon name="star" size={13} filled className="text-amber-400" />
+                    <span className="text-[12px] font-semibold" style={{ color: '#1A1C40' }}>
+                      {place.rating}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-[13px] font-medium mt-1" style={{ color: '#6B7280' }}>
+                  {place.address}
+                </p>
+                <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                  <span
+                    className="inline-flex px-3 py-1 text-[11px] font-semibold rounded-full"
+                    style={{ background: '#f0f0f0', color: '#555' }}
+                  >
+                    {place.category}
+                  </span>
+                  {!activeFolderId && folders
+                    .filter((f) => safePlaceIds(f).includes(place.id))
+                    .map((f) => (
+                      <span
+                        key={f.id}
+                        className="inline-flex px-3 py-1 text-[11px] font-semibold rounded-full truncate max-w-[140px]"
+                        style={{ background: '#f0f0f0', color: '#555' }}
+                      >
+                        {f.name}
+                      </span>
+                    ))}
+                </div>
+              </div>
+              {!selectionMode && (
+                <div className="flex-shrink-0 self-start pt-1">
+                  <button
+                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-muted/50 transition-colors"
+                    onClick={() => { setSelectedPlace(place); setSheetOpen(true); }}
+                  >
+                    <Icon name="more_vert" size={22} style={{ color: '#1A1C40' }} />
+                  </button>
                 </div>
               )}
             </div>
-            <div className="flex-1 min-w-0 flex flex-col justify-center">
-              <div className="flex items-center gap-1.5">
-                <h3
-                  className="font-bold text-[15px] leading-tight truncate"
-                  style={{ color: '#1A1C40' }}
-                >
-                  {place.name}
-                </h3>
-                <div className="flex items-center gap-0.5 flex-shrink-0">
-                  <Icon name="star" size={13} filled className="text-amber-400" />
-                  <span className="text-[12px] font-semibold" style={{ color: '#1A1C40' }}>
-                    {place.rating}
-                  </span>
-                </div>
-              </div>
-              <p className="text-[13px] font-medium mt-1" style={{ color: '#6B7280' }}>
-                {place.address}
-              </p>
-              <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                <span
-                  className="inline-flex px-3 py-1 text-[11px] font-semibold rounded-full"
-                  style={{ background: '#f0f0f0', color: '#555' }}
-                >
-                  {place.category}
-                </span>
-                {!activeFolderId && folders
-                  .filter((f) => safePlaceIds(f).includes(place.id))
-                  .map((f) => (
-                    <span
-                      key={f.id}
-                      className="inline-flex px-3 py-1 text-[11px] font-semibold rounded-full truncate max-w-[140px]"
-                      style={{ background: '#f0f0f0', color: '#555' }}
-                    >
-                      {f.name}
-                    </span>
-                  ))}
-              </div>
-            </div>
-            {!selectionMode && (
-              <div className="flex-shrink-0 self-start pt-1">
-                <button
-                  className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-muted/50 transition-colors"
-                  onClick={() => { setSelectedPlace(place); setSheetOpen(true); }}
-                >
-                  <Icon name="more_vert" size={22} style={{ color: '#1A1C40' }} />
-                </button>
-              </div>
-            )}
-          </div>
           );
         })}
       </div>
 
       {/* Floating action button + contextual menu */}
       {!selectionMode && (
-      <div className="fixed right-5 md:right-[calc(50%-215px+20px)] z-30" style={{ bottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}>
-        <div className="relative flex flex-col items-end gap-3">
-          {fabSheetOpen && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setFabSheetOpen(false)} />
-              <div className="z-50 flex flex-col items-end gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
-                <button
-                  className="flex items-center gap-3 px-5 py-3 bg-white rounded-full hover:bg-muted/50 transition-colors"
-                  style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.10)' }}
-                  onClick={() => { setFabSheetOpen(false); setShowVideoSheet(true); }}
-                >
-                  <Icon name="videocam" size={20} style={{ color: '#1A1C40' }} />
-                  <span className="text-[14px] font-medium whitespace-nowrap" style={{ color: '#1A1C40' }}>
-                    Extrair de vídeo
-                  </span>
-                </button>
-                <button
-                  className="flex items-center gap-3 px-5 py-3 bg-white rounded-full hover:bg-muted/50 transition-colors"
-                  style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.10)' }}
-                  onClick={() => { setFabSheetOpen(false); setShowAddPlaceSheetV2(true); }}
-                >
-                  <Icon name="add_location" size={20} style={{ color: '#1A1C40' }} />
-                  <span className="text-[14px] font-medium whitespace-nowrap" style={{ color: '#1A1C40' }}>
-                    Adicionar local
-                  </span>
-                </button>
-                <button
-                  className="flex items-center gap-3 px-5 py-3 bg-white rounded-full hover:bg-muted/50 transition-colors"
-                  style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.10)' }}
-                  onClick={() => { setFabSheetOpen(false); setShowCreateFolderSheet(true); }}
-                >
-                  <Icon name="create_new_folder" size={20} style={{ color: '#1A1C40' }} />
-                  <span className="text-[14px] font-medium whitespace-nowrap" style={{ color: '#1A1C40' }}>
-                    Criar pasta
-                  </span>
-                </button>
-              </div>
-            </>
-          )}
-          <button
-            onClick={() => setFabSheetOpen(!fabSheetOpen)}
-            className="w-14 h-14 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform z-50"
-            style={{ background: fabSheetOpen ? '#1A1C40' : '#9DCC36' }}
-          >
-            <Icon
-              name={fabSheetOpen ? 'close' : 'add'}
-              size={28}
-              style={{ color: fabSheetOpen ? '#FFFFFF' : '#1A1C40' }}
-            />
-          </button>
+        <div className="fixed right-5 md:right-[calc(50%-215px+20px)] z-30" style={{ bottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}>
+          <div className="relative flex flex-col items-end gap-3">
+            {fabSheetOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setFabSheetOpen(false)} />
+                <div className="z-50 flex flex-col items-end gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                  <button
+                    className="flex items-center gap-3 px-5 py-3 bg-white rounded-full hover:bg-muted/50 transition-colors"
+                    style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.10)' }}
+                    onClick={() => { setFabSheetOpen(false); setShowVideoSheet(true); }}
+                  >
+                    <Icon name="videocam" size={20} style={{ color: '#1A1C40' }} />
+                    <span className="text-[14px] font-medium whitespace-nowrap" style={{ color: '#1A1C40' }}>
+                      Extrair de vídeo
+                    </span>
+                  </button>
+                  <button
+                    className="flex items-center gap-3 px-5 py-3 bg-white rounded-full hover:bg-muted/50 transition-colors"
+                    style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.10)' }}
+                    onClick={() => { setFabSheetOpen(false); setShowAddPlaceSheetV2(true); }}
+                  >
+                    <Icon name="add_location" size={20} style={{ color: '#1A1C40' }} />
+                    <span className="text-[14px] font-medium whitespace-nowrap" style={{ color: '#1A1C40' }}>
+                      Adicionar local
+                    </span>
+                  </button>
+                  <button
+                    className="flex items-center gap-3 px-5 py-3 bg-white rounded-full hover:bg-muted/50 transition-colors"
+                    style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.10)' }}
+                    onClick={() => { setFabSheetOpen(false); setShowCreateFolderSheet(true); }}
+                  >
+                    <Icon name="create_new_folder" size={20} style={{ color: '#1A1C40' }} />
+                    <span className="text-[14px] font-medium whitespace-nowrap" style={{ color: '#1A1C40' }}>
+                      Criar pasta
+                    </span>
+                  </button>
+                </div>
+              </>
+            )}
+            <button
+              onClick={() => setFabSheetOpen(!fabSheetOpen)}
+              className="w-14 h-14 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform z-50"
+              style={{ background: fabSheetOpen ? '#1A1C40' : '#9DCC36' }}
+            >
+              <Icon
+                name={fabSheetOpen ? 'close' : 'add'}
+                size={28}
+                style={{ color: fabSheetOpen ? '#FFFFFF' : '#1A1C40' }}
+              />
+            </button>
+          </div>
         </div>
-      </div>
       )}
 
       {/* Selection action bar */}
@@ -1441,9 +1438,9 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
       {/* Sort Bottom Sheet */}
       {showSortSheet && (
         <div className="absolute inset-0 z-50 overflow-hidden">
-          <div 
+          <div
             className="absolute inset-0 bg-black/40 animate-in fade-in duration-200"
-            onClick={() => setShowSortSheet(false)} 
+            onClick={() => setShowSortSheet(false)}
           />
           <div className="absolute bottom-0 left-0 right-0 bg-background rounded-t-[24px] animate-in slide-in-from-bottom duration-300 pb-6">
             <div className="flex justify-center pt-3 pb-1">
@@ -1462,16 +1459,14 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
                 <button
                   key={option.id}
                   onClick={() => { setSortBy(option.id); setShowSortSheet(false); }}
-                  className={`flex items-center justify-between min-h-[48px] py-4 ${
-                    index < 3 ? 'border-b border-[#EAEAEA]' : ''
-                  }`}
+                  className={`flex items-center justify-between min-h-[48px] py-4 ${index < 3 ? 'border-b border-[#EAEAEA]' : ''
+                    }`}
                 >
                   <span className="text-[15px] font-normal text-foreground">
                     {option.label}
                   </span>
-                  <div className={`w-[22px] h-[22px] rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                    sortBy === option.id ? 'border-foreground' : 'border-muted-foreground/40'
-                  }`}>
+                  <div className={`w-[22px] h-[22px] rounded-full border-2 flex items-center justify-center flex-shrink-0 ${sortBy === option.id ? 'border-foreground' : 'border-muted-foreground/40'
+                    }`}>
                     {sortBy === option.id && (
                       <div className="w-[12px] h-[12px] rounded-full bg-foreground" />
                     )}
@@ -1547,7 +1542,7 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
       {/* Delete Confirmation Bottom Sheet */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-[110] flex items-end justify-center" onClick={() => setShowDeleteConfirm(false)}>
-          <div 
+          <div
             className="absolute inset-0 bg-black/20"
             style={{ animation: 'fadeIn 0.2s ease-out' }}
           />
