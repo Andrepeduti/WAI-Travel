@@ -37,6 +37,7 @@ export interface UserItinerary {
   description?: string;
   tags?: string[];
   userId: string;
+  createdAt?: string;
 }
 
 export interface CreateItineraryInput {
@@ -84,6 +85,7 @@ function rowToItinerary(row: any): UserItinerary {
     description: row.description ?? '',
     tags: row.tags ?? [],
     userId: row.user_id,
+    createdAt: row.created_at ? String(row.created_at) : undefined,
   };
 }
 

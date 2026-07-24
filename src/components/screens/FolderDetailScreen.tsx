@@ -31,6 +31,11 @@ interface FolderDetailScreenProps {
   onAddPlace?: () => void;
   onAddVideo?: () => void;
   onCreateFolder?: () => void;
+  onShowActivityDetail?: (place: Place) => void;
+  onAddToItinerary?: (place: Place) => void;
+  onViewMap?: (place: Place) => void;
+  onMoveToFolder?: (place: Place) => void;
+  onDeletePlace?: (place: Place) => void;
 }
 
 export function FolderDetailScreen({
@@ -44,6 +49,11 @@ export function FolderDetailScreen({
   onAddPlace,
   onAddVideo,
   onCreateFolder,
+  onShowActivityDetail,
+  onAddToItinerary,
+  onViewMap,
+  onMoveToFolder,
+  onDeletePlace,
 }: FolderDetailScreenProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
@@ -143,7 +153,11 @@ export function FolderDetailScreen({
           </div>
         )}
         {filteredPlaces.map((place) => (
-          <div key={place.id} className="flex gap-3.5 py-4">
+          <div
+            key={place.id}
+            className="flex gap-3.5 py-4 cursor-pointer hover:bg-muted/30 transition-colors"
+            onClick={() => { setSelectedPlace(place); setSheetOpen(true); }}
+          >
             <div className="flex-shrink-0">
               <img
                 src={place.image}
@@ -210,9 +224,23 @@ export function FolderDetailScreen({
           </div>
 
           <div className="px-6 pb-8">
+            {/* Ver detalhes */}
             <button
               className="w-full flex items-center gap-4 py-4 active:bg-muted/30 transition-colors"
-              onClick={() => setSheetOpen(false)}
+              onClick={() => { setSheetOpen(false); if (selectedPlace && onShowActivityDetail) onShowActivityDetail(selectedPlace); }}
+            >
+              <Icon name="info" size={22} style={{ color: '#1A1C40' }} />
+              <span className="flex-1 text-[15px] font-medium text-left" style={{ color: '#1A1C40' }}>
+                Ver detalhes
+              </span>
+              <Icon name="chevron_right" size={18} style={{ color: '#C0C0C0' }} />
+            </button>
+
+            <div className="h-px" style={{ background: '#F0F0F0' }} />
+
+            <button
+              className="w-full flex items-center gap-4 py-4 active:bg-muted/30 transition-colors"
+              onClick={() => { setSheetOpen(false); if (selectedPlace && onAddToItinerary) onAddToItinerary(selectedPlace); }}
             >
               <Icon name="add_circle" size={22} style={{ color: '#1A1C40' }} />
               <span className="flex-1 text-[15px] font-medium text-left" style={{ color: '#1A1C40' }}>
@@ -225,7 +253,7 @@ export function FolderDetailScreen({
 
             <button
               className="w-full flex items-center gap-4 py-4 active:bg-muted/30 transition-colors"
-              onClick={() => setSheetOpen(false)}
+              onClick={() => { setSheetOpen(false); if (selectedPlace && onViewMap) onViewMap(selectedPlace); }}
             >
               <Icon name="map" size={22} style={{ color: '#1A1C40' }} />
               <span className="flex-1 text-[15px] font-medium text-left" style={{ color: '#1A1C40' }}>
@@ -235,6 +263,35 @@ export function FolderDetailScreen({
             </button>
 
             <div className="h-px" style={{ background: '#F0F0F0' }} />
+
+            <button
+              className="w-full flex items-center gap-4 py-4 active:bg-muted/30 transition-colors"
+              onClick={() => { setSheetOpen(false); if (selectedPlace && onMoveToFolder) onMoveToFolder(selectedPlace); }}
+            >
+              <Icon name="drive_file_move" size={22} style={{ color: '#1A1C40' }} />
+              <span className="flex-1 text-[15px] font-medium text-left" style={{ color: '#1A1C40' }}>
+                Mover para pasta
+              </span>
+              <Icon name="chevron_right" size={18} style={{ color: '#C0C0C0' }} />
+            </button>
+
+            <div className="h-px" style={{ background: '#F0F0F0' }} />
+
+            {selectedPlace?.lat !== undefined && selectedPlace?.lng !== undefined && (
+              <>
+                <button
+                  className="w-full flex items-center gap-4 py-4 active:bg-muted/30 transition-colors"
+                  onClick={() => { window.open(`https://maps.google.com/?q=${selectedPlace.lat},${selectedPlace.lng}`, '_blank'); setSheetOpen(false); }}
+                >
+                  <Icon name="directions" size={22} style={{ color: '#1A1C40' }} />
+                  <span className="flex-1 text-[15px] font-medium text-left" style={{ color: '#1A1C40' }}>
+                    Como chegar
+                  </span>
+                  <Icon name="chevron_right" size={18} style={{ color: '#C0C0C0' }} />
+                </button>
+                <div className="h-px" style={{ background: '#F0F0F0' }} />
+              </>
+            )}
 
             <button
               className="w-full flex items-center gap-4 py-4 active:bg-muted/30 transition-colors"
@@ -254,7 +311,7 @@ export function FolderDetailScreen({
 
             <button
               className="w-full flex items-center gap-4 py-4 active:bg-muted/30 transition-colors"
-              onClick={() => setSheetOpen(false)}
+              onClick={() => { setSheetOpen(false); if (selectedPlace && onDeletePlace) onDeletePlace(selectedPlace); }}
             >
               <Icon name="delete" size={22} style={{ color: '#DA501F' }} />
               <span className="flex-1 text-[15px] font-medium text-left" style={{ color: '#DA501F' }}>

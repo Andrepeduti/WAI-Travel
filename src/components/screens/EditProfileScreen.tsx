@@ -4,6 +4,7 @@ import { useCurrentUser } from '@/hooks/use-current-user';
 import { BackButton } from '@/components/ui/BackButton';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { toast } from 'sonner';
+import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { EditInterestsSheet, INTEREST_CATALOG, type Interest } from '@/components/travel/EditInterestsSheet';
@@ -19,7 +20,7 @@ type VerificationStatus = 'unverified' | 'pending' | 'verified';
 const VERIFICATION_KEY = 'wai-travel-verification-status';
 
 export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
-  const { user, update, refresh } = useCurrentUser();
+  const { user, update, refresh, loading: isUserLoading } = useCurrentUser();
   const { user: authUser } = useAuth();
 
   const [formData, setFormData] = useState({
@@ -39,6 +40,7 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
   const [verifyStep, setVerifyStep] = useState<0 | 1 | 2 | 3>(0);
   const [docFileName, setDocFileName] = useState<string | null>(null);
   const [selfieTaken, setSelfieTaken] = useState(false);
+  const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [verification, setVerification] = useState<VerificationStatus>(() => {
     if (typeof window === 'undefined') return 'unverified';
     return (localStorage.getItem(VERIFICATION_KEY) as VerificationStatus) || 'unverified';
@@ -272,12 +274,20 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
     });
   };
 
+  const handleBack = () => {
+    if (hasChanges) {
+      setShowDiscardDialog(true);
+    } else {
+      onBack();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background pb-32">
       {/* Header — padrão sub-page (sticky branco com BackButton) */}
       <div className="sticky top-0 z-20 bg-background pt-[env(safe-area-inset-top)]">
         <div className="flex items-center gap-3 px-4 py-4">
-          <BackButton onClick={onBack} />
+          <BackButton onClick={handleBack} />
           <h1
             className="text-foreground"
             style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--font-weight-bold)' }}
@@ -287,313 +297,335 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
         </div>
       </div>
 
-      <div className="px-5 pt-2">
-        {/* Avatar */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="relative mb-3">
-            {avatar ? (
-              <img
-                src={avatar}
-                alt="Foto de perfil"
-                className="w-24 h-24 rounded-full object-cover"
-              />
-            ) : (
-              <UserAvatar src={null} alt="Sem foto de perfil" size={96} />
-            )}
-            <label
-              className="absolute bottom-0 right-0 w-8 h-8 rounded-full flex items-center justify-center cursor-pointer shadow-sm"
-              style={{ background: 'hsl(var(--primary))' }}
-            >
-              <Icon name="photo_camera" size={16} style={{ color: 'hsl(var(--primary-foreground))' }} />
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => handleAvatarPick(e.target.files?.[0] ?? null)}
-              />
-            </label>
-          </div>
-          <span
-            className="text-muted-foreground"
-            style={{ fontSize: 'var(--text-xs)' }}
-          >
-            Alterar foto
-          </span>
-        </div>
-
-        {/* Form — somente campos essenciais */}
-        <div className="space-y-5">
-          <div>
-            <label
-              className="block text-muted-foreground mb-1.5"
-              style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)' }}
-            >
-              Nome
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => handleChange('name', e.target.value)}
-              placeholder="Seu nome"
-              className="w-full rounded-xl border border-border bg-background px-4 py-3 text-foreground outline-none focus:border-primary transition-colors"
-              style={{ fontSize: 'var(--text-base)' }}
-            />
-          </div>
-
-          <div>
-            <label
-              className="block text-muted-foreground mb-1.5"
-              style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)' }}
-            >
-              Nome de usuário
-            </label>
-            <div className="relative">
-              <span
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
-                style={{ fontSize: 'var(--text-base)' }}
-              >
-                @
-              </span>
-              <input
-                type="text"
-                value={formData.username}
-                onChange={(e) => {
-                  if (usernameError) setUsernameError(null);
-                  handleChange('username', e.target.value.replace(/^@/, '').toLowerCase());
-                }}
-                placeholder="seunome"
-                className={`w-full rounded-xl border bg-background pl-9 pr-4 py-3 text-foreground outline-none transition-colors ${usernameError ? 'border-destructive focus:border-destructive' : 'border-border focus:border-primary'
-                  }`}
-                style={{ fontSize: 'var(--text-base)' }}
-              />
+      {isUserLoading ? (
+        <div className="px-5 pt-8 flex flex-col items-center">
+          <Skeleton className="w-24 h-24 rounded-full mb-8" />
+          <div className="w-full space-y-6">
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-1/4 rounded" />
+              <Skeleton className="h-12 w-full rounded-xl" />
             </div>
-            {usernameError && (
-              <p
-                className="text-destructive mt-1.5"
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-1/3 rounded" />
+              <Skeleton className="h-12 w-full rounded-xl" />
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-1/4 rounded" />
+              <Skeleton className="h-12 w-full rounded-xl" />
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="px-5 pt-2">
+            {/* Avatar */}
+            <div className="flex flex-col items-center mb-8">
+              <div className="relative mb-3">
+                {avatar ? (
+                  <img
+                    src={avatar}
+                    alt="Foto de perfil"
+                    className="w-24 h-24 rounded-full object-cover"
+                  />
+                ) : (
+                  <UserAvatar src={null} alt="Sem foto de perfil" size={96} />
+                )}
+                <label
+                  className="absolute bottom-0 right-0 w-8 h-8 rounded-full flex items-center justify-center cursor-pointer shadow-sm"
+                  style={{ background: 'hsl(var(--primary))' }}
+                >
+                  <Icon name="photo_camera" size={16} style={{ color: 'hsl(var(--primary-foreground))' }} />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handleAvatarPick(e.target.files?.[0] ?? null)}
+                  />
+                </label>
+              </div>
+              <span
+                className="text-muted-foreground"
                 style={{ fontSize: 'var(--text-xs)' }}
               >
-                {usernameError}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label
-              className="block text-muted-foreground mb-1.5"
-              style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)' }}
-            >
-              Localização
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                value={locationInput}
-                onChange={(e) => {
-                  setLocationInput(e.target.value);
-                  setShowLocationSuggestions(true);
-                }}
-                onFocus={() => setShowLocationSuggestions(true)}
-                onBlur={() => setTimeout(() => setShowLocationSuggestions(false), 150)}
-                placeholder="Buscar cidade..."
-                className="w-full rounded-xl border border-border bg-background px-4 py-3 text-foreground outline-none focus:border-primary transition-colors"
-                style={{ fontSize: 'var(--text-base)' }}
-                autoComplete="off"
-              />
-              {showLocationSuggestions && locationInput.trim().length >= 2 && (
-                <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-xl border border-border bg-background shadow-lg max-h-64 overflow-y-auto">
-                  {isSearchingLocation && locationResults.length === 0 && (
-                    <div
-                      className="px-4 py-3 text-muted-foreground"
-                      style={{ fontSize: 'var(--text-sm)' }}
-                    >
-                      Buscando...
-                    </div>
-                  )}
-                  {!isSearchingLocation && locationResults.length === 0 && (
-                    <div
-                      className="px-4 py-3 text-muted-foreground"
-                      style={{ fontSize: 'var(--text-sm)' }}
-                    >
-                      Nenhuma cidade encontrada
-                    </div>
-                  )}
-                  {locationResults.map((r) => (
-                    <button
-                      key={r.full}
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => handleSelectCity(r.full)}
-                      className="w-full text-left px-4 py-3 hover:bg-muted/40 flex items-center gap-2 border-b border-border last:border-b-0"
-                    >
-                      <Icon name="location_on" size={18} className="text-muted-foreground flex-shrink-0" />
-                      <div className="min-w-0">
-                        <div
-                          className="text-foreground truncate"
-                          style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)' }}
-                        >
-                          {r.label}
-                        </div>
-                        {r.sub && (
-                          <div
-                            className="text-muted-foreground truncate"
-                            style={{ fontSize: 'var(--text-xs)' }}
-                          >
-                            {r.sub}
-                          </div>
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
+                Alterar foto
+              </span>
             </div>
-          </div>
 
-          <div>
-            <label
-              className="block text-muted-foreground mb-1.5"
-              style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)' }}
-            >
-              Bio
-            </label>
-            <textarea
-              value={formData.bio}
-              onChange={(e) => {
-                if (e.target.value.length <= 150) handleChange('bio', e.target.value);
-              }}
-              placeholder="Conte um pouco sobre você e seu estilo de viajar..."
-              rows={3}
-              className="w-full rounded-xl border border-border bg-background px-4 py-3 text-foreground outline-none focus:border-primary transition-colors resize-none"
-              style={{ fontSize: 'var(--text-base)' }}
-            />
-            <div
-              className="flex justify-end mt-1 text-muted-foreground"
-              style={{ fontSize: 'var(--text-xs)' }}
-            >
-              {formData.bio.length}/150
-            </div>
-          </div>
-
-        </div>
-
-        {/* Interesses — hidden */}
-
-        {/* Redes sociais */}
-        <div className="mt-8">
-          <h2
-            className="text-foreground mb-3"
-            style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-weight-bold)' }}
-          >
-            Redes sociais
-          </h2>
-          <div className="space-y-3">
-            {([
-              { key: 'instagram', label: 'Instagram', icon: '/icons/instagram.svg', placeholder: '@seuusuario', prefix: '@' },
-              { key: 'tiktok', label: 'TikTok', icon: '/icons/tiktok.svg', placeholder: '@seuusuario', prefix: '@' },
-              { key: 'youtube', label: 'YouTube', icon: '/icons/youtube.svg', placeholder: '@seucanal', prefix: '@' },
-            ] as const).map((social) => (
-              <div key={social.key}>
+            {/* Form — somente campos essenciais */}
+            <div className="space-y-5">
+              <div>
                 <label
                   className="block text-muted-foreground mb-1.5"
                   style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)' }}
                 >
-                  {social.label}
+                  Nome
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => handleChange('name', e.target.value)}
+                  placeholder="Seu nome"
+                  className="w-full rounded-xl border border-border bg-background px-4 py-3 text-foreground outline-none focus:border-primary transition-colors"
+                  style={{ fontSize: 'var(--text-base)' }}
+                />
+              </div>
+
+              <div>
+                <label
+                  className="block text-muted-foreground mb-1.5"
+                  style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)' }}
+                >
+                  Nome de usuário
                 </label>
                 <div className="relative">
                   <span
                     className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
                     style={{ fontSize: 'var(--text-base)' }}
                   >
-                    {social.prefix}
+                    @
                   </span>
                   <input
                     type="text"
-                    value={(formData[social.key] ?? '').replace(/^@/, '')}
-                    onChange={(e) => handleChange(social.key, e.target.value.replace(/^@/, '').replace(/\s+/g, ''))}
-                    placeholder={social.placeholder.replace(/^@/, '')}
-                    className="w-full rounded-xl border border-border bg-background pl-9 pr-4 py-3 text-foreground outline-none focus:border-primary transition-colors"
+                    value={formData.username}
+                    onChange={(e) => {
+                      if (usernameError) setUsernameError(null);
+                      handleChange('username', e.target.value.replace(/^@/, '').toLowerCase());
+                    }}
+                    placeholder="seunome"
+                    className={`w-full rounded-xl border bg-background pl-9 pr-4 py-3 text-foreground outline-none transition-colors ${usernameError ? 'border-destructive focus:border-destructive' : 'border-border focus:border-primary'
+                      }`}
+                    style={{ fontSize: 'var(--text-base)' }}
+                  />
+                </div>
+                {usernameError && (
+                  <p
+                    className="text-destructive mt-1.5"
+                    style={{ fontSize: 'var(--text-xs)' }}
+                  >
+                    {usernameError}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label
+                  className="block text-muted-foreground mb-1.5"
+                  style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)' }}
+                >
+                  Localização
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={locationInput}
+                    onChange={(e) => {
+                      setLocationInput(e.target.value);
+                      setShowLocationSuggestions(true);
+                    }}
+                    onFocus={() => setShowLocationSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowLocationSuggestions(false), 150)}
+                    placeholder="Buscar cidade..."
+                    className="w-full rounded-xl border border-border bg-background px-4 py-3 text-foreground outline-none focus:border-primary transition-colors"
                     style={{ fontSize: 'var(--text-base)' }}
                     autoComplete="off"
                   />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* TODO: Temporariamente oculto — reativar quando fluxo de verificação estiver pronto */}
-        {false && (
-          <div className="mt-8">
-            <h2
-              className="text-foreground mb-3"
-              style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-weight-bold)' }}
-            >
-              Verificação de identidade
-            </h2>
-
-            <button
-              type="button"
-              onClick={() => { if (verification !== 'verified') { setVerifyStep(0); setDocFileName(null); setSelfieTaken(false); setVerifyOpen(true); } }}
-              disabled={verification === 'verified'}
-              className="w-full text-left rounded-2xl border border-border bg-card p-4 flex items-start gap-3 transition-colors hover:bg-muted/40 disabled:cursor-default disabled:hover:bg-card"
-            >
-              <div
-                className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                style={{ background: '#1D9BF0' }}
-              >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path
-                    d="M12 1.5l2.39 2.05 3.13-.36.79 3.06 2.84 1.42-1.4 2.83.79 3.07-2.84 1.41-.79 3.07-3.13-.36L12 19.74l-2.39-2.05-3.13.36-.79-3.07L2.85 13.57l1.4-2.83-.79-3.07L6.3 6.25l.79-3.06 3.13.36L12 1.5z"
-                    fill="#FFFFFF"
-                  />
-                  <path
-                    d="M9 12.2l2.1 2.1L15.5 9.9"
-                    stroke="#1D9BF0"
-                    strokeWidth="2.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <span
-                    className="text-foreground"
-                    style={{
-                      fontSize: 'var(--text-base)',
-                      fontWeight: 'var(--font-weight-semibold)',
-                    }}
-                  >
-                    {verification === 'verified'
-                      ? 'Conta verificada'
-                      : verification === 'pending'
-                        ? 'Verificação em análise'
-                        : 'Conquistar selo verificado'}
-                  </span>
-                  {verification !== 'verified' && (
-                    <Icon
-                      name="chevron_right"
-                      size={20}
-                      className="text-muted-foreground flex-shrink-0"
-                    />
+                  {showLocationSuggestions && locationInput.trim().length >= 2 && (
+                    <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-xl border border-border bg-background shadow-lg max-h-64 overflow-y-auto">
+                      {isSearchingLocation && locationResults.length === 0 && (
+                        <div
+                          className="px-4 py-3 text-muted-foreground"
+                          style={{ fontSize: 'var(--text-sm)' }}
+                        >
+                          Buscando...
+                        </div>
+                      )}
+                      {!isSearchingLocation && locationResults.length === 0 && (
+                        <div
+                          className="px-4 py-3 text-muted-foreground"
+                          style={{ fontSize: 'var(--text-sm)' }}
+                        >
+                          Nenhuma cidade encontrada
+                        </div>
+                      )}
+                      {locationResults.map((r) => (
+                        <button
+                          key={r.full}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => handleSelectCity(r.full)}
+                          className="w-full text-left px-4 py-3 hover:bg-muted/40 flex items-center gap-2 border-b border-border last:border-b-0"
+                        >
+                          <Icon name="location_on" size={18} className="text-muted-foreground flex-shrink-0" />
+                          <div className="min-w-0">
+                            <div
+                              className="text-foreground truncate"
+                              style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)' }}
+                            >
+                              {r.label}
+                            </div>
+                            {r.sub && (
+                              <div
+                                className="text-muted-foreground truncate"
+                                style={{ fontSize: 'var(--text-xs)' }}
+                              >
+                                {r.sub}
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
-                <p
-                  className="text-muted-foreground mt-1"
-                  style={{ fontSize: 'var(--text-xs)', lineHeight: 1.4 }}
-                >
-                  {verification === 'verified'
-                    ? 'Você ganhou o selo oficial. Agora viajantes confiam ainda mais nos seus roteiros.'
-                    : verification === 'pending'
-                      ? 'Sua solicitação está em análise. Você receberá uma notificação em até 48h.'
-                      : 'Mostre que é você de verdade e ganhe o selo azul. Criadores verificados têm mais alcance e credibilidade.'}
-                </p>
               </div>
-            </button>
-          </div>
-        )}
 
-      </div>
+              <div>
+                <label
+                  className="block text-muted-foreground mb-1.5"
+                  style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)' }}
+                >
+                  Bio
+                </label>
+                <textarea
+                  value={formData.bio}
+                  onChange={(e) => {
+                    if (e.target.value.length <= 150) handleChange('bio', e.target.value);
+                  }}
+                  placeholder="Conte um pouco sobre você e seu estilo de viajar..."
+                  rows={3}
+                  className="w-full rounded-xl border border-border bg-background px-4 py-3 text-foreground outline-none focus:border-primary transition-colors resize-none"
+                  style={{ fontSize: 'var(--text-base)' }}
+                />
+                <div
+                  className="flex justify-end mt-1 text-muted-foreground"
+                  style={{ fontSize: 'var(--text-xs)' }}
+                >
+                  {formData.bio.length}/150
+                </div>
+              </div>
+
+            </div>
+
+            {/* Interesses — hidden */}
+
+            {/* Redes sociais */}
+            <div className="mt-8">
+              <h2
+                className="text-foreground mb-3"
+                style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-weight-bold)' }}
+              >
+                Redes sociais
+              </h2>
+              <div className="space-y-3">
+                {([
+                  { key: 'instagram', label: 'Instagram', icon: '/icons/instagram.svg', placeholder: '@seuusuario', prefix: '@' },
+                  { key: 'tiktok', label: 'TikTok', icon: '/icons/tiktok.svg', placeholder: '@seuusuario', prefix: '@' },
+                  { key: 'youtube', label: 'YouTube', icon: '/icons/youtube.svg', placeholder: '@seucanal', prefix: '@' },
+                ] as const).map((social) => (
+                  <div key={social.key}>
+                    <label
+                      className="block text-muted-foreground mb-1.5"
+                      style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)' }}
+                    >
+                      {social.label}
+                    </label>
+                    <div className="relative">
+                      <span
+                        className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
+                        style={{ fontSize: 'var(--text-base)' }}
+                      >
+                        {social.prefix}
+                      </span>
+                      <input
+                        type="text"
+                        value={(formData[social.key] ?? '').replace(/^@/, '')}
+                        onChange={(e) => handleChange(social.key, e.target.value.replace(/^@/, '').replace(/\s+/g, ''))}
+                        placeholder={social.placeholder.replace(/^@/, '')}
+                        className="w-full rounded-xl border border-border bg-background pl-9 pr-4 py-3 text-foreground outline-none focus:border-primary transition-colors"
+                        style={{ fontSize: 'var(--text-base)' }}
+                        autoComplete="off"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* TODO: Temporariamente oculto — reativar quando fluxo de verificação estiver pronto */}
+            {false && (
+              <div className="mt-8">
+                <h2
+                  className="text-foreground mb-3"
+                  style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-weight-bold)' }}
+                >
+                  Verificação de identidade
+                </h2>
+
+                <button
+                  type="button"
+                  onClick={() => { if (verification !== 'verified') { setVerifyStep(0); setDocFileName(null); setSelfieTaken(false); setVerifyOpen(true); } }}
+                  disabled={verification === 'verified'}
+                  className="w-full text-left rounded-2xl border border-border bg-card p-4 flex items-start gap-3 transition-colors hover:bg-muted/40 disabled:cursor-default disabled:hover:bg-card"
+                >
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{ background: '#1D9BF0' }}
+                  >
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path
+                        d="M12 1.5l2.39 2.05 3.13-.36.79 3.06 2.84 1.42-1.4 2.83.79 3.07-2.84 1.41-.79 3.07-3.13-.36L12 19.74l-2.39-2.05-3.13.36-.79-3.07L2.85 13.57l1.4-2.83-.79-3.07L6.3 6.25l.79-3.06 3.13.36L12 1.5z"
+                        fill="#FFFFFF"
+                      />
+                      <path
+                        d="M9 12.2l2.1 2.1L15.5 9.9"
+                        stroke="#1D9BF0"
+                        strokeWidth="2.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className="text-foreground"
+                        style={{
+                          fontSize: 'var(--text-base)',
+                          fontWeight: 'var(--font-weight-semibold)',
+                        }}
+                      >
+                        {verification === 'verified'
+                          ? 'Conta verificada'
+                          : verification === 'pending'
+                            ? 'Verificação em análise'
+                            : 'Conquistar selo verificado'}
+                      </span>
+                      {verification !== 'verified' && (
+                        <Icon
+                          name="chevron_right"
+                          size={20}
+                          className="text-muted-foreground flex-shrink-0"
+                        />
+                      )}
+                    </div>
+                    <p
+                      className="text-muted-foreground mt-1"
+                      style={{ fontSize: 'var(--text-xs)', lineHeight: 1.4 }}
+                    >
+                      {verification === 'verified'
+                        ? 'Você ganhou o selo oficial. Agora viajantes confiam ainda mais nos seus roteiros.'
+                        : verification === 'pending'
+                          ? 'Sua solicitação está em análise. Você receberá uma notificação em até 48h.'
+                          : 'Mostre que é você de verdade e ganhe o selo azul. Criadores verificados têm mais alcance e credibilidade.'}
+                    </p>
+                  </div>
+                </button>
+              </div>
+            )}
+
+          </div>
+        </>
+      )}
 
       {/* Footer fixo — Salvar */}
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full w-full bg-background border-t border-border px-5 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)] z-30">
@@ -896,6 +928,56 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
           </div>
         </div>
       )}
+
+      {/* Discard Dialog Modal */}
+      {showDiscardDialog && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setShowDiscardDialog(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-3xl bg-background p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4">
+              <h2
+                className="text-foreground"
+                style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-weight-bold)' }}
+              >
+                Descartar alterações?
+              </h2>
+              <p
+                className="mt-2 text-muted-foreground"
+                style={{ fontSize: 'var(--text-sm)', lineHeight: 1.5 }}
+              >
+                Você editou algumas informações do seu perfil. Se voltar agora, essas alterações não serão salvas.
+              </p>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setShowDiscardDialog(false)}
+                className="flex-1 rounded-full border border-border bg-background py-3 text-foreground font-semibold transition-colors hover:bg-muted/40"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDiscardDialog(false);
+                  onBack();
+                }}
+                className="flex-1 btn-primary"
+                style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-weight-semibold)' }}
+              >
+                Descartar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <EditInterestsSheet
         open={interestsSheetOpen}
         onOpenChange={setInterestsSheetOpen}

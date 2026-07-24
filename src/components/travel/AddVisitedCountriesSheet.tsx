@@ -80,8 +80,8 @@ export function AddVisitedCountriesSheet({
     // Assim o sheet fica curto no mobile e o teclado não oculta o input.
     if (!q) return [];
     return ALL_COUNTRIES.filter(
-      c => 
-        normalize(c.name).includes(q) || 
+      c =>
+        normalize(c.name).includes(q) ||
         normalize(c.continent).includes(q) ||
         (c.aliases && c.aliases.some(alias => normalize(alias).includes(q)))
     );
@@ -201,7 +201,7 @@ export function AddVisitedCountriesSheet({
                     className="w-14 h-14 rounded-full flex items-center justify-center mb-3"
                     style={{ background: '#F2F2F2' }}
                   >
-                    <Icon name="travel_explore" size={26} className="text-muted-foreground" />
+                    <Icon name="search" size={26} className="text-muted-foreground" />
                   </div>
                   <p className="text-muted-foreground text-center" style={{ fontSize: 14, fontWeight: 600 }}>
                     Busque um país para adicionar
@@ -298,15 +298,15 @@ export function AddVisitedCountriesSheet({
                       <p className="text-muted-foreground truncate" style={{ fontSize: 12 }}>{country.continent}</p>
                     </div>
                     <div className="shrink-0">
-                       <input 
-                         type="number"
-                         inputMode="numeric"
-                         value={yearsMap[country.code] || ''}
-                         onChange={(e) => setYearsMap(prev => ({ ...prev, [country.code]: Number(e.target.value) }))}
-                         max={new Date().getFullYear()}
-                         className="w-20 h-10 rounded-xl bg-white border border-[#E5E7EB] text-center outline-none focus:border-[#1A1C40] text-[#1A1C40]"
-                         style={{ fontSize: 14, fontWeight: 700 }}
-                       />
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={yearsMap[country.code] || ''}
+                        onChange={(e) => setYearsMap(prev => ({ ...prev, [country.code]: Number(e.target.value) }))}
+                        max={new Date().getFullYear()}
+                        className="w-20 h-10 rounded-xl bg-white border border-[#E5E7EB] text-center outline-none focus:border-[#1A1C40] text-[#1A1C40]"
+                        style={{ fontSize: 14, fontWeight: 700 }}
+                      />
                     </div>
                   </div>
                 ))}

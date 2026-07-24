@@ -59,6 +59,7 @@ export async function getMarketplaceItinerary(id: string): Promise<MarketplaceIt
     authorName: profile?.name || profile?.username || 'Viajante',
     authorUsername: profile?.username || '',
     authorAvatar: profile?.avatar_url || '',
+    createdAt: data.created_at ? String(data.created_at) : undefined,
   };
 }
 

@@ -94,6 +94,25 @@ export function PublishItineraryFlow({
   const [isReviewingTerms, setIsReviewingTerms] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [showFAQ, setShowFAQ] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => setViewportHeight(vv.height);
+    onResize();
+    vv.addEventListener('resize', onResize);
+    vv.addEventListener('scroll', onResize);
+    return () => {
+      vv.removeEventListener('resize', onResize);
+      vv.removeEventListener('scroll', onResize);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) setViewportHeight(null);
+  }, [open]);
 
   useEffect(() => {
     if (open) {
@@ -109,7 +128,10 @@ export function PublishItineraryFlow({
 
   if (showFAQ) {
     return (
-      <div className="fixed inset-0 z-[220] bg-background w-full h-full overflow-y-auto pb-safe">
+      <div
+        className="fixed inset-x-0 top-0 z-[220] bg-background w-full overflow-y-auto pb-safe"
+        style={{ height: viewportHeight ? `${viewportHeight}px` : '100dvh' }}
+      >
         <HelpCenterScreen onBack={() => setShowFAQ(false)} hideTourGuide={true} />
       </div>
     );
@@ -219,8 +241,11 @@ export function PublishItineraryFlow({
             true;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[#F2F2F2]">
-      <div className="relative w-full h-full w-full mx-auto overflow-hidden font-sans">
+    <div
+      className="fixed inset-x-0 top-0 z-[200] flex items-center justify-center bg-[#F2F2F2]"
+      style={{ height: viewportHeight ? `${viewportHeight}px` : '100dvh' }}
+    >
+      <div className="relative w-full h-full mx-auto overflow-hidden font-sans">
         {/* Top bar — only back button */}
         <div className={cn('absolute top-0 left-0 right-0 z-30', step <= 0 ? 'pt-[68px]' : 'pt-safe-top pb-3 bg-[#F2F2F2]')}>
           <div className={step <= 0 ? 'px-3' : 'px-7'}>

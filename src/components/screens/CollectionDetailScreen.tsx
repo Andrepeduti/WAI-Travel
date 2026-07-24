@@ -516,7 +516,21 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
       toast(`${skipped} ${skipped === 1 ? 'lugar foi ignorado por já existir' : 'lugares foram ignorados por já existirem'} na coleção`);
     }
     if (newPlaces.length === 0) return;
-    setAddedPlaces(prev => [...prev, ...newPlaces]);
+    setAddedPlaces(prev => {
+      const updated = [...prev, ...newPlaces];
+      let updatedFolders = folders;
+      if (activeFolderId) {
+        updatedFolders = folders.map(f => {
+          if (f.id === activeFolderId) {
+            return { ...f, placeIds: [...f.placeIds, ...newPlaces.map(p => p.id)] };
+          }
+          return f;
+        });
+        setFolders(updatedFolders);
+      }
+      saveCollectionData(collectionId, updated, updatedFolders, customTitle, shareSelectedIds, importedVideos);
+      return updated;
+    });
   };
 
   const getFilterCount = (filterId: string) =>
@@ -575,26 +589,228 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
     );
   }
 
+  const modals = (
+    <>
+      {/* Share Sheet */}
+      <ShareCollectionSheet
+        isOpen={showShareSheet}
+        onClose={() => setShowShareSheet(false)}
+        selectedIds={shareSelectedIds}
+        onToggle={(id) => setShareSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])}
+      />
+      <AddPlaceToCollectionSheetV2
+        open={showAddPlaceSheetV2}
+        onClose={() => setShowAddPlaceSheetV2(false)}
+        onSelect={handleAddPlaces}
+      />
+      <AddVideoSheet
+        isOpen={showVideoSheet}
+        onClose={() => setShowVideoSheet(false)}
+        onOptionSelect={(optionId) => {
+          setShowVideoSheet(false);
+          if (optionId === 'link') setShowVideoByLinkSheet(true);
+          else if (optionId === 'gallery') setShowVideoFromGallery(true);
+        }}
+      />
+      <AddVideoByLinkSheet
+        isOpen={showVideoByLinkSheet}
+        onClose={() => setShowVideoByLinkSheet(false)}
+        onBack={() => { setShowVideoByLinkSheet(false); setShowVideoSheet(true); }}
+        onSubmit={(link, sources) => {
+          const newVideo = buildImportedVideoFromLink(link, '', 'Novo vídeo importado');
+          const nextVideos = [newVideo, ...importedVideos];
+          setImportedVideos(nextVideos);
+
+          if (!sources || sources.length === 0) {
+            setAddedPlaces(prev => {
+              saveCollectionData(collectionId, prev, folders, customTitle, shareSelectedIds, nextVideos);
+              return prev;
+            });
+            setShowVideoByLinkSheet(false);
+            toast('Vídeo adicionado como referência');
+            return;
+          }
+
+          const norm = (s: string) => (s ?? '').trim().toLowerCase();
+          const existingNames = new Set(allPlaces.map(p => norm(p.name)));
+          const newPlaces: Place[] = sources
+            .filter(p => !existingNames.has(norm(p.name)))
+            .map((p, i) => ({
+              id: Date.now() + i,
+              name: p.name,
+              rating: p.rating,
+              reviewCount: '—',
+              address: p.location,
+              category: p.category,
+              image: p.image,
+              lat: 0,
+              lng: 0,
+              filter: p.category,
+              videoLink: link,
+            }));
+
+          setAddedPlaces(prev => {
+            const updated = [...prev, ...newPlaces];
+            let updatedFolders = folders;
+            if (activeFolderId && newPlaces.length > 0) {
+              updatedFolders = folders.map(f => {
+                if (f.id === activeFolderId) {
+                  return { ...f, placeIds: [...f.placeIds, ...newPlaces.map(p => p.id)] };
+                }
+                return f;
+              });
+              setFolders(updatedFolders);
+            }
+            saveCollectionData(collectionId, updated, updatedFolders, customTitle, shareSelectedIds, nextVideos);
+            return updated;
+          });
+          setShowVideoByLinkSheet(false);
+          toast('Lugares extraídos e vídeo adicionado!');
+        }}
+      />
+      <AddVideoFromGallerySheet
+        isOpen={showVideoFromGallery}
+        onClose={() => setShowVideoFromGallery(false)}
+        onBack={() => { setShowVideoFromGallery(false); setShowVideoSheet(true); }}
+        onSubmit={(file, sources) => {
+          if (!sources || sources.length === 0) {
+            setShowVideoFromGallery(false);
+            return;
+          }
+          const norm = (s: string) => (s ?? '').trim().toLowerCase();
+          const existingNames = new Set(allPlaces.map(p => norm(p.name)));
+          const newPlaces: Place[] = sources
+            .filter(p => !existingNames.has(norm(p.name)))
+            .map((p, i) => ({
+              id: Date.now() + i,
+              name: p.name,
+              rating: p.rating,
+              reviewCount: '—',
+              address: p.location,
+              category: p.category,
+              image: p.image,
+              lat: 0,
+              lng: 0,
+              filter: p.category,
+              videoLink: undefined,
+            }));
+          const fileName = (file as any)?.name?.replace(/\.[^.]+$/, '') || 'Vídeo da galeria';
+          const newVideo: ImportedVideo = {
+            id: Date.now(),
+            platform: 'gallery',
+            title: fileName,
+            thumbnail: newPlaces[0]?.image || '',
+            sourceLabel: 'Galeria',
+            sourceIcon: 'collections',
+            createdAt: Date.now(),
+          };
+          const nextVideos = [newVideo, ...importedVideos];
+          setImportedVideos(nextVideos);
+          setAddedPlaces(prev => {
+            const updated = [...prev, ...newPlaces];
+            let updatedFolders = folders;
+            if (activeFolderId && newPlaces.length > 0) {
+              updatedFolders = folders.map(f => {
+                if (f.id === activeFolderId) {
+                  return { ...f, placeIds: [...f.placeIds, ...newPlaces.map(p => p.id)] };
+                }
+                return f;
+              });
+              setFolders(updatedFolders);
+            }
+            saveCollectionData(collectionId, updated, updatedFolders, customTitle, shareSelectedIds, nextVideos);
+            return updated;
+          });
+          setShowVideoFromGallery(false);
+        }}
+        collectionMode
+      />
+      <ActivityDetailSheet
+        onClose={() => setDetailPlace(null)}
+        activity={
+          detailPlace
+            ? {
+              id: detailPlace.id,
+              name: detailPlace.name,
+              rating: detailPlace.rating,
+              image: detailPlace.image,
+              category: detailPlace.category,
+              price: 'Gratuito',
+              openHours: '09:00 - 18:00',
+              startTime: '09:00',
+              endTime: '12:00',
+            }
+            : null
+        }
+      />
+      <AddPlaceToItinerarySheet
+        open={showAddToItinerarySheet}
+        onClose={() => setShowAddToItinerarySheet(false)}
+        place={
+          selectedPlace
+            ? {
+              id: selectedPlace.id,
+              name: selectedPlace.name,
+              category: selectedPlace.category,
+              image: selectedPlace.image,
+              rating: selectedPlace.rating,
+              lat: selectedPlace.lat,
+              lng: selectedPlace.lng,
+            }
+            : null
+        }
+      />
+      <MoveFolderSheet
+        isOpen={showMoveFolderSheet}
+        onClose={() => setShowMoveFolderSheet(false)}
+        folders={folders}
+        onSelect={handleMoveToFolder}
+        onCreateFolder={() => { setPendingMoveAfterCreate(true); setShowCreateFolderSheet(true); }}
+      />
+      <MoveFolderSheet
+        isOpen={showMoveMultipleSheet}
+        onClose={() => { setShowMoveMultipleSheet(false); exitSelectionMode(); }}
+        folders={folders}
+        onSelect={handleMoveSelectedToFolder}
+        onCreateFolder={() => setShowCreateFolderSheet(true)}
+      />
+      <CreateFolderSheet
+        isOpen={showCreateFolderSheet}
+        onClose={() => setShowCreateFolderSheet(false)}
+        onSubmit={handleCreateFolder}
+      />
+    </>
+  );
+
   // Render folder detail as separate page
   if (activeFolderId && activeFolder) {
     const folderPlaces = allPlaces.filter(p => safePlaceIds(activeFolder).includes(p.id));
     return (
-      <FolderDetailScreen
-        folderId={activeFolder.id}
-        folderName={activeFolder.name}
-        places={folderPlaces}
-        onBack={() => setActiveFolderId(null)}
-        onRemoveFromFolder={handleRemoveFromFolder}
-        onRenameFolder={handleRenameFolder}
-        onDeleteFolder={handleDeleteFolder}
-        onAddPlace={() => setShowAddPlaceSheetV2(true)}
-        onAddVideo={() => setShowVideoSheet(true)}
-      />
+      <>
+        <FolderDetailScreen
+          folderId={activeFolder.id}
+          folderName={activeFolder.name}
+          places={folderPlaces}
+          onBack={() => setActiveFolderId(null)}
+          onRemoveFromFolder={handleRemoveFromFolder}
+          onRenameFolder={handleRenameFolder}
+          onDeleteFolder={handleDeleteFolder}
+          onAddPlace={() => setShowAddPlaceSheetV2(true)}
+          onAddVideo={() => setShowVideoSheet(true)}
+          onShowActivityDetail={(place) => setDetailPlace(place)}
+          onAddToItinerary={(place) => { setSelectedPlace(place); setShowAddToItinerarySheet(true); }}
+          onViewMap={(place) => setMapPlace(place)}
+          onMoveToFolder={(place) => { setSelectedPlace(place); setShowMoveFolderSheet(true); }}
+          onDeletePlace={(place) => handleDeletePlace(place)}
+        />
+        {modals}
+      </>
     );
   }
 
   return (
     <div className="min-h-screen pb-24 bg-white relative">
+      {modals}
       {/* Clean Header */}
       <header className="px-5 pt-5 pb-2 bg-zinc-100">
         <div className="flex items-center justify-between" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
@@ -876,8 +1092,15 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
           return (
             <div
               key={place.id}
-              className={`flex gap-3.5 py-4 ${selectionMode ? 'cursor-pointer -mx-2 px-2 rounded-2xl transition-colors' : ''} ${selectionMode && isSelected ? 'bg-[#9DCC36]/10' : ''}`}
-              onClick={selectionMode ? () => togglePlaceSelected(place.id) : undefined}
+              className={`flex gap-3.5 py-4 cursor-pointer hover:bg-muted/30 transition-colors ${selectionMode ? '-mx-2 px-2 rounded-2xl' : ''} ${selectionMode && isSelected ? 'bg-[#9DCC36]/10 hover:bg-[#9DCC36]/20' : ''}`}
+              onClick={() => {
+                if (selectionMode) {
+                  togglePlaceSelected(place.id);
+                } else {
+                  setSelectedPlace(place);
+                  setSheetOpen(true);
+                }
+              }}
             >
               <div className="flex-shrink-0 relative">
                 <img
@@ -1477,32 +1700,6 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
           </div>
         </div>
       )}
-
-      {/* Create Folder Sheet */}
-      <CreateFolderSheet
-        isOpen={showCreateFolderSheet}
-        onClose={() => setShowCreateFolderSheet(false)}
-        onSubmit={handleCreateFolder}
-      />
-
-      {/* Move to Folder Sheet */}
-      <MoveFolderSheet
-        isOpen={showMoveFolderSheet}
-        onClose={() => setShowMoveFolderSheet(false)}
-        folders={folders}
-        onSelect={handleMoveToFolder}
-        placeName={selectedPlace?.name}
-        onCreateFolder={() => { setPendingMoveAfterCreate(true); setShowCreateFolderSheet(true); }}
-      />
-
-      <MoveFolderSheet
-        isOpen={showMoveMultipleSheet}
-        onClose={() => setShowMoveMultipleSheet(false)}
-        folders={folders}
-        onSelect={handleMoveSelectedToFolder}
-        selectedCount={selectedPlaceIds.length}
-        onCreateFolder={() => { setShowCreateFolderSheet(true); }}
-      />
 
       {/* Rename Collection Sheet */}
       {showRenameSheet && (

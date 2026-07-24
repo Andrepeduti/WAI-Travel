@@ -184,6 +184,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
       startDate: marketplaceData.startDate ? parseISO(marketplaceData.startDate) : new Date(),
       endDate: marketplaceData.endDate ? parseISO(marketplaceData.endDate) : addDays(new Date(), totalDays - 1),
       salesCount: (marketplaceData as any).salesCount || 0,
+      createdAt: marketplaceData.createdAt,
     };
   }, [marketplaceData, reviewsData, authorOverride, authorImageOverride]);
 
@@ -624,6 +625,26 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
               ? itineraryData.description
               : `Roteiro completo com ${derivedDays.length} dias, ${derivedPlaces.length} locais imperdíveis e dicas práticas para aproveitar ao máximo sua viagem por ${itineraryData.title.toLowerCase()}.`}
           </p>
+
+          {itineraryData?.destinations?.length > 0 && (
+            <div className="flex items-center gap-2 mb-2 text-[13px] text-[#1A1C40]">
+              <Icon name="location_on" size={16} className="text-[#1A1C40]" />
+              <span>
+                <span className="font-semibold">Destinos: </span>
+                <span className="text-muted-foreground">{itineraryData.destinations.join(' • ')}</span>
+              </span>
+            </div>
+          )}
+
+          {itineraryData?.createdAt && (
+            <div className="flex items-center gap-2 mb-2 text-[13px] text-[#1A1C40]">
+              <Icon name="history" size={16} className="text-[#1A1C40]" />
+              <span>
+                <span className="font-semibold">Criado em: </span>
+                <span className="text-muted-foreground">{format(parseISO(itineraryData.createdAt), "dd MMM yyyy", { locale: ptBR })}</span>
+              </span>
+            </div>
+          )}
 
           {itineraryData && (
             <div className="flex items-center gap-2 mb-4 text-[13px] text-[#1A1C40]">

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { UserAvatar } from '@/components/ui/UserAvatar';
+import { Skeleton } from '@/components/ui/skeleton';
 import { PassportStamps } from '@/components/travel/PassportStamps';
 import { CountryDetailSheet } from '@/components/travel/CountryDetailSheet';
 import { HorizontalCarousel } from '@/components/travel/HorizontalCarousel';
@@ -399,14 +400,22 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
   const [checkoutItinerary, setCheckoutItinerary] = useState<PublicItinerary | null>(null);
 
   const [countries, setCountries] = useState<CountryVisit[]>([]);
+  const [isFetchingPassport, setIsFetchingPassport] = useState(true);
 
   useEffect(() => {
     let active = true;
     const fetchPassport = async () => {
       const uid = friend.userId;
-      if (!uid) return;
+      if (!uid) {
+        if (active) setIsFetchingPassport(false);
+        return;
+      }
+      setIsFetchingPassport(true);
       const visits = await getFullPassport(uid);
-      if (active) setCountries(visits);
+      if (active) {
+        setCountries(visits);
+        setIsFetchingPassport(false);
+      }
     };
 
     fetchPassport();
@@ -1643,136 +1652,163 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
       )}
 
       {/* ═══ PASSAPORTE ═══ */}
-      {(isSelf || countries.length > 0) && (
+      {(isSelf || countries.length > 0 || isFetchingPassport) && (
         <div className="mb-8">
-          <button
-            onClick={() => setShowCountriesMap(true)}
-            className="w-full flex items-center justify-between mb-3 px-5 active:opacity-70"
-          >
-            <div className="flex flex-col items-start">
-              <h3 className="text-foreground" style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-weight-bold)' }}>
-                Passaporte · {countries.length} {countries.length === 1 ? 'país' : 'países'}
-              </h3>
-              <span className="text-muted-foreground text-xs" style={{ fontSize: 'var(--text-xs)', marginTop: 2 }}>
-                Toque para marcar os países que você já visitou
-              </span>
-            </div>
-            <Icon name="chevron_right" size={18} style={{ color: '#1A1C40' }} />
-          </button>
-          {countries.length === 0 ? (
+          {isFetchingPassport ? (
             <div className="px-5">
-              {isSelf ? (
-                <button
-                  type="button"
-                  onClick={() => setShowCountriesMap(true)}
-                  className="w-full card-base flex items-center gap-3 px-4"
-                  style={{ minHeight: 88 }}
-                >
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#F2F2F2' }}>
-                    <Icon name="public" size={20} className="text-muted-foreground" />
-                  </div>
-                  <div className="flex flex-col items-start text-left">
-                    <h4 className="text-foreground font-semibold" style={{ fontSize: 'var(--text-sm)' }}>
-                      Crie seu passaporte
-                    </h4>
-                    <p className="text-muted-foreground" style={{ fontSize: 'var(--text-xs)', lineHeight: 1.3 }}>
-                      Marque os países que você já visitou.
-                    </p>
-                  </div>
-                </button>
+              <div className="flex items-center justify-between mb-3">
+                <div className="space-y-2 py-1">
+                  <Skeleton className="h-5 w-40" />
+                  <Skeleton className="h-3 w-64" />
+                </div>
+                <Skeleton className="h-4 w-4 rounded-full" />
+              </div>
+              <div className="w-full min-w-0" style={{ overflow: 'hidden' }}>
+                <div style={{ padding: '8px 0', overflow: 'hidden' }}>
+                  <HorizontalCarousel
+                    showDots={false}
+                    itemClassName="w-[100px]"
+                  >
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <Skeleton key={i} className="w-[100px] h-[100px] rounded-lg flex-shrink-0" />
+                    ))}
+                  </HorizontalCarousel>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <button
+                onClick={() => setShowCountriesMap(true)}
+                className="w-full flex items-center justify-between mb-3 px-5 active:opacity-70"
+              >
+                <div className="flex flex-col items-start">
+                  <h3 className="text-foreground" style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-weight-bold)' }}>
+                    Passaporte · {countries.length} {countries.length === 1 ? 'país' : 'países'}
+                  </h3>
+                  <span className="text-muted-foreground text-xs" style={{ fontSize: 'var(--text-xs)', marginTop: 2 }}>
+                    Toque para marcar os países que você já visitou
+                  </span>
+                </div>
+                <Icon name="chevron_right" size={18} style={{ color: '#1A1C40' }} />
+              </button>
+
+              {countries.length === 0 ? (
+                <div className="px-5">
+                  {isSelf ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowCountriesMap(true)}
+                      className="w-full card-base flex items-center gap-3 px-4"
+                      style={{ minHeight: 88 }}
+                    >
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#F2F2F2' }}>
+                        <Icon name="public" size={20} className="text-muted-foreground" />
+                      </div>
+                      <div className="flex flex-col items-start text-left">
+                        <h4 className="text-foreground font-semibold" style={{ fontSize: 'var(--text-sm)' }}>
+                          Crie seu passaporte
+                        </h4>
+                        <p className="text-muted-foreground" style={{ fontSize: 'var(--text-xs)', lineHeight: 1.3 }}>
+                          Marque os países que você já visitou.
+                        </p>
+                      </div>
+                    </button>
+                  ) : (
+                    <div className="card-base flex items-center gap-3 px-4" style={{ minHeight: 88 }}>
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#F2F2F2' }}>
+                        <Icon name="public" size={20} className="text-muted-foreground" />
+                      </div>
+                      <div className="flex flex-col items-start text-left">
+                        <h4 className="text-foreground font-semibold" style={{ fontSize: 'var(--text-sm)' }}>
+                          Passaporte vazio
+                        </h4>
+                        <p className="text-muted-foreground" style={{ fontSize: 'var(--text-xs)', lineHeight: 1.3 }}>
+                          Nenhum país visitado ainda.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               ) : (
-                <div className="card-base flex items-center gap-3 px-4" style={{ minHeight: 88 }}>
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#F2F2F2' }}>
-                    <Icon name="public" size={20} className="text-muted-foreground" />
-                  </div>
-                  <div className="flex flex-col items-start text-left">
-                    <h4 className="text-foreground font-semibold" style={{ fontSize: 'var(--text-sm)' }}>
-                      Passaporte vazio
-                    </h4>
-                    <p className="text-muted-foreground" style={{ fontSize: 'var(--text-xs)', lineHeight: 1.3 }}>
-                      Nenhum país visitado ainda.
-                    </p>
+                <div className="px-5 w-full min-w-0" style={{ overflow: 'hidden' }}>
+                  <div style={{ padding: '8px 0', overflow: 'hidden' }}>
+                    <HorizontalCarousel
+                      showDots={false}
+                      itemClassName="w-[100px]"
+                    >
+                      {countries.map((country, idx) => {
+                        const stampColors = [
+                          'hsl(var(--capri-normal))',
+                          'hsl(var(--florida-normal))',
+                          'hsl(var(--violet-normal))',
+                          'hsl(var(--cyan-dark))',
+                          'hsl(var(--sun-dark))',
+                          'hsl(var(--sicilia-dark))',
+                        ];
+                        const rotations = [-4, 3, -2, 5, -3, 2, -5, 1, -1, 4];
+                        const color = stampColors[idx % stampColors.length];
+                        const rotation = rotations[idx % rotations.length];
+                        return (
+                          <button
+                            key={country.code}
+                            onClick={() => { setSelectedCountry(country); setSheetOpen(true); }}
+                            className="relative w-[100px] h-[100px] rounded-lg flex flex-col items-center justify-center active:scale-95 flex-shrink-0"
+                            style={{
+                              transform: `rotate(${rotation}deg)`,
+                              border: `2px solid ${color}`,
+                              padding: '8px 4px',
+                              transition: 'transform 0.15s ease',
+                              background: 'hsl(32 22% 93%)',
+                            }}
+                          >
+                            {/* Dashed inner border */}
+                            <div
+                              className="absolute inset-[3px] rounded-md pointer-events-none"
+                              style={{ border: `1.5px dashed ${color}`, opacity: 0.3 }}
+                            />
+
+                            <span style={{ fontSize: '28px', lineHeight: 1 }}>{country.flag}</span>
+                            <span
+                              className="mt-1 uppercase tracking-wider text-center"
+                              style={{
+                                fontSize: '9px',
+                                fontWeight: 'var(--font-weight-bold)',
+                                color,
+                                letterSpacing: '0.08em',
+                                lineHeight: 1.1,
+                              }}
+                            >
+                              {country.name}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: '8px',
+                                fontWeight: 'var(--font-weight-semibold)',
+                                color,
+                                opacity: 0.75,
+                              }}
+                            >
+                              {country.year}
+                            </span>
+
+                            {/* Ink smudge */}
+                            <div
+                              className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full pointer-events-none"
+                              style={{
+                                background: color,
+                                opacity: 0.05,
+                                filter: 'blur(4px)',
+                              }}
+                            />
+                          </button>
+                        );
+                      })}
+                    </HorizontalCarousel>
                   </div>
                 </div>
               )}
-            </div>
-          ) : (
-            <div className="px-5 w-full min-w-0" style={{ overflow: 'hidden' }}>
-              <div style={{ padding: '8px 0', overflow: 'hidden' }}>
-                <HorizontalCarousel
-                  showDots={false}
-                  itemClassName="w-[100px]"
-                >
-                  {countries.map((country, idx) => {
-                    const stampColors = [
-                      'hsl(var(--capri-normal))',
-                      'hsl(var(--florida-normal))',
-                      'hsl(var(--violet-normal))',
-                      'hsl(var(--cyan-dark))',
-                      'hsl(var(--sun-dark))',
-                      'hsl(var(--sicilia-dark))',
-                    ];
-                    const rotations = [-4, 3, -2, 5, -3, 2, -5, 1, -1, 4];
-                    const color = stampColors[idx % stampColors.length];
-                    const rotation = rotations[idx % rotations.length];
-                    return (
-                      <button
-                        key={country.code}
-                        onClick={() => { setSelectedCountry(country); setSheetOpen(true); }}
-                        className="relative w-[100px] h-[100px] rounded-lg flex flex-col items-center justify-center active:scale-95 flex-shrink-0"
-                        style={{
-                          transform: `rotate(${rotation}deg)`,
-                          border: `2px solid ${color}`,
-                          padding: '8px 4px',
-                          transition: 'transform 0.15s ease',
-                          background: 'hsl(32 22% 93%)',
-                        }}
-                      >
-                        {/* Dashed inner border */}
-                        <div
-                          className="absolute inset-[3px] rounded-md pointer-events-none"
-                          style={{ border: `1.5px dashed ${color}`, opacity: 0.3 }}
-                        />
-
-                        <span style={{ fontSize: '28px', lineHeight: 1 }}>{country.flag}</span>
-                        <span
-                          className="mt-1 uppercase tracking-wider text-center"
-                          style={{
-                            fontSize: '9px',
-                            fontWeight: 'var(--font-weight-bold)',
-                            color,
-                            letterSpacing: '0.08em',
-                            lineHeight: 1.1,
-                          }}
-                        >
-                          {country.name}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: '8px',
-                            fontWeight: 'var(--font-weight-semibold)',
-                            color,
-                            opacity: 0.75,
-                          }}
-                        >
-                          {country.year}
-                        </span>
-
-                        {/* Ink smudge */}
-                        <div
-                          className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full pointer-events-none"
-                          style={{
-                            background: color,
-                            opacity: 0.05,
-                            filter: 'blur(4px)',
-                          }}
-                        />
-                      </button>
-                    );
-                  })}
-                </HorizontalCarousel>
-              </div>
-            </div>
+            </>
           )}
         </div>
       )}
