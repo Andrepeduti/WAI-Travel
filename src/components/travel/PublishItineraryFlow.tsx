@@ -555,7 +555,6 @@ function PriceScreen({
                 onBlur={onBlur}
                 placeholder={isFree ? 'Grátis' : '0,00'}
                 inputMode="numeric"
-                autoFocus={!isFree}
                 disabled={isFree}
                 className="flex-1 w-full h-full bg-transparent text-[#0A0A0A] font-semibold placeholder:text-[#0A0A0A]/25 outline-none"
                 style={{ fontSize: '20px' }}
