@@ -12,11 +12,11 @@ export function emitPassportChanged() {
 /**
  * Retorna a lista de códigos de países visitados por um usuário.
  */
-export async function getVisitedCountries(userId: string): Promise<string[]> {
+export async function getVisitedCountries(userId: string): Promise<{ country_code: string, year: number | null }[]> {
   if (!userId) return [];
   const { data, error } = await supabase
     .from('visited_countries')
-    .select('country_code')
+    .select('country_code, year')
     .eq('user_id', userId);
 
   if (error) {
@@ -24,7 +24,7 @@ export async function getVisitedCountries(userId: string): Promise<string[]> {
     return [];
   }
 
-  return data.map(d => d.country_code);
+  return data || [];
 }
 
 /**
@@ -33,15 +33,15 @@ export async function getVisitedCountries(userId: string): Promise<string[]> {
 export async function getFullPassport(userId: string): Promise<CountryVisit[]> {
   const codes = await getVisitedCountries(userId);
   const visits: CountryVisit[] = [];
-  
-  codes.forEach(code => {
-    const info = ALL_COUNTRIES.find(c => c.code === code);
+
+  codes.forEach(row => {
+    const info = ALL_COUNTRIES.find(c => c.code === row.country_code);
     if (info) {
       visits.push({
         code: info.code,
         name: info.name,
         flag: info.flag,
-        year: new Date().getFullYear(),
+        year: row.year || new Date().getFullYear(),
         continent: info.continent,
         cities: [],
         days: 1,
@@ -59,12 +59,12 @@ export async function getFullPassport(userId: string): Promise<CountryVisit[]> {
 /**
  * Adiciona uma lista de países ao passaporte do usuário logado.
  */
-export async function addVisitedCountries(countryCodes: string[]): Promise<boolean> {
+export async function addVisitedCountries(countries: { code: string, year: number }[]): Promise<boolean> {
   const { data: authData } = await supabase.auth.getUser();
   if (!authData?.user) return false;
 
   const userId = authData.user.id;
-  const inserts = countryCodes.map(code => ({ user_id: userId, country_code: code }));
+  const inserts = countries.map(c => ({ user_id: userId, country_code: c.code, year: c.year }));
 
   // upsert on conflict para evitar erro se o usuário já tiver o país
   const { error } = await supabase
@@ -110,7 +110,7 @@ export async function removeVisitedCountry(countryCode: string): Promise<boolean
  */
 export async function getFriendsWhoVisited(countryCodes: string[]): Promise<Record<string, { user_id: string; avatar: string; name: string }[]>> {
   if (!countryCodes.length) return {};
-  
+
   const { data: authData } = await supabase.auth.getUser();
   if (!authData?.user) return {};
 
@@ -119,9 +119,9 @@ export async function getFriendsWhoVisited(countryCodes: string[]): Promise<Reco
     .from('profile_follows')
     .select('following_id')
     .eq('follower_id', authData.user.id);
-    
+
   if (followsError || !followsData?.length) return {};
-  
+
   const followingIds = followsData.map(f => f.following_id);
 
   // 2. Pegar as visitas dessas pessoas para os países solicitados
@@ -149,7 +149,7 @@ export async function getFriendsWhoVisited(countryCodes: string[]): Promise<Reco
   });
 
   const result: Record<string, any[]> = {};
-  
+
   visitsData.forEach(visit => {
     if (!result[visit.country_code]) {
       result[visit.country_code] = [];

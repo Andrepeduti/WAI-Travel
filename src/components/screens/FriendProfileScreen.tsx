@@ -701,7 +701,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
     };
     setCountries(prev => [...prev, newCountry]);
     toast.success(`${info.flag} ${info.name} adicionado ao passaporte`);
-    await addVisitedCountries([info.code]);
+    await addVisitedCountries([{ code: info.code, year }]);
   };
 
   // Map → "Quero visitar": abre o mesmo bottom sheet de "Adicionar próxima viagem"
