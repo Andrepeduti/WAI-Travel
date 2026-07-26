@@ -180,9 +180,9 @@ function AvatarStack({ participants }: { participants: string[] }) {
   return (
     <div className="flex -space-x-2">
       {visible.map((avatar, index) => (
-        <img 
+        <img
           key={index}
-          src={avatar} 
+          src={avatar}
           alt=""
           className="w-7 h-7 rounded-full border-2 border-white object-cover"
         />
@@ -389,15 +389,15 @@ function SwipeableItineraryCard({
 }
 
 // Collection card with mosaic / cover / placeholder thumbnail
-function CollectionCard({ 
-  collection, 
-  onClick, 
-  isEditing, 
-  isSelected, 
+function CollectionCard({
+  collection,
+  onClick,
+  isEditing,
+  isSelected,
   onToggleSelect,
-  onLongPress 
-}: { 
-  collection: typeof collections[0]; 
+  onLongPress
+}: {
+  collection: typeof collections[0];
   onClick: () => void;
   isEditing: boolean;
   isSelected: boolean;
@@ -472,9 +472,8 @@ function CollectionCard({
         {/* Edit mode check */}
         {isEditing && (
           <div className="absolute top-2.5 left-2.5">
-            <div className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-colors ${
-              isSelected ? 'bg-primary border-primary' : 'border-white bg-black/30'
-            }`}>
+            <div className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-primary border-primary' : 'border-white bg-black/30'
+              }`}>
               {isSelected && <Icon name="check" size={16} className="text-primary-foreground" />}
             </div>
           </div>
@@ -531,7 +530,7 @@ export function TripsScreen({
   const [showSortSheet, setShowSortSheet] = useState(false);
   const [showCreateSheet, setShowCreateSheet] = useState(false);
   const { favorites: favoriteItems, removeFavorite } = useFavorites();
-  
+
   const tabs = [{
     id: 'private' as TabType,
     label: 'Meus roteiros'
@@ -545,7 +544,7 @@ export function TripsScreen({
     id: 'collections' as TabType,
     label: 'Coleções'
   }];
-  
+
   const { user: authUser } = useAuth();
   const [userCollections, setUserCollections] = useState<UserCollection[]>(() => getUserCollections());
   const { itineraries: userItineraries, loading: itinerariesLoading, remove: removeItinerary, refetch: refetchItineraries } = useMyItineraries();
@@ -604,34 +603,62 @@ export function TripsScreen({
     })();
     return () => { cancelled = true; };
   }, [authUser?.id, userItineraries.length, purchasesVersion]);
-
   // Avatares reais (dono + membros aceitos) por roteiro — usados nos cards.
   const [memberAvatarsByItin, setMemberAvatarsByItin] = useState<Record<string, string[]>>(() => cachedMemberAvatars);
+  const [visualsReady, setVisualsReady] = useState(false);
+
   useEffect(() => {
-    const ids = userItineraries.map((u) => u.id).filter((id): id is string => typeof id === 'string');
-    if (ids.length === 0) {
-      if (Object.keys(cachedMemberAvatars).length > 0) {
-        cachedMemberAvatars = {};
-        setMemberAvatarsByItin({});
-      }
-      return;
-    }
     let cancelled = false;
+    const ids = userItineraries.map((u) => u.id).filter((id): id is string => typeof id === 'string');
+
     (async () => {
-      try {
-        const map = await fetchItineraryMemberAvatars(ids);
-        if (!cancelled) {
-          cachedMemberAvatars = map;
-          setMemberAvatarsByItin(map);
+      let map = cachedMemberAvatars;
+      if (ids.length > 0) {
+        try {
+          map = await fetchItineraryMemberAvatars(ids);
+          if (!cancelled) {
+            cachedMemberAvatars = map;
+            setMemberAvatarsByItin(map);
+          }
+        } catch {
+          /* silencioso */
         }
-      } catch {
-        /* silencioso */
+      } else {
+        if (Object.keys(cachedMemberAvatars).length > 0) {
+          cachedMemberAvatars = {};
+          setMemberAvatarsByItin({});
+        }
+      }
+
+      // Preload images logic
+      if (userItineraries.length > 0) {
+        const imageUrlsToPreload: string[] = [];
+        userItineraries.forEach(itin => {
+          if (itin.images && itin.images.length > 0) {
+            imageUrlsToPreload.push(...itin.images);
+          } else {
+            const covers = resolveTripThumbnailImages(itin.destinations);
+            imageUrlsToPreload.push(...covers);
+          }
+          const participants = map[itin.id as string] || itin.participants || [];
+          imageUrlsToPreload.push(...participants);
+        });
+
+        const { preloadImages } = await import('@/lib/preloadImages');
+        await preloadImages(imageUrlsToPreload);
+      }
+
+      if (!cancelled) {
+        setVisualsReady(true);
       }
     })();
+
     return () => { cancelled = true; };
   }, [userItineraries]);
 
   const allCollections = useMemo(() => [...userCollections], [userCollections]);
+
+  const isTripsScreenLoading = itinerariesLoading || !visualsReady;
 
   const mergedPrivateItineraries = useMemo(() => {
     const today = new Date();
@@ -825,530 +852,526 @@ export function TripsScreen({
   }, [videosTick, userCollections]);
   return <div className="min-h-screen pb-24 bg-[#F2F2F2]">
     {/* Header — fixed title */}
-      <header className="px-6 pt-safe-top pb-4">
-        <div className="flex items-center justify-between gap-3 mb-2">
-          <h1 className="text-[22px] font-bold text-foreground">Roteiros e coleções</h1>
-          <button
-            onClick={() => setShowCreateSheet(true)}
-            aria-label="Criar"
-            className="w-9 h-9 flex items-center justify-center rounded-full bg-primary text-primary-foreground hover:opacity-90 transition-opacity flex-shrink-0"
-          >
-            <Icon name="add" size={20} className="text-primary-foreground" />
-          </button>
-        </div>
-      </header>
-
-      {/* Tabs */}
-      <div className="border-b border-border">
-        <div className="flex gap-5 px-6 overflow-x-auto no-scrollbar">
-          {tabs.map(tab => <button key={tab.id} onClick={() => { setActiveTab(tab.id); if (tab.id !== 'collections') exitEditMode(); }} className={`pb-3 text-sm font-medium transition-colors relative whitespace-nowrap flex-shrink-0 ${activeTab === tab.id ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
-              {tab.label}
-              {activeTab === tab.id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground rounded-full" />}
-            </button>)}
-        </div>
+    <header className="px-6 pt-safe-top pb-4">
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <h1 className="text-[22px] font-bold text-foreground">Roteiros e coleções</h1>
+        <button
+          onClick={() => setShowCreateSheet(true)}
+          aria-label="Criar"
+          className="w-9 h-9 flex items-center justify-center rounded-full bg-primary text-primary-foreground hover:opacity-90 transition-opacity flex-shrink-0"
+        >
+          <Icon name="add" size={20} className="text-primary-foreground" />
+        </button>
       </div>
+    </header>
 
-      {/* Content */}
-      <main className={activeTab === 'collections' ? 'px-6 pt-5' : 'px-5 pt-4'}>
-        {(activeTab === 'private' || activeTab === 'public') && itemCount > 0 && (() => {
-          const limit = itineraryLimit ?? 0;
-          const used = itineraryUsedCount ?? 0;
-          const remaining = Math.max(limit - used, 0);
-          const showLimitChip = activeTab === 'private' && limit > 0;
-          const isReached = remaining === 0;
-          const isWarning = remaining === 1;
-          const chipText = isReached
-            ? 'Limite atingido'
-            : `Restam ${remaining} ${remaining === 1 ? 'roteiro' : 'roteiros'}`;
-          const chipStyle = isReached
-            ? { background: 'rgba(220, 38, 38, 0.1)', color: '#B91C1C', borderColor: 'rgba(220, 38, 38, 0.25)' }
-            : isWarning
-              ? { background: 'rgba(234, 88, 12, 0.1)', color: '#C2410C', borderColor: 'rgba(234, 88, 12, 0.25)' }
-              : { background: '#F2F2F2', color: '#6B7280', borderColor: 'transparent' };
-          return (
-            <div className="flex items-center justify-between mb-4 gap-2">
-              <span className="text-sm text-muted-foreground whitespace-nowrap">
-                {itemCount} {itemLabel}
-              </span>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {showLimitChip && (
-                  <button
-                    type="button"
-                    onClick={() => onUpgrade?.()}
-                    aria-label={`${chipText}. Toque para ver planos.`}
-                    className="inline-flex items-center h-7 px-3 rounded-full border text-xs font-semibold transition-transform active:scale-95"
-                    style={chipStyle}
-                  >
-                    {chipText}
-                  </button>
-                )}
+    {/* Tabs */}
+    <div className="border-b border-border">
+      <div className="flex gap-5 px-6 overflow-x-auto no-scrollbar">
+        {tabs.map(tab => <button key={tab.id} onClick={() => { setActiveTab(tab.id); if (tab.id !== 'collections') exitEditMode(); }} className={`pb-3 text-sm font-medium transition-colors relative whitespace-nowrap flex-shrink-0 ${activeTab === tab.id ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+          {tab.label}
+          {activeTab === tab.id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground rounded-full" />}
+        </button>)}
+      </div>
+    </div>
+
+    {/* Content */}
+    <main className={activeTab === 'collections' ? 'px-6 pt-5' : 'px-5 pt-4'}>
+      {(activeTab === 'private' || activeTab === 'public') && itemCount > 0 && (() => {
+        const limit = itineraryLimit ?? 0;
+        const used = itineraryUsedCount ?? 0;
+        const remaining = Math.max(limit - used, 0);
+        const showLimitChip = activeTab === 'private' && limit > 0;
+        const isReached = remaining === 0;
+        const isWarning = remaining === 1;
+        const chipText = isReached
+          ? 'Limite atingido'
+          : `Restam ${remaining} ${remaining === 1 ? 'roteiro' : 'roteiros'}`;
+        const chipStyle = isReached
+          ? { background: 'rgba(220, 38, 38, 0.1)', color: '#B91C1C', borderColor: 'rgba(220, 38, 38, 0.25)' }
+          : isWarning
+            ? { background: 'rgba(234, 88, 12, 0.1)', color: '#C2410C', borderColor: 'rgba(234, 88, 12, 0.25)' }
+            : { background: '#F2F2F2', color: '#6B7280', borderColor: 'transparent' };
+        return (
+          <div className="flex items-center justify-between mb-4 gap-2">
+            <span className="text-sm text-muted-foreground whitespace-nowrap">
+              {itemCount} {itemLabel}
+            </span>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {showLimitChip && (
                 <button
-                  onClick={() => setShowSortSheet(true)}
-                  className="relative w-9 h-9 flex items-center justify-center border border-border rounded-full hover:bg-muted/50 transition-colors flex-shrink-0"
+                  type="button"
+                  onClick={() => onUpgrade?.()}
+                  aria-label={`${chipText}. Toque para ver planos.`}
+                  className="inline-flex items-center h-7 px-3 rounded-full border text-xs font-semibold transition-transform active:scale-95"
+                  style={chipStyle}
                 >
-                  <Icon name="tune" size={18} className="text-foreground" />
-                  {(sortBy !== 'az' || (activeTab === 'private' && originFilter !== 'all')) && (
-                    <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border-2 border-background" />
-                  )}
+                  {chipText}
                 </button>
-              </div>
+              )}
+              <button
+                onClick={() => setShowSortSheet(true)}
+                className="relative w-9 h-9 flex items-center justify-center border border-border rounded-full hover:bg-muted/50 transition-colors flex-shrink-0"
+              >
+                <Icon name="tune" size={18} className="text-foreground" />
+                {(sortBy !== 'az' || (activeTab === 'private' && originFilter !== 'all')) && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border-2 border-background" />
+                )}
+              </button>
             </div>
-          );
-        })()}
+          </div>
+        );
+      })()}
 
 
-        {/* Private / Public Itineraries List */}
-        {(activeTab === 'private' || activeTab === 'public') && (() => {
-          const upcoming = activeTab === 'private'
-            ? sortedItineraries.filter((i: any) => !i.isPast)
-            : sortedItineraries;
-          const past = activeTab === 'private'
-            ? sortedItineraries.filter((i: any) => i.isPast)
-            : [];
+      {/* Private / Public Itineraries List */}
+      {(activeTab === 'private' || activeTab === 'public') && (() => {
+        const upcoming = activeTab === 'private'
+          ? sortedItineraries.filter((i: any) => !i.isPast)
+          : sortedItineraries;
+        const past = activeTab === 'private'
+          ? sortedItineraries.filter((i: any) => i.isPast)
+          : [];
 
-          const renderCard = (item: any) => {
-            const handleClick = () => {
-              if (activeTab === 'public' && item._userItinerary && onUserPublicItineraryClick) {
-                onUserPublicItineraryClick(item._userItinerary);
-              } else if (activeTab === 'private' && item._userItinerary && onUserItineraryClick) {
-                onUserItineraryClick(item._userItinerary);
-              } else if (activeTab === 'private' && onPrivateItineraryClick) {
-                onPrivateItineraryClick(item.id);
-              } else {
-                onItineraryClick(item.id);
-              }
-            };
-            const isShared = !!(item._userItinerary && authUser?.id && item._userItinerary.userId && item._userItinerary.userId !== authUser.id);
-            return (
-              <SwipeableItineraryCard
-                key={item.id}
-                item={item}
-                isPrivate={activeTab === 'private'}
-                isShared={isShared}
-                isSwiped={swipedItemId === item.id}
-                onSwipeOpen={() => setSwipedItemId(item.id)}
-                onSwipeClose={() => setSwipedItemId(null)}
-                onClick={handleClick}
-                onDelete={() => setShowDeleteConfirm({ id: item.id, title: item.title, isUser: !!item._userItinerary, isPurchased: !!item.isPurchased, isShared })}
-                getDaysRemainingStyle={getDaysRemainingStyle}
-              />
-            );
-          };
-
-          const isEmpty = upcoming.length === 0 && past.length === 0;
-
-          if (itinerariesLoading && isEmpty) {
-            return <ItineraryListSkeleton count={3} />;
-          }
-
-          if (isEmpty) {
-            if (activeTab === 'private') {
-              return (
-                <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-                  <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-5">
-                    <Icon name="luggage" size={28} className="text-muted-foreground text-xs" />
-                  </div>
-                  <h3 className="text-lg font-bold text-foreground mb-2">
-                    Nenhum roteiro ainda
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-6 max-w-[280px]">
-                    Crie seu primeiro roteiro e organize sua próxima viagem do seu jeito.
-                  </p>
-                  <button
-                    onClick={() => onCreateItinerary?.()}
-                    className="px-6 py-3 bg-primary text-primary-foreground rounded-full text-sm font-semibold active:scale-95 transition-transform"
-                  >
-                    Criar roteiro
-                  </button>
-                </div>
-              );
+        const renderCard = (item: any) => {
+          const handleClick = () => {
+            if (activeTab === 'public' && item._userItinerary && onUserPublicItineraryClick) {
+              onUserPublicItineraryClick(item._userItinerary);
+            } else if (activeTab === 'private' && item._userItinerary && onUserItineraryClick) {
+              onUserItineraryClick(item._userItinerary);
+            } else if (activeTab === 'private' && onPrivateItineraryClick) {
+              onPrivateItineraryClick(item.id);
+            } else {
+              onItineraryClick(item.id);
             }
+          };
+          const isShared = !!(item._userItinerary && authUser?.id && item._userItinerary.userId && item._userItinerary.userId !== authUser.id);
+          return (
+            <SwipeableItineraryCard
+              key={item.id}
+              item={item}
+              isPrivate={activeTab === 'private'}
+              isShared={isShared}
+              isSwiped={swipedItemId === item.id}
+              onSwipeOpen={() => setSwipedItemId(item.id)}
+              onSwipeClose={() => setSwipedItemId(null)}
+              onClick={handleClick}
+              onDelete={() => setShowDeleteConfirm({ id: item.id, title: item.title, isUser: !!item._userItinerary, isPurchased: !!item.isPurchased, isShared })}
+              getDaysRemainingStyle={getDaysRemainingStyle}
+            />
+          );
+        };
+
+        const isEmpty = upcoming.length === 0 && past.length === 0;
+
+        if (isTripsScreenLoading) {
+          return <ItineraryListSkeleton count={3} />;
+        }
+
+        if (isEmpty) {
+          if (activeTab === 'private') {
             return (
               <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
                 <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-5">
-                  <Icon name="search" size={28} className="text-muted-foreground text-xs" />
+                  <Icon name="luggage" size={28} className="text-muted-foreground text-xs" />
                 </div>
                 <h3 className="text-lg font-bold text-foreground mb-2">
-                  Você ainda não publicou roteiros
+                  Nenhum roteiro ainda
                 </h3>
                 <p className="text-sm text-muted-foreground mb-6 max-w-[280px]">
-                  Torne-se um criador, publique seus roteiros no marketplace e ganhe com suas viagens.
+                  Crie seu primeiro roteiro e organize sua próxima viagem do seu jeito.
                 </p>
                 <button
-                  onClick={() => onBecomeCreator?.()}
+                  onClick={() => onCreateItinerary?.()}
                   className="px-6 py-3 bg-primary text-primary-foreground rounded-full text-sm font-semibold active:scale-95 transition-transform"
                 >
-                  Quero ser criador
+                  Criar roteiro
                 </button>
               </div>
             );
           }
-
           return (
-            <div className="flex flex-col gap-6">
-              {activeTab === 'private' && upcoming.length > 0 && (
-                <SectionHeader
-                  icon="flight_takeoff"
-                  label="Próximas viagens"
-                  count={upcoming.length}
-                  variant="upcoming"
-                />
-              )}
-              {upcoming.length > 0 && (
-                <div className="flex flex-col gap-4">
-                  {upcoming.map(renderCard)}
-                </div>
-              )}
-
-              {activeTab === 'private' && past.length > 0 && (
-                <>
-                  <SectionHeader
-                    icon="check_circle"
-                    label="Viagens passadas"
-                    count={past.length}
-                    variant="past"
-                  />
-                  <div className="flex flex-col gap-4">
-                    {past.map(renderCard)}
-                  </div>
-                </>
-              )}
+            <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
+              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-5">
+                <Icon name="search" size={28} className="text-muted-foreground text-xs" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground mb-2">
+                Você ainda não publicou roteiros
+              </h3>
+              <p className="text-sm text-muted-foreground mb-6 max-w-[280px]">
+                Torne-se um criador, publique seus roteiros no marketplace e ganhe com suas viagens.
+              </p>
+              <button
+                onClick={() => onBecomeCreator?.()}
+                className="px-6 py-3 bg-primary text-primary-foreground rounded-full text-sm font-semibold active:scale-95 transition-transform"
+              >
+                Quero ser criador
+              </button>
             </div>
           );
-        })()}
+        }
 
-        {/* Favorites Tab */}
-        {activeTab === 'favorites' && (
-          <>
-            {favoriteItems.length === 0 ? (
-              /* Empty State */
-              <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-5">
-                  <Icon name="favorite" size={28} className="text-muted-foreground text-xs" />
-                </div>
-                <h3 className="text-lg font-bold text-foreground mb-2">Você ainda não salvou roteiros</h3>
-                <p className="text-sm text-muted-foreground mb-6 max-w-[260px]">
-                  Salve roteiros públicos para comparar e comprar depois.
-                </p>
-                <button 
-                  onClick={() => onExplore?.()}
-                  className="px-6 py-3 bg-primary text-primary-foreground rounded-full text-sm font-semibold active:scale-95 transition-transform"
-                >
-                  Explorar roteiros
-                </button>
+        return (
+          <div className="flex flex-col gap-6">
+            {activeTab === 'private' && upcoming.length > 0 && (
+              <SectionHeader
+                icon="flight_takeoff"
+                label="Próximas viagens"
+                count={upcoming.length}
+                variant="upcoming"
+              />
+            )}
+            {upcoming.length > 0 && (
+              <div className="flex flex-col gap-4">
+                {upcoming.map(renderCard)}
               </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-3">
-                {favoriteItems.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => onItineraryClick(item.id)}
-                    className="text-left bg-card rounded-2xl overflow-hidden border border-border/50 active:scale-[0.97] transition-transform duration-150 flex flex-col"
-                    style={{ height: 260 }}
-                  >
-                    {/* Image — fixed height */}
-                    <div className="relative w-full overflow-hidden flex-shrink-0" style={{ height: 120 }}>
-                      <img src={item.image} alt={item.title} className="w-full h-full object-cover block" />
-                      {item.rating && (
-                        <div className="absolute top-2.5 left-2.5 flex items-center gap-1 bg-white/70 backdrop-blur-sm rounded-full px-2 py-1">
-                          <Icon name="star" size={12} filled className="text-amber-500" />
-                          <span className="text-[11px] font-bold text-foreground">{item.rating}</span>
-                        </div>
-                      )}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeFavorite(item.id);
-                        }}
-                        className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-white/70 backdrop-blur-sm flex items-center justify-center active:scale-90 transition-transform"
-                      >
-                        <Icon name="favorite" size={18} filled style={{ color: '#DA501F' }} />
-                      </button>
-                    </div>
+            )}
 
-                    {/* Content — fixed height, fixed gaps */}
-                    <div className="px-3 pt-2 pb-2.5 flex flex-col flex-1 min-h-0">
-                      {/* Title — reserved for 2 lines */}
-                      <h4
-                        className="font-semibold text-[13px] text-foreground leading-[1.25] line-clamp-2"
-                        style={{ height: 32 }}
-                      >
-                        {item.title}
-                      </h4>
+            {activeTab === 'private' && past.length > 0 && (
+              <>
+                <SectionHeader
+                  icon="check_circle"
+                  label="Viagens passadas"
+                  count={past.length}
+                  variant="past"
+                />
+                <div className="flex flex-col gap-4">
+                  {past.map(renderCard)}
+                </div>
+              </>
+            )}
+          </div>
+        );
+      })()}
 
-                      {/* Creator — fixed line */}
-                      <div className="flex items-center gap-1.5 mt-1.5" style={{ height: 20 }}>
-                        <img
-                          src={item.creatorImage || 'https://api.dicebear.com/7.x/initials/svg?seed=' + encodeURIComponent(item.creator || '?')}
-                          alt={item.creator}
-                          className="w-5 h-5 rounded-full object-cover flex-shrink-0 border border-border/50"
-                        />
-                        <span className="text-[12px] font-medium text-foreground/60 truncate">
-                          {item.creator}
-                        </span>
+      {/* Favorites Tab */}
+      {activeTab === 'favorites' && (
+        <>
+          {favoriteItems.length === 0 ? (
+            /* Empty State */
+            <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
+              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-5">
+                <Icon name="favorite" size={28} className="text-muted-foreground text-xs" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Você ainda não salvou roteiros</h3>
+              <p className="text-sm text-muted-foreground mb-6 max-w-[260px]">
+                Salve roteiros públicos para comparar e comprar depois.
+              </p>
+              <button
+                onClick={() => onExplore?.()}
+                className="px-6 py-3 bg-primary text-primary-foreground rounded-full text-sm font-semibold active:scale-95 transition-transform"
+              >
+                Explorar roteiros
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {favoriteItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => onItineraryClick(item.id)}
+                  className="text-left bg-card rounded-2xl overflow-hidden border border-border/50 active:scale-[0.97] transition-transform duration-150 flex flex-col"
+                  style={{ height: 260 }}
+                >
+                  {/* Image — fixed height */}
+                  <div className="relative w-full overflow-hidden flex-shrink-0" style={{ height: 120 }}>
+                    <img src={item.image} alt={item.title} className="w-full h-full object-cover block" />
+                    {item.rating && (
+                      <div className="absolute top-2.5 left-2.5 flex items-center gap-1 bg-white/70 backdrop-blur-sm rounded-full px-2 py-1">
+                        <Icon name="star" size={12} filled className="text-amber-500" />
+                        <span className="text-[11px] font-bold text-foreground">{item.rating}</span>
                       </div>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeFavorite(item.id);
+                      }}
+                      className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-white/70 backdrop-blur-sm flex items-center justify-center active:scale-90 transition-transform"
+                    >
+                      <Icon name="favorite" size={18} filled style={{ color: '#DA501F' }} />
+                    </button>
+                  </div>
 
-                      {/* Metadata — fixed line */}
-                      <div className="flex items-center gap-1.5 text-[12px] font-medium flex-nowrap mt-1.5 truncate" style={{ height: 18 }}>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <Icon name="schedule" size={13} className="text-foreground/50" />
-                          <span className="text-foreground/60">{item.days}d</span>
-                        </div>
-                        <span className="text-foreground/30 text-[14px]">·</span>
-                        <div className="flex items-center gap-1 flex-shrink-0 truncate">
-                          <Icon name="location_on" size={13} className="text-foreground/50" />
-                          <span className="text-foreground/60 truncate">{item.places} lugares</span>
-                        </div>
-                      </div>
+                  {/* Content — fixed height, fixed gaps */}
+                  <div className="px-3 pt-2 pb-2.5 flex flex-col flex-1 min-h-0">
+                    {/* Title — reserved for 2 lines */}
+                    <h4
+                      className="font-semibold text-[13px] text-foreground leading-[1.25] line-clamp-2"
+                      style={{ height: 32 }}
+                    >
+                      {item.title}
+                    </h4>
 
-                      {/* Price — pinned to bottom */}
-                      <span className="mt-auto text-[15px] font-bold leading-none" style={{ color: '#1a1c40' }}>
-                        R$ {item.price.toFixed(2).replace('.', ',')}
+                    {/* Creator — fixed line */}
+                    <div className="flex items-center gap-1.5 mt-1.5" style={{ height: 20 }}>
+                      <img
+                        src={item.creatorImage || 'https://api.dicebear.com/7.x/initials/svg?seed=' + encodeURIComponent(item.creator || '?')}
+                        alt={item.creator}
+                        className="w-5 h-5 rounded-full object-cover flex-shrink-0 border border-border/50"
+                      />
+                      <span className="text-[12px] font-medium text-foreground/60 truncate">
+                        {item.creator}
                       </span>
                     </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </>
-        )}
 
-        {/* Collections Tab */}
-        {activeTab === 'collections' && (
-          <div className="-mx-6">
-            {/* Collections section */}
-            <section className="px-6">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-[15px] font-bold text-foreground">
-                  Coleções <span className="text-muted-foreground font-medium">{allCollections.length}</span>
-                </h2>
-              </div>
-              {allCollections.length === 0 ? (
-                /* Empty state — segue o padrão da aba Favoritos */
-                <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-                  <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-5">
-                    <Icon name="folder" size={28} className="text-muted-foreground text-xs" />
-                  </div>
-                  <h3 className="text-lg font-bold text-foreground mb-2">Você ainda não tem coleções</h3>
-                  <p className="text-sm text-muted-foreground mb-6 max-w-[260px]">
-                    Crie coleções para organizar lugares que você quer visitar.
-                  </p>
-                  <button
-                    onClick={() => setShowCreateCollection(true)}
-                    className="px-6 py-3 bg-primary text-primary-foreground rounded-full text-sm font-semibold active:scale-95 transition-transform"
-                  >
-                    Criar coleção
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-4">
-                  {allCollections.map(collection => (
-                    <CollectionCard
-                      key={collection.id}
-                      collection={collection}
-                      onClick={() => onCollectionClick(collection.id)}
-                      isEditing={isEditingCollections}
-                      isSelected={selectedCollections.has(collection.id)}
-                      onToggleSelect={() => toggleSelectCollection(collection.id)}
-                      onLongPress={enterEditMode}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
-
-            {/* Importados recentemente removido a pedido do usuário */}
-          </div>
-        )}
-      </main>
-
-      {/* Create collection sheet (triggered from "+ Nova" inline button) */}
-      <CreateCollectionSheet
-        isOpen={showCreateCollection}
-        onClose={() => setShowCreateCollection(false)}
-        onSubmit={(name) => {
-          const newCollection: UserCollection = {
-            id: Date.now(),
-            title: name,
-            itemCount: 0,
-            isFavorites: false,
-            isPrivate: false,
-            images: [],
-            participants: [],
-          };
-          saveUserCollection(newCollection);
-          setUserCollections(getUserCollections());
-          setShowCreateCollection(false);
-        }}
-      />
-
-      {/* Create action sheet — Novo roteiro / Nova coleção */}
-      <BottomSheet
-        open={showCreateSheet}
-        onClose={() => setShowCreateSheet(false)}
-        bodyClassName="px-6 pb-2"
-      >
-        <div className="space-y-2 py-2">
-          <button
-            onClick={() => {
-              setShowCreateSheet(false);
-              onCreateItinerary?.();
-            }}
-            className="w-full flex items-center gap-4 p-4 rounded-2xl border border-border hover:bg-muted/50 transition-colors text-left"
-          >
-            <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
-              <Icon name="map" size={24} className="text-foreground" />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-sm font-semibold text-foreground">Novo roteiro</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Planeje uma nova viagem do zero</p>
-            </div>
-          </button>
-          <button
-            onClick={() => {
-              setShowCreateSheet(false);
-              setShowCreateCollection(true);
-            }}
-            className="w-full flex items-center gap-4 p-4 rounded-2xl border border-border hover:bg-muted/50 transition-colors text-left"
-          >
-            <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
-              <Icon name="folder" size={24} className="text-foreground" />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-sm font-semibold text-foreground">Nova coleção</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Organize lugares e ideias em uma pasta</p>
-            </div>
-          </button>
-        </div>
-      </BottomSheet>
-
-      {/* Sort Bottom Sheet — inline to respect 430px container */}
-      {showSortSheet && (
-        <div className="absolute inset-0 z-50 overflow-hidden">
-          {/* Backdrop */}
-          <div 
-            className="absolute inset-0 bg-black/40 animate-in fade-in duration-200"
-            onClick={() => setShowSortSheet(false)} 
-          />
-          {/* Panel */}
-          <div className="absolute bottom-0 left-0 right-0 bg-background rounded-t-[24px] animate-in slide-in-from-bottom duration-300 pb-6 max-h-[85vh] overflow-y-auto">
-            {/* Drag handle */}
-            <div className="flex justify-center pt-3 pb-1">
-              <div className="w-10 h-1 rounded-full bg-[#E0E0E0]" />
-            </div>
-
-            {/* Header */}
-            <div className="flex justify-center py-4">
-              <h2 className="text-[17px] font-bold text-foreground">
-                {activeTab === 'private' ? 'Filtros' : 'Ordenar por'}
-              </h2>
-            </div>
-
-            {/* Origin filter — apenas na aba "Meus roteiros" */}
-            {activeTab === 'private' && (
-              <div className="px-6">
-                <h3 className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide mb-1 mt-2">Mostrar</h3>
-                <div className="flex flex-col">
-                  {originOptions.map((option, index) => (
-                    <button
-                      key={option.id}
-                      onClick={() => { setOriginFilter(option.id); setShowSortSheet(false); }}
-                      className={`flex items-center justify-between min-h-[48px] py-4 ${
-                        index < originOptions.length - 1 ? 'border-b border-[#EAEAEA]' : ''
-                      }`}
-                    >
-                      <span className="text-[15px] font-normal text-foreground">{option.label}</span>
-                      <div className={`w-[22px] h-[22px] rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                        originFilter === option.id ? 'border-foreground' : 'border-muted-foreground/40'
-                      }`}>
-                        {originFilter === option.id && (
-                          <div className="w-[12px] h-[12px] rounded-full bg-foreground" />
-                        )}
+                    {/* Metadata — fixed line */}
+                    <div className="flex items-center gap-1.5 text-[12px] font-medium flex-nowrap mt-1.5 truncate" style={{ height: 18 }}>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <Icon name="schedule" size={13} className="text-foreground/50" />
+                        <span className="text-foreground/60">{item.days}d</span>
                       </div>
-                    </button>
-                  ))}
-                </div>
-                <h3 className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide mb-1 mt-5">Ordenar por</h3>
-              </div>
-            )}
+                      <span className="text-foreground/30 text-[14px]">·</span>
+                      <div className="flex items-center gap-1 flex-shrink-0 truncate">
+                        <Icon name="location_on" size={13} className="text-foreground/50" />
+                        <span className="text-foreground/60 truncate">{item.places} lugares</span>
+                      </div>
+                    </div>
 
-            {/* Options */}
-            <div className="flex flex-col px-6">
-              {sortOptions.map((option, index) => (
-                <button
-                  key={option.id}
-                  onClick={() => { setSortBy(option.id); setShowSortSheet(false); }}
-                  className={`flex items-center justify-between min-h-[48px] py-4 ${
-                    index < sortOptions.length - 1 ? 'border-b border-[#EAEAEA]' : ''
-                  }`}
-                >
-                  <span className="text-[15px] font-normal text-foreground">
-                    {option.label}
-                  </span>
-                  {/* Instagram-style radio button */}
-                  <div className={`w-[22px] h-[22px] rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                    sortBy === option.id ? 'border-foreground' : 'border-muted-foreground/40'
-                  }`}>
-                    {sortBy === option.id && (
-                      <div className="w-[12px] h-[12px] rounded-full bg-foreground" />
-                    )}
+                    {/* Price — pinned to bottom */}
+                    <span className="mt-auto text-[15px] font-bold leading-none" style={{ color: '#1a1c40' }}>
+                      R$ {item.price.toFixed(2).replace('.', ',')}
+                    </span>
                   </div>
                 </button>
               ))}
             </div>
-          </div>
-        </div>
+          )}
+        </>
       )}
 
-      {/* Delete Confirmation Sheet */}
-      {showDeleteConfirm && (
-        <>
-          <div className="fixed inset-0 bg-black/40 z-[100]" onClick={() => setShowDeleteConfirm(null)} />
-          <div className="fixed bottom-0 left-0 right-0 z-[101] flex justify-center">
-            <div className="bg-background rounded-t-3xl w-full w-full animate-in slide-in-from-bottom duration-300">
-              <div className="flex justify-center py-3">
-                <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
-              </div>
-              <div className="px-6 pb-8 text-center">
-                <div className="w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
-                  <Icon name={showDeleteConfirm.isShared ? 'logout' : 'delete'} size={28} className="text-destructive" />
+      {/* Collections Tab */}
+      {activeTab === 'collections' && (
+        <div className="-mx-6">
+          {/* Collections section */}
+          <section className="px-6">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-[15px] font-bold text-foreground">
+                Coleções <span className="text-muted-foreground font-medium">{allCollections.length}</span>
+              </h2>
+            </div>
+            {allCollections.length === 0 ? (
+              /* Empty state — segue o padrão da aba Favoritos */
+              <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
+                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-5">
+                  <Icon name="folder" size={28} className="text-muted-foreground text-xs" />
                 </div>
-                <h3 className="text-lg font-bold text-foreground mb-2">
-                  {showDeleteConfirm.isShared ? 'Sair deste roteiro?' : 'Excluir roteiro?'}
-                </h3>
-                <p className="text-sm text-muted-foreground mb-6">
-                  {showDeleteConfirm.isShared ? (
-                    <>
-                      Você deixará de participar deste roteiro e perderá acesso às futuras atualizações feitas pelo organizador. Essa ação não excluirá o roteiro para os demais participantes.
-                    </>
-                  ) : showDeleteConfirm.isPurchased ? (
-                    <>
-                      O roteiro "<span className="font-medium">{showDeleteConfirm.title}</span>" será removido da sua lista, mas como você o comprou, ele ficará sempre disponível para resgate em <span className="font-medium text-foreground">Configurações › Compras</span>.
-                    </>
-                  ) : (
-                    <>
-                      O roteiro "<span className="font-medium">{showDeleteConfirm.title}</span>" será removido permanentemente.
-                    </>
-                  )}
+                <h3 className="text-lg font-bold text-foreground mb-2">Você ainda não tem coleções</h3>
+                <p className="text-sm text-muted-foreground mb-6 max-w-[260px]">
+                  Crie coleções para organizar lugares que você quer visitar.
                 </p>
-                <div className="flex gap-3">
+                <button
+                  onClick={() => setShowCreateCollection(true)}
+                  className="px-6 py-3 bg-primary text-primary-foreground rounded-full text-sm font-semibold active:scale-95 transition-transform"
+                >
+                  Criar coleção
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                {allCollections.map(collection => (
+                  <CollectionCard
+                    key={collection.id}
+                    collection={collection}
+                    onClick={() => onCollectionClick(collection.id)}
+                    isEditing={isEditingCollections}
+                    isSelected={selectedCollections.has(collection.id)}
+                    onToggleSelect={() => toggleSelectCollection(collection.id)}
+                    onLongPress={enterEditMode}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Importados recentemente removido a pedido do usuário */}
+        </div>
+      )}
+    </main>
+
+    {/* Create collection sheet (triggered from "+ Nova" inline button) */}
+    <CreateCollectionSheet
+      isOpen={showCreateCollection}
+      onClose={() => setShowCreateCollection(false)}
+      onSubmit={(name) => {
+        const newCollection: UserCollection = {
+          id: Date.now(),
+          title: name,
+          itemCount: 0,
+          isFavorites: false,
+          isPrivate: false,
+          images: [],
+          participants: [],
+        };
+        saveUserCollection(newCollection);
+        setUserCollections(getUserCollections());
+        setShowCreateCollection(false);
+      }}
+    />
+
+    {/* Create action sheet — Novo roteiro / Nova coleção */}
+    <BottomSheet
+      open={showCreateSheet}
+      onClose={() => setShowCreateSheet(false)}
+      bodyClassName="px-6 pb-2"
+    >
+      <div className="space-y-2 py-2">
+        <button
+          onClick={() => {
+            setShowCreateSheet(false);
+            onCreateItinerary?.();
+          }}
+          className="w-full flex items-center gap-4 p-4 rounded-2xl border border-border hover:bg-muted/50 transition-colors text-left"
+        >
+          <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
+            <Icon name="map" size={24} className="text-foreground" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-foreground">Novo roteiro</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Planeje uma nova viagem do zero</p>
+          </div>
+        </button>
+        <button
+          onClick={() => {
+            setShowCreateSheet(false);
+            setShowCreateCollection(true);
+          }}
+          className="w-full flex items-center gap-4 p-4 rounded-2xl border border-border hover:bg-muted/50 transition-colors text-left"
+        >
+          <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
+            <Icon name="folder" size={24} className="text-foreground" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-foreground">Nova coleção</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Organize lugares e ideias em uma pasta</p>
+          </div>
+        </button>
+      </div>
+    </BottomSheet>
+
+    {/* Sort Bottom Sheet — inline to respect 430px container */}
+    {showSortSheet && (
+      <div className="absolute inset-0 z-50 overflow-hidden">
+        {/* Backdrop */}
+        <div
+          className="absolute inset-0 bg-black/40 animate-in fade-in duration-200"
+          onClick={() => setShowSortSheet(false)}
+        />
+        {/* Panel */}
+        <div className="absolute bottom-0 left-0 right-0 bg-background rounded-t-[24px] animate-in slide-in-from-bottom duration-300 pb-6 max-h-[85vh] overflow-y-auto">
+          {/* Drag handle */}
+          <div className="flex justify-center pt-3 pb-1">
+            <div className="w-10 h-1 rounded-full bg-[#E0E0E0]" />
+          </div>
+
+          {/* Header */}
+          <div className="flex justify-center py-4">
+            <h2 className="text-[17px] font-bold text-foreground">
+              {activeTab === 'private' ? 'Filtros' : 'Ordenar por'}
+            </h2>
+          </div>
+
+          {/* Origin filter — apenas na aba "Meus roteiros" */}
+          {activeTab === 'private' && (
+            <div className="px-6">
+              <h3 className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide mb-1 mt-2">Mostrar</h3>
+              <div className="flex flex-col">
+                {originOptions.map((option, index) => (
                   <button
-                    onClick={() => setShowDeleteConfirm(null)}
-                    className="flex-1 py-3.5 rounded-2xl text-sm font-semibold border border-border text-foreground"
+                    key={option.id}
+                    onClick={() => { setOriginFilter(option.id); setShowSortSheet(false); }}
+                    className={`flex items-center justify-between min-h-[48px] py-4 ${index < originOptions.length - 1 ? 'border-b border-[#EAEAEA]' : ''
+                      }`}
                   >
-                    Cancelar
+                    <span className="text-[15px] font-normal text-foreground">{option.label}</span>
+                    <div className={`w-[22px] h-[22px] rounded-full border-2 flex items-center justify-center flex-shrink-0 ${originFilter === option.id ? 'border-foreground' : 'border-muted-foreground/40'
+                      }`}>
+                      {originFilter === option.id && (
+                        <div className="w-[12px] h-[12px] rounded-full bg-foreground" />
+                      )}
+                    </div>
                   </button>
-                  <button
-                    onClick={() => handleDeleteItinerary(showDeleteConfirm.id, showDeleteConfirm.isUser, showDeleteConfirm.isShared)}
-                    className="flex-1 py-3.5 rounded-2xl text-sm font-semibold bg-destructive text-destructive-foreground"
-                  >
-                    {showDeleteConfirm.isShared ? 'Sair do roteiro' : 'Excluir'}
-                  </button>
+                ))}
+              </div>
+              <h3 className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide mb-1 mt-5">Ordenar por</h3>
+            </div>
+          )}
+
+          {/* Options */}
+          <div className="flex flex-col px-6">
+            {sortOptions.map((option, index) => (
+              <button
+                key={option.id}
+                onClick={() => { setSortBy(option.id); setShowSortSheet(false); }}
+                className={`flex items-center justify-between min-h-[48px] py-4 ${index < sortOptions.length - 1 ? 'border-b border-[#EAEAEA]' : ''
+                  }`}
+              >
+                <span className="text-[15px] font-normal text-foreground">
+                  {option.label}
+                </span>
+                {/* Instagram-style radio button */}
+                <div className={`w-[22px] h-[22px] rounded-full border-2 flex items-center justify-center flex-shrink-0 ${sortBy === option.id ? 'border-foreground' : 'border-muted-foreground/40'
+                  }`}>
+                  {sortBy === option.id && (
+                    <div className="w-[12px] h-[12px] rounded-full bg-foreground" />
+                  )}
                 </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Delete Confirmation Sheet */}
+    {showDeleteConfirm && (
+      <>
+        <div className="fixed inset-0 bg-black/40 z-[100]" onClick={() => setShowDeleteConfirm(null)} />
+        <div className="fixed bottom-0 left-0 right-0 z-[101] flex justify-center">
+          <div className="bg-background rounded-t-3xl w-full w-full animate-in slide-in-from-bottom duration-300">
+            <div className="flex justify-center py-3">
+              <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
+            </div>
+            <div className="px-6 pb-8 text-center">
+              <div className="w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+                <Icon name={showDeleteConfirm.isShared ? 'logout' : 'delete'} size={28} className="text-destructive" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground mb-2">
+                {showDeleteConfirm.isShared ? 'Sair deste roteiro?' : 'Excluir roteiro?'}
+              </h3>
+              <p className="text-sm text-muted-foreground mb-6">
+                {showDeleteConfirm.isShared ? (
+                  <>
+                    Você deixará de participar deste roteiro e perderá acesso às futuras atualizações feitas pelo organizador. Essa ação não excluirá o roteiro para os demais participantes.
+                  </>
+                ) : showDeleteConfirm.isPurchased ? (
+                  <>
+                    O roteiro "<span className="font-medium">{showDeleteConfirm.title}</span>" será removido da sua lista, mas como você o comprou, ele ficará sempre disponível para resgate em <span className="font-medium text-foreground">Configurações › Compras</span>.
+                  </>
+                ) : (
+                  <>
+                    O roteiro "<span className="font-medium">{showDeleteConfirm.title}</span>" será removido permanentemente.
+                  </>
+                )}
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(null)}
+                  className="flex-1 py-3.5 rounded-2xl text-sm font-semibold border border-border text-foreground"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => handleDeleteItinerary(showDeleteConfirm.id, showDeleteConfirm.isUser, showDeleteConfirm.isShared)}
+                  className="flex-1 py-3.5 rounded-2xl text-sm font-semibold bg-destructive text-destructive-foreground"
+                >
+                  {showDeleteConfirm.isShared ? 'Sair do roteiro' : 'Excluir'}
+                </button>
               </div>
             </div>
           </div>
-        </>
-      )}
-    </div>;
+        </div>
+      </>
+    )}
+  </div>;
 }

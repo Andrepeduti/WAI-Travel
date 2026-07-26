@@ -27,7 +27,10 @@ export function usePopularItineraries(limit = 10) {
                     supabase
                         .from('itinerary_reviews')
                         .select('itinerary_id, rating')
-                        .then(({ data }) => data ?? []),
+                        .then(({ data, error }) => {
+                            if (error) return [];
+                            return data ?? [];
+                        }),
                 ]);
 
                 if (cancelled) return;
@@ -69,7 +72,7 @@ export function usePopularItineraries(limit = 10) {
                 });
 
                 const waiLogo = '/__l5e/assets-v1/9cb2fe10-a285-4f17-bbef-f67389a96b37/wai-logo.png';
-                
+
                 const calcDays = (startDate: string, endDate: string): number => {
                     if (!startDate || !endDate) return 0;
                     const start = new Date(startDate);
@@ -104,6 +107,10 @@ export function usePopularItineraries(limit = 10) {
                         destinations: itin.destinations ?? [],
                     };
                 });
+
+                const { preloadImages } = await import('@/lib/preloadImages');
+                const urlsToPreload = result.flatMap(r => [r.image, r.authorImage]).filter(Boolean);
+                await preloadImages(urlsToPreload);
 
                 if (!cancelled) {
                     setItineraries(result);

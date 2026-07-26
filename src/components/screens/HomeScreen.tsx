@@ -350,8 +350,12 @@ export function HomeScreen({
         const end = parseLocalDate(it.endDate) ?? start;
         return { it, start, end };
       })
-      .filter(({ start, end }) => start && end && end.getTime() >= today.getTime())
-      .sort((a, b) => (a.start!.getTime() - b.start!.getTime()))
+      .filter(({ start, end }) => !start || !end || end.getTime() >= today.getTime())
+      .sort((a, b) => {
+        if (a.start && b.start) return a.start.getTime() - b.start.getTime();
+        if (!a.start && !b.start) return 0;
+        return a.start ? 1 : -1;
+      })
       .slice(0, 8);
   })();
   const displayName = userName ?? (currentUser.name ? currentUser.name.split(' ')[0] : 'Viajante');

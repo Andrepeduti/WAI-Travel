@@ -1,4 +1,6 @@
 import { Icon } from '@/components/ui/Icon';
+import { Heart, Search, Share2, Star, CalendarDays, ExternalLink, MessageCircle, PenLine, ArrowLeft, ArrowUpRight, Copy, FileText, Check, MoreVertical, X, Trash2, StopCircle } from 'lucide-react';
+import { MarketplaceSkeleton } from '@/components/ui/MarketplaceSkeleton';
 import { shareItinerary } from '@/lib/shareItinerary';
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useCart } from '@/contexts/CartContext';
@@ -132,19 +134,66 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
 
   const { data: marketplaceData, isLoading: isLoadingItinerary } = useQuery({
     queryKey: ['marketplace-itinerary', idStr],
-    queryFn: () => getMarketplaceItinerary(idStr),
+    queryFn: async () => {
+      const data = await getMarketplaceItinerary(idStr);
+      if (data) {
+        const imagePromises: Promise<void>[] = [];
+        if (data.authorAvatar) {
+          imagePromises.push(
+            fetch(data.authorAvatar)
+              .then(res => res.blob())
+              .then(blob => {
+                data.authorAvatar = URL.createObjectURL(blob);
+              })
+              .catch(console.error)
+          );
+        }
+        if (data.images?.[0]) {
+          imagePromises.push(
+            fetch(data.images[0])
+              .then(res => res.blob())
+              .then(blob => {
+                data.images[0] = URL.createObjectURL(blob);
+              })
+              .catch(console.error)
+          );
+        }
+        await Promise.all(imagePromises);
+      }
+      return data;
+    },
+    staleTime: Infinity,
     enabled: !!idStr,
   });
 
   const { data: reviewsData, isLoading: isLoadingReviews } = useQuery({
     queryKey: ['itinerary-reviews', idStr],
-    queryFn: () => getItineraryReviews(idStr),
+    queryFn: async () => {
+      const reviews = await getItineraryReviews(idStr);
+      if (reviews && reviews.length > 0) {
+        const promises = reviews.map(r => {
+          if (r.userImage) {
+            return fetch(r.userImage)
+              .then(res => res.blob())
+              .then(blob => {
+                r.userImage = URL.createObjectURL(blob);
+              })
+              .catch(console.error);
+          }
+          return Promise.resolve();
+        });
+        await Promise.all(promises);
+      }
+      return reviews;
+    },
+    staleTime: Infinity,
     enabled: !!idStr,
   });
 
   const { data: plannerData, isLoading: isLoadingPlanner } = useQuery({
     queryKey: ['planner-data', idStr],
     queryFn: () => loadPlannerData(idStr),
+    staleTime: Infinity,
     enabled: !!idStr,
   });
 
@@ -373,13 +422,23 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
     setSavingPlace(null);
   };
 
+  const [visualsReady, setVisualsReady] = useState(false);
 
-  if (isLoadingItinerary) {
-    return (
-      <div className="flex h-[100dvh] items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+  useEffect(() => {
+    let cancelled = false;
+    if (itineraryData && !isLoadingItinerary) {
+      (async () => {
+        const { preloadImages } = await import('@/lib/preloadImages');
+        const toLoad = [itineraryData.image, itineraryData.authorImage].filter(Boolean);
+        await preloadImages(toLoad);
+        if (!cancelled) setVisualsReady(true);
+      })();
+    }
+    return () => { cancelled = true; };
+  }, [itineraryData, isLoadingItinerary]);
+
+  if (isLoadingItinerary || !visualsReady) {
+    return <MarketplaceSkeleton />;
   }
 
   if (!itineraryData) {

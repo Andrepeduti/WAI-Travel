@@ -168,7 +168,10 @@ export function useRecommendedItineraries(limit = 10) {
                     supabase
                         .from('itinerary_reviews')
                         .select('itinerary_id, rating')
-                        .then(({ data }) => data ?? []),
+                        .then(({ data, error }) => {
+                            if (error) return [];
+                            return data ?? [];
+                        }),
 
                     // Países visitados pelo usuário
                     userId
@@ -387,6 +390,10 @@ export function useRecommendedItineraries(limit = 10) {
                         destinations: itin.destinations ?? [],
                     };
                 });
+
+                const { preloadImages } = await import('@/lib/preloadImages');
+                const urlsToPreload = result.flatMap(r => [r.image, r.authorImage]).filter(Boolean);
+                await preloadImages(urlsToPreload);
 
                 if (!cancelled) {
                     setItineraries(result);
