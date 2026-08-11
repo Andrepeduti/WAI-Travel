@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { setCachedOwnerProfile, setCachedItineraryMembers, type ItineraryMember } from './itineraryMembersApi';
 
 /**
  * Evento global disparado após qualquer mutação confirmada em `itineraries`.
@@ -38,6 +39,7 @@ export interface UserItinerary {
   tags?: string[];
   userId: string;
   createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface CreateItineraryInput {
@@ -86,6 +88,7 @@ function rowToItinerary(row: any): UserItinerary {
     tags: row.tags ?? [],
     userId: row.user_id,
     createdAt: row.created_at ? String(row.created_at) : undefined,
+    updatedAt: row.updated_at ? String(row.updated_at) : (row.created_at ? String(row.created_at) : undefined),
   };
 }
 
@@ -100,7 +103,7 @@ export async function listMyItineraries(): Promise<UserItinerary[]> {
   const userId = userData.user?.id;
   if (!userId) return [];
   const [ownedRes, memberRes] = await Promise.all([
-    supabase.from('itineraries').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+    supabase.from('itineraries').select('*').eq('user_id', userId).order('updated_at', { ascending: false }).order('created_at', { ascending: false }),
     supabase.from('itinerary_members').select('itinerary_id').eq('user_id', userId),
   ]);
   if (ownedRes.error) {
@@ -114,6 +117,7 @@ export async function listMyItineraries(): Promise<UserItinerary[]> {
       .from('itineraries')
       .select('*')
       .in('id', memberIds)
+      .order('updated_at', { ascending: false })
       .order('created_at', { ascending: false });
     if (sErr) {
       console.error('[itinerariesApi] listMyItineraries shared failed', sErr);
@@ -129,6 +133,12 @@ export async function listMyItineraries(): Promise<UserItinerary[]> {
     seen.add(it.id);
     merged.push(it);
   }
+  // Ordena por data de última alteração (updatedAt ou createdAt) decrescente
+  merged.sort((a, b) => {
+    const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+    const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+    return timeB - timeA;
+  });
   return merged;
 }
 
@@ -208,6 +218,7 @@ export async function updateItinerary(id: string, patch: UpdateItineraryInput): 
   if (patch.description !== undefined) updates.description = patch.description;
   if (patch.tags !== undefined) updates.tags = patch.tags;
   if (Object.keys(updates).length === 0) return;
+  (updates as any).updated_at = new Date().toISOString();
   const { error } = await supabase.from('itineraries').update(updates as never).eq('id', id);
   if (error) {
     console.error('[itinerariesApi] updateItinerary failed', error);
@@ -216,17 +227,46 @@ export async function updateItinerary(id: string, patch: UpdateItineraryInput): 
   emitItinerariesChanged('update', id);
 }
 
+/**
+ * Atualiza o timestamp `updated_at` de um roteiro no Supabase para a hora atual
+ * e dispara o evento global `ITINERARIES_CHANGED_EVENT` para colocar o roteiro no topo da listagem.
+ */
+export async function touchItinerary(id: string | number | undefined | null): Promise<void> {
+  if (!id) return;
+  const idStr = String(id);
+  const now = new Date().toISOString();
+  
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idStr)) {
+    const { error } = await supabase
+      .from('itineraries')
+      .update({ updated_at: now } as never)
+      .eq('id', idStr);
+    if (error) {
+      console.error('[itinerariesApi] touchItinerary failed', error);
+    }
+  }
+
+  emitItinerariesChanged('update', idStr);
+}
+
+
+export interface ItineraryCardParticipant {
+  userId: string;
+  avatar: string;
+  name?: string;
+  isOwner: boolean;
+}
 
 /**
- * Para uma lista de itinerary IDs, retorna um mapa { itineraryId -> avatares[] }
- * combinando o avatar do dono + dos membros aceitos. Útil para exibir nos cards
- * da aba "Meus roteiros" sem precisar carregar cada roteiro individualmente.
+ * Para uma lista de itinerary IDs, retorna um mapa { itineraryId -> ItineraryCardParticipant[] }
+ * combinando o avatar e perfil do dono (marcado com isOwner: true) + dos membros aceitos.
+ * Útil para exibir nos cards da aba "Meus roteiros" com o avatar stack.
  */
 export async function fetchItineraryMemberAvatars(
   itineraryIds: string[],
-): Promise<Record<string, string[]>> {
+): Promise<Record<string, ItineraryCardParticipant[]>> {
   if (itineraryIds.length === 0) return {};
-  const result: Record<string, string[]> = {};
+  const result: Record<string, ItineraryCardParticipant[]> = {};
   // 1) Donos dos roteiros
   const { data: itins } = await supabase
     .from('itineraries')
@@ -237,35 +277,91 @@ export async function fetchItineraryMemberAvatars(
     .from('itinerary_members')
     .select('itinerary_id, user_id')
     .in('itinerary_id', itineraryIds);
+
   const ownerByItin = new Map<string, string>();
   (itins ?? []).forEach((i: any) => ownerByItin.set(i.id, i.user_id));
-  const userIdsByItin = new Map<string, string[]>();
+
+  const userIdsByItin = new Map<string, { ownerId?: string; memberIds: string[] }>();
   itineraryIds.forEach((id) => {
-    const arr: string[] = [];
     const owner = ownerByItin.get(id);
-    if (owner) arr.push(owner);
-    userIdsByItin.set(id, arr);
+    userIdsByItin.set(id, { ownerId: owner, memberIds: [] });
   });
+
   (members ?? []).forEach((m: any) => {
-    const arr = userIdsByItin.get(m.itinerary_id) ?? [];
-    if (!arr.includes(m.user_id)) arr.push(m.user_id);
-    userIdsByItin.set(m.itinerary_id, arr);
+    const entry = userIdsByItin.get(m.itinerary_id);
+    if (entry) {
+      if (m.user_id !== entry.ownerId && !entry.memberIds.includes(m.user_id)) {
+        entry.memberIds.push(m.user_id);
+      }
+    }
   });
-  // 3) Carrega avatares uma única vez
-  const allUserIds = Array.from(new Set(Array.from(userIdsByItin.values()).flat()));
-  let avatarMap = new Map<string, string>();
+
+  // 3) Carrega avatares e nomes uma única vez
+  const allUserIds = Array.from(
+    new Set(
+      Array.from(userIdsByItin.values()).flatMap((e) => [e.ownerId, ...e.memberIds].filter(Boolean) as string[])
+    )
+  );
+
+  const profileMap = new Map<string, { name?: string; avatar: string }>();
   if (allUserIds.length > 0) {
     const { data: profiles } = await supabase
       .from('profiles_public')
-      .select('user_id, avatar_url')
+      .select('user_id, name, username, avatar_url')
       .in('user_id', allUserIds);
+
     (profiles ?? []).forEach((p: any) => {
-      if (p.avatar_url) avatarMap.set(p.user_id, p.avatar_url);
+      const name = p.name || p.username || '';
+      const fallbackAvatar = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name || 'U')}`;
+      profileMap.set(p.user_id, {
+        name: p.name || p.username,
+        avatar: p.avatar_url || fallbackAvatar,
+      });
     });
   }
-  userIdsByItin.forEach((userIds, itinId) => {
-    result[itinId] = userIds.map((u) => avatarMap.get(u)).filter(Boolean) as string[];
+
+  userIdsByItin.forEach((entry, itinId) => {
+    const list: ItineraryCardParticipant[] = [];
+    const memberItems: ItineraryMember[] = [];
+
+    if (entry.ownerId) {
+      const prof = profileMap.get(entry.ownerId);
+      list.push({
+        userId: entry.ownerId,
+        avatar: prof?.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=Dono`,
+        name: prof?.name,
+        isOwner: true,
+      });
+      setCachedOwnerProfile(itinId, {
+        userId: entry.ownerId,
+        name: prof?.name || 'Dono',
+        avatar: prof?.avatar,
+      });
+    }
+
+    entry.memberIds.forEach((mId) => {
+      const prof = profileMap.get(mId);
+      list.push({
+        userId: mId,
+        avatar: prof?.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=Membro`,
+        name: prof?.name,
+        isOwner: false,
+      });
+      memberItems.push({
+        id: `cached-${mId}`,
+        itineraryId: itinId,
+        userId: mId,
+        role: 'editor',
+        name: prof?.name || 'Membro',
+        avatar: prof?.avatar,
+        acceptedAt: new Date().toISOString(),
+      });
+    });
+
+    setCachedItineraryMembers(itinId, memberItems);
+    result[itinId] = list;
   });
+
   return result;
 }
 

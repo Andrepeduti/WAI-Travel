@@ -418,9 +418,9 @@ export function CreateItinerarySheet({ isOpen, onClose, onSubmit, initialDestina
           </div>
           
           {/* Header with back button */}
-          <div className="px-6 pb-4" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
+          <div className="px-6 pb-4 flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
             <BackButton onClick={onClose} />
-            <h2 className="text-xl font-bold text-foreground my-0 mt-[24px]">Criar Roteiro</h2>
+            <h2 className="text-xl font-bold text-foreground my-0">Criar Roteiro</h2>
           </div>
           
           {/* Content */}

@@ -88,7 +88,7 @@ function getTransportIcon(type: TransportBetween['type']) {
 export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales, onUpgrade, onNavigateToFAQ }: NewItineraryScreenProps) {
   const { session } = useAuth();
   const { itineraries: myItinerariesForLimit } = useMyItineraries();
-  const FREE_PLAN_ITINERARY_LIMIT = 3;
+  const FREE_PLAN_ITINERARY_LIMIT = Infinity;
   const ownCreatedCount = myItinerariesForLimit.filter(
     (it) => it.userId === session?.user?.id && it.sourceDatasetId == null
   ).length;

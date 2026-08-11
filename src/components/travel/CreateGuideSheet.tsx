@@ -52,9 +52,9 @@ export function CreateGuideSheet({ isOpen, onClose, onSubmit }: CreateGuideSheet
           </div>
           
           {/* Header */}
-          <div className="px-6 pb-6" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
+          <div className="px-6 pb-6 flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
             <BackButton onClick={handleClose} />
-            <h2 className="text-xl font-bold text-foreground my-0 mt-[24px]">Novo Guia</h2>
+            <h2 className="text-xl font-bold text-foreground my-0">Novo Guia</h2>
           </div>
 
           {/* Content */}

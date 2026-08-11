@@ -137,7 +137,7 @@ const Index = () => {
   const [showItinerarySheet, setShowItinerarySheet] = useState(false);
   const [showPlanLimitSheet, setShowPlanLimitSheet] = useState(false);
   const { itineraries: myItinerariesForLimit } = useMyItineraries();
-  const FREE_PLAN_ITINERARY_LIMIT = 3;
+  const FREE_PLAN_ITINERARY_LIMIT = Infinity;
   // Conta apenas roteiros originais criados pelo próprio usuário.
   // Exclui: comprados (sourceDatasetId != null) e compartilhados (userId != auth user).
   // Excluímos os publicados (roteiros à venda não entram no limite)
@@ -175,7 +175,15 @@ const Index = () => {
 
   // Abre o sheet de criar roteiro quando navegado com state { openCreateItinerary: true }
   useEffect(() => {
-    const state = location.state as { openCreateItinerary?: boolean; openMarketplaceItineraryId?: number; openCreatorDashboardItinerary?: UserItinerary; openItineraryForPublish?: UserItinerary; openCollaboratorItineraryId?: string } | null;
+    const state = location.state as { 
+      openCreateItinerary?: boolean; 
+      openMarketplaceItineraryId?: number; 
+      openCreatorDashboardItinerary?: UserItinerary; 
+      openItineraryForPublish?: UserItinerary; 
+      openCollaboratorItineraryId?: string;
+      openUserPublicItinerary?: UserItinerary;
+      fromStandaloneProfile?: boolean;
+    } | null;
     if (state?.openCreateItinerary) {
       tryOpenItinerarySheet();
       // Limpa o state para não reabrir em re-renderizações
@@ -198,11 +206,25 @@ const Index = () => {
       if (dataset) {
         setSelectedItinerary(dataset);
       }
+      if (state?.fromStandaloneProfile) {
+        setNavigatedFromStandaloneProfile(true);
+      }
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+    // Abre um roteiro público/marketplace do usuário vindo do banco.
+    if (state?.openUserPublicItinerary) {
+      handleUserPublicItineraryClick(state.openUserPublicItinerary);
+      if (state?.fromStandaloneProfile) {
+        setNavigatedFromStandaloneProfile(true);
+      }
       navigate(location.pathname, { replace: true, state: {} });
     }
     // Abre o dashboard de criador de um roteiro à venda (vindo do perfil em /profile).
     if (state?.openCreatorDashboardItinerary) {
       setCreatorDashboardItinerary(state.openCreatorDashboardItinerary);
+      if (state?.fromStandaloneProfile) {
+        setNavigatedFromStandaloneProfile(true);
+      }
       navigate(location.pathname, { replace: true, state: {} });
     }
     // Abre um roteiro existente do usuário no planner com o fluxo de publicação já aberto.
@@ -280,6 +302,7 @@ const Index = () => {
   const [showPromoDetail, setShowPromoDetail] = useState(false);
   const [navigatedFromNotifications, setNavigatedFromNotifications] = useState(false);
   const [navigatedFromFriendProfile, setNavigatedFromFriendProfile] = useState(false);
+  const [navigatedFromStandaloneProfile, setNavigatedFromStandaloneProfile] = useState(false);
   const [navigatedFromPurchases, setNavigatedFromPurchases] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [showDeleteSuccessToast, setShowDeleteSuccessToast] = useState(false);
@@ -564,15 +587,6 @@ const Index = () => {
       console.error('Failed to create itinerary');
       removeOptimisticItinerary(tempId);
       return;
-    }
-
-    try {
-      const { fetchPlacesForCity } = await import('@/lib/placesApi');
-      await Promise.allSettled(
-        data.destinations.map(dest => fetchPlacesForCity(dest))
-      );
-    } catch (e) {
-      console.error('Error prefetching places:', e);
     }
 
     setShowItinerarySheet(false);
@@ -972,7 +986,13 @@ const Index = () => {
         <div className="w-full bg-background min-h-screen overflow-x-clip">
           <CreatorItineraryDashboardScreen
             itinerary={creatorDashboardItinerary}
-            onBack={wrapBack(() => setCreatorDashboardItinerary(null))}
+            onBack={wrapBack(() => {
+              setCreatorDashboardItinerary(null);
+              if (navigatedFromStandaloneProfile) {
+                setNavigatedFromStandaloneProfile(false);
+                navigate(-1);
+              }
+            })}
             onPreview={() => {
               const it = creatorDashboardItinerary;
               setCreatorDashboardItinerary(null);
@@ -1014,7 +1034,11 @@ const Index = () => {
       setResumeCheckoutId(null);
       setPurchasedItineraryId(null);
 
-      if (navigatedFromPurchases) {
+      if (navigatedFromStandaloneProfile) {
+        setNavigatedFromStandaloneProfile(false);
+        setSelectedItinerary(null);
+        navigate(-1);
+      } else if (navigatedFromPurchases) {
         setNavigatedFromPurchases(false);
         setSelectedItinerary(null);
         setProfileSubScreen('purchases');
@@ -1120,10 +1144,13 @@ const Index = () => {
                   setSelectedItinerary(plannerDataset);
                 }
               }}
-              onViewCreator={() => {
+              onViewCreator={(author, authorImage, authorUserId, authorUsername) => {
                 if (navigatedFromFriendProfile && selectedFriend) {
                   // Go back to the friend profile instead of opening a new creator profile
                   setSelectedItinerary(null);
+                } else if (navigatedFromStandaloneProfile) {
+                  setSelectedItinerary(null);
+                  navigate(-1);
                 } else {
                   const author = selectedItinerary.author || 'Autor';
                   const authorImage = selectedItinerary.authorImage || '';
@@ -1131,8 +1158,9 @@ const Index = () => {
                   navigate('/profile', {
                     state: {
                       friend: {
+                        userId: authorUserId,
                         name: author,
-                        username: '@' + author.toLowerCase().replace(/[^a-z0-9]/g, ''),
+                        username: authorUsername || '@' + author.toLowerCase().replace(/[^a-z0-9]/g, ''),
                         location: 'Brasil',
                         avatar: authorImage,
                         following: 128,
@@ -1533,7 +1561,14 @@ const Index = () => {
               friend={selectedFriend}
               onBack={wrapBack(() => { setProfileSubScreen('main'); setSelectedFriend(null); })}
               onChat={() => { setProfileSubScreen('main'); setSelectedFriend(null); setShowChat(true); }}
-              onItineraryClick={(id) => { setNavigatedFromFriendProfile(true); handleItineraryClick(id); }}
+              onItineraryClick={(id, userItinerary) => {
+                setNavigatedFromFriendProfile(true);
+                if (userItinerary) {
+                  handleUserPublicItineraryClick(userItinerary);
+                } else {
+                  handleItineraryClick(id as number);
+                }
+              }}
             />
           </div>
         </div>

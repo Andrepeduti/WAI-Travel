@@ -38,7 +38,7 @@ export interface BudgetExtraPerson {
 interface BudgetScreenProps {
   onBack: () => void;
   expenses: Expense[];
-  onExpensesChange: (expenses: Expense[]) => void;
+  onExpensesChange: (expenses: Expense[] | ((prev: Expense[]) => Expense[])) => void;
   autoOpenAdd?: boolean;
   participants?: BudgetParticipant[];
   extraPeople?: BudgetExtraPerson[];
@@ -114,10 +114,15 @@ export function BudgetScreen({ onBack, expenses, onExpensesChange, autoOpenAdd =
   const [selectedPersonExtrato, setSelectedPersonExtrato] = useState<Person | null>(null);
   const [showEditPeople, setShowEditPeople] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
-  const [toastMessage, setToastMessage] = useState({ title: '', description: '' });
+  const [toastMessage, setToastMessage] = useState<{
+    title: string;
+    description: string;
+    actionLabel?: string;
+    onAction?: () => void;
+  }>({ title: '', description: '' });
 
-  const showToast = (title: string, description: string) => {
-    setToastMessage({ title, description });
+  const showToast = (title: string, description: string, actionLabel?: string, onAction?: () => void) => {
+    setToastMessage({ title, description, actionLabel, onAction });
     setToastVisible(true);
   };
 
@@ -248,7 +253,31 @@ export function BudgetScreen({ onBack, expenses, onExpensesChange, autoOpenAdd =
     showToast('Pessoa excluída!', `${person?.name || 'Pessoa'} foi removida do grupo`);
   };
   const handleDeleteExpense = (id: string) => {
-    setExpenses(expenses.filter(e => e.id !== id));
+    const expenseToDelete = expenses.find(e => e.id === id);
+    if (!expenseToDelete) return;
+    const index = expenses.findIndex(e => e.id === id);
+
+    const updatedExpenses = expenses.filter(e => e.id !== id);
+    setExpenses(updatedExpenses);
+
+    showToast(
+      'Gasto removido',
+      `"${expenseToDelete.name}" foi removido do orçamento`,
+      'Desfazer',
+      () => {
+        setExpenses(prevExpenses => {
+          const current = Array.isArray(prevExpenses) ? prevExpenses : updatedExpenses;
+          if (current.some(e => e.id === expenseToDelete.id)) return current;
+          const restored = [...current];
+          if (index >= 0 && index <= restored.length) {
+            restored.splice(index, 0, expenseToDelete);
+          } else {
+            restored.push(expenseToDelete);
+          }
+          return restored;
+        });
+      }
+    );
   };
 
   const filters: { key: CategoryFilter; label: string; icon?: typeof Building2 }[] = [
@@ -264,7 +293,7 @@ export function BudgetScreen({ onBack, expenses, onExpensesChange, autoOpenAdd =
       <header className="sticky top-0 z-20 bg-background px-4 pt-5 pb-3">
         <div className="flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />
-          <h1 className="text-xl font-bold text-foreground my-0 mt-[24px]">Orçamento total</h1>
+          <h1 className="text-xl font-bold text-foreground my-0">Orçamento total</h1>
         </div>
       </header>
 
@@ -641,6 +670,9 @@ export function BudgetScreen({ onBack, expenses, onExpensesChange, autoOpenAdd =
         onClose={() => setToastVisible(false)}
         title={toastMessage.title}
         description={toastMessage.description}
+        actionLabel={toastMessage.actionLabel}
+        onAction={toastMessage.onAction}
+        duration={5000}
       />
     </div>
   );

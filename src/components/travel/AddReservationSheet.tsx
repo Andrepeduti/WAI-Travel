@@ -108,14 +108,13 @@ export function AddReservationSheet({ open, onClose, onSave, dayNumber }: AddRes
               <label className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
                 Horário
               </label>
-              <div className="flex items-center gap-2 rounded-xl px-4 py-3" style={{ background: '#F2F2F2' }}>
-                <Icon name="schedule" size={16} className="text-muted-foreground" />
+              <div className="flex items-center gap-2 rounded-xl px-4 py-3 relative overflow-hidden cursor-pointer" style={{ background: '#F2F2F2' }}>
+                <Icon name="schedule" size={16} className="text-muted-foreground flex-shrink-0" />
                 <input
-                  type="text"
-                  placeholder="00:00"
+                  type="time"
                   value={time}
                   onChange={e => setTime(e.target.value)}
-                  className="flex-1 bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground outline-none"
+                  className="flex-1 text-[14px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-full"
                 />
               </div>
             </div>

@@ -90,7 +90,7 @@ export interface MarketplaceItineraryScreenProps {
   itineraryId: number | string;
   onBack: () => void;
   onViewPurchasedItinerary?: (itineraryId: number | string, newStartDate?: Date, newEndDate?: Date) => void;
-  onViewCreator?: (author: string, authorImage: string) => void;
+  onViewCreator?: (author: string, authorImage: string, authorUserId?: string, authorUsername?: string) => void;
   authorOverride?: string;
   authorImageOverride?: string;
   /** Optional dataset injected from outside (e.g. a user-published itinerary not in the static catalog). */
@@ -223,6 +223,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
       author: authorOverride || marketplaceData.authorName || 'Autor',
       authorImage: authorImageOverride || marketplaceData.authorAvatar || '',
       authorUsername: marketplaceData.authorUsername || (authorOverride || marketplaceData.authorName || 'Autor'),
+      authorUserId: marketplaceData.userId,
       authorVerified: true, // Assuming published means verified enough for this UI
       duration: `${totalDays} dias`,
       cities: uniqueCities.size || 1,
@@ -504,7 +505,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
     );
   }
 
-  if (showAllReviews) {
+  if (showAllReviews && reviewsData && reviewsData.length > 0) {
     const rData = reviewsData ?? [];
     const avg = rData.length > 0
       ? rData.reduce((s, r) => s + r.rating, 0) / rData.length
@@ -620,7 +621,12 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
         <div className="flex items-center justify-between mb-4">
           <button
             className="flex items-center gap-3"
-            onClick={() => onViewCreator?.(itineraryData.author, itineraryData.authorImage)}
+            onClick={() => onViewCreator?.(
+              itineraryData.author,
+              itineraryData.authorImage,
+              itineraryData.authorUserId,
+              itineraryData.authorUsername
+            )}
           >
             <img
               src={itineraryData.authorImage}
@@ -867,56 +873,74 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
 
         {/* Reviews section */}
         <section className="mb-10 -mx-5">
-          <button
-            onClick={() => setShowAllReviews(true)}
-            className="flex items-center gap-1 mb-4 px-5 active:opacity-70"
-          >
-            <h2 className="section-title">Avaliações</h2>
-            <Icon name="chevron_right" size={18} style={{ color: '#1A1C40' }} />
-          </button>
+          {reviewsData && reviewsData.length > 0 ? (
+            <>
+              <button
+                onClick={() => setShowAllReviews(true)}
+                className="flex items-center gap-1 mb-4 px-5 active:opacity-70"
+              >
+                <h2 className="section-title">Avaliações</h2>
+                <Icon name="chevron_right" size={18} style={{ color: '#1A1C40' }} />
+              </button>
 
-
-
-          {/* Individual reviews carousel */}
-          <div className="pl-5">
-            <HorizontalCarousel showDots={false} itemClassName="w-[260px]">
-              {(reviewsData || []).map((review) => (
-                <div key={review.id} className="card-base p-3.5 w-full h-full">
-                  <div className="flex items-start gap-3">
-                    <img
-                      src={review.userImage}
-                      alt={review.userName}
-                      className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-foreground" style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-semibold)' }}>
-                          {review.userName}
-                        </span>
-                        <div className="flex items-center gap-0.5">
-                          {Array.from({ length: 5 }).map((_, i) => (
-                            <Icon
-                              key={i}
-                              name="star"
-                              size={9}
-                              filled
-                              style={{ color: i < review.rating ? '#F2B90C' : '#E5E7EB' }}
-                            />
-                          ))}
+              {/* Individual reviews carousel */}
+              <div className="pl-5">
+                <HorizontalCarousel showDots={false} itemClassName="w-[260px]">
+                  {reviewsData.map((review) => (
+                    <div key={review.id} className="card-base p-3.5 w-full h-full">
+                      <div className="flex items-start gap-3">
+                        <img
+                          src={review.userImage}
+                          alt={review.userName}
+                          className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className="text-foreground" style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-semibold)' }}>
+                              {review.userName}
+                            </span>
+                            <div className="flex items-center gap-0.5">
+                              {Array.from({ length: 5 }).map((_, i) => (
+                                <Icon
+                                  key={i}
+                                  name="star"
+                                  size={9}
+                                  filled
+                                  style={{ color: i < review.rating ? '#F2B90C' : '#E5E7EB' }}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <p className="text-muted-foreground mb-1" style={{ fontSize: '11px' }}>
+                            {review.date}
+                          </p>
+                          <p className="text-foreground" style={{ fontSize: 'var(--text-sm)', lineHeight: '1.4' }}>
+                            "{review.comment}"
+                          </p>
                         </div>
                       </div>
-                      <p className="text-muted-foreground mb-1" style={{ fontSize: '11px' }}>
-                        {review.date}
-                      </p>
-                      <p className="text-foreground" style={{ fontSize: 'var(--text-sm)', lineHeight: '1.4' }}>
-                        "{review.comment}"
-                      </p>
                     </div>
+                  ))}
+                </HorizontalCarousel>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-1 mb-4 px-5">
+                <h2 className="section-title">Avaliações</h2>
+              </div>
+              <div className="px-5">
+                <div className="card-base border-0 shadow-none p-6 flex flex-col items-center justify-center text-center">
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center mb-2" style={{ background: '#F2F2F2' }}>
+                    <Icon name="star" size={22} className="text-muted-foreground" />
                   </div>
+                  <p className="text-muted-foreground text-sm font-medium">
+                    Ainda não há avaliações
+                  </p>
                 </div>
-              ))}
-            </HorizontalCarousel>
-          </div>
+              </div>
+            </>
+          )}
         </section>
       </div>
 

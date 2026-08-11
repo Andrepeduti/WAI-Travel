@@ -43,7 +43,7 @@ export function PlaceCard({ place, onClick, className }: PlaceCardProps) {
         </div>
         <div className="flex items-center gap-1">
           <Icon name="star" size={12} filled className="text-[#F2B90C]" />
-          <span className="text-xs font-semibold">{place.rating}</span>
+          <span className="text-xs font-semibold">{place.rating > 0 ? place.rating : '-'}</span>
         </div>
       </div>
     </button>

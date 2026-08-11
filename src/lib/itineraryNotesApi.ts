@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { touchItinerary } from '@/lib/itinerariesApi';
 import type { TripNote } from '@/components/screens/TripNotesScreen';
 
 function isUuid(id: string): boolean {
@@ -6,7 +7,7 @@ function isUuid(id: string): boolean {
 }
 
 /**
- * Carrega as notas de um roteiro.
+ * Carrega as notas de um roteiro com desduplicação por id/client_id.
  */
 export async function loadItineraryNotes(itineraryId: string): Promise<TripNote[] | null> {
   if (!isUuid(itineraryId)) return null;
@@ -22,17 +23,28 @@ export async function loadItineraryNotes(itineraryId: string): Promise<TripNote[
     return null;
   }
 
-  return (data || []).map((row) => ({
-    id: row.client_id,
-    author: row.author,
-    authorImage: row.author_image,
-    title: row.title,
-    summary: row.summary,
-  }));
+  const seen = new Set<string>();
+  const uniqueNotes: TripNote[] = [];
+
+  for (const row of data || []) {
+    const noteId = row.client_id || row.id;
+    if (noteId && !seen.has(noteId)) {
+      seen.add(noteId);
+      uniqueNotes.push({
+        id: noteId,
+        author: row.author,
+        authorImage: row.author_image,
+        title: row.title,
+        summary: row.summary,
+      });
+    }
+  }
+
+  return uniqueNotes;
 }
 
 /**
- * Bulk replace: deleta as notas antigas e insere as novas para sincronizar
+ * Bulk replace: deleta as notas antigas e insere/upserta as novas para sincronizar
  * com o estado em memória.
  */
 export async function saveItineraryNotes(itineraryId: string, notes: TripNote[]): Promise<void> {
@@ -42,7 +54,15 @@ export async function saveItineraryNotes(itineraryId: string, notes: TripNote[])
   const userId = userData.user?.id;
   if (!userId) return;
 
-  const rows = notes.map((note, index) => ({
+  // Desduplica as notas por id antes de salvar
+  const seen = new Set<string>();
+  const uniqueNotes = notes.filter((n) => {
+    if (!n.id || seen.has(n.id)) return false;
+    seen.add(n.id);
+    return true;
+  });
+
+  const rows = uniqueNotes.map((note, index) => ({
     itinerary_id: itineraryId,
     user_id: userId,
     client_id: note.id,
@@ -71,4 +91,7 @@ export async function saveItineraryNotes(itineraryId: string, notes: TripNote[])
       console.error('[itineraryNotesApi] insert failed', insError);
     }
   }
+
+  await touchItinerary(itineraryId);
 }
+

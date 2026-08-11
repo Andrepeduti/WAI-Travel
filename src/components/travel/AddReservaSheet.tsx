@@ -347,10 +347,22 @@ export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva, initia
                         <Calendar mode="single" selected={checkInDate} onSelect={(date) => { setCheckInDate(date); setIsCheckInCalendarOpen(false); }} initialFocus className="p-3 pointer-events-auto" />
                       </PopoverContent>
                     </Popover>
-                    <button onClick={() => setTimePickerTarget('checkIn')} className={timeButtonClass}>
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      {checkInHora}:{checkInMinuto}
-                    </button>
+                    <div className={cn(timeButtonClass, "relative overflow-hidden cursor-pointer")}>
+                      <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <input
+                        type="time"
+                        value={`${checkInHora}:${checkInMinuto}`}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val) {
+                            const [h, m] = val.split(':');
+                            setCheckInHora(h);
+                            setCheckInMinuto(m);
+                          }
+                        }}
+                        className="text-[14px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-[45px] text-center"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -368,10 +380,22 @@ export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva, initia
                         <Calendar mode="single" selected={checkOutDate} onSelect={(date) => { setCheckOutDate(date); setIsCheckOutCalendarOpen(false); }} initialFocus className="p-3 pointer-events-auto" />
                       </PopoverContent>
                     </Popover>
-                    <button onClick={() => setTimePickerTarget('checkOut')} className={timeButtonClass}>
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      {checkOutHora}:{checkOutMinuto}
-                    </button>
+                    <div className={cn(timeButtonClass, "relative overflow-hidden cursor-pointer")}>
+                      <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <input
+                        type="time"
+                        value={`${checkOutHora}:${checkOutMinuto}`}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val) {
+                            const [h, m] = val.split(':');
+                            setCheckOutHora(h);
+                            setCheckOutMinuto(m);
+                          }
+                        }}
+                        className="text-[14px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-[45px] text-center"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -450,10 +474,22 @@ export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva, initia
 
                 <div className="mb-4">
                   <label className="text-sm font-medium text-foreground mb-1.5 block">Horário</label>
-                  <button onClick={() => setTimePickerTarget('atividade')} className={cn(timeButtonClass, 'w-full')}>
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    {atividadeHora}:{atividadeMinuto}
-                  </button>
+                  <div className={cn(timeButtonClass, "w-full relative overflow-hidden cursor-pointer")}>
+                    <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <input
+                      type="time"
+                      value={`${atividadeHora}:${atividadeMinuto}`}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val) {
+                          const [h, m] = val.split(':');
+                          setAtividadeHora(h);
+                          setAtividadeMinuto(m);
+                        }
+                      }}
+                      className="flex-1 text-[14px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-full"
+                    />
+                  </div>
                 </div>
 
                 <label className="text-sm font-medium text-foreground mb-1.5 block">

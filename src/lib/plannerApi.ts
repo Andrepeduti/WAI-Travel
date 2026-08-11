@@ -14,6 +14,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { touchItinerary } from '@/lib/itinerariesApi';
 
 export interface PlannerActivity {
   id: number;
@@ -199,6 +200,8 @@ export async function savePlannerData(
     const { error } = await supabase.from('itinerary_transports').insert(transportRows);
     if (error) console.error('[plannerApi] insert transports failed', error);
   }
+
+  await touchItinerary(itineraryId);
 }
 
 /**

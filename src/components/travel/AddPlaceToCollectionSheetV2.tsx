@@ -39,7 +39,7 @@ export function AddPlaceToCollectionSheetV2({
   // Debounced search
   const [debouncedSearch, setDebouncedSearch] = useState('');
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 1000);
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(t);
   }, [search]);
 
@@ -53,6 +53,7 @@ export function AddPlaceToCollectionSheetV2({
       setApiPlaces({});
       setFetchedCities(new Set());
       setDetectedCity('');
+      setSearchingGoogle(false);
     }
   }, [open]);
 
@@ -103,37 +104,46 @@ export function AddPlaceToCollectionSheetV2({
 
   // Google Places fallback for global search + city detection
   const [googleResults, setGoogleResults] = useState<CityPlace[]>([]);
+  const [searchingGoogle, setSearchingGoogle] = useState(false);
 
   useEffect(() => {
     const q = debouncedSearch.trim();
-    if (!q) {
+    if (!q || q.length < 2) {
       setGoogleResults([]);
       setDetectedCity('');
+      setSearchingGoogle(false);
       return;
     }
 
     let cancelled = false;
-    const t = setTimeout(async () => {
-      const results = await searchGoogleFallback(q, inferredCity || '');
-      if (cancelled) return;
-      setGoogleResults(results);
+    setSearchingGoogle(true);
 
-      // If the top result is a populated place (city/town/village/municipality),
-      // assume the user typed a city name and load that city's places.
-      const top = results[0] as (CityPlace & { _osmCategory?: string }) | undefined;
-      const topCity = top?.city?.trim();
-      const looksLikeCity = !!topCity && (
-        // category 'place' is set for city/town/village in category map
-        top?.category === 'Bairro' ||
-        topCity === q.toLowerCase() ||
-        q.toLowerCase().includes(topCity)
-      );
-      if (looksLikeCity && topCity) {
-        setDetectedCity(topCity);
-      } else if (!inferredCity) {
-        setDetectedCity('');
+    const t = setTimeout(async () => {
+      try {
+        const results = await searchGoogleFallback(q, inferredCity || '');
+        if (cancelled) return;
+        setGoogleResults(results);
+
+        // If the top result is a populated place (city/town/village/municipality),
+        // assume the user typed a city name and load that city's places.
+        const top = results[0] as (CityPlace & { _osmCategory?: string }) | undefined;
+        const topCity = top?.city?.trim();
+        const looksLikeCity = !!topCity && (
+          top?.category === 'Bairro' ||
+          topCity === q.toLowerCase() ||
+          q.toLowerCase().includes(topCity)
+        );
+        if (looksLikeCity && topCity) {
+          setDetectedCity(topCity);
+        } else if (!inferredCity) {
+          setDetectedCity('');
+        }
+      } catch (e) {
+        console.error('Google fallback search error:', e);
+      } finally {
+        if (!cancelled) setSearchingGoogle(false);
       }
-    }, 200);
+    }, 150);
     return () => { cancelled = true; clearTimeout(t); };
   }, [debouncedSearch, inferredCity]);
 
@@ -276,10 +286,10 @@ export function AddPlaceToCollectionSheetV2({
           className="flex-1 overflow-y-auto px-5 scrollbar-hide"
           style={{ paddingBottom: count > 0 ? '90px' : '32px' }}
         >
-          {loadingApi && (
+          {loadingApi && !hasResults && !debouncedSearch && (
             <div className="flex items-center gap-2 px-1 pb-3">
               <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              <span className="text-[12px] text-muted-foreground">Buscando lugares...</span>
+              <span className="text-[12px] text-muted-foreground">Buscando sugestões...</span>
             </div>
           )}
 
@@ -293,7 +303,12 @@ export function AddPlaceToCollectionSheetV2({
                 Ex: "Torre Eiffel", "Rua Augusta, São Paulo" ou "01310-100"
               </p>
             </div>
-          ) : !hasResults && !loadingApi ? (
+          ) : searchingGoogle && !hasResults ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3 text-primary" />
+              <p className="text-[14px] font-medium text-foreground">Buscando lugares no Google Places...</p>
+            </div>
+          ) : !hasResults && !loadingApi && !searchingGoogle ? (
             <div className="text-center py-12">
               <Icon name="search" size={40} className="text-muted-foreground mx-auto mb-3 opacity-40" />
               <p className="text-[14px] text-muted-foreground mb-4">Nenhum lugar encontrado</p>

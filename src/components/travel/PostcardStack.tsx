@@ -130,7 +130,7 @@ export function PostcardStack({ places, savedPlaces, flippedCards, onToggleSave,
                       {/* Rating Badge - consistent with Home */}
                       <div className="absolute top-3 left-3 flex items-center gap-1 bg-white/70 backdrop-blur-sm rounded-full px-2 py-1">
                         <Icon name="star" size={14} filled className="text-[#F2B90C]" />
-                        <span className="text-xs font-bold text-foreground">{place.rating}</span>
+                        <span className="text-xs font-bold text-foreground">{place.rating > 0 ? place.rating : '-'}</span>
                       </div>
                       {isTop && (
                         <div className="absolute bottom-3 right-3 flex items-center gap-1 opacity-60">
@@ -159,7 +159,7 @@ export function PostcardStack({ places, savedPlaces, flippedCards, onToggleSave,
                       </div>
                       <div className="flex items-center gap-1 bg-primary/10 rounded-full px-2 py-0.5 flex-shrink-0">
                         <Icon name="star" size={11} filled className="text-sun" />
-                        <span className="text-[11px] font-bold text-foreground">{place.rating}</span>
+                        <span className="text-[11px] font-bold text-foreground">{place.rating > 0 ? place.rating : '-'}</span>
                       </div>
                     </div>
                     <p className="text-[12px] text-muted-foreground leading-relaxed flex-1 line-clamp-3">

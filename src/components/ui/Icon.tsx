@@ -97,7 +97,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 // Lucide icons for transport (not available in Heroicons)
-import { Footprints, Bus as LucideBus, TrainFront, CarFront, TrainFrontTunnel, GripVertical, LayoutList, Rows3, Route, UtensilsCrossed, Landmark, Trees, Wine, MapPin, Ticket, Bike, Coffee, Moon, Luggage, SquarePen, Crown, SunMoon, Umbrella, Mountain, Snowflake, BookMarked, Palette, Sandwich, Waves, Anchor, Flower2, Martini, Building2, Church, PartyPopper, Backpack, Gem, Pause, Tent, PawPrint, Leaf, Ship, Beer, Utensils } from 'lucide-react';
+import { Footprints, Bus as LucideBus, TrainFront, CarFront, TrainFrontTunnel, GripVertical, LayoutList, Rows3, Route, UtensilsCrossed, Landmark, Trees, Wine, MapPin, Ticket, Bike, Coffee, Moon, Luggage, SquarePen, Crown, SunMoon, Umbrella, Mountain, Snowflake, BookMarked, Palette, Sandwich, Waves, Anchor, Flower2, Martini, Building2, Church, PartyPopper, Backpack, Gem, Pause, Tent, PawPrint, Leaf, Ship, Beer, Utensils, SearchX } from 'lucide-react';
 
 // Wrap lucide components to match heroicon SVG prop interface
 const makeLucideWrapper = (LucideIcon: React.ComponentType<any>): React.ComponentType<React.SVGProps<SVGSVGElement>> => {
@@ -159,6 +159,7 @@ const LeafIcon = makeLucideWrapper(Leaf);
 const ShipIcon = makeLucideWrapper(Ship);
 const BeerIcon = makeLucideWrapper(Beer);
 const UtensilsIcon = makeLucideWrapper(Utensils);
+const SearchXIcon = makeLucideWrapper(SearchX);
 
 // Heroicons solid (for filled state)
 import {
@@ -209,6 +210,7 @@ const iconMap: Record<string, [React.ComponentType<React.SVGProps<SVGSVGElement>
   logout: [ArrowRightOnRectangleIcon],
   share: [ShareIcon],
   search: [MagnifyingGlassIcon, MagnifyingGlassIconSolid],
+  search_off: [SearchXIcon],
   tune: [AdjustmentsHorizontalIcon],
   swap_vert: [ArrowsUpDownIcon],
   swap_horiz: [ArrowsRightLeftIcon],

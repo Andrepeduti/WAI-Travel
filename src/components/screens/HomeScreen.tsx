@@ -630,12 +630,10 @@ export function HomeScreen({
                   <div className="px-4 pt-1 pb-4 flex flex-col gap-2">
                     <h3 className="font-bold text-[15px] text-foreground leading-tight">{item.title}</h3>
                     <div className="flex items-center gap-3">
-                      {item.rating > 0 && (
-                        <div className="flex items-center gap-1">
-                          <Icon name="star" size={14} className="text-[#F2B90C]" />
-                          <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{item.rating.toFixed(1)}</span>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1">
+                        <Icon name="star" size={14} className="text-[#F2B90C]" />
+                        <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{item.rating > 0 ? item.rating.toFixed(1) : '-'}</span>
+                      </div>
                       {item.places > 0 && (
                         <div className="flex items-center gap-1">
                           <Icon name="location_on" size={14} style={{ color: '#1E293B' }} />
@@ -809,12 +807,10 @@ export function HomeScreen({
                   <div className="px-4 pt-1 pb-4 flex flex-col gap-2">
                     <h3 className="font-bold text-[15px] text-foreground leading-tight">{item.title}</h3>
                     <div className="flex items-center gap-3">
-                      {item.rating > 0 && (
-                        <div className="flex items-center gap-1">
-                          <Icon name="star" size={14} className="text-[#F2B90C]" />
-                          <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{item.rating.toFixed(1)}</span>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1">
+                        <Icon name="star" size={14} className="text-[#F2B90C]" />
+                        <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{item.rating > 0 ? item.rating.toFixed(1) : '-'}</span>
+                      </div>
                       {item.places > 0 && (
                         <div className="flex items-center gap-1">
                           <Icon name="location_on" size={14} style={{ color: '#1E293B' }} />

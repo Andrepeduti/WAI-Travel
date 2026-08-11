@@ -278,7 +278,7 @@ export function TripTipsScreen({ onBack, destination = 'Amsterdam' }: TripTipsSc
       <header className="sticky top-0 z-20 bg-background px-4 pt-5 pb-3">
         <div className="flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />
-          <h1 className="text-xl font-bold text-foreground my-0 mt-[24px] flex-1">Dicas de viagem</h1>
+          <h1 className="text-xl font-bold text-foreground my-0 flex-1">Dicas de viagem</h1>
         </div>
       </header>
 

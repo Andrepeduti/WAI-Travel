@@ -169,39 +169,35 @@ export function AddNoteSheet({ open, onClose, onSave, dayNumber, totalDays, star
             </label>
             <div className="flex items-center gap-2">
               {/* Start time stepper */}
-              <div className="flex-1 flex items-center rounded-full border border-border/60 overflow-hidden h-11">
-                <button
-                  onClick={() => setStartTime(stepTime(startTime, -15))}
-                  className="w-11 h-full flex items-center justify-center text-muted-foreground active:bg-muted/60 transition-colors"
-                >
-                  <Icon name="remove" size={18} />
-                </button>
-                <span className="flex-1 text-center text-[14px] font-semibold text-foreground">{startTime}</span>
-                <button
-                  onClick={() => setStartTime(stepTime(startTime, 15))}
-                  className="w-11 h-full flex items-center justify-center text-muted-foreground active:bg-muted/60 transition-colors"
-                >
-                  <Icon name="add" size={18} />
-                </button>
+              <div className="flex items-center bg-[#F2F2F2] rounded-lg px-3 h-10 relative overflow-hidden cursor-pointer hover:bg-[#E5E5E5] transition-colors">
+                <input
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => {
+                    const newStart = e.target.value;
+                    if (newStart) {
+                      setStartTime(newStart);
+                    }
+                  }}
+                  className="text-[15px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-[70px] text-center"
+                />
               </div>
 
               <span className="text-[13px] text-muted-foreground font-medium">-</span>
 
               {/* End time stepper */}
-              <div className="flex-1 flex items-center rounded-full border border-border/60 overflow-hidden h-11">
-                <button
-                  onClick={() => setEndTime(stepTime(endTime, -15))}
-                  className="w-11 h-full flex items-center justify-center text-muted-foreground active:bg-muted/60 transition-colors"
-                >
-                  <Icon name="remove" size={18} />
-                </button>
-                <span className="flex-1 text-center text-[14px] font-semibold text-foreground">{endTime}</span>
-                <button
-                  onClick={() => setEndTime(stepTime(endTime, 15))}
-                  className="w-11 h-full flex items-center justify-center text-muted-foreground active:bg-muted/60 transition-colors"
-                >
-                  <Icon name="add" size={18} />
-                </button>
+              <div className="flex items-center bg-[#F2F2F2] rounded-lg px-3 h-10 relative overflow-hidden cursor-pointer hover:bg-[#E5E5E5] transition-colors">
+                <input
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => {
+                    const newEnd = e.target.value;
+                    if (newEnd) {
+                      setEndTime(newEnd);
+                    }
+                  }}
+                  className="text-[15px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-[70px] text-center"
+                />
               </div>
             </div>
           </div>

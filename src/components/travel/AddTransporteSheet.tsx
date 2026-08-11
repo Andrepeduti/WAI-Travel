@@ -278,20 +278,33 @@ export function AddTransporteSheet({ isOpen, onClose, onAdd, editingTransporte }
 
             {/* Tipo */}
             <label className="text-sm font-medium text-foreground mb-2 block">Tipo</label>
-            <div className="grid grid-cols-4 gap-2 mb-5">
+            <div className="flex gap-2 mb-5 overflow-x-auto scrollbar-hide">
               {(Object.keys(tipoConfig) as TransporteTipo[]).map((t) => {
                 const config = tipoConfig[t];
                 const IconComp = config.icon;
+                const active = tipo === t;
                 return (
                   <button
                     key={t}
+                    type="button"
                     onClick={() => setTipo(t)}
-                    className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 transition-colors ${
-                      tipo === t ? 'border-primary-official bg-primary-official/10' : 'border-border bg-background'
-                    }`}
+                    className="h-9 px-4 rounded-full text-[13px] font-semibold transition-all whitespace-nowrap flex-shrink-0 active:scale-[0.97] border inline-flex items-center gap-1.5"
+                    style={
+                      active
+                        ? {
+                            backgroundColor: '#1A1C40',
+                            color: '#FFFFFF',
+                            borderColor: 'transparent',
+                          }
+                        : {
+                            background: 'hsl(var(--card))',
+                            color: 'hsl(var(--foreground))',
+                            borderColor: 'hsl(var(--border))',
+                          }
+                    }
                   >
-                    <IconComp size={20} strokeWidth={1.5} className={tipo === t ? 'text-primary-official' : 'text-muted-foreground'} />
-                    <span className={`text-xs font-medium ${tipo === t ? 'text-foreground' : 'text-muted-foreground'}`}>{config.label}</span>
+                    <IconComp size={14} strokeWidth={2} className={active ? 'text-white' : ''} />
+                    {config.label}
                   </button>
                 );
               })}
@@ -320,10 +333,22 @@ export function AddTransporteSheet({ isOpen, onClose, onAdd, editingTransporte }
                     <Calendar mode="single" selected={partidaDate} onSelect={(date) => { setPartidaDate(date); setIsPartidaCalendarOpen(false); }} initialFocus className="p-3 pointer-events-auto" />
                   </PopoverContent>
                 </Popover>
-                <button onClick={() => setTimePickerTarget('partida')} className={timeButtonClass}>
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  {partidaHora}:{partidaMinuto}
-                </button>
+                <div className={cn(timeButtonClass, "relative overflow-hidden cursor-pointer")}>
+                  <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <input
+                    type="time"
+                    value={`${partidaHora}:${partidaMinuto}`}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val) {
+                        const [h, m] = val.split(':');
+                        setPartidaHora(h);
+                        setPartidaMinuto(m);
+                      }
+                    }}
+                    className="text-[14px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-[45px] text-center"
+                  />
+                </div>
               </div>
             </div>
 
@@ -333,9 +358,9 @@ export function AddTransporteSheet({ isOpen, onClose, onAdd, editingTransporte }
                 type="button"
                 onClick={() => setShowChegada(true)}
                 className="flex items-center gap-1.5 text-sm font-medium mb-4 transition-colors"
-                style={{ color: '#9DCC36' }}
+                style={{ color: '#1A1C40' }}
               >
-                <Icon name="add" size={16} />
+                <Icon name="add" size={16} style={{ color: '#1A1C40' }} />
                 Adicionar chegada
               </button>
             ) : (
@@ -367,10 +392,22 @@ export function AddTransporteSheet({ isOpen, onClose, onAdd, editingTransporte }
                       <Calendar mode="single" selected={chegadaDate} onSelect={(date) => { setChegadaDate(date); setIsChegadaCalendarOpen(false); }} initialFocus className="p-3 pointer-events-auto" />
                     </PopoverContent>
                   </Popover>
-                  <button onClick={() => setTimePickerTarget('chegada')} className={timeButtonClass}>
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    {chegadaHora}:{chegadaMinuto}
-                  </button>
+                  <div className={cn(timeButtonClass, "relative overflow-hidden cursor-pointer")}>
+                    <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <input
+                      type="time"
+                      value={`${chegadaHora}:${chegadaMinuto}`}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val) {
+                          const [h, m] = val.split(':');
+                          setChegadaHora(h);
+                          setChegadaMinuto(m);
+                        }
+                      }}
+                      className="text-[14px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-[45px] text-center"
+                    />
+                  </div>
                 </div>
               </div>
             )}

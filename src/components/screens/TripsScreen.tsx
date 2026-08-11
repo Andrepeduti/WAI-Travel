@@ -4,7 +4,7 @@ import { Icon } from '../ui/Icon';
 import { Crown, Users, ShoppingBag } from 'lucide-react';
 import { CreateCollectionSheet } from '../travel/CreateCollectionSheet';
 import { BottomSheet } from '../ui/BottomSheet';
-import { format, differenceInDays } from 'date-fns';
+import { format, differenceInDays, differenceInCalendarDays } from 'date-fns';
 import { parseLocalDate } from '@/lib/localDate';
 import { ptBR } from 'date-fns/locale';
 import { resolveTripThumbnailImages, GENERIC_TRAVEL_PLACEHOLDER } from '@/lib/coverImageResolver';
@@ -131,7 +131,7 @@ const collections = [{
   participants: []
 }];
 
-let cachedMemberAvatars: Record<string, string[]> = {};
+let cachedMemberAvatars: Record<string, any[]> = {};
 
 type TabType = 'private' | 'public' | 'favorites' | 'collections';
 
@@ -171,25 +171,48 @@ function TripThumbnail({ images }: { images: string[] }) {
   );
 }
 
-// Component for avatar stack
-function AvatarStack({ participants }: { participants: string[] }) {
-  const maxVisible = 4;
-  const visible = participants.slice(0, maxVisible);
-  const extraCount = Math.max(0, participants.length - maxVisible);
+interface ParticipantItem {
+  avatar: string;
+  name?: string;
+  isOwner?: boolean;
+}
+
+// Component for avatar stack with owner crown indicator
+function AvatarStack({ participants }: { participants?: (string | ParticipantItem)[] }) {
+  if (!participants || participants.length === 0) {
+    return (
+      <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center border border-white shadow-xs">
+        <Icon name="person" size={14} className="text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // Normaliza participantes para array de objetos
+  const list: ParticipantItem[] = participants.map((p, idx) => {
+    if (typeof p === 'string') {
+      return { avatar: p, isOwner: idx === 0 };
+    }
+    return p;
+  });
+
+  const maxVisible = 3;
+  const visible = list.slice(0, maxVisible);
+  const extraCount = Math.max(0, list.length - maxVisible);
 
   return (
-    <div className="flex -space-x-2">
-      {visible.map((avatar, index) => (
+    <div className="flex items-center -space-x-2">
+      {visible.map((item, index) => (
         <img
           key={index}
-          src={avatar}
-          alt=""
-          className="w-7 h-7 rounded-full border-2 border-white object-cover"
+          src={item.avatar}
+          alt={item.name || ''}
+          title={item.name ? `${item.name}${item.isOwner ? ' (Dono)' : ''}` : (item.isOwner ? 'Dono do roteiro' : undefined)}
+          className="w-7 h-7 rounded-full border-2 border-white object-cover bg-muted shadow-xs flex-shrink-0"
         />
       ))}
       {extraCount > 0 && (
-        <div className="w-7 h-7 rounded-full border-2 border-white bg-muted flex items-center justify-center">
-          <span className="text-[10px] font-semibold text-muted-foreground">
+        <div className="w-7 h-7 rounded-full border-2 border-white bg-[#F2F2F2] flex items-center justify-center flex-shrink-0 shadow-xs z-10">
+          <span className="text-[10px] font-bold text-[#1A1C40]">
             +{extraCount}
           </span>
         </div>
@@ -282,60 +305,61 @@ function SwipeableItineraryCard({
         className="flex gap-4 items-stretch bg-white rounded-2xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.03)] relative z-10"
       >
         <button onClick={() => { if (!isSwiped) onClick(); else onSwipeClose(); }} className="flex-shrink-0 self-stretch">
-          <div className={`h-full ${item.isPast ? 'grayscale-[0.6] opacity-80 transition' : ''}`}>
+          <div className={`h-full ${item.isPast || item.isCancelled ? 'grayscale-[0.6] opacity-80 transition' : ''}`}>
             <TripThumbnail images={item.images} />
           </div>
         </button>
         <div className="flex-1 min-w-0 flex flex-col gap-2">
           <button onClick={() => { if (!isSwiped) onClick(); else onSwipeClose(); }} className="text-left min-w-0">
-            <h3 className={`font-semibold text-[16px] leading-tight truncate ${item.isPast ? 'text-muted-foreground' : 'text-[#1A1C40]'}`}>
+            <h3 className={`font-semibold text-[16px] leading-tight truncate ${item.isPast || item.isCancelled ? 'text-muted-foreground' : 'text-[#1A1C40]'}`}>
               {item.title}
             </h3>
           </button>
           {isPrivate ? (
             <>
-              <p className="text-[12px] font-medium text-muted-foreground">
-                {item.dateRange} <span className="inline-block w-1 h-1 rounded-full bg-muted-foreground mx-1 align-middle" /> {item.places} lugares
+              <p className="text-[12px] font-medium text-muted-foreground truncate">
+                {item.dateRange} <span className="inline-block w-1 h-1 rounded-full bg-muted-foreground/40 mx-1 align-middle" /> {item.places} lugares
               </p>
-              {item.participants && item.participants.length > 0 && (
-                <AvatarStack participants={item.participants} />
-              )}
-              <div className="flex items-center gap-2 flex-wrap">
-                {item.isPast ? (
-                  <span className="h-7 inline-flex items-center gap-1 text-[12px] font-medium px-3 rounded-2xl bg-[#F2F2F2] text-[#8E8E93]">
-                    <Icon name="check_circle" size={14} className="text-[#8E8E93]" />
-                    Concluída
-                  </span>
-                ) : item.isFlexible ? null : (
-                  <span className={`h-7 inline-flex items-center text-[12px] font-medium px-3 rounded-2xl ${getDaysRemainingStyle(item.daysRemaining)}`}>
-                    Em {item.daysRemaining} dias
-                  </span>
-                )}
-                {item.isPurchased ? (
-                  <span
-                    title="Comprado"
-                    aria-label="Comprado"
-                    className="h-7 w-7 inline-flex items-center justify-center rounded-2xl text-[#8E8E93] bg-[#F2F2F2]"
-                  >
-                    <ShoppingBag size={14} className="text-[#8E8E93]" />
-                  </span>
-                ) : item.isShared ? (
-                  <span
-                    title="Compartilhado"
-                    aria-label="Compartilhado"
-                    className="h-7 w-7 inline-flex items-center justify-center rounded-2xl text-[#8E8E93] bg-[#F2F2F2]"
-                  >
-                    <Users size={14} className="text-[#8E8E93]" />
-                  </span>
-                ) : (
-                  <span
-                    title="Criado por mim"
-                    aria-label="Criado por mim"
-                    className="h-7 w-7 inline-flex items-center justify-center rounded-2xl text-[#8E8E93] bg-[#F2F2F2]"
-                  >
-                    <Crown size={14} className="text-[#8E8E93]" />
-                  </span>
-                )}
+              <div className="flex items-center justify-between mt-auto pt-1 gap-2">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {item.isCancelled ? (
+                    <span className="h-6 inline-flex items-center gap-1 text-[11px] font-medium px-2.5 rounded-full bg-[#FFE5E5] text-[#D32F2F]">
+                      <Icon name="cancel" size={13} className="text-[#D32F2F]" />
+                      Cancelado
+                    </span>
+                  ) : item.isPast ? (
+                    <span className="h-6 inline-flex items-center gap-1 text-[11px] font-medium px-2.5 rounded-full bg-[#F2F2F2] text-[#8E8E93]">
+                      <Icon name="check_circle" size={13} className="text-[#8E8E93]" />
+                      Concluída
+                    </span>
+                  ) : item.isFlexible ? null : (
+                    <span className={`h-6 inline-flex items-center text-[11px] font-medium px-2.5 rounded-full ${getDaysRemainingStyle(item.daysRemaining)}`}>
+                      Em {item.daysRemaining} {item.daysRemaining === 1 ? 'dia' : 'dias'}
+                    </span>
+                  )}
+                  {item.isPurchased && (
+                    <span
+                      title="Comprado"
+                      aria-label="Comprado"
+                      className="h-6 w-6 inline-flex items-center justify-center rounded-full text-[#8E8E93] bg-[#F2F2F2]"
+                    >
+                      <ShoppingBag size={13} className="text-[#8E8E93]" />
+                    </span>
+                  )}
+                  {item.isShared && (
+                    <span
+                      title="Compartilhado"
+                      aria-label="Compartilhado"
+                      className="h-6 w-6 inline-flex items-center justify-center rounded-full text-[#8E8E93] bg-[#F2F2F2]"
+                    >
+                      <Users size={13} className="text-[#8E8E93]" />
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex-shrink-0 ml-auto">
+                  <AvatarStack participants={item.participants} />
+                </div>
               </div>
             </>
           ) : (
@@ -365,7 +389,7 @@ function SwipeableItineraryCard({
                 <div className="flex items-center gap-1">
                   <Icon name="star" size={14} className="text-amber-500" />
                   <span className="text-[12px] font-medium text-muted-foreground">
-                    {item.rating ?? '—'}
+                    {(item.rating ?? 0) > 0 ? item.rating : '-'}
                   </span>
                 </div>
                 <div className="flex items-center gap-1">
@@ -522,10 +546,12 @@ export function TripsScreen({
   defaultTab = 'private'
 }: TripsScreenProps) {
   const [activeTab, setActiveTab] = useState<TabType>(defaultTab);
+  const [categoryView, setCategoryView] = useState<'mine' | 'purchased_shared' | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [isEditingCollections, setIsEditingCollections] = useState(false);
   const [selectedCollections, setSelectedCollections] = useState<Set<number>>(new Set());
   const [showCreateCollection, setShowCreateCollection] = useState(false);
-  const [sortBy, setSortBy] = useState<SortOption>('az');
+  const [sortBy, setSortBy] = useState<SortOption>('recent');
   const [originFilter, setOriginFilter] = useState<OriginFilter>('all');
   const [showSortSheet, setShowSortSheet] = useState(false);
   const [showCreateSheet, setShowCreateSheet] = useState(false);
@@ -533,7 +559,7 @@ export function TripsScreen({
 
   const tabs = [{
     id: 'private' as TabType,
-    label: 'Meus roteiros'
+    label: 'Roteiros'
   }, {
     id: 'public' as TabType,
     label: 'À venda'
@@ -641,7 +667,10 @@ export function TripsScreen({
             imageUrlsToPreload.push(...covers);
           }
           const participants = map[itin.id as string] || itin.participants || [];
-          imageUrlsToPreload.push(...participants);
+          const avatarUrls = participants
+            .map((p: any) => (typeof p === 'string' ? p : p.avatar))
+            .filter((url): url is string => Boolean(url));
+          imageUrlsToPreload.push(...avatarUrls);
         });
 
         const { preloadImages } = await import('@/lib/preloadImages');
@@ -668,8 +697,9 @@ export function TripsScreen({
       const start = parseLocalDate(ui.startDate) ?? new Date();
       const end = parseLocalDate(ui.endDate) ?? new Date();
       const isFlexible = ui.tags?.includes('_FLEXIBLE_DATES_') || false;
+      const isCancelled = ui.tags?.includes('_CANCELLED_') || ui.tags?.includes('_CANCELED_') || false;
       const durationDays = differenceInDays(end, start) + 1;
-      const daysRemaining = Math.max(0, differenceInDays(start, new Date()));
+      const daysRemaining = Math.max(0, differenceInCalendarDays(start, new Date()));
       const dateRange = isFlexible ? `Duração: ${durationDays} ${durationDays === 1 ? 'dia' : 'dias'}` : `${format(start, "d 'de' MMM", { locale: ptBR })} - ${format(end, "d 'de' MMM", { locale: ptBR })}`;
       const validImages = ui.images.filter((image) => image && !image.startsWith('blob:'));
       const images = validImages.length > 0 ? validImages : resolveTripThumbnailImages(ui.destinations);
@@ -679,7 +709,8 @@ export function TripsScreen({
         dateRange,
         places: ui.places,
         daysRemaining,
-        isPast: !isFlexible && end < today,
+        isPast: !isFlexible && !isCancelled && end < today,
+        isCancelled,
         isFlexible,
         images,
         participants: (typeof ui.id === 'string' && (memberAvatarsByItin[ui.id]?.length ?? 0) > 0)
@@ -691,7 +722,12 @@ export function TripsScreen({
         _userItinerary: ui,
       };
     });
-    userCards.sort((a, b) => (parseLocalDate(a._userItinerary.startDate)?.getTime() ?? 0) - (parseLocalDate(b._userItinerary.startDate)?.getTime() ?? 0));
+    // Ordenação natural: roteiros alterados recentemente em primeiro lugar
+    userCards.sort((a, b) => {
+      const timeA = a._userItinerary?.updatedAt ? new Date(a._userItinerary.updatedAt).getTime() : (a._userItinerary?.createdAt ? new Date(a._userItinerary.createdAt).getTime() : 0);
+      const timeB = b._userItinerary?.updatedAt ? new Date(b._userItinerary.updatedAt).getTime() : (b._userItinerary?.createdAt ? new Date(b._userItinerary.createdAt).getTime() : 0);
+      return timeB - timeA;
+    });
     return userCards;
   }, [userItineraries, purchasedItineraryIds, authUser?.id, memberAvatarsByItin]);
 
@@ -702,8 +738,9 @@ export function TripsScreen({
       const start = parseLocalDate(ui.startDate) ?? new Date();
       const end = parseLocalDate(ui.endDate) ?? new Date();
       const isFlexible = ui.tags?.includes('_FLEXIBLE_DATES_') || false;
+      const isCancelled = ui.tags?.includes('_CANCELLED_') || ui.tags?.includes('_CANCELED_') || false;
       const durationDays = differenceInDays(end, start) + 1;
-      const daysRemaining = Math.max(0, differenceInDays(start, new Date()));
+      const daysRemaining = Math.max(0, differenceInCalendarDays(start, new Date()));
       const dateRange = isFlexible ? `Duração: ${durationDays} ${durationDays === 1 ? 'dia' : 'dias'}` : `${format(start, "d 'de' MMM", { locale: ptBR })} - ${format(end, "d 'de' MMM", { locale: ptBR })}`;
       const validImages = ui.images.filter((image) => image && !image.startsWith('blob:'));
       const images = validImages.length > 0 ? validImages : resolveTripThumbnailImages(ui.destinations);
@@ -713,7 +750,8 @@ export function TripsScreen({
         dateRange,
         places: ui.places,
         daysRemaining,
-        isPast: !isFlexible && end < today,
+        isPast: !isFlexible && !isCancelled && end < today,
+        isCancelled,
         isFlexible,
         images,
         participants: ui.participants,
@@ -722,7 +760,12 @@ export function TripsScreen({
         _userItinerary: ui,
       };
     });
-    userPublicCards.sort((a, b) => (parseLocalDate(a._userItinerary.startDate)?.getTime() ?? 0) - (parseLocalDate(b._userItinerary.startDate)?.getTime() ?? 0));
+    // Ordenação natural: roteiros alterados recentemente em primeiro lugar
+    userPublicCards.sort((a, b) => {
+      const timeA = a._userItinerary?.updatedAt ? new Date(a._userItinerary.updatedAt).getTime() : (a._userItinerary?.createdAt ? new Date(a._userItinerary.createdAt).getTime() : 0);
+      const timeB = b._userItinerary?.updatedAt ? new Date(b._userItinerary.updatedAt).getTime() : (b._userItinerary?.createdAt ? new Date(b._userItinerary.createdAt).getTime() : 0);
+      return timeB - timeA;
+    });
     return userPublicCards;
   }, [userItineraries, salesByItinerary]);
 
@@ -747,8 +790,20 @@ export function TripsScreen({
       case 'za': sorted.sort((a, b) => b.title.localeCompare(a.title)); break;
       case 'days-asc': sorted.sort((a, b) => a.daysRemaining - b.daysRemaining); break;
       case 'days-desc': sorted.sort((a, b) => b.daysRemaining - a.daysRemaining); break;
-      case 'recent': sorted.sort((a, b) => String(b.id).localeCompare(String(a.id))); break;
-      case 'oldest': sorted.sort((a, b) => String(a.id).localeCompare(String(b.id))); break;
+      case 'recent':
+        sorted.sort((a, b) => {
+          const timeA = a._userItinerary?.updatedAt ? new Date(a._userItinerary.updatedAt).getTime() : (a._userItinerary?.createdAt ? new Date(a._userItinerary.createdAt).getTime() : 0);
+          const timeB = b._userItinerary?.updatedAt ? new Date(b._userItinerary.updatedAt).getTime() : (b._userItinerary?.createdAt ? new Date(b._userItinerary.createdAt).getTime() : 0);
+          return timeB - timeA;
+        });
+        break;
+      case 'oldest':
+        sorted.sort((a, b) => {
+          const timeA = a._userItinerary?.updatedAt ? new Date(a._userItinerary.updatedAt).getTime() : (a._userItinerary?.createdAt ? new Date(a._userItinerary.createdAt).getTime() : 0);
+          const timeB = b._userItinerary?.updatedAt ? new Date(b._userItinerary.updatedAt).getTime() : (b._userItinerary?.createdAt ? new Date(b._userItinerary.createdAt).getTime() : 0);
+          return timeA - timeB;
+        });
+        break;
     }
     return sorted;
   }, [filteredItineraries, sortBy]);
@@ -850,6 +905,173 @@ export function TripsScreen({
     return collected.sort((a, b) => (b.id ?? 0) - (a.id ?? 0)).slice(0, 12);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videosTick, userCollections]);
+
+  const uncompletedCount = useMemo(() => {
+    return mergedPrivateItineraries.filter((i: any) => !i.isPast && !i.isCancelled).length;
+  }, [mergedPrivateItineraries]);
+
+  const shouldShowCompleted = uncompletedCount < 3;
+
+  const mineItineraries = useMemo(() => {
+    return mergedPrivateItineraries.filter((i: any) => !i.isShared && !i.isPurchased);
+  }, [mergedPrivateItineraries]);
+
+  const mineItinerariesMain = useMemo(() => {
+    if (shouldShowCompleted) return mineItineraries;
+    return mineItineraries.filter((i: any) => !i.isPast);
+  }, [mineItineraries, shouldShowCompleted]);
+
+  const purchasedSharedItineraries = useMemo(() => {
+    return mergedPrivateItineraries.filter((i: any) => i.isShared || i.isPurchased);
+  }, [mergedPrivateItineraries]);
+
+  const purchasedSharedItinerariesMain = useMemo(() => {
+    if (shouldShowCompleted) return purchasedSharedItineraries;
+    return purchasedSharedItineraries.filter((i: any) => !i.isPast);
+  }, [purchasedSharedItineraries, shouldShowCompleted]);
+
+  const sortItinerariesByLastModified = useCallback((list: any[]) => {
+    const sorted = [...list];
+    sorted.sort((a, b) => {
+      const timeA = a._userItinerary?.updatedAt ? new Date(a._userItinerary.updatedAt).getTime() : (a._userItinerary?.createdAt ? new Date(a._userItinerary.createdAt).getTime() : 0);
+      const timeB = b._userItinerary?.updatedAt ? new Date(b._userItinerary.updatedAt).getTime() : (b._userItinerary?.createdAt ? new Date(b._userItinerary.createdAt).getTime() : 0);
+      return timeB - timeA;
+    });
+    return sorted;
+  }, []);
+
+  const categoryFilteredList = useMemo(() => {
+    if (!categoryView) return [];
+    const baseList = categoryView === 'mine' ? mineItineraries : purchasedSharedItineraries;
+    let list = baseList;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = baseList.filter((item: any) => {
+        const titleMatch = item.title?.toLowerCase().includes(q);
+        const destMatch = item._userItinerary?.destinations?.some((d: string) => d.toLowerCase().includes(q));
+        return titleMatch || destMatch;
+      });
+    }
+    const sorted = [...list];
+    switch (sortBy) {
+      case 'az': sorted.sort((a, b) => a.title.localeCompare(b.title)); break;
+      case 'za': sorted.sort((a, b) => b.title.localeCompare(a.title)); break;
+      case 'days-asc': sorted.sort((a, b) => a.daysRemaining - b.daysRemaining); break;
+      case 'days-desc': sorted.sort((a, b) => b.daysRemaining - a.daysRemaining); break;
+      case 'recent':
+        sorted.sort((a, b) => {
+          const timeA = a._userItinerary?.updatedAt ? new Date(a._userItinerary.updatedAt).getTime() : (a._userItinerary?.createdAt ? new Date(a._userItinerary.createdAt).getTime() : 0);
+          const timeB = b._userItinerary?.updatedAt ? new Date(b._userItinerary.updatedAt).getTime() : (b._userItinerary?.createdAt ? new Date(b._userItinerary.createdAt).getTime() : 0);
+          return timeB - timeA;
+        });
+        break;
+      case 'oldest':
+        sorted.sort((a, b) => {
+          const timeA = a._userItinerary?.updatedAt ? new Date(a._userItinerary.updatedAt).getTime() : (a._userItinerary?.createdAt ? new Date(a._userItinerary.createdAt).getTime() : 0);
+          const timeB = b._userItinerary?.updatedAt ? new Date(b._userItinerary.updatedAt).getTime() : (b._userItinerary?.createdAt ? new Date(b._userItinerary.createdAt).getTime() : 0);
+          return timeA - timeB;
+        });
+        break;
+    }
+    return sorted;
+  }, [categoryView, mineItineraries, purchasedSharedItineraries, searchQuery, sortBy]);
+
+  // Renderiza a listagem completa da categoria quando o usuário clica em "Ver todos"
+  if (categoryView !== null) {
+    return (
+      <div className="min-h-screen pb-24 bg-[#F2F2F2]">
+        {/* Header — Listagem por categoria */}
+        <header className="px-6 pt-safe-top pb-3 flex items-center justify-between bg-[#F2F2F2]">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => { setCategoryView(null); setSearchQuery(''); }}
+              aria-label="Voltar"
+              className="w-9 h-9 flex items-center justify-center rounded-full border border-border/80 bg-white hover:bg-muted transition-colors flex-shrink-0"
+            >
+              <Icon name="chevron_left" size={20} className="text-foreground" />
+            </button>
+            <h1 className="text-[19px] font-bold text-foreground">
+              {categoryView === 'mine' ? 'Criados por mim' : 'Comprados / Compartilhados'}
+            </h1>
+          </div>
+          <button
+            onClick={() => setShowSortSheet(true)}
+            className="w-9 h-9 flex items-center justify-center border border-border/80 bg-white rounded-full hover:bg-muted transition-colors flex-shrink-0 relative"
+          >
+            <Icon name="tune" size={18} className="text-foreground" />
+            {sortBy !== 'recent' && (
+              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border-2 border-background" />
+            )}
+          </button>
+        </header>
+
+        <main className="px-5 pt-1">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-medium text-muted-foreground">
+              {categoryFilteredList.length} {categoryFilteredList.length === 1 ? 'roteiro' : 'roteiros'}
+            </span>
+          </div>
+
+          {/* Campo de busca */}
+          <div className="relative mb-5">
+            <Icon name="search" size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar por título ou destino..."
+              className="w-full pl-10 pr-9 py-2.5 bg-white border border-border/60 rounded-xl text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-muted-foreground hover:text-foreground"
+              >
+                <Icon name="close" size={16} />
+              </button>
+            )}
+          </div>
+
+          {/* Lista de cards */}
+          {isTripsScreenLoading ? (
+            <ItineraryListSkeleton count={3} />
+          ) : categoryFilteredList.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <Icon name="search_off" size={32} className="text-muted-foreground/50 mb-2" />
+              <p className="text-sm font-semibold text-foreground mb-1">Nenhum resultado para este filtro</p>
+              <p className="text-xs text-muted-foreground">Não encontramos nenhum roteiro correspondente.</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {categoryFilteredList.map(item => (
+                <SwipeableItineraryCard
+                  key={item.id}
+                  item={item}
+                  isPrivate={true}
+                  isShared={!!item.isShared}
+                  isSwiped={swipedItemId === item.id}
+                  onSwipeOpen={() => setSwipedItemId(item.id)}
+                  onSwipeClose={() => setSwipedItemId(null)}
+                  onClick={() => {
+                    if (item._userItinerary && onUserItineraryClick) {
+                      onUserItineraryClick(item._userItinerary);
+                    } else if (onPrivateItineraryClick) {
+                      onPrivateItineraryClick(item.id);
+                    } else {
+                      onItineraryClick(item.id);
+                    }
+                  }}
+                  onDelete={() => setShowDeleteConfirm({ id: item.id, title: item.title, isUser: !!item._userItinerary, isPurchased: !!item.isPurchased, isShared: !!item.isShared })}
+                  getDaysRemainingStyle={getDaysRemainingStyle}
+                />
+              ))}
+            </div>
+          )}
+        </main>
+      </div>
+    );
+  }
+
   return <div className="min-h-screen pb-24 bg-[#F2F2F2]">
     {/* Header — fixed title */}
     <header className="px-6 pt-safe-top pb-4">
@@ -868,7 +1090,7 @@ export function TripsScreen({
     {/* Tabs */}
     <div className="border-b border-border">
       <div className="flex gap-5 px-6 overflow-x-auto no-scrollbar">
-        {tabs.map(tab => <button key={tab.id} onClick={() => { setActiveTab(tab.id); if (tab.id !== 'collections') exitEditMode(); }} className={`pb-3 text-sm font-medium transition-colors relative whitespace-nowrap flex-shrink-0 ${activeTab === tab.id ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+        {tabs.map(tab => <button key={tab.id} onClick={() => { setActiveTab(tab.id); setCategoryView(null); setSearchQuery(''); if (tab.id !== 'collections') exitEditMode(); }} className={`pb-3 text-sm font-medium transition-colors relative whitespace-nowrap flex-shrink-0 ${activeTab === tab.id ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
           {tab.label}
           {activeTab === tab.id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground rounded-full" />}
         </button>)}
@@ -877,119 +1099,227 @@ export function TripsScreen({
 
     {/* Content */}
     <main className={activeTab === 'collections' ? 'px-6 pt-5' : 'px-5 pt-4'}>
-      {(activeTab === 'private' || activeTab === 'public') && itemCount > 0 && (() => {
-        const limit = itineraryLimit ?? 0;
-        const used = itineraryUsedCount ?? 0;
-        const remaining = Math.max(limit - used, 0);
-        const showLimitChip = activeTab === 'private' && limit > 0;
-        const isReached = remaining === 0;
-        const isWarning = remaining === 1;
-        const chipText = isReached
-          ? 'Limite atingido'
-          : `Restam ${remaining} ${remaining === 1 ? 'roteiro' : 'roteiros'}`;
-        const chipStyle = isReached
-          ? { background: 'rgba(220, 38, 38, 0.1)', color: '#B91C1C', borderColor: 'rgba(220, 38, 38, 0.25)' }
-          : isWarning
-            ? { background: 'rgba(234, 88, 12, 0.1)', color: '#C2410C', borderColor: 'rgba(234, 88, 12, 0.25)' }
-            : { background: '#F2F2F2', color: '#6B7280', borderColor: 'transparent' };
-        return (
-          <div className="flex items-center justify-between mb-4 gap-2">
-            <span className="text-sm text-muted-foreground whitespace-nowrap">
-              {itemCount} {itemLabel}
-            </span>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {showLimitChip && (
-                <button
-                  type="button"
-                  onClick={() => onUpgrade?.()}
-                  aria-label={`${chipText}. Toque para ver planos.`}
-                  className="inline-flex items-center h-7 px-3 rounded-full border text-xs font-semibold transition-transform active:scale-95"
-                  style={chipStyle}
-                >
-                  {chipText}
-                </button>
-              )}
+      {((activeTab === 'private' && mergedPrivateItineraries.length > 0) || (activeTab === 'public' && itemCount > 0)) && (
+        <div className="flex items-center justify-between mb-4 gap-2">
+          <span className="text-sm text-muted-foreground whitespace-nowrap">
+            {activeTab === 'private'
+              ? (originFilter !== 'all'
+                  ? `${sortedItineraries.length} ${sortedItineraries.length === 1 ? 'roteiro' : 'roteiros'}`
+                  : `${mergedPrivateItineraries.length} ${mergedPrivateItineraries.length === 1 ? 'roteiro' : 'roteiros'}`)
+              : `${itemCount} ${itemLabel}`}
+          </span>
+          <button
+            onClick={() => setShowSortSheet(true)}
+            aria-label="Filtros e ordenação"
+            className="relative w-9 h-9 flex items-center justify-center border border-border rounded-full hover:bg-muted/50 transition-colors flex-shrink-0"
+          >
+            <Icon name="tune" size={18} className="text-foreground" />
+            {(sortBy !== 'recent' || originFilter !== 'all') && (
+              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border-2 border-background" />
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Roteiros Tab — Criados por mim & Comprados/Compartilhados */}
+      {activeTab === 'private' && (
+        <>
+          {originFilter !== 'all' && sortedItineraries.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+              <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-3">
+                <Icon name="search_off" size={26} className="text-muted-foreground/60" />
+              </div>
+              <p className="text-sm font-semibold text-foreground mb-1">
+                Nenhum resultado para este filtro
+              </p>
+              <p className="text-xs text-muted-foreground mb-4">
+                Não encontramos nenhum roteiro com o filtro selecionado.
+              </p>
               <button
-                onClick={() => setShowSortSheet(true)}
-                className="relative w-9 h-9 flex items-center justify-center border border-border rounded-full hover:bg-muted/50 transition-colors flex-shrink-0"
+                onClick={() => {
+                  setOriginFilter('all');
+                  setSortBy('recent');
+                }}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-full text-xs font-semibold active:scale-95 transition-transform"
               >
-                <Icon name="tune" size={18} className="text-foreground" />
-                {(sortBy !== 'az' || (activeTab === 'private' && originFilter !== 'all')) && (
-                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border-2 border-background" />
-                )}
+                Limpar filtro
               </button>
             </div>
-          </div>
-        );
-      })()}
+          ) : originFilter !== 'all' ? (
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between mb-1">
+                <h2 className="text-[17px] font-bold text-foreground">
+                  {originFilter === 'mine'
+                    ? 'Criados por mim'
+                    : originFilter === 'shared'
+                    ? 'Compartilhados comigo'
+                    : 'Comprados'} <span className="text-muted-foreground font-normal">({sortedItineraries.length})</span>
+                </h2>
+              </div>
+              {sortedItineraries.map((item: any) => (
+                <SwipeableItineraryCard
+                  key={item.id}
+                  item={item}
+                  isPrivate={true}
+                  isShared={!!item.isShared}
+                  isSwiped={swipedItemId === item.id}
+                  onSwipeOpen={() => setSwipedItemId(item.id)}
+                  onSwipeClose={() => setSwipedItemId(null)}
+                  onClick={() => {
+                    if (item._userItinerary && onUserItineraryClick) {
+                      onUserItineraryClick(item._userItinerary);
+                    } else if (onPrivateItineraryClick) {
+                      onPrivateItineraryClick(item.id);
+                    } else {
+                      onItineraryClick(item.id);
+                    }
+                  }}
+                  onDelete={() => setShowDeleteConfirm({ id: item.id, title: item.title, isUser: !!item._userItinerary, isPurchased: !!item.isPurchased, isShared: !!item.isShared })}
+                  getDaysRemainingStyle={getDaysRemainingStyle}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-6">
+              {/* Seção 1: Criados por mim */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-[17px] font-bold text-foreground">
+                    Criados por mim <span className="text-muted-foreground font-normal">({mineItineraries.length})</span>
+                  </h2>
+                  <button
+                    onClick={() => setCategoryView('mine')}
+                    className="text-xs font-semibold text-foreground hover:opacity-80 flex items-center gap-0.5"
+                  >
+                    Ver todos
+                    <Icon name="chevron_right" size={16} />
+                  </button>
+                </div>
 
+                {isTripsScreenLoading ? (
+                  <ItineraryListSkeleton count={2} />
+                ) : mineItinerariesMain.length === 0 ? (
+                  <div className="bg-white rounded-2xl p-6 text-center border border-border/40">
+                    <p className="text-xs text-muted-foreground mb-3">Você ainda não criou nenhum roteiro.</p>
+                    <button
+                      onClick={() => onCreateItinerary?.()}
+                      className="px-4 py-2 bg-primary text-primary-foreground rounded-full text-xs font-semibold"
+                    >
+                      Criar roteiro
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    {sortItinerariesByLastModified(mineItinerariesMain).map((item: any) => (
+                      <SwipeableItineraryCard
+                        key={item.id}
+                        item={item}
+                        isPrivate={true}
+                        isShared={false}
+                        isSwiped={swipedItemId === item.id}
+                        onSwipeOpen={() => setSwipedItemId(item.id)}
+                        onSwipeClose={() => setSwipedItemId(null)}
+                        onClick={() => {
+                          if (item._userItinerary && onUserItineraryClick) {
+                            onUserItineraryClick(item._userItinerary);
+                          } else if (onPrivateItineraryClick) {
+                            onPrivateItineraryClick(item.id);
+                          } else {
+                            onItineraryClick(item.id);
+                          }
+                        }}
+                        onDelete={() => setShowDeleteConfirm({ id: item.id, title: item.title, isUser: !!item._userItinerary, isPurchased: false, isShared: false })}
+                        getDaysRemainingStyle={getDaysRemainingStyle}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
 
-      {/* Private / Public Itineraries List */}
-      {(activeTab === 'private' || activeTab === 'public') && (() => {
-        const upcoming = activeTab === 'private'
-          ? sortedItineraries.filter((i: any) => !i.isPast)
-          : sortedItineraries;
-        const past = activeTab === 'private'
-          ? sortedItineraries.filter((i: any) => i.isPast)
-          : [];
+              {/* Seção 2: Comprados / Compartilhados */}
+              <div>
+                <div className="flex items-center justify-between mb-3 mt-2">
+                  <h2 className="text-[17px] font-bold text-foreground">
+                    Comprados / Compartilhados <span className="text-muted-foreground font-normal">({purchasedSharedItineraries.length})</span>
+                  </h2>
+                  <button
+                    onClick={() => setCategoryView('purchased_shared')}
+                    className="text-xs font-semibold text-foreground hover:opacity-80 flex items-center gap-0.5"
+                  >
+                    Ver todos
+                    <Icon name="chevron_right" size={16} />
+                  </button>
+                </div>
 
+                {isTripsScreenLoading ? (
+                  <ItineraryListSkeleton count={2} />
+                ) : purchasedSharedItinerariesMain.length === 0 ? (
+                  <div className="bg-white rounded-2xl p-6 text-center border border-border/40">
+                    <p className="text-xs text-muted-foreground">Você ainda não possui roteiros comprados ou compartilhados.</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    {sortItinerariesByLastModified(purchasedSharedItinerariesMain).map((item: any) => (
+                      <SwipeableItineraryCard
+                        key={item.id}
+                        item={item}
+                        isPrivate={true}
+                        isShared={!!item.isShared}
+                        isSwiped={swipedItemId === item.id}
+                        onSwipeOpen={() => setSwipedItemId(item.id)}
+                        onSwipeClose={() => setSwipedItemId(null)}
+                        onClick={() => {
+                          if (item._userItinerary && onUserItineraryClick) {
+                            onUserItineraryClick(item._userItinerary);
+                          } else if (onPrivateItineraryClick) {
+                            onPrivateItineraryClick(item.id);
+                          } else {
+                            onItineraryClick(item.id);
+                          }
+                        }}
+                        onDelete={() => setShowDeleteConfirm({ id: item.id, title: item.title, isUser: !!item._userItinerary, isPurchased: !!item.isPurchased, isShared: !!item.isShared })}
+                        getDaysRemainingStyle={getDaysRemainingStyle}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Public Itineraries List (À venda) */}
+      {activeTab === 'public' && (() => {
         const renderCard = (item: any) => {
           const handleClick = () => {
-            if (activeTab === 'public' && item._userItinerary && onUserPublicItineraryClick) {
+            if (item._userItinerary && onUserPublicItineraryClick) {
               onUserPublicItineraryClick(item._userItinerary);
-            } else if (activeTab === 'private' && item._userItinerary && onUserItineraryClick) {
-              onUserItineraryClick(item._userItinerary);
-            } else if (activeTab === 'private' && onPrivateItineraryClick) {
-              onPrivateItineraryClick(item.id);
             } else {
               onItineraryClick(item.id);
             }
           };
-          const isShared = !!(item._userItinerary && authUser?.id && item._userItinerary.userId && item._userItinerary.userId !== authUser.id);
           return (
             <SwipeableItineraryCard
               key={item.id}
               item={item}
-              isPrivate={activeTab === 'private'}
-              isShared={isShared}
+              isPrivate={false}
+              isShared={false}
               isSwiped={swipedItemId === item.id}
               onSwipeOpen={() => setSwipedItemId(item.id)}
               onSwipeClose={() => setSwipedItemId(null)}
               onClick={handleClick}
-              onDelete={() => setShowDeleteConfirm({ id: item.id, title: item.title, isUser: !!item._userItinerary, isPurchased: !!item.isPurchased, isShared })}
+              onDelete={() => setShowDeleteConfirm({ id: item.id, title: item.title, isUser: !!item._userItinerary, isPurchased: false, isShared: false })}
               getDaysRemainingStyle={getDaysRemainingStyle}
             />
           );
         };
 
-        const isEmpty = upcoming.length === 0 && past.length === 0;
-
         if (isTripsScreenLoading) {
           return <ItineraryListSkeleton count={3} />;
         }
 
-        if (isEmpty) {
-          if (activeTab === 'private') {
-            return (
-              <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-5">
-                  <Icon name="luggage" size={28} className="text-muted-foreground text-xs" />
-                </div>
-                <h3 className="text-lg font-bold text-foreground mb-2">
-                  Nenhum roteiro ainda
-                </h3>
-                <p className="text-sm text-muted-foreground mb-6 max-w-[280px]">
-                  Crie seu primeiro roteiro e organize sua próxima viagem do seu jeito.
-                </p>
-                <button
-                  onClick={() => onCreateItinerary?.()}
-                  className="px-6 py-3 bg-primary text-primary-foreground rounded-full text-sm font-semibold active:scale-95 transition-transform"
-                >
-                  Criar roteiro
-                </button>
-              </div>
-            );
-          }
+        if (sortedItineraries.length === 0) {
           return (
             <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
               <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-5">
@@ -1012,34 +1342,8 @@ export function TripsScreen({
         }
 
         return (
-          <div className="flex flex-col gap-6">
-            {activeTab === 'private' && upcoming.length > 0 && (
-              <SectionHeader
-                icon="flight_takeoff"
-                label="Próximas viagens"
-                count={upcoming.length}
-                variant="upcoming"
-              />
-            )}
-            {upcoming.length > 0 && (
-              <div className="flex flex-col gap-4">
-                {upcoming.map(renderCard)}
-              </div>
-            )}
-
-            {activeTab === 'private' && past.length > 0 && (
-              <>
-                <SectionHeader
-                  icon="check_circle"
-                  label="Viagens passadas"
-                  count={past.length}
-                  variant="past"
-                />
-                <div className="flex flex-col gap-4">
-                  {past.map(renderCard)}
-                </div>
-              </>
-            )}
+          <div className="flex flex-col gap-4">
+            {sortedItineraries.map(renderCard)}
           </div>
         );
       })()}
@@ -1076,12 +1380,10 @@ export function TripsScreen({
                   {/* Image — fixed height */}
                   <div className="relative w-full overflow-hidden flex-shrink-0" style={{ height: 120 }}>
                     <img src={item.image} alt={item.title} className="w-full h-full object-cover block" />
-                    {item.rating && (
-                      <div className="absolute top-2.5 left-2.5 flex items-center gap-1 bg-white/70 backdrop-blur-sm rounded-full px-2 py-1">
-                        <Icon name="star" size={12} filled className="text-amber-500" />
-                        <span className="text-[11px] font-bold text-foreground">{item.rating}</span>
-                      </div>
-                    )}
+                    <div className="absolute top-2.5 left-2.5 flex items-center gap-1 bg-white/70 backdrop-blur-sm rounded-full px-2 py-1">
+                      <Icon name="star" size={12} filled className="text-amber-500" />
+                      <span className="text-[11px] font-bold text-foreground">{(item.rating ?? 0) > 0 ? item.rating : '-'}</span>
+                    </div>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

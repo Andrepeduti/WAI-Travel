@@ -8,6 +8,8 @@ import {
   updateMemberRole,
   cancelInvite,
   getItineraryOwnerProfile,
+  getCachedOwnerProfile,
+  getCachedItineraryMembers,
   type ItineraryMember,
   type ItineraryInvite,
 } from '@/lib/itineraryMembersApi';
@@ -35,10 +37,10 @@ function getInitials(name: string) {
 }
 
 export function ParticipantsSheet({ open, onClose, itineraryId, currentUserId, onInvite }: ParticipantsSheetProps) {
-  const [owner, setOwner] = useState<{ userId: string; name: string; avatar?: string } | null>(null);
-  const [members, setMembers] = useState<ItineraryMember[]>([]);
+  const [owner, setOwner] = useState<{ userId: string; name: string; avatar?: string } | null>(() => getCachedOwnerProfile(itineraryId));
+  const [members, setMembers] = useState<ItineraryMember[]>(() => getCachedItineraryMembers(itineraryId) || []);
   const [invites, setInvites] = useState<ItineraryInvite[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(() => !getCachedOwnerProfile(itineraryId));
   const [actionMember, setActionMember] = useState<ItineraryMember | null>(null);
   const [pendingRole, setPendingRole] = useState<'editor' | 'viewer'>('viewer');
   const [savingRole, setSavingRole] = useState(false);

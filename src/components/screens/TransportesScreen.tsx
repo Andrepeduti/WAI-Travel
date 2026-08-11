@@ -95,7 +95,7 @@ export function TransportesScreen({ onBack, transportes: externalTransportes, on
       <header className="sticky top-0 z-20 bg-background px-4 pt-5 pb-3">
         <div className="flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />
-          <h1 className="text-xl font-bold text-foreground my-0 mt-[24px]">Transportes</h1>
+          <h1 className="text-xl font-bold text-foreground my-0">Transportes</h1>
         </div>
       </header>
 

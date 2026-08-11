@@ -266,7 +266,10 @@ export function PublishItineraryFlow({
         style={{ bottom: keyboardHeight }}
       >
         {/* Top bar — only back button */}
-        <div className={cn('absolute top-0 left-0 right-0 z-30', step <= 0 ? 'pt-[68px]' : 'pt-safe-top pb-3 bg-[#F2F2F2]')}>
+        <div
+          className="absolute top-0 left-0 right-0 z-30 pb-3 bg-[#F2F2F2]"
+          style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)))' }}
+        >
           <div className={step <= 0 ? 'px-3' : 'px-7'}>
             <div className={cn('flex items-center justify-between', step <= 0 && 'w-full max-w-[396px] mx-auto px-7')}>
               <button
@@ -522,7 +525,10 @@ function PriceScreen({
       className="absolute inset-0 flex flex-col bg-[#F2F2F2]"
     >
       <div className="flex-1 overflow-y-auto min-h-0">
-        <div className="flex flex-col justify-end min-h-full px-7 pt-20 pb-32">
+        <div
+          className="flex flex-col justify-end min-h-full px-7 pb-32"
+          style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 68px)' }}
+        >
           <StepDots current={0} total={TOTAL_QUESTION_STEPS} />
           <h1
             className="text-[#0A0A0A] leading-[1.1] tracking-[-0.02em]"
@@ -721,10 +727,13 @@ function ReviewScreen({
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       className="absolute inset-0 overflow-y-auto bg-[#F2F2F2]"
     >
-      <div className="px-7 pt-20 pb-0">
+      <div
+        className="px-7 pb-36"
+        style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 68px)' }}
+      >
         <StepDots current={4} total={TOTAL_QUESTION_STEPS} />
         <h1
-          className="text-[#0A0A0A] leading-[1.1] tracking-[-0.02em]"
+          className="text-[#0A0A0A] leading-[1.15] tracking-[-0.02em]"
           style={{ fontSize: '28px', fontWeight: 800 }}
         >
           Revise as<br />informações<br />do seu roteiro
@@ -905,7 +914,10 @@ function DescriptionScreen({
       className="absolute inset-0 flex flex-col bg-[#F2F2F2]"
     >
       <div className="flex-1 overflow-y-auto min-h-0">
-        <div className="flex flex-col justify-end min-h-full px-7 pt-20 pb-40">
+        <div
+          className="flex flex-col justify-end min-h-full px-7 pb-40"
+          style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 68px)' }}
+        >
           <StepDots current={1} total={TOTAL_QUESTION_STEPS} />
           <h1
             className="text-[#0A0A0A] leading-[1.1] tracking-[-0.02em]"
@@ -1035,7 +1047,10 @@ function TagsScreen({
       className="absolute inset-0 flex flex-col bg-[#F2F2F2]"
     >
       <div className="flex-1 overflow-y-auto min-h-0">
-        <div className="flex flex-col min-h-full px-7 pt-20 pb-40">
+        <div
+          className="flex flex-col min-h-full px-7 pb-40"
+          style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 68px)' }}
+        >
           <div className="mt-auto">
             <StepDots current={3} total={TOTAL_QUESTION_STEPS} />
             <h1
@@ -1129,7 +1144,10 @@ function SeasonScreen({
       className="absolute inset-0 flex flex-col bg-[#F2F2F2]"
     >
       <div className="flex-1 overflow-y-auto min-h-0">
-        <div className="flex flex-col justify-end min-h-full px-7 pt-20 pb-40">
+        <div
+          className="flex flex-col justify-end min-h-full px-7 pb-40"
+          style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 68px)' }}
+        >
           <StepDots current={2} total={TOTAL_QUESTION_STEPS} />
           <h1
             className="text-[#0A0A0A] leading-[1.1] tracking-[-0.02em]"

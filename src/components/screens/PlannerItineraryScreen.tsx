@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, lazy, Suspense, useCallback, useMemo } from 'react';
 import { MapPin, Calendar, Users, DollarSign, Clock, LayoutGrid, Heart, Eye, HandCoins, ExternalLink, Settings, MoreVertical, X, Share2, UploadCloud, Edit3, Trash2, Home, Bus, Train, Plane, Car, Plus, AlignLeft, Info, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { updateItinerary } from '@/lib/itinerariesApi';
 import { COUNTRY_TO_TAGS } from '@/data/countriesCatalog';
 import { SuccessToast } from '@/components/travel/SuccessToast';
 import { ItinerarySettingsSheet } from '@/components/travel/ItinerarySettingsSheet';
@@ -15,6 +16,7 @@ import { Icon } from '@/components/ui/Icon';
 import { DocumentosScreen } from './DocumentosScreen';
 import { BudgetScreen, Expense } from './BudgetScreen';
 import { estimatedPriceFor } from '@/lib/paidAttractions';
+import { detectCurrencySymbol, extractNumericPrice, formatNumericInput } from '@/lib/currency';
 
 import { Reserva } from '@/components/travel/AddReservaSheet';
 import { DocTypePickerSheet, type DocType } from '@/components/travel/DocTypePickerSheet';
@@ -33,6 +35,7 @@ import { AddManualActivitySheet, ManualActivityData } from '@/components/travel/
 import { EditTripInfoSheet } from '@/components/travel/EditTripInfoSheet';
 import { DraggableActivityList } from '@/components/travel/DraggableActivityList';
 import { ReorderActivitiesScreen } from './ReorderActivitiesScreen';
+import { AiRecommendationsScreen } from './AiRecommendationsScreen';
 import { Bars3BottomLeftIcon, ListBulletIcon } from '@heroicons/react/24/outline';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import {
@@ -43,7 +46,7 @@ import {
 } from '@/components/ui/sheet';
 import { Check } from 'lucide-react';
 
-import { format, differenceInDays, addDays } from 'date-fns';
+import { format, differenceInDays, differenceInCalendarDays, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ItineraryFormData } from '@/components/travel/CreateItinerarySheet';
 import { ItineraryDataset, ItineraryDay as DatasetDay, ItineraryActivity as DatasetActivity, TransportBetween as DatasetTransport, ItinerarySuggestion } from '@/data/itineraries';
@@ -61,7 +64,7 @@ import { formatBRL } from '@/lib/utils';
 import { loadItineraryDocs, saveItineraryDocs } from '@/lib/itineraryDocsApi';
 import { loadItineraryNotes, saveItineraryNotes } from '@/lib/itineraryNotesApi';
 import { loadBudget, saveBudget } from '@/lib/budgetApi';
-import { listItineraryMembers, getMyRole, getItineraryOwnerProfile, type ItineraryMember, type ItineraryRole } from '@/lib/itineraryMembersApi';
+import { listItineraryMembers, getMyRole, getItineraryOwnerProfile, getCachedOwnerProfile, getCachedItineraryMembers, type ItineraryMember, type ItineraryRole } from '@/lib/itineraryMembersApi';
 import { ShareItinerarySheet } from '@/components/travel/ShareItinerarySheet';
 import { useItineraryRealtime } from '@/hooks/use-itinerary-realtime';
 import { useMyItineraries, addOptimisticItinerary } from '@/hooks/use-my-itineraries';
@@ -492,6 +495,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   const [editEndTime, setEditEndTime] = useState('');
   const [editOriginalDuration, setEditOriginalDuration] = useState(0);
   const [editPrice, setEditPrice] = useState('');
+  const [editCurrencySymbol, setEditCurrencySymbol] = useState('R$');
   const [editObservation, setEditObservation] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [showShareSheet, setShowShareSheet] = useState(false);
@@ -533,7 +537,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   const [showParticipantsSheet, setShowParticipantsSheet] = useState(false);
 
   const { itineraries: myItinerariesForLimit } = useMyItineraries();
-  const FREE_PLAN_ITINERARY_LIMIT = 3;
+  const FREE_PLAN_ITINERARY_LIMIT = Infinity;
   const ownCreatedCount = myItinerariesForLimit.filter(
     (it) => it.userId === session?.user?.id && it.sourceDatasetId == null
   ).length;
@@ -590,6 +594,11 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   const [showManualActivity, setShowManualActivity] = useState(false);
   const [showEditTripInfo, setShowEditTripInfo] = useState(false);
   const [showReorder, setShowReorder] = useState(false);
+  const [showAiPlanSheet, setShowAiPlanSheet] = useState(false);
+  const [showAiRecommendationsScreen, setShowAiRecommendationsScreen] = useState(false);
+  const [aiRecommendationsTargetDay, setAiRecommendationsTargetDay] = useState(1);
+  const [isAiPlanning, setIsAiPlanning] = useState(false);
+  const [aiProgress, setAiProgress] = useState({ current: 0, total: 0 });
   const [aiLoadingDays, setAiLoadingDays] = useState<Set<number>>(new Set());
   const [optimizingDays, setOptimizingDays] = useState<Set<number>>(new Set());
   const [optimizedFlash, setOptimizedFlash] = useState<Set<number>>(new Set());
@@ -688,23 +697,42 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   }, [isUuidId, itineraryId, dayActivities, dayTransports]);
 
   // ─── Membros compartilhados (Lovable Cloud) ─────────────────────────────
-  const [sharedMembers, setSharedMembers] = useState<ItineraryMember[]>([]);
+  const [sharedMembers, setSharedMembers] = useState<ItineraryMember[]>(() => {
+    if (typeof itineraryId === 'string') {
+      return getCachedItineraryMembers(itineraryId) || [];
+    }
+    return [];
+  });
   const [myRole, setMyRole] = useState<ItineraryRole | null>(null);
-  const [ownerProfile, setOwnerProfile] = useState<{ userId: string; name: string; avatar?: string } | null>(null);
+  const [ownerProfile, setOwnerProfile] = useState<{ userId: string; name: string; avatar?: string } | null>(() => {
+    if (typeof itineraryId === 'string') {
+      return getCachedOwnerProfile(itineraryId);
+    }
+    return null;
+  });
+  const [loadingMembers, setLoadingMembers] = useState<boolean>(() => {
+    if (typeof itineraryId === 'string' && isUuidId) {
+      return getCachedOwnerProfile(itineraryId) === null;
+    }
+    return false;
+  });
   const isViewer = myRole === 'viewer';
   const reloadMembers = useCallback(async () => {
-    if (!isUuidId || typeof itineraryId !== 'string') return;
-    try {
-      const m = await listItineraryMembers(itineraryId);
-      setSharedMembers(m);
-    } catch {
-      /* silencioso */
+    if (!isUuidId || typeof itineraryId !== 'string') {
+      setLoadingMembers(false);
+      return;
     }
     try {
-      const owner = await getItineraryOwnerProfile(itineraryId);
+      const [m, owner] = await Promise.all([
+        listItineraryMembers(itineraryId),
+        getItineraryOwnerProfile(itineraryId),
+      ]);
+      setSharedMembers(m);
       setOwnerProfile(owner);
     } catch {
       /* silencioso */
+    } finally {
+      setLoadingMembers(false);
     }
     if (session?.user?.id) {
       const role = await getMyRole(itineraryId, session.user.id);
@@ -788,14 +816,9 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     }
     const remote = await loadItineraryNotes(itineraryId);
     if (!remote) return;
-    if (notesHydratedRef.current) {
-      skipNextNotesSaveRef.current = true;
+    skipNextNotesSaveRef.current = true;
+    if (notesHydratedRef.current || remote.length > 0) {
       setTripNotes(remote);
-    } else {
-      if (remote.length > 0) {
-        skipNextNotesSaveRef.current = true;
-        setTripNotes(remote);
-      }
     }
     notesHydratedRef.current = true;
   }, [itineraryId, isUuidId]);
@@ -1223,10 +1246,31 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   }, [dayActivities, suggestionsData, itineraryData.destinations]);
 
 
+  const timeToMin = (t?: string): number => {
+    if (!t) return Infinity;
+    const m = /^(\d{1,2}):(\d{2})/.exec(String(t).trim());
+    if (!m) return Infinity;
+    const h = Number(m[1]);
+    const min = Number(m[2]);
+    if (isNaN(h) || isNaN(min)) return Infinity;
+    return h * 60 + min;
+  };
+
+  const sortActivitiesChronologically = (activities: Activity[]): Activity[] => {
+    return [...activities].sort((a, b) => {
+      const startA = timeToMin(a.startTime);
+      const startB = timeToMin(b.startTime);
+      if (startA !== startB) return startA - startB;
+      const endA = timeToMin(a.endTime);
+      const endB = timeToMin(b.endTime);
+      if (endA !== endB) return endA - endB;
+      return 0;
+    });
+  };
+
   const getAllActivities = useCallback((day: number): Activity[] => {
-    if (dayActivities[day] !== undefined) return dayActivities[day];
-    const base = effectiveDaysData.find((d) => d.day === day);
-    return base?.activities ?? [];
+    const raw = dayActivities[day] !== undefined ? dayActivities[day] : (effectiveDaysData.find((d) => d.day === day)?.activities ?? []);
+    return sortActivitiesChronologically(raw);
   }, [effectiveDaysData, dayActivities]);
 
   // Build mutable transports: base data overridden by mutable state
@@ -1235,6 +1279,125 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     const base = effectiveDaysData.find((d) => d.day === day);
     return base?.transports ?? [];
   }, [effectiveDaysData, dayTransports]);
+
+  const handlePlanWithAi = useCallback(async (mode: 'all' | 'empty') => {
+    setShowAiPlanSheet(false);
+
+    const tripDays = effectiveDaysData.length;
+    const targetDays = effectiveDaysData
+      .map((d) => d.day)
+      .filter((day) => {
+        if (mode === 'all') return true;
+        const acts = getAllActivities(day);
+        return acts.length === 0;
+      });
+
+    if (targetDays.length === 0) {
+      toast.info('Não há dias vazios para planejar.');
+      return;
+    }
+
+    setIsAiPlanning(true);
+    setAiProgress({ current: 0, total: targetDays.length });
+    setAiLoadingDays(new Set(targetDays));
+
+    const usedNames = new Set<string>();
+    if (mode === 'empty') {
+      Object.values(dayActivitiesRef.current ?? {}).forEach((acts) => {
+        (acts as Activity[] | undefined)?.forEach((a) => {
+          if (a?.name) usedNames.add(a.name.trim().toLowerCase());
+        });
+      });
+    }
+
+    const { fetchPlacesForCity } = await import('@/lib/placesApi');
+
+    let completed = 0;
+
+    for (const day of targetDays) {
+      const destName = itineraryData.destinations?.length
+        ? getDestinationForDay(itineraryData.destinations, day, tripDays)
+        : 'Paris, França';
+
+      let pool: any[] = [];
+      try {
+        pool = await fetchPlacesForCity(destName);
+      } catch (e) {
+        console.error('Error fetching places for AI planning:', e);
+      }
+
+      if (!pool || pool.length === 0) {
+        pool = getPlacesForDestinations([destName]);
+      }
+
+      const available = pool.filter((p) => !usedNames.has(p.name.trim().toLowerCase()));
+      const candidates = (available.length >= 3 ? available : pool).slice(0, 5);
+
+      if (candidates.length > 0) {
+        const slots = [
+          { start: '09:30', duration: 90 },
+          { start: '12:30', duration: 75 },
+          { start: '15:00', duration: 90 },
+          { start: '19:30', duration: 90 },
+          { start: '22:00', duration: 120 },
+        ];
+
+        const generated: Activity[] = candidates.map((item: any, idx: number) => {
+          usedNames.add(item.name.trim().toLowerCase());
+          const slot = slots[idx % slots.length];
+          const parseHHMM = (s: string) => {
+            const m = /(\d{1,2}):(\d{2})/.exec(s || '');
+            if (!m) return 570;
+            return Math.min(23, parseInt(m[1], 10)) * 60 + Math.min(59, parseInt(m[2], 10));
+          };
+          const totalMins = parseHHMM(slot.start) + (item.duration || slot.duration);
+          const endH = Math.floor(totalMins / 60) % 24;
+          const endM = totalMins % 60;
+          const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+
+          return {
+            id: Date.now() + idx + Math.floor(Math.random() * 10000),
+            type: 'activity',
+            name: item.name,
+            startTime: slot.start,
+            endTime,
+            category: item.category || 'Ponto Turístico',
+            categoryColor: item.categoryColor || '#10B981',
+            image: item.image || 'https://images.unsplash.com/photo-1503220317375-aaad61436b1b?w=300',
+            openHours: item.openHours || '',
+            rating: item.rating || 4.5,
+            price: item.price || estimatedPriceFor(item.name, item.city || destName),
+            lat: item.lat,
+            lng: item.lng,
+          };
+        });
+
+        setDayActivities((prev) => ({ ...prev, [day]: generated }));
+
+        const needed = Math.max(0, generated.length - 1);
+        const newTransports: TransportBetween[] = Array.from({ length: needed }, () => ({
+          type: 'walk' as const,
+          duration: '15 min',
+        }));
+        setDayTransports((prev) => ({ ...prev, [day]: newTransports }));
+      }
+
+      completed++;
+      setAiProgress({ current: completed, total: targetDays.length });
+      setAiLoadingDays((prev) => {
+        const next = new Set(prev);
+        next.delete(day);
+        return next;
+      });
+    }
+
+    setIsAiPlanning(false);
+    toast.success(
+      mode === 'all'
+        ? 'Roteiro inteiro planejado com sucesso pela IA!'
+        : 'Dias vazios planejados com sucesso pela IA!'
+    );
+  }, [effectiveDaysData, itineraryData.destinations, getAllActivities]);
 
   // Detecta nomes de atividades repetidos em mais de um dia do roteiro
   const repeatedActivityNames = React.useMemo(() => {
@@ -1545,8 +1708,8 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     const previousTransportsSource = getAllTransports(sourceDay);
     const previousTransportsTarget = targetDay !== null ? getAllTransports(targetDay) : [];
 
-    const nextSourceActivities = previousActivitiesSource.filter((a) => a.id !== activity.id);
-    const nextTargetActivities = targetDay !== null ? [...previousActivitiesTarget, activity] : [];
+    const nextSourceActivities = sortActivitiesChronologically(previousActivitiesSource.filter((a) => a.id !== activity.id));
+    const nextTargetActivities = targetDay !== null ? sortActivitiesChronologically([...previousActivitiesTarget, activity]) : [];
 
     setDayActivities((prev) => ({
       ...prev,
@@ -1661,12 +1824,16 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     return { start: '09:00', end: addMinutes('09:00', durationMins) };
   };
 
-  const recalculateTimes = (activities: Activity[]): Activity[] => {
+  const recalculateTimes = (activities: Activity[], resetStart: boolean = false): Activity[] => {
     if (activities.length === 0) return activities;
-    return activities.map((act, i) => {
+    let currentStart = '09:00';
+    if (!resetStart && activities[0].startTime && timeToMin(activities[0].startTime) !== Infinity) {
+      currentStart = activities[0].startTime;
+    }
+    const recalculated = activities.map((act, i) => {
       if (i === 0) {
-        const start = act.startTime || '09:00';
-        const end = act.endTime || addMinutes(start, 90);
+        const start = currentStart;
+        const end = act.endTime && !resetStart ? act.endTime : addMinutes(start, 90);
         return { ...act, startTime: start, endTime: end };
       }
       const prev = activities[i - 1];
@@ -1675,30 +1842,35 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       const end = addMinutes(start, 90);
       return { ...act, startTime: start, endTime: end };
     });
+    return sortActivitiesChronologically(recalculated);
   };
 
-  const handleAddPlace = (place: PlaceResult, day: number) => {
-    addDefaultTransport(day, place.name, place.lat, place.lng);
-    setDayActivities((prev) => {
-      const base = effectiveDaysData.find((d) => d.day === day);
-      const currentActivities = prev[day] !== undefined ? prev[day] : (base?.activities ?? []);
+  const handleAddPlace = async (placeOrPlaces: PlaceResult | PlaceResult[], day: number) => {
+    const placesArray = Array.isArray(placeOrPlaces) ? placeOrPlaces : [placeOrPlaces];
+    if (placesArray.length === 0) return;
 
-      // Calculate next time based on current (latest) state
+    const base = effectiveDaysData.find((d) => d.day === day);
+    const currentActivities = dayActivities[day] !== undefined ? dayActivities[day] : (base?.activities ?? []);
+
+    let workingActivities = [...currentActivities];
+
+    placesArray.forEach((place, index) => {
       let start = '09:00';
       let end = addMinutes('09:00', 90);
-      if (currentActivities.length > 0) {
-        const last = currentActivities[currentActivities.length - 1];
-        if (last.endTime) {
+      if (workingActivities.length > 0) {
+        const sortedCurrent = sortActivitiesChronologically(workingActivities);
+        const last = sortedCurrent[sortedCurrent.length - 1];
+        if (last.endTime && timeToMin(last.endTime) !== Infinity) {
           start = addMinutes(last.endTime, 30);
           end = addMinutes(start, 90);
-        } else if (last.startTime) {
+        } else if (last.startTime && timeToMin(last.startTime) !== Infinity) {
           start = addMinutes(last.startTime, 120);
           end = addMinutes(start, 90);
         }
       }
 
       const newActivity: Activity = {
-        id: Date.now() + Math.random(),
+        id: Date.now() + index + Math.random(),
         type: 'activity',
         startTime: start,
         endTime: end,
@@ -1712,8 +1884,20 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         lat: place.lat,
         lng: place.lng,
       };
-      return { ...prev, [day]: [...currentActivities, newActivity] };
+
+      workingActivities = sortActivitiesChronologically([...workingActivities, newActivity]);
     });
+
+    const nextActivities = workingActivities;
+    const nextTransports = await buildTransportsForActivities(nextActivities);
+
+    setDayActivities((prev) => ({ ...prev, [day]: nextActivities }));
+    setDayTransports((prev) => ({ ...prev, [day]: nextTransports }));
+    toast.success(
+      placesArray.length === 1
+        ? `${placesArray[0].name} adicionado ao Dia ${day}`
+        : `${placesArray.length} lugares adicionados ao Dia ${day}`
+    );
   };
 
   const handleAddNote = (data: { title: string; text: string; day: number; startTime?: string; endTime?: string; location?: string; lat?: number; lng?: number; }) => {
@@ -1790,7 +1974,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     });
   };
 
-  const handleAddManualActivity = (data: ManualActivityData) => {
+  const handleAddManualActivity = async (data: ManualActivityData) => {
     const categoryMap: Record<string, { color: string; }> = {
       'Restaurante': { color: '#F59E0B' },
       'Ponto Turístico': { color: '#10B981' },
@@ -1814,10 +1998,17 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       rating: 0,
       price: data.price || ''
     };
-    addDefaultTransport(data.day, data.name);
+    const current = getAllActivities(data.day);
+    const updated = sortActivitiesChronologically([...current, newActivity]);
+    const nextTransports = await buildTransportsForActivities(updated);
+
     setDayActivities((prev) => ({
       ...prev,
-      [data.day]: [...getAllActivities(data.day), newActivity]
+      [data.day]: updated
+    }));
+    setDayTransports((prev) => ({
+      ...prev,
+      [data.day]: nextTransports
     }));
   };
 
@@ -2171,7 +2362,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       ordered.push(remaining.splice(bestIdx, 1)[0]);
     }
     ordered.push(...coordless);
-    const recalculated = recalculateTimes(ordered);
+    const recalculated = recalculateTimes(ordered, true);
     setDayActivities((prev) => ({ ...prev, [day]: recalculated }));
     const needed = Math.max(0, recalculated.length - 1);
     const newTransports: TransportBetween[] = await Promise.all(
@@ -2210,6 +2401,17 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                 {showAddAction &&
                   <div className="flex flex-col gap-2 animate-fade-in mb-1">
                     <button
+                      onClick={() => {
+                        setShowAddAction(false);
+                        setAiRecommendationsTargetDay(selectedDay || 1);
+                        setShowAiRecommendationsScreen(true);
+                      }}
+                      className="flex items-center gap-2 h-12 px-5 rounded-full bg-card shadow-lg active:scale-95 transition-transform">
+                      <Icon name="auto_awesome" size={20} className="text-[#7C3AED]" />
+                      <span className="text-[14px] font-semibold text-foreground">Recomendações da IA</span>
+                    </button>
+
+                    <button
                       onClick={() => { setShowAddAction(false); setShowAddPlace(true); }}
                       className="flex items-center gap-2 h-12 px-5 rounded-full bg-card shadow-lg active:scale-95 transition-transform">
 
@@ -2217,11 +2419,12 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                       <span className="text-[14px] font-semibold text-foreground">Lugar</span>
                     </button>
 
-
-
-
-
-
+                    <button
+                      onClick={() => { setShowAddAction(false); setShowAddTripNote(true); }}
+                      className="flex items-center gap-2 h-12 px-5 rounded-full bg-card shadow-lg active:scale-95 transition-transform">
+                      <Icon name="edit_note" size={20} className="text-foreground" />
+                      <span className="text-[14px] font-semibold text-foreground">Nota</span>
+                    </button>
 
                     <button
                       onClick={() => { setShowAddAction(false); setShowAddNote(true); }}
@@ -2246,13 +2449,6 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                         <Icon name="directions_bus" size={18} className="text-foreground" />
                       </div>
                       <span className="text-[14px] font-semibold text-foreground">Reserva</span>
-                    </button>
-                    <button
-                      onClick={() => { setShowAddAction(false); setShowAddTripNote(true); }}
-                      className="flex items-center gap-2 h-12 px-5 rounded-full bg-card shadow-lg active:scale-95 transition-transform">
-
-                      <Icon name="edit_note" size={20} className="text-foreground" />
-                      <span className="text-[14px] font-semibold text-foreground">Notas</span>
                     </button>
                   </div>
                 }
@@ -2338,7 +2534,8 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
               </div>
               {(() => {
                 if (isFlexibleDates) return null;
-                const daysLeft = Math.max(0, differenceInDays(itineraryData.startDate ?? new Date(), new Date()));
+                const start = parseLocalDate(itineraryData.startDate) ?? (itineraryData.startDate instanceof Date ? itineraryData.startDate : new Date());
+                const daysLeft = Math.max(0, differenceInCalendarDays(start, new Date()));
                 const isClose = daysLeft <= 7;
                 return (
                   <div className={`h-7 inline-flex items-center px-3 rounded-2xl ${isClose ? 'bg-[#9DCC36] text-[#1A1C40]' : 'bg-[#F2F2F2] text-[#8E8E93]'}`}>
@@ -2349,6 +2546,14 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
               })()}
               <div className={`ml-auto flex -space-x-1.5 transition-transform ${creatorEditMode ? '' : 'cursor-pointer active:scale-95'}`} onClick={creatorEditMode ? undefined : () => setShowParticipantsSheet(true)}>
                 {(() => {
+                  if (loadingMembers && isUuidId) {
+                    return (
+                      <div className="flex -space-x-1.5 items-center animate-pulse">
+                        <div className="w-7 h-7 rounded-full border-[1.5px] border-white bg-white/40" />
+                        <div className="w-7 h-7 rounded-full border-[1.5px] border-white bg-white/25" />
+                      </div>
+                    );
+                  }
                   const friends = itineraryData.invitedFriends || [];
                   // If dataset has participants (marketplace itinerary), use those; otherwise use invited friends
                   const avatarUrls = itineraryDataset?.participants;
@@ -2374,7 +2579,9 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                   // User-created itinerary: show owner + accepted members + (legacy) invited friends
                   const maxVisible = 3;
                   const myUserId = session?.user?.id;
-                  const ownerIsMe = !ownerProfile || (myUserId && ownerProfile.userId === myUserId);
+                  const ownerIsMe = ownerProfile
+                    ? (myUserId && ownerProfile.userId === myUserId)
+                    : (!myUserId || (data.userId && data.userId === myUserId));
                   const ownerEntry = ownerIsMe
                     ? { id: 'owner', userId: myUserId, name: ownerName, avatar: ownerAvatar }
                     : { id: `owner-${ownerProfile!.userId}`, userId: ownerProfile!.userId, name: ownerProfile!.name, avatar: ownerProfile!.avatar };
@@ -2606,7 +2813,19 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
 
             {/* View toggle */}
             <div className="flex items-center justify-between pt-1 pb-3">
-              <h3 className="text-[15px] font-semibold text-foreground">Itinerário</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-[15px] font-semibold text-foreground">Itinerário</h3>
+                {!isViewer && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAiPlanSheet(true)}
+                    className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#7C3AED]/10 hover:bg-[#7C3AED]/20 text-[#7C3AED] border border-[#7C3AED]/20 text-[12px] font-bold active:scale-95 transition-all shadow-sm"
+                  >
+                    <Icon name="auto_awesome" size={14} className="text-[#7C3AED]" />
+                    <span>Planejar com IA</span>
+                  </button>
+                )}
+              </div>
               <div className="flex items-center gap-1.5">
                 {!isViewer && effectiveDaysData.some(d => getAllActivities(d.day).length > 0) && (
                   <button
@@ -2640,6 +2859,29 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                 </button>
               </div>
             </div>
+
+            {/* Indicator de progresso da IA */}
+            {isAiPlanning && (
+              <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-purple-500/10 border border-[#7C3AED]/30 flex items-center gap-3 animate-fade-in">
+                <div className="w-8 h-8 rounded-full bg-[#7C3AED]/20 flex items-center justify-center shrink-0">
+                  <Icon name="auto_awesome" size={18} className="text-[#7C3AED] animate-spin" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between text-[13px] font-semibold text-foreground mb-1">
+                    <span>Planejando com IA...</span>
+                    <span className="text-[12px] text-[#7C3AED] font-bold">
+                      {aiProgress.current} de {aiProgress.total} {aiProgress.total === 1 ? 'dia' : 'dias'}
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 bg-muted/60 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full transition-all duration-300"
+                      style={{ width: `${(aiProgress.current / (aiProgress.total || 1)) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* All Days Timeline */}
@@ -2668,229 +2910,61 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                   className="sticky z-10 pt-safe-top pb-2 -mx-4 px-4"
                   style={{ backgroundColor: 'hsl(var(--divider))', top: stickyTabsHeight }}
                 >
-                  <div className="flex items-baseline gap-2">
-                    <h3 className="text-[22px] font-extrabold text-foreground tracking-tight">
-                      {isFlexibleDates ? `Dia ${dayItem.day}` : `${capitalizedWeekday.slice(0, 3)} ${shortDate}`}
-                    </h3>
-                    {!isFlexibleDates && <span className="text-[13px] text-muted-foreground">· Dia {dayItem.day}</span>}
-                  </div>
-
-                  {/* Quick inline actions — contextual */}
-                  {(dayActs.length === 0 || dayActs.length >= 2) && !aiLoadingDays.has(dayItem.day) && (
-                    <div className="flex items-center gap-4 mt-1.5">
-                      {dayActs.length === 0 && (
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const day = dayItem.day;
-                            setSelectedDay(day);
-                            setAiLoadingDays((prev) => { const n = new Set(prev); n.add(day); return n; });
-
-                            // 1) Esperar sugestões do dia carregarem (até 6s),
-                            //    lendo das refs para evitar closure presa.
-                            const getPoolForDay = () => {
-                              if (itineraryDataset?.suggestions) {
-                                return (suggestionsData as ItinerarySuggestion[]) ?? [];
-                              }
-                              return (
-                                dynamicSuggestionsByDayRef.current?.[day]
-                                ?? suggestionsByDayRef.current?.[day]
-                                ?? []
-                              );
-                            };
-                            const waitStart = Date.now();
-                            let pool = getPoolForDay();
-                            while (pool.length === 0 && Date.now() - waitStart < 6000) {
-                              const fetched = Boolean(hasFetchedByDayRef.current?.[day]);
-                              if (fetched) break;
-                              await new Promise((r) => setTimeout(r, 250));
-                              pool = getPoolForDay();
-                            }
-                            // Última leitura após o wait
-                            pool = getPoolForDay();
-
-                            // 2) Filtrar lugares já presentes em qualquer dia (anti-duplicata global)
-                            const used = new Set<string>();
-                            Object.values(dayActivitiesRef.current ?? {}).forEach((acts) => {
-                              (acts as Activity[] | undefined)?.forEach((a) => {
-                                if (a?.name) used.add(a.name.trim().toLowerCase());
-                              });
-                            });
-                            const filtered = pool.filter(
-                              (s) => !used.has(s.name.trim().toLowerCase())
-                            );
-
-                            // 3) Caso vazio: NÃO mostrar sucesso, dar feedback claro
-                            if (filtered.length === 0) {
-                              setAiLoadingDays((prev) => { const n = new Set(prev); n.delete(day); return n; });
-                              const destName = (
-                                itineraryData.destinations?.length
-                                  ? getDestinationForDay(itineraryData.destinations, day, tripDays).split(',')[0]
-                                  : ''
-                              ) || 'esse dia';
-                              toast.error(`Não encontrei sugestões para ${destName}. Tente adicionar manualmente.`);
-                              return;
-                            }
-
-                            // 4) Montar agenda lógica por horário, respeitando funcionamento
-                            const parseHHMM = (s: string): number | null => {
-                              const m = /(\d{1,2}):(\d{2})/.exec(s || '');
-                              if (!m) return null;
-                              return Math.min(23, parseInt(m[1], 10)) * 60 + Math.min(59, parseInt(m[2], 10));
-                            };
-                            const parseHoursRange = (raw: string): { open: number; close: number } | null => {
-                              if (!raw) return null;
-                              const txt = raw.trim().toLowerCase();
-                              if (txt === '24h' || txt.includes('24 h') || txt.includes('aberto 24')) {
-                                return { open: 0, close: 24 * 60 };
-                              }
-                              const parts = txt.split(/\s*(?:às|-|–|to|until|a)\s*/i);
-                              if (parts.length < 2) return null;
-                              const o = parseHHMM(parts[0]);
-                              const c = parseHHMM(parts[1]);
-                              if (o == null || c == null) return null;
-                              return { open: o, close: c <= o ? c + 24 * 60 : c };
-                            };
-                            const isOpenAt = (raw: string, minutes: number): boolean => {
-                              const r = parseHoursRange(raw);
-                              if (!r) return true; // sem info → não bloquear
-                              const m1 = minutes;
-                              const m2 = minutes + 24 * 60;
-                              return (m1 >= r.open && m1 <= r.close) || (m2 >= r.open && m2 <= r.close);
-                            };
-                            const inferBucket = (it: any): 'restaurants' | 'experiences' | 'attractions' | 'nightlife' | 'events' => {
-                              const explicit = it?.bucket as string | undefined;
-                              if (explicit) return explicit as any;
-                              const cat = (it?.category || '').toLowerCase();
-                              if (cat.includes('restaurante')) return 'restaurants';
-                              if (cat.includes('noturna') || cat.includes('bar') || cat.includes('balada')) return 'nightlife';
-                              if (cat.includes('experiência') || cat.includes('experiencia')) return 'experiences';
-                              if (cat.includes('evento')) return 'events';
-                              return 'attractions';
-                            };
-                            type Slot = { start: string; duration: number; prefer: string[]; matchSlot: string };
-                            const slots: Slot[] = [
-                              { start: '09:30', duration: 90, prefer: ['attractions', 'experiences'], matchSlot: 'morning' },
-                              { start: '12:30', duration: 75, prefer: ['restaurants'], matchSlot: 'lunch' },
-                              { start: '15:00', duration: 90, prefer: ['experiences', 'attractions'], matchSlot: 'afternoon' },
-                              { start: '19:30', duration: 90, prefer: ['restaurants', 'events'], matchSlot: 'dinner' },
-                              { start: '22:00', duration: 120, prefer: ['nightlife', 'events'], matchSlot: 'night' },
-                            ];
-                            const remaining = [...filtered];
-                            const picks: typeof filtered = [];
-                            const pickOne = (slot: Slot): any | null => {
-                              const startMin = parseHHMM(slot.start) ?? 9 * 60;
-                              // Tier 1: bucket preferido + slot sugerido bate + aberto
-                              const tiers = [
-                                (it: any) => slot.prefer.includes(inferBucket(it)) && (it.suggestedTimeSlot === slot.matchSlot) && isOpenAt(it.openHours || '', startMin),
-                                (it: any) => slot.prefer.includes(inferBucket(it)) && isOpenAt(it.openHours || '', startMin),
-                                (it: any) => (it.suggestedTimeSlot === slot.matchSlot) && isOpenAt(it.openHours || '', startMin),
-                                (it: any) => isOpenAt(it.openHours || '', startMin) && inferBucket(it) !== 'nightlife',
-                              ];
-                              for (const test of tiers) {
-                                const idx = remaining.findIndex(test);
-                                if (idx !== -1) {
-                                  const [item] = remaining.splice(idx, 1);
-                                  return item;
-                                }
-                              }
-                              return null;
-                            };
-                            for (const slot of slots) {
-                              const item = pickOne(slot);
-                              if (!item) continue;
-                              picks.push(Object.assign({}, item, { __slot: slot }));
-                              if (picks.length >= 5) break;
-                            }
-                            // Garantir mínimo de 3 itens — preencher slots vazios com qualquer coisa restante
-                            if (picks.length < 3) {
-                              const fallbackSlots = slots.filter((s) => !picks.some((p: any) => p.__slot?.start === s.start));
-                              for (const slot of fallbackSlots) {
-                                if (picks.length >= 3) break;
-                                if (remaining.length === 0) break;
-                                const item = remaining.shift();
-                                picks.push(Object.assign({}, item, { __slot: slot }));
-                              }
-                            }
-                            // Ordenar por horário de início
-                            picks.sort((a: any, b: any) => (parseHHMM(a.__slot.start)! - parseHHMM(b.__slot.start)!));
-
-                            const generated: Activity[] = picks.map((item: any, idx) => {
-                              const slot: Slot = item.__slot;
-                              const duration = (item as any).duration || slot.duration;
-                              const start = slot.start;
-                              const end = addMinutes(start, duration);
-                              return {
-                                id: Date.now() + idx,
-                                type: 'activity',
-                                name: item.name,
-                                startTime: start,
-                                endTime: end,
-                                category: item.category || '',
-                                categoryColor: item.categoryColor || '#10B981',
-                                image: item.image,
-                                openHours: (item as any).openHours || '',
-                                rating: (item as any).rating || 0,
-                                price: (item as any).price || estimatedPriceFor(item.name, (item as any).city),
-                                lat: (item as any).lat,
-                                lng: (item as any).lng,
-                              };
-                            });
-                            setDayActivities((prev) => ({ ...prev, [day]: generated }));
-                            // Build transports between generated activities
-                            const needed = Math.max(0, generated.length - 1);
-                            const newTransports: TransportBetween[] = await Promise.all(
-                              Array.from({ length: needed }, async (_, i) => {
-                                const fromAct = generated[i];
-                                const toAct = generated[i + 1];
-                                if (fromAct.lat && fromAct.lng && toAct.lat && toAct.lng) {
-                                  return getRouteInfo(fromAct.lat, fromAct.lng, toAct.lat, toAct.lng);
-                                }
-                                return { type: 'walk' as const, duration: '0 min' };
-                              })
-                            );
-                            setDayTransports((prev) => ({ ...prev, [day]: newTransports }));
-                            setAiLoadingDays((prev) => { const n = new Set(prev); n.delete(day); return n; });
-                            toast.success(`Roteiro gerado com IA · ${generated.length} ${generated.length === 1 ? 'lugar' : 'lugares'}`);
-                          }}
-                          className="flex items-center gap-1 text-[13px] font-semibold text-[#7C3AED] active:opacity-70 transition-opacity"
-                        >
-                          <Icon name="auto_awesome" size={14} className="text-[#7C3AED]" />
-                          <span>Preencher com IA</span>
-                        </button>
-                      )}
-                      {dayActs.length >= 2 && (
-                        <button
-                          type="button"
-                          disabled={optimizingDays.has(dayItem.day)}
-                          onClick={() => setConfirmOptimizeDay(dayItem.day)}
-                          className="flex items-center gap-1 text-[13px] font-semibold text-[#2563EB] active:opacity-70 transition-opacity disabled:opacity-60"
-                        >
-                          <Icon
-                            name={optimizingDays.has(dayItem.day) ? "autorenew" : "route"}
-                            size={14}
-                            className={`text-[#2563EB] ${optimizingDays.has(dayItem.day) ? 'animate-spin' : ''}`}
-                          />
-                          <span key={optimizingDays.has(dayItem.day) ? 'optimizing' : 'idle'}>
-                            {optimizingDays.has(dayItem.day) ? 'Otimizando rota...' : 'Otimizar rota'}
-                          </span>
-                        </button>
-                      )}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-baseline gap-2">
+                      <h3 className="text-[22px] font-extrabold text-foreground tracking-tight">
+                        {isFlexibleDates ? `Dia ${dayItem.day}` : `${capitalizedWeekday.slice(0, 3)} ${shortDate}`}
+                      </h3>
+                      {!isFlexibleDates && <span className="text-[13px] text-muted-foreground">· Dia {dayItem.day}</span>}
                     </div>
-                  )}
+
+                    {dayActs.length >= 2 && !aiLoadingDays.has(dayItem.day) && (
+                      <button
+                        type="button"
+                        disabled={optimizingDays.has(dayItem.day)}
+                        onClick={() => setConfirmOptimizeDay(dayItem.day)}
+                        className="flex items-center gap-1 text-[13px] font-semibold text-[#2563EB] active:opacity-70 transition-opacity disabled:opacity-60"
+                      >
+                        <Icon
+                          name={optimizingDays.has(dayItem.day) ? "autorenew" : "route"}
+                          size={14}
+                          className={`text-[#2563EB] ${optimizingDays.has(dayItem.day) ? 'animate-spin' : ''}`}
+                        />
+                        <span key={optimizingDays.has(dayItem.day) ? 'optimizing' : 'idle'}>
+                          {optimizingDays.has(dayItem.day) ? 'Otimizando rota...' : 'Otimizar rota'}
+                        </span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                {/* Add a place input — only when day is empty */}
+                {/* Empty state for days with no activities */}
                 {dayActs.length === 0 && !aiLoadingDays.has(dayItem.day) && (
-                  <button
-                    type="button"
-                    onClick={() => { setSelectedDay(dayItem.day); setShowAddPlace(true); }}
-                    className="w-full h-11 mb-3 mt-2 px-3.5 rounded-xl bg-card border border-border flex items-center gap-2 text-left active:scale-[0.99] transition-transform"
-                    style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
-                  >
-                    <Icon name="location_on" size={16} className="text-muted-foreground" />
-                    <span className="text-[13px] text-muted-foreground">Adicionar um lugar</span>
-                  </button>
+                  <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-card border border-border/60 mb-4 my-2" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                    <div className="w-10 h-10 rounded-full bg-muted/60 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Icon name="location_on" size={20} className="text-muted-foreground" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-[14px] font-bold text-foreground leading-snug">
+                        Seu dia ainda está em branco
+                      </h4>
+                      <p className="text-[13px] text-muted-foreground leading-relaxed mt-0.5">
+                        Adicione lugares pelo botão de &quot;+&quot; ou deixe a{' '}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAiRecommendationsTargetDay(dayItem.day);
+                            setShowAiRecommendationsScreen(true);
+                          }}
+                          className="inline-flex items-center gap-0.5 font-semibold text-[#7C3AED] hover:underline"
+                        >
+                          <Icon name="auto_awesome" size={13} className="text-[#7C3AED]" />
+                          IA
+                        </button>{' '}
+                        planejar este dia.
+                      </p>
+                    </div>
+                  </div>
                 )}
 
                 {dayActs.length > 0 && optimizingDays.has(dayItem.day) ? (
@@ -2969,163 +3043,19 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                     />
                   </div>
                 ) : aiLoadingDays.has(dayItem.day) ? (
-                  <div className="space-y-3 mb-4 animate-fade-in">
+                  <div className="space-y-3 mb-4 animate-fade-in my-2">
                     {[0, 1, 2].map((i) => (
-                      <div key={i} className="rounded-xl bg-card p-3 flex gap-3" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-                        <div className="w-16 h-16 rounded-lg bg-muted animate-pulse" />
+                      <div key={i} className="rounded-2xl bg-card p-3.5 flex gap-3 border border-border/40" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                        <div className="w-16 h-16 rounded-xl bg-muted animate-pulse flex-shrink-0" />
                         <div className="flex-1 space-y-2 py-1">
-                          <div className="h-3 w-2/3 rounded bg-muted animate-pulse" />
-                          <div className="h-3 w-1/3 rounded bg-muted animate-pulse" />
-                          <div className="h-3 w-1/2 rounded bg-muted animate-pulse" />
+                          <div className="h-3.5 rounded-md bg-muted animate-pulse w-3/4" />
+                          <div className="h-3 rounded-md bg-muted animate-pulse w-1/2" />
+                          <div className="h-3 rounded-md bg-muted animate-pulse w-2/5" />
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : null}
-
-                {/* Per-Day Recommendations */}
-                {(() => {
-                  const daySuggestions = itineraryDataset?.suggestions
-                    ? suggestionsData
-                    : (dynamicSuggestionsByDay[dayItem.day] ?? suggestionsByDay[dayItem.day] ?? []);
-                  const dayActivityNames = dayActs.map(a => a.name.toLowerCase());
-                  const filteredSuggestions = daySuggestions.filter((item) => !dayActivityNames.includes(item.name.toLowerCase()));
-                  const hasSuggestions = daySuggestions.length > 0;
-                  const allSuggestionsAlreadyAdded = hasSuggestions && filteredSuggestions.length === 0;
-                  const isSearchingSuggestions = Boolean(isLoadingByDay[dayItem.day]) && !hasSuggestions;
-                  const suggestionsFetched = Boolean(hasFetchedByDay[dayItem.day]);
-                  const dayDestinationName = getDestinationForDay(itineraryData.destinations, dayItem.day, tripDays).split(',')[0];
-                  const dayDestination = itineraryData.destinations.length > 1 ? dayDestinationName : null;
-                  const bucketOf = (cat: string): RecCategory => {
-                    const c = (cat || '').toLowerCase();
-                    if (c.includes('restaurante') || c.includes('cafeteria') || c.includes('mercado')) return 'food';
-                    if (c.includes('experiência') || c.includes('experiencia')) return 'experience';
-                    if (c.includes('vida noturna') || c.includes('bar') || c.includes('pub') || c.includes('balada')) return 'night';
-                    if (c.includes('evento')) return 'event';
-                    return 'attraction';
-                  };
-                  // Quando há filtro de categoria ativo, busca no pool completo
-                  // da cidade (não na fatia rotativa por dia) para garantir que
-                  // restaurantes/experiências/vida noturna apareçam mesmo quando
-                  // o slice diário só trouxe atrações.
-                  // Filtro de categoria opera sobre a fatia do dia para manter
-                  // recomendações diferentes em cada dia, inclusive por bucket.
-                  const recFilter: RecCategory = recFilterByDay[dayItem.day] ?? 'all';
-                  const categoryFiltered = recFilter === 'all'
-                    ? filteredSuggestions
-                    : filteredSuggestions.filter((s) => bucketOf(s.category || '') === recFilter);
-                  const chips: { key: RecCategory; label: string }[] = [
-                    { key: 'all', label: 'Tudo' },
-                    { key: 'attraction', label: 'Atrações' },
-                    { key: 'food', label: 'Restaurantes' },
-                    { key: 'experience', label: 'Experiências' },
-                    { key: 'night', label: 'Vida noturna' },
-                    { key: 'event', label: 'Eventos' },
-                  ];
-                  return (
-                    <div className="mt-3">
-                      <h4 className="text-[13px] font-semibold text-foreground mb-2">
-                        {dayDestination ? `Recomendações em ${dayDestination}` : 'Recomendações pra esse dia'}
-                      </h4>
-                      {filteredSuggestions.length > 0 && (
-                        <div className="flex overflow-x-auto scrollbar-hide gap-1.5 mb-2.5 -mr-5 pr-5" style={{ overscrollBehaviorX: 'contain' }}>
-                          {chips.map((chip) => {
-                            const active = recFilter === chip.key;
-                            return (
-                              <button
-                                key={chip.key}
-                                onClick={() => setRecFilterByDay((prev) => ({ ...prev, [dayItem.day]: chip.key }))}
-                                className="px-3 py-1 rounded-full text-[12px] font-medium flex-shrink-0 transition-colors"
-                                style={{
-                                  background: active ? '#1A1C40' : '#FFFFFF',
-                                  color: active ? '#FFFFFF' : '#1A1C40',
-                                  border: active ? '1px solid #1A1C40' : '1px solid hsl(var(--border))',
-                                }}
-                              >
-                                {chip.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                      {categoryFiltered.length > 0 ? (
-                        <div className="flex overflow-x-auto scrollbar-hide gap-3 -mr-5 pr-5" style={{ overscrollBehaviorX: 'contain' }} onWheel={(e) => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { const el = e.currentTarget; el.style.overflowX = 'hidden'; requestAnimationFrame(() => { if (el) el.style.overflowX = 'auto'; }); } }}>
-                          {categoryFiltered.map((item) =>
-                            <div
-                              key={item.id}
-                              className="flex items-center gap-3 p-2.5 rounded-xl border border-dashed border-border bg-card flex-shrink-0"
-                              style={{ width: 'calc((100% - 12px) / 1.6)' }}>
-                              <img
-                                src={item.image}
-                                alt={item.name}
-                                className="w-[72px] h-[72px] rounded-lg object-cover flex-shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <h4 className="text-[13px] font-semibold text-foreground line-clamp-2 leading-tight">{item.name}</h4>
-                              </div>
-                              <button
-                                onClick={() => {
-                                  const duration = item.duration || 90;
-                                  const { start, end } = suggestNextTime(dayItem.day, duration);
-                                  const itemLat = (item as any).lat as number | undefined;
-                                  const itemLng = (item as any).lng as number | undefined;
-                                  const newActivity: Activity = {
-                                    id: Date.now() + item.id,
-                                    type: 'activity',
-                                    name: item.name,
-                                    startTime: start,
-                                    endTime: end,
-                                    category: item.category || '',
-                                    categoryColor: item.categoryColor || '#10B981',
-                                    image: item.image,
-                                    openHours: '',
-                                    rating: item.rating || 0,
-                                    price: (item as any).price || estimatedPriceFor(item.name, (item as any).city),
-                                    lat: itemLat,
-                                    lng: itemLng
-                                  };
-                                  addDefaultTransport(dayItem.day, item.name, itemLat, itemLng);
-                                  setDayActivities((prev) => ({
-                                    ...prev,
-                                    [dayItem.day]: [...getAllActivities(dayItem.day), newActivity]
-                                  }));
-                                  toast(`${item.name} adicionado ao Dia ${dayItem.day}`);
-                                }}
-                                className="w-8 h-8 rounded-full border border-border bg-card flex items-center justify-center flex-shrink-0">
-                                <Icon name="add" size={20} className="text-muted-foreground" />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ) : recFilter !== 'all' && filteredSuggestions.length > 0 ? (
-                        <div className="flex items-center gap-2 py-3 px-3 rounded-xl bg-muted/40">
-                          <Icon name="filter_alt_off" size={16} className="text-muted-foreground flex-shrink-0" />
-                          <p className="text-[12px] font-medium text-muted-foreground">
-                            Nenhuma sugestão nessa categoria
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 py-3 px-3 rounded-xl bg-muted/40">
-                          {isSearchingSuggestions ? (
-                            <Icon name="autorenew" size={16} className="text-muted-foreground flex-shrink-0 animate-spin" />
-                          ) : allSuggestionsAlreadyAdded ? (
-                            <Icon name="check_circle" size={16} filled className="text-primary flex-shrink-0" />
-                          ) : (
-                            <Icon name="travel_explore" size={16} className="text-muted-foreground flex-shrink-0" />
-                          )}
-                          <p className="text-[12px] font-medium text-muted-foreground">
-                            {isSearchingSuggestions
-                              ? `Buscando sugestões em ${dayDestinationName || 'seu destino'}...`
-                              : allSuggestionsAlreadyAdded
-                                ? 'Todas as sugestões já estão neste dia'
-                                : suggestionsFetched
-                                  ? `Ainda não encontramos sugestões para ${dayDestinationName || 'esse destino'}`
-                                  : `Buscando sugestões em ${dayDestinationName || 'seu destino'}...`}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
               </div>
             );
           })}
@@ -3137,6 +3067,57 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
             <p className="text-[14px] font-semibold text-foreground">Abrindo cópia do roteiro...</p>
           </div>
         }
+
+        {/* Bottom sheet Planejar com IA */}
+        <Sheet open={showAiPlanSheet} onOpenChange={setShowAiPlanSheet}>
+          <SheetContent side="bottom" className="rounded-t-3xl p-0 max-h-[70vh]">
+            <SheetHeader className="px-5 pt-5 pb-2">
+              <SheetTitle className="text-left text-[18px] font-bold text-foreground flex items-center gap-2">
+                <Icon name="auto_awesome" size={20} className="text-[#7C3AED]" />
+                Planejar com IA
+              </SheetTitle>
+            </SheetHeader>
+            <div className="px-4 pt-2 pb-8 space-y-3">
+              <button
+                type="button"
+                onClick={() => handlePlanWithAi('all')}
+                className="w-full flex items-center gap-4 p-4 rounded-2xl bg-card hover:bg-muted/30 active:scale-[0.98] transition-all text-left border border-border/60 shadow-sm"
+              >
+                <div className="w-11 h-11 rounded-2xl bg-[#7C3AED]/10 flex items-center justify-center shrink-0">
+                  <Icon name="auto_awesome" size={22} className="text-[#7C3AED]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-[15px] font-bold text-foreground block">
+                    Planejar roteiro inteiro
+                  </span>
+                  <span className="text-[12px] text-muted-foreground block mt-0.5">
+                    Gera recomendações de lugares para todos os dias do roteiro
+                  </span>
+                </div>
+                <Icon name="chevron_right" size={20} className="text-muted-foreground shrink-0" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handlePlanWithAi('empty')}
+                className="w-full flex items-center gap-4 p-4 rounded-2xl bg-card hover:bg-muted/30 active:scale-[0.98] transition-all text-left border border-border/60 shadow-sm"
+              >
+                <div className="w-11 h-11 rounded-2xl bg-indigo-500/10 flex items-center justify-center shrink-0">
+                  <Icon name="calendar_today" size={20} className="text-indigo-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-[15px] font-bold text-foreground block">
+                    Planejar dias vazios
+                  </span>
+                  <span className="text-[12px] text-muted-foreground block mt-0.5">
+                    Preenche apenas os dias que ainda não têm lugares
+                  </span>
+                </div>
+                <Icon name="chevron_right" size={20} className="text-muted-foreground shrink-0" />
+              </button>
+            </div>
+          </SheetContent>
+        </Sheet>
 
         {/* Bottom sheet para escolher modo de visualização do itinerário */}
         <Sheet open={showViewModeSheet} onOpenChange={setShowViewModeSheet}>
@@ -3232,6 +3213,17 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
           }}
           isPurchased={isPurchased}
           isPublic={isItineraryPublic}
+          isCancelled={itineraryData.tags?.includes('_CANCELLED_') || itineraryData.tags?.includes('_CANCELED_')}
+          onToggleCancelled={async () => {
+            if (typeof itineraryId !== 'string') return;
+            const isCurrentlyCancelled = itineraryData.tags?.includes('_CANCELLED_') || itineraryData.tags?.includes('_CANCELED_');
+            const newTags = isCurrentlyCancelled
+              ? (itineraryData.tags || []).filter(t => t !== '_CANCELLED_' && t !== '_CANCELED_')
+              : [...(itineraryData.tags || []), '_CANCELLED_'];
+            await updateItinerary(itineraryId, { tags: newTags });
+            setItineraryData(prev => ({ ...prev, tags: newTags }));
+            toast.success(isCurrentlyCancelled ? 'Roteiro reativado!' : 'Roteiro cancelado.');
+          }}
           onTogglePublic={(v) => {
             if (v && !isItineraryPublic) {
               // Privado → público: abre o fluxo de publicação para criar uma cópia independente
@@ -3276,6 +3268,63 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
               }),
             });
           }} />
+
+        {showAiRecommendationsScreen && (
+          <AiRecommendationsScreen
+            destinations={itineraryData.destinations}
+            daysData={effectiveDaysData.map((d) => ({
+              day: d.day,
+              title: d.title,
+              date: d.date,
+            }))}
+            initialDay={aiRecommendationsTargetDay}
+            initialDestination={itineraryData.destinations[0]}
+            onBack={() => setShowAiRecommendationsScreen(false)}
+            onAddPlace={(day, place) => {
+              const acts = getAllActivities(day);
+              let start = '09:30';
+              let end = '11:00';
+              if (acts.length > 0) {
+                const last = acts[acts.length - 1];
+                const parseHHMM = (s: string) => {
+                  const m = /(\d{1,2}):(\d{2})/.exec(s || '');
+                  if (!m) return 570;
+                  return Math.min(23, parseInt(m[1], 10)) * 60 + Math.min(59, parseInt(m[2], 10));
+                };
+                const startMins = parseHHMM(last.endTime || '09:30');
+                const endMins = startMins + 90;
+                const formatTime = (mins: number) => {
+                  const h = Math.floor(mins / 60) % 24;
+                  const m = mins % 60;
+                  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                };
+                start = formatTime(startMins);
+                end = formatTime(endMins);
+              }
+
+              const newActivity: Activity = {
+                id: Date.now() + Math.floor(Math.random() * 10000),
+                type: 'activity',
+                name: place.name,
+                startTime: start,
+                endTime: end,
+                category: place.category || 'Ponto Turístico',
+                categoryColor: place.categoryColor || '#10B981',
+                image: place.image || 'https://images.unsplash.com/photo-1503220317375-aaad61436b1b?w=300',
+                openHours: place.openHours || '',
+                rating: place.rating || 4.5,
+                price: place.price || estimatedPriceFor(place.name, place.city || itineraryData.destinations[0]),
+                lat: place.lat,
+                lng: place.lng,
+              };
+
+              setDayActivities((prev) => ({
+                ...prev,
+                [day]: [...getAllActivities(day), newActivity],
+              }));
+            }}
+          />
+        )}
 
         {isUuidId && typeof itineraryId === 'string' && session?.user?.id && (
           <ShareItinerarySheet
@@ -3566,7 +3615,14 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                       setEditStartTime(start);
                       setEditEndTime(end);
                       setEditOriginalDuration(Math.max(0, toMin(end) - toMin(start)));
-                      setEditPrice(activityActionTarget.price || '');
+                      const sym = detectCurrencySymbol(
+                        activityActionTarget.price,
+                        (itineraryData as any)?.currency,
+                        itineraryData?.destinations
+                      );
+                      const numericVal = extractNumericPrice(activityActionTarget.price);
+                      setEditCurrencySymbol(sym);
+                      setEditPrice(numericVal);
                       setEditObservation(activityActionTarget.observation || '');
                       setActivityEditMode(true);
                     }}
@@ -3653,58 +3709,38 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                   <div className="py-3.5 border-b border-border/40">
                     <span className="text-[11px] text-muted-foreground block mb-2">Horário</span>
                     <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1 bg-[#F2F2F2] rounded-xl px-1.5 h-9 flex-1">
-                        <button
-                          onClick={() => {
-                            const [h, m] = (editStartTime || '09:00').split(':').map(Number);
-                            const total = Math.max(0, h * 60 + m - 15);
-                            const newStart = `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
-                            setEditStartTime(newStart);
-                            const newEndTotal = total + editOriginalDuration;
-                            setEditEndTime(`${String(Math.floor(newEndTotal / 60)).padStart(2, '0')}:${String(newEndTotal % 60).padStart(2, '0')}`);
+                      <div className="flex items-center bg-[#F2F2F2] rounded-lg px-3 h-9 relative overflow-hidden cursor-pointer hover:bg-[#E5E5E5] transition-colors">
+                        <input
+                          type="time"
+                          value={editStartTime || '09:00'}
+                          onChange={(e) => {
+                            const newStart = e.target.value;
+                            if (newStart) {
+                              setEditStartTime(newStart);
+                              const [sh, sm] = newStart.split(':').map(Number);
+                              const totalStart = sh * 60 + sm;
+                              const newEndTotal = totalStart + editOriginalDuration;
+                              setEditEndTime(`${String(Math.floor(newEndTotal / 60)).padStart(2, '0')}:${String(newEndTotal % 60).padStart(2, '0')}`);
+                            }
                           }}
-                          className="w-7 h-7 rounded-full flex items-center justify-center">
-
-                          <Icon name="remove" size={16} className="text-foreground" />
-                        </button>
-                        <span className="text-[14px] font-semibold text-foreground flex-1 text-center">{editStartTime || '--:--'}</span>
-                        <button
-                          onClick={() => {
-                            const [h, m] = (editStartTime || '09:00').split(':').map(Number);
-                            const total = Math.min(1439, h * 60 + m + 15);
-                            const newStart = `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
-                            setEditStartTime(newStart);
-                            const newEndTotal = total + editOriginalDuration;
-                            setEditEndTime(`${String(Math.floor(newEndTotal / 60)).padStart(2, '0')}:${String(newEndTotal % 60).padStart(2, '0')}`);
-                          }}
-                          className="w-7 h-7 rounded-full flex items-center justify-center">
-
-                          <Icon name="add" size={16} className="text-foreground" />
-                        </button>
+                          className="text-[15px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-[70px] text-center"
+                        />
                       </div>
+                      
                       <span className="text-[13px] text-muted-foreground">–</span>
-                      <div className="flex items-center gap-1 bg-[#F2F2F2] rounded-xl px-1.5 h-9 flex-1">
-                        <button
-                          onClick={() => {
-                            const [h, m] = (editEndTime || '11:00').split(':').map(Number);
-                            const total = Math.max(0, h * 60 + m - 15);
-                            setEditEndTime(`${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`);
+                      
+                      <div className="flex items-center bg-[#F2F2F2] rounded-lg px-3 h-9 relative overflow-hidden cursor-pointer hover:bg-[#E5E5E5] transition-colors">
+                        <input
+                          type="time"
+                          value={editEndTime || '11:00'}
+                          onChange={(e) => {
+                            const newEnd = e.target.value;
+                            if (newEnd) {
+                              setEditEndTime(newEnd);
+                            }
                           }}
-                          className="w-7 h-7 rounded-full flex items-center justify-center">
-
-                          <Icon name="remove" size={16} className="text-foreground" />
-                        </button>
-                        <span className="text-[14px] font-semibold text-foreground flex-1 text-center">{editEndTime || '--:--'}</span>
-                        <button
-                          onClick={() => {
-                            const [h, m] = (editEndTime || '11:00').split(':').map(Number);
-                            const total = Math.min(1439, h * 60 + m + 15);
-                            setEditEndTime(`${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`);
-                          }}
-                          className="w-7 h-7 rounded-full flex items-center justify-center">
-
-                          <Icon name="add" size={16} className="text-foreground" />
-                        </button>
+                          className="text-[15px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-[70px] text-center"
+                        />
                       </div>
                     </div>
                     {/* Overlap info removed — auto-adjusted on save */}
@@ -3713,14 +3749,11 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                   <div className="py-3.5 border-b border-border/40">
                     <span className="text-[11px] text-muted-foreground block mb-2">Valor</span>
                     <div className="w-full bg-[#F2F2F2] rounded-xl px-3 h-9 flex items-center gap-1">
-                      <span className="text-[14px] font-medium text-muted-foreground">R$</span>
+                      <span className="text-[14px] font-medium text-muted-foreground">{editCurrencySymbol}</span>
                       <input
                         value={editPrice}
                         onChange={(e) => {
-                          const digits = e.target.value.replace(/\D/g, '').slice(0, 11);
-                          if (!digits) { setEditPrice(''); return; }
-                          const n = parseInt(digits, 10) / 100;
-                          setEditPrice(n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                          setEditPrice(formatNumericInput(e.target.value));
                         }}
                         placeholder="0,00"
                         inputMode="numeric"
@@ -3743,21 +3776,26 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
 
                   {/* Save button */}
                   <button
-                    onClick={() => {
-                      const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+                    onClick={async () => {
+                      const toMin = (t: string) => {
+                        const m = /^(\d{1,2}):(\d{2})/.exec((t || '').trim());
+                        if (!m) return 0;
+                        return Number(m[1]) * 60 + Number(m[2]);
+                      };
                       const toTime = (m: number) => { const h = Math.floor(m / 60) % 24; const mm = m % 60; return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`; };
                       const GAP = 15;
 
+                      const formattedPrice = editPrice ? `${editCurrencySymbol} ${editPrice}` : '';
                       const allCurrent = getAllActivities(selectedDay);
                       // Apply edit to target activity
                       let updated = allCurrent.map((a) =>
                         a.id === activityActionTarget.id
-                          ? { ...a, startTime: editStartTime, endTime: editEndTime, price: editPrice, observation: editObservation || undefined }
+                          ? { ...a, startTime: editStartTime, endTime: editEndTime, price: formattedPrice, observation: editObservation || undefined }
                           : a
                       );
 
-                      // Sort by startTime
-                      updated.sort((a, b) => toMin(a.startTime || '00:00') - toMin(b.startTime || '00:00'));
+                      // Re-sort chronologically by startTime
+                      updated = sortActivitiesChronologically(updated);
 
                       // Cascade: push subsequent activities forward if overlapping
                       let adjusted = false;
@@ -3774,13 +3812,23 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                         }
                       }
 
+                      // Re-sort chronologically after cascade
+                      updated = sortActivitiesChronologically(updated);
+
+                      // Rebuild transports for the new chronological order
+                      const newTransports = await buildTransportsForActivities(updated);
+
                       setDayActivities((prev) => ({
                         ...prev,
                         [selectedDay]: updated
                       }));
+                      setDayTransports((prev) => ({
+                        ...prev,
+                        [selectedDay]: newTransports
+                      }));
                       setActivityEditMode(false);
                       setActivityActionTarget(null);
-                      toast(adjusted ? 'Horários ajustados automaticamente' : 'Atividade atualizada');
+                      toast.success(adjusted ? 'Horários ajustados e itens reordenados' : 'Atividade atualizada e reordenada');
                     }}
                     className="w-full h-[41px] rounded-[16px] bg-primary text-primary-foreground font-semibold text-[14px] flex items-center justify-center mt-5">
 
@@ -3908,14 +3956,21 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         open={showAddTripNote}
         onClose={() => setShowAddTripNote(false)}
         onSave={(note) => {
-          const newNote: TripNote = {
-            id: Date.now().toString(),
-            author: 'Você',
-            authorImage: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
-            title: note.title || 'Sem título',
-            summary: note.content || '',
-          };
-          setTripNotes(prev => [newNote, ...prev]);
+          try {
+            const newNote: TripNote = {
+              id: Date.now().toString(),
+              author: currentUser.name || 'Você',
+              authorImage: currentUser.avatar || '',
+              title: note.title || 'Sem título',
+              summary: note.content || '',
+            };
+            setTripNotes(prev => [newNote, ...prev]);
+            toast.success('Nota salva com sucesso!');
+            setShowTips(true);
+          } catch (err) {
+            toast.error('Erro ao salvar a nota. Tente novamente.');
+          }
+          setShowAddTripNote(false);
         }}
       />
 

@@ -7,6 +7,7 @@ import { ptBR } from 'date-fns/locale';
 import type { DateRange } from 'react-day-picker';
 import { resolveNextRange } from '@/lib/dateRangeSelection';
 import { searchGooglePlacesAutocomplete } from '@/lib/googlePlacesApi';
+import { toast } from 'sonner';
 
 interface EditTripInfoSheetProps {
   open: boolean;
@@ -119,6 +120,7 @@ export function EditTripInfoSheet({ open, onClose, destinations: initialDest, st
       isFlexible: !isFixedDate,
       durationDays: !isFixedDate ? (durationDays === '' ? 1 : durationDays) : undefined,
     });
+    toast.success('Destinos e datas salvos com sucesso!');
     onClose();
   };
 

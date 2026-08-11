@@ -236,20 +236,30 @@ export function AddDeslocamentoSheet({ open, onClose, onSave, totalDays, startDa
           {positionIndex !== null && (
             <div>
               <label className="text-[13px] font-medium text-muted-foreground mb-2 block">Tipo de locomoção</label>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex gap-2 overflow-x-auto scrollbar-hide">
                 {transportTypes.map(t => {
-                  const isSelected = type === t.id;
+                  const active = type === t.id;
                   return (
                     <button
                       key={t.id}
+                      type="button"
                       onClick={() => setType(t.id)}
-                      className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[13px] font-medium transition-colors border ${
-                        isSelected
-                          ? 'bg-foreground text-background border-foreground'
-                          : 'bg-transparent text-foreground border-border'
-                      }`}
+                      className="h-9 px-4 rounded-full text-[13px] font-semibold transition-all whitespace-nowrap flex-shrink-0 active:scale-[0.97] border inline-flex items-center gap-1.5"
+                      style={
+                        active
+                          ? {
+                              backgroundColor: '#1A1C40',
+                              color: '#FFFFFF',
+                              borderColor: 'transparent',
+                            }
+                          : {
+                              background: 'hsl(var(--card))',
+                              color: 'hsl(var(--foreground))',
+                              borderColor: 'hsl(var(--border))',
+                            }
+                      }
                     >
-                      <Icon name={t.icon} size={16} className="text-current" />
+                      <Icon name={t.icon} size={14} className={active ? 'text-white' : ''} />
                       {t.label}
                     </button>
                   );

@@ -47,7 +47,7 @@ export function ItineraryCard({ itinerary, onClick, variant = 'default', classNa
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1">
               <Icon name="star" size={16} filled className="text-[#F2B90C]" />
-              <span className="font-semibold">{itinerary.rating}</span>
+              <span className="font-semibold">{itinerary.rating > 0 ? (typeof itinerary.rating === 'number' && Number.isInteger(itinerary.rating) ? itinerary.rating : itinerary.rating.toFixed(1)) : '-'}</span>
               <span className="text-white/70">({itinerary.reviewCount})</span>
             </div>
             <div className="bg-white/20 backdrop-blur-sm rounded-full px-4 py-1.5">
@@ -69,7 +69,7 @@ export function ItineraryCard({ itinerary, onClick, variant = 'default', classNa
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1">
               <Icon name="star" size={14} filled className="text-[#F2B90C]" />
-              <span className="text-sm font-semibold">{itinerary.rating}</span>
+              <span className="text-sm font-semibold">{itinerary.rating > 0 ? (typeof itinerary.rating === 'number' && Number.isInteger(itinerary.rating) ? itinerary.rating : itinerary.rating.toFixed(1)) : '-'}</span>
             </div>
             <span className="text-primary font-bold text-sm">R$ {itinerary.price.toFixed(2).replace('.', ',')}</span>
           </div>
@@ -101,7 +101,7 @@ export function ItineraryCard({ itinerary, onClick, variant = 'default', classNa
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1">
             <Icon name="star" size={12} filled className="text-[#F2B90C]" />
-            <span className="text-[12px] font-semibold">{itinerary.rating}</span>
+            <span className="text-[12px] font-semibold">{itinerary.rating > 0 ? (typeof itinerary.rating === 'number' && Number.isInteger(itinerary.rating) ? itinerary.rating : itinerary.rating.toFixed(1)) : '-'}</span>
             <span className="text-[11px] text-muted-foreground">({itinerary.reviewCount})</span>
           </div>
           <span className="text-[11px] text-muted-foreground">{itinerary.duration}</span>

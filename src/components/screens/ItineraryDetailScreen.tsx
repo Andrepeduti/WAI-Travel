@@ -222,7 +222,7 @@ export function ItineraryDetailScreen({ itineraryId, onBack, onOpenChat }: Itine
         <div className="flex items-center gap-4 mb-5 flex-wrap">
           <div className="flex items-center gap-1">
             <Icon name="star" size={16} filled className="text-[#F2B90C]" />
-            <span className="text-[15px] font-semibold">{itineraryData.rating}</span>
+            <span className="text-[15px] font-semibold">{itineraryData.rating > 0 ? itineraryData.rating : '-'}</span>
           </div>
 
           <div className="w-px h-4 bg-border" />

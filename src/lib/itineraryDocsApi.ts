@@ -10,6 +10,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { touchItinerary } from '@/lib/itinerariesApi';
 import type { Reserva } from '@/components/travel/AddReservaSheet';
 import type { Transporte } from '@/components/travel/AddTransporteSheet';
 
@@ -223,6 +224,7 @@ export async function saveItineraryDocs(
     if (error) console.error('[itineraryDocsApi] insert doc transports failed', error);
   }
 
+  await touchItinerary(itineraryId);
   return { reservas, transportes };
 }
 

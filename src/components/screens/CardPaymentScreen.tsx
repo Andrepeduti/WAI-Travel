@@ -107,7 +107,7 @@ export function CardPaymentScreen({ onBack, onSave, onDelete, initialData }: Car
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
             <BackButton onClick={onBack} />
-            <h1 className="text-xl font-bold text-foreground my-0 mt-[24px]">{initialData ? 'Editar cartão' : 'Adicionar cartão'}</h1>
+            <h1 className="text-xl font-bold text-foreground my-0">{initialData ? 'Editar cartão' : 'Adicionar cartão'}</h1>
           </div>
           {initialData && onDelete && (
             <button

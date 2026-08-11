@@ -162,7 +162,12 @@ export function EditItineraryDataScreen({
               <Icon name="calendar_today" size={18} className="text-muted-foreground" />
             </button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="center">
+          <PopoverContent
+            className="w-auto p-0 z-[200] max-w-[calc(100vw-32px)]"
+            align="center"
+            sideOffset={8}
+            collisionPadding={{ top: 20, bottom: 85, left: 16, right: 16 }}
+          >
             <Calendar
               mode="range"
               selected={dateRange}

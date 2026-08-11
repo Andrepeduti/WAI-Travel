@@ -36,7 +36,7 @@ export interface PlaceResult {
 interface AddPlaceSheetProps {
   open: boolean;
   onClose: () => void;
-  onSelect: (place: PlaceResult, day: number) => void;
+  onSelect: (placeOrPlaces: PlaceResult | PlaceResult[], day: number) => void;
   onAddManually?: () => void;
   dayNumber: number;
   totalDays: number;
@@ -66,6 +66,7 @@ export function AddPlaceSheet({ open, onClose, onSelect, onAddManually, dayNumbe
   const [search, setSearch] = useState('');
   const [selectedDay, setSelectedDay] = useState(dayNumber);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [selectedPlacesMap, setSelectedPlacesMap] = useState<Map<number, PlaceResult>>(new Map());
   const [activeTab, setActiveTab] = useState<'places' | 'collections'>('places');
   const [openCollectionId, setOpenCollectionId] = useState<number | null>(null);
   useEffect(() => { setSelectedDay(dayNumber); }, [dayNumber]);
@@ -75,6 +76,9 @@ export function AddPlaceSheet({ open, onClose, onSelect, onAddManually, dayNumbe
     if (open) {
       setActiveTab('places');
       setOpenCollectionId(null);
+      setSelectedIds(new Set());
+      setSelectedPlacesMap(new Map());
+      setSearch('');
     }
   }, [open]);
 
@@ -117,7 +121,7 @@ export function AddPlaceSheet({ open, onClose, onSelect, onAddManually, dayNumbe
   // Debounced search
   const [debouncedSearch, setDebouncedSearch] = useState('');
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 1000);
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(t);
   }, [search]);
 
@@ -214,6 +218,7 @@ export function AddPlaceSheet({ open, onClose, onSelect, onAddManually, dayNumbe
 
   // Google Places fallback results (state, fed by effect below)
   const [googleResults, setGoogleResults] = useState<CityPlace[]>([]);
+  const [searchingGoogle, setSearchingGoogle] = useState(false);
 
   // Search results
   const { localResults, globalResults } = useMemo(() => {
@@ -252,76 +257,63 @@ export function AddPlaceSheet({ open, onClose, onSelect, onAddManually, dayNumbe
 
   const hasResults = localResults.length > 0 || globalResults.length > 0;
 
-  // Google Places fallback: when text search returns 0 results from local+API,
-  // search globally restricted to the day's city.
+  // Google Places API search effect
   useEffect(() => {
     const q = debouncedSearch.trim();
-    if (!q || !dayCity) {
+    if (!q || q.length < 2 || !dayCity) {
       setGoogleResults([]);
+      setSearchingGoogle(false);
       return;
     }
 
-    // Check if local+API produced any matches for this query
-    const queryLower = q.toLowerCase();
-    const { local: staticLocal, global: staticGlobal } = searchPlaces(q, destinations);
-    const apiMatches = Object.values(apiPlaces).flat().filter(p =>
-      p.name.toLowerCase().includes(queryLower) || p.category.toLowerCase().includes(queryLower)
-    );
-    if (staticLocal.length + staticGlobal.length + apiMatches.length > 0) {
-      setGoogleResults([]);
-      return;
-    }
-
-    // Debounce extra (the search itself is already debounced 300ms; total ~500ms)
     let cancelled = false;
+    setSearchingGoogle(true);
+
     const t = setTimeout(async () => {
-      const results = await searchGoogleFallback(q, dayCity);
-      if (!cancelled) setGoogleResults(results);
-    }, 200);
-    return () => { cancelled = true; clearTimeout(t); };
-  }, [debouncedSearch, dayCity, destinations, apiPlaces]);
+      try {
+        const results = await searchGoogleFallback(q, dayCity);
+        if (!cancelled) setGoogleResults(results);
+      } catch (e) {
+        console.error('Google search error:', e);
+      } finally {
+        if (!cancelled) setSearchingGoogle(false);
+      }
+    }, 150);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [debouncedSearch, dayCity]);
 
   if (!open) return null;
 
-  const togglePlace = (id: number) => {
+  const togglePlaceItem = (place: PlaceResult) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(place.id)) next.delete(place.id);
+      else next.add(place.id);
+      return next;
+    });
+    setSelectedPlacesMap(prev => {
+      const next = new Map(prev);
+      if (next.has(place.id)) next.delete(place.id);
+      else next.set(place.id, place);
       return next;
     });
   };
 
   const handleConfirm = () => {
-    if (activeTab === 'collections' && openCollection) {
-      const selected = collectionPlaces.filter(p => selectedIds.has(p.id));
-      selected.forEach(p => {
-        onSelect(
-          {
-            id: p.id,
-            name: p.name,
-            category: p.category || 'Lugar salvo',
-            categoryColor: '#9DCC36',
-            image: p.image,
-            rating: p.rating ?? 0,
-            price: '',
-            openHours: '',
-          },
-          selectedDay
-        );
-      });
-    } else {
-      const allPlaces = [...localResults, ...globalResults];
-      const selected = allPlaces.filter(p => selectedIds.has(p.id));
-      selected.forEach(place => onSelect(cityPlaceToResult(place), selectedDay));
+    const selectedList = Array.from(selectedPlacesMap.values()).filter(p => selectedIds.has(p.id));
+    if (selectedList.length > 0) {
+      onSelect(selectedList, selectedDay);
     }
-    setSelectedIds(new Set());
-    setSearch('');
-    onClose();
+    handleClose();
   };
 
   const handleClose = () => {
     setSelectedIds(new Set());
+    setSelectedPlacesMap(new Map());
     setSearch('');
     onClose();
   };
@@ -332,10 +324,11 @@ export function AddPlaceSheet({ open, onClose, onSelect, onAddManually, dayNumbe
     const isSelected = selectedIds.has(place.id);
     const isApiOnly = place.rating === 0; // API places have no rating
     const isAlreadyAdded = existingActivityNames.includes(place.name.toLowerCase());
+    const placeResult = cityPlaceToResult(place);
     return (
       <button
         key={place.id}
-        onClick={() => togglePlace(place.id)}
+        onClick={() => togglePlaceItem(placeResult)}
         className={`w-full flex items-center gap-3 p-2.5 rounded-xl transition-colors text-left ${
           isSelected ? 'bg-primary/8' : 'active:bg-secondary/60'
         }`}
@@ -523,10 +516,20 @@ export function AddPlaceSheet({ open, onClose, onSelect, onAddManually, dayNumbe
                 {filteredCollectionPlaces.map(p => {
                   const isSelected = selectedIds.has(p.id);
                   const isAlreadyAdded = existingActivityNames.includes(p.name.toLowerCase());
+                  const placeResult: PlaceResult = {
+                    id: p.id,
+                    name: p.name,
+                    category: p.category || 'Lugar salvo',
+                    categoryColor: '#9DCC36',
+                    image: p.image,
+                    rating: p.rating ?? 0,
+                    price: '',
+                    openHours: '',
+                  };
                   return (
                     <button
                       key={p.id}
-                      onClick={() => togglePlace(p.id)}
+                      onClick={() => togglePlaceItem(placeResult)}
                       className={`w-full flex items-center gap-3 p-2.5 rounded-xl transition-colors text-left ${
                         isSelected ? 'bg-primary/8' : 'active:bg-secondary/60'
                       }`}
@@ -563,15 +566,20 @@ export function AddPlaceSheet({ open, onClose, onSelect, onAddManually, dayNumbe
             )
           ) : (
           <>
-          {/* Loading indicator */}
-          {loadingApi && (
+          {/* Background loading indicator */}
+          {loadingApi && !hasResults && !debouncedSearch && (
             <div className="flex items-center gap-2 px-1 pb-3">
               <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              <span className="text-[12px] text-muted-foreground">Buscando mais lugares em {dayCity}...</span>
+              <span className="text-[12px] text-muted-foreground">Buscando sugestões para {dayCity}...</span>
             </div>
           )}
 
-          {!hasResults && !loadingApi ? (
+          {searchingGoogle && !hasResults ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3 text-primary" />
+              <p className="text-[14px] font-medium text-foreground">Buscando lugares no Google Places...</p>
+            </div>
+          ) : !hasResults && !loadingApi && !searchingGoogle ? (
             <div className="text-center py-12">
               <Icon name="search" size={40} className="text-muted-foreground mx-auto mb-3 opacity-40" />
               <p className="text-[14px] text-muted-foreground mb-4">Nenhum lugar encontrado</p>

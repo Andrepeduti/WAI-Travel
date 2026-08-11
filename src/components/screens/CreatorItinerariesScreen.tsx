@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { BackButton } from '@/components/ui/BackButton';
+import { UserItinerary } from '@/lib/itinerariesApi';
 
 interface PublicItinerary {
-  id: number;
+  id: string | number;
   title: string;
   destination: string;
   image: string;
@@ -12,14 +13,15 @@ interface PublicItinerary {
   price: number | null;
   duration: string;
   cities: number;
+  userItinerary?: UserItinerary;
 }
 
 interface CreatorItinerariesScreenProps {
   creatorName: string;
   itineraries: PublicItinerary[];
-  acquiredIds: Set<number>;
+  acquiredIds: Set<string | number>;
   onBack: () => void;
-  onItineraryClick: (id: number) => void;
+  onItineraryClick: (id: string | number, userItinerary?: UserItinerary) => void;
 }
 
 type SortOption = 'recent' | 'rating' | 'price_asc' | 'price_desc';
@@ -134,7 +136,7 @@ export function CreatorItinerariesScreen({
             return (
               <button
                 key={it.id}
-                onClick={() => onItineraryClick(it.id)}
+                onClick={() => onItineraryClick(it.id, it.userItinerary)}
                 className="rounded-2xl overflow-hidden bg-card text-left flex flex-col w-full"
                 style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
               >
@@ -151,7 +153,7 @@ export function CreatorItinerariesScreen({
                   <p className="text-muted-foreground mb-1.5" style={{ fontSize: '11px' }}>{it.duration} · {it.cities} cidades</p>
                   <div className="flex items-center gap-1 mb-2">
                     <Icon name="star" size={12} filled style={{ color: '#F2B90C' }} />
-                    <span className="text-foreground font-semibold" style={{ fontSize: '11px' }}>{it.rating}</span>
+                    <span className="text-foreground font-semibold" style={{ fontSize: '11px' }}>{it.rating > 0 ? (typeof it.rating === 'number' && Number.isInteger(it.rating) ? it.rating : it.rating.toFixed(1)) : '-'}</span>
                     <span className="text-muted-foreground" style={{ fontSize: '10px' }}>({it.reviewCount})</span>
                   </div>
                   <div className="mt-auto">

@@ -24,8 +24,8 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
   const { user: authUser } = useAuth();
 
   const [formData, setFormData] = useState({
-    name: user.name ?? '',
-    username: (user.username ?? '').replace(/^@/, ''),
+    name: (user.name ?? '').replace(/[0-9]/g, '').slice(0, 25),
+    username: (user.username ?? '').replace(/^@/, '').slice(0, 10),
     location: user.location ?? '',
     bio: user.bio ?? '',
     instagram: user.instagram ?? '',
@@ -72,8 +72,8 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
   // Sincroniza o formulário com os dados reais do perfil quando carregam
   useEffect(() => {
     setFormData({
-      name: user.name ?? '',
-      username: (user.username ?? '').replace(/^@/, ''),
+      name: (user.name ?? '').replace(/[0-9]/g, '').slice(0, 25),
+      username: (user.username ?? '').replace(/^@/, '').slice(0, 10),
       location: user.location ?? '',
       bio: user.bio ?? '',
       instagram: user.instagram ?? '',
@@ -354,16 +354,28 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
             {/* Form — somente campos essenciais */}
             <div className="space-y-5">
               <div>
-                <label
-                  className="block text-muted-foreground mb-1.5"
-                  style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)' }}
-                >
-                  Nome
-                </label>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label
+                    className="block text-muted-foreground"
+                    style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)' }}
+                  >
+                    Nome
+                  </label>
+                  <span
+                    className="text-muted-foreground"
+                    style={{ fontSize: 'var(--text-xs)' }}
+                  >
+                    {formData.name.length}/25
+                  </span>
+                </div>
                 <input
                   type="text"
                   value={formData.name}
-                  onChange={(e) => handleChange('name', e.target.value)}
+                  maxLength={25}
+                  onChange={(e) => {
+                    const cleanValue = e.target.value.replace(/[0-9]/g, '').slice(0, 25);
+                    handleChange('name', cleanValue);
+                  }}
                   placeholder="Seu nome"
                   className="w-full rounded-xl border border-border bg-background px-4 py-3 text-foreground outline-none focus:border-primary transition-colors"
                   style={{ fontSize: 'var(--text-base)' }}
@@ -371,12 +383,20 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
               </div>
 
               <div>
-                <label
-                  className="block text-muted-foreground mb-1.5"
-                  style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)' }}
-                >
-                  Nome de usuário
-                </label>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label
+                    className="block text-muted-foreground"
+                    style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)' }}
+                  >
+                    Nome de usuário
+                  </label>
+                  <span
+                    className="text-muted-foreground"
+                    style={{ fontSize: 'var(--text-xs)' }}
+                  >
+                    {formData.username.length}/10
+                  </span>
+                </div>
                 <div className="relative">
                   <span
                     className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
@@ -387,9 +407,11 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
                   <input
                     type="text"
                     value={formData.username}
+                    maxLength={10}
                     onChange={(e) => {
                       if (usernameError) setUsernameError(null);
-                      handleChange('username', e.target.value.replace(/^@/, '').toLowerCase());
+                      const cleanValue = e.target.value.replace(/^@/, '').toLowerCase().slice(0, 10);
+                      handleChange('username', cleanValue);
                     }}
                     placeholder="seunome"
                     className={`w-full rounded-xl border bg-background pl-9 pr-4 py-3 text-foreground outline-none transition-colors ${usernameError ? 'border-destructive focus:border-destructive' : 'border-border focus:border-primary'

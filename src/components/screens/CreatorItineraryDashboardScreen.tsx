@@ -271,22 +271,6 @@ export function CreatorItineraryDashboardScreen({
               className="absolute inset-0 p-5 flex flex-col justify-end text-white"
               style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}
             >
-              <div className="flex items-center gap-2 mb-3">
-                {cardData.authorImage ? (
-                  <img
-                    src={cardData.authorImage}
-                    alt={cardData.author}
-                    className="w-7 h-7 rounded-full object-cover border-2 border-white/40"
-                  />
-                ) : (
-                  <div className="w-7 h-7 rounded-full bg-white/20 border-2 border-white/40 flex items-center justify-center">
-                    <span className="text-[11px] font-semibold text-white">
-                      {(cardData.author || '?').slice(0, 1).toUpperCase()}
-                    </span>
-                  </div>
-                )}
-                <span className="text-sm font-medium text-white/95">{cardData.author}</span>
-              </div>
               <h3 className="text-xl font-bold mb-2 leading-tight line-clamp-2">
                 {cardData.title}
               </h3>

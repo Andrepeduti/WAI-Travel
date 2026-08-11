@@ -332,7 +332,7 @@ export function AddVideoFromGallerySheet({ isOpen, onClose, onBack, onSubmit, on
               >
                 <Icon name="chevron_left" size={24} className="text-foreground [&>svg]:stroke-[2.5]" />
               </button>
-              <h2 className="text-xl font-bold text-foreground my-0 mt-[24px]">{header.title}</h2>
+              <h2 className="text-xl font-bold text-foreground my-0">{header.title}</h2>
             </div>
             {header.subtitle && (
               <p className="text-sm text-muted-foreground mt-1">{header.subtitle}</p>

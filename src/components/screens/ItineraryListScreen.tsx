@@ -103,7 +103,7 @@ export function ItineraryListScreen({ title, items, onBack, onItineraryClick, on
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-1">
                     <Icon name="star" size={14} className="text-[#F2B90C]" />
-                    <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{item.rating}</span>
+                    <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{item.rating > 0 ? (typeof item.rating === 'number' && Number.isInteger(item.rating) ? item.rating : item.rating.toFixed(1)) : '-'}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Icon name="location_on" size={14} style={{ color: '#1E293B' }} />

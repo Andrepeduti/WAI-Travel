@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { EditTransportSheet, TransportData } from './EditTransportSheet';
+import { detectCurrencySymbol, extractNumericPrice } from '@/lib/currency';
 import {
   Sheet,
   SheetContent,
@@ -297,13 +298,12 @@ export function DraggableActivityList({
                                </span>
                              )}
                               {activity.price && (() => {
-                                const raw = String(activity.price).replace(/[^\d.,]/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.');
-                                const num = parseFloat(raw);
-                                if (!isFinite(num) || num <= 0) return null;
-                                const formatted = num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                const sym = detectCurrencySymbol(activity.price);
+                                const numeric = extractNumericPrice(activity.price);
+                                if (!numeric) return null;
                                 return (
                                   <span className="text-[12px] font-medium text-muted-foreground">
-                                    R$ {formatted}
+                                    {sym} {numeric}
                                   </span>
                                 );
                               })()}

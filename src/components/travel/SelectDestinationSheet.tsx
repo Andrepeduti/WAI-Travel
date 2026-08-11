@@ -76,9 +76,9 @@ export function SelectDestinationSheet({
           </div>
           
           {/* Header */}
-          <div className="px-6 pb-4" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
+          <div className="px-6 pb-4 flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
             <BackButton onClick={onBack} />
-            <h2 className="text-xl font-bold text-foreground my-0 mt-[24px]">{title}</h2>
+            <h2 className="text-xl font-bold text-foreground my-0">{title}</h2>
           </div>
 
           {/* Search */}

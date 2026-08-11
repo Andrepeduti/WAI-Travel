@@ -108,8 +108,10 @@ export interface FriendProfileData {
   countries: CountryVisit[];
 }
 
+import { UserItinerary } from '@/lib/itinerariesApi';
+
 interface PublicItinerary {
-  id: number;
+  id: string | number;
   title: string;
   destination: string;
   image: string;
@@ -123,6 +125,7 @@ interface PublicItinerary {
   places: number;
   comments: { user: string; text: string; avatar: string }[];
   theme?: { emoji: string; label: string };
+  userItinerary?: UserItinerary;
 }
 
 // Tema da viagem por roteiro (cultural, romântico, gastronômico, etc.)
@@ -144,8 +147,8 @@ interface FriendProfileScreenProps {
   friend: FriendProfileData;
   onBack: () => void;
   onChat?: () => void;
-  onItineraryClick?: (id: number) => void;
-  onDuplicateItinerary?: (id: number) => void;
+  onItineraryClick?: (id: string | number, userItinerary?: UserItinerary) => void;
+  onDuplicateItinerary?: (id: string | number) => void;
   /**
    * 'self'  → meu próprio perfil (botão Editar, ícone Configurações no header)
    * 'other' → perfil de outra pessoa (botões Chat + Seguir, menu de 3 pontinhos no header)
@@ -490,7 +493,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
   };
   const [editInterestsOpen, setEditInterestsOpen] = useState(false);
 
-  const [duplicatedIds, setDuplicatedIds] = useState<Set<number>>(new Set());
+  const [duplicatedIds, setDuplicatedIds] = useState<Set<string | number>>(new Set());
 
   // Roteiros públicos REAIS de outro usuário (vindos do banco). Só
   // entram em ação quando o perfil tem userId real (perfil do banco).
@@ -508,13 +511,31 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
     (async () => {
       const rows = await getPublicItinerariesByUserId(friend.userId!);
       if (cancelled) return;
-      const mapped: PublicItinerary[] = rows.map((r, idx) => {
+      const mapped: PublicItinerary[] = rows.map((r) => {
         const days = r.start_date && r.end_date
           ? Math.max(1, differenceInDays(new Date(r.end_date), new Date(r.start_date)) + 1)
           : 1;
         const uniqueCities = new Set((r.destinations || []).map(d => d.split(',')[0].trim()));
+        
+        const userItinerary: UserItinerary = {
+          id: r.id,
+          title: r.title || 'Roteiro',
+          destinations: r.destinations || [],
+          startDate: r.start_date || '',
+          endDate: r.end_date || '',
+          images: r.images || [],
+          participants: [],
+          places: r.places_count ?? 0,
+          sourceDatasetId: null,
+          isPublic: true,
+          priceCents: r.price_cents,
+          description: r.description || '',
+          tags: r.tags || (r.main_tag ? [r.main_tag] : []),
+          userId: friend.userId!,
+        };
+
         return {
-          id: idx + 1, // id local apenas para keys (entidade real é por uuid)
+          id: r.id,
           title: r.title || 'Roteiro',
           destination: r.destinations?.[0] || '',
           image: r.images?.[0] || '',
@@ -528,6 +549,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
           places: r.places_count ?? 0,
           comments: [],
           theme: r.main_tag ? { emoji: '✈️', label: r.main_tag } : undefined,
+          userItinerary,
         };
       });
       setRealPublicItineraries(mapped);
@@ -834,9 +856,9 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
         itineraries={publicItineraries}
         acquiredIds={duplicatedIds}
         onBack={() => setShowAllItineraries(false)}
-        onItineraryClick={(id) => {
+        onItineraryClick={(id, userItinerary) => {
           setShowAllItineraries(false);
-          onItineraryClick?.(id);
+          onItineraryClick?.(id, userItinerary);
         }}
       />
     );
@@ -1449,7 +1471,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
                       key={it.id}
                       onClick={() => {
                         if (isSelf) {
-                          navigate('/home', { state: { openCreatorDashboardItinerary: it } });
+                          navigate('/home', { state: { openCreatorDashboardItinerary: it, fromStandaloneProfile: true } });
                         } else {
                           navigate(`/itinerary/${it.id}`);
                         }
@@ -1539,7 +1561,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
                   return (
                     <button
                       key={it.id}
-                      onClick={() => onItineraryClick?.(it.id)}
+                      onClick={() => onItineraryClick?.(it.id, it.userItinerary)}
                       className="w-[240px] flex flex-col text-left bg-card rounded-2xl overflow-hidden"
                       style={{ boxShadow: '0 2px 16px rgba(0, 0, 0, 0.07)' }}
                     >
@@ -1556,7 +1578,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
                         <h3 className="font-bold text-[15px] text-foreground leading-tight line-clamp-1">{it.title}</h3>
                         <div className="flex items-center gap-1.5">
                           <Icon name="star" size={14} filled className="text-[#F2B90C]" />
-                          <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{it.rating}</span>
+                          <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{it.rating > 0 ? (typeof it.rating === 'number' && Number.isInteger(it.rating) ? it.rating : it.rating.toFixed(1)) : '-'}</span>
                           <Icon name="location_on" size={14} style={{ color: '#1E293B' }} className="ml-2" />
                           <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{it.cities} cidades</span>
                           <Icon name="schedule" size={14} style={{ color: '#1E293B' }} className="ml-2" />

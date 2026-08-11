@@ -50,7 +50,7 @@ export function TripRemindersScreen({ onBack }: TripRemindersScreenProps) {
         <div className="flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />
           <div>
-            <h1 className="text-xl font-bold text-foreground my-0 mt-[24px]">Amsterdam</h1>
+            <h1 className="text-xl font-bold text-foreground my-0">Amsterdam</h1>
             <p className="text-sm text-muted-foreground">Faltam 15 dias para sua viagem!</p>
           </div>
         </div>

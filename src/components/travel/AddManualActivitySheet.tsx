@@ -152,23 +152,35 @@ export function AddManualActivitySheet({ open, onClose, onSave, dayNumber, total
             <div>
               <label className="text-[13px] font-semibold text-foreground mb-2 block">Horário</label>
               <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setShowStartPicker(true)}
-                  className="flex-1 flex items-center gap-2 rounded-xl px-4 py-3 text-[14px] font-medium text-foreground"
+                <div
+                  className="flex-1 flex items-center gap-2 rounded-xl px-4 py-3 text-[14px] font-medium text-foreground relative overflow-hidden cursor-pointer"
                   style={{ background: '#F2F2F2' }}
                 >
-                  <Icon name="schedule" size={16} className="text-muted-foreground" />
-                  {startTime}
-                </button>
+                  <Icon name="schedule" size={16} className="text-muted-foreground flex-shrink-0" />
+                  <input
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => {
+                      if (e.target.value) setStartTime(e.target.value);
+                    }}
+                    className="flex-1 text-[14px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-full"
+                  />
+                </div>
                 <span className="text-[13px] text-muted-foreground font-medium">até</span>
-                <button
-                  onClick={() => setShowEndPicker(true)}
-                  className="flex-1 flex items-center gap-2 rounded-xl px-4 py-3 text-[14px] font-medium text-foreground"
+                <div
+                  className="flex-1 flex items-center gap-2 rounded-xl px-4 py-3 text-[14px] font-medium text-foreground relative overflow-hidden cursor-pointer"
                   style={{ background: '#F2F2F2' }}
                 >
-                  <Icon name="schedule" size={16} className="text-muted-foreground" />
-                  {endTime}
-                </button>
+                  <Icon name="schedule" size={16} className="text-muted-foreground flex-shrink-0" />
+                  <input
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => {
+                      if (e.target.value) setEndTime(e.target.value);
+                    }}
+                    className="flex-1 text-[14px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-full"
+                  />
+                </div>
               </div>
             </div>
 

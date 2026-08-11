@@ -98,6 +98,8 @@ export interface PublicItineraryRow {
   places_count: number;
   price_cents: number | null;
   main_tag: string;
+  description?: string | null;
+  tags?: string[] | null;
 }
 
 /** Busca os roteiros públicos publicados por um usuário. */
@@ -107,7 +109,7 @@ export async function getPublicItinerariesByUserId(
   if (!userId) return [];
   const { data, error } = await supabase
     .from('itineraries')
-    .select('id, title, destinations, images, start_date, end_date, places_count, price_cents, main_tag')
+    .select('id, title, destinations, images, start_date, end_date, places_count, price_cents, main_tag, description, tags')
     .eq('user_id', userId)
     .eq('is_public', true)
     .order('created_at', { ascending: false });
