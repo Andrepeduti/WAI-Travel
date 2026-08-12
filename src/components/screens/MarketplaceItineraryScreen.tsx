@@ -931,11 +931,14 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
               </div>
               <div className="px-5">
                 <div className="card-base border-0 shadow-none p-6 flex flex-col items-center justify-center text-center">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center mb-2" style={{ background: '#F2F2F2' }}>
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3" style={{ background: '#F2F2F2' }}>
                     <Icon name="star" size={22} className="text-muted-foreground" />
                   </div>
-                  <p className="text-muted-foreground text-sm font-medium">
-                    Ainda não há avaliações
+                  <h4 className="text-foreground font-semibold text-sm mb-1">
+                    Este roteiro ainda não recebeu avaliações
+                  </h4>
+                  <p className="text-muted-foreground text-xs leading-relaxed max-w-[280px]">
+                    Quando os viajantes avaliarem este roteiro, elas aparecerão aqui
                   </p>
                 </div>
               </div>

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { DaySelector } from './DaySelector';
 import { searchGooglePlacesText } from '@/lib/googlePlacesApi';
+import { toast } from 'sonner';
 
 interface AddNoteSheetProps {
   open: boolean;
@@ -26,6 +27,19 @@ interface AddressSuggestion {
   lat: string;
   lon: string;
   place_id: number;
+}
+
+function timeToMinutes(t: string): number {
+  const match = /^(\d{1,2}):(\d{2})/.exec((t || '').trim());
+  if (!match) return 0;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function minutesToTime(mins: number): string {
+  const clamped = Math.max(0, Math.min(24 * 60 - 1, mins));
+  const h = Math.floor(clamped / 60);
+  const m = clamped % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
 function parseTime(t: string): [number, number] {
@@ -115,7 +129,29 @@ export function AddNoteSheet({ open, onClose, onSave, dayNumber, totalDays, star
 
   if (!open) return null;
 
+  const handleStartTimeChange = (newStart: string) => {
+    setStartTime(newStart);
+    const startMin = timeToMinutes(newStart);
+    const endMin = timeToMinutes(endTime);
+    if (startMin >= endMin) {
+      setEndTime(minutesToTime(startMin + 60));
+    }
+  };
+
+  const handleEndTimeChange = (newEnd: string) => {
+    setEndTime(newEnd);
+    const endMin = timeToMinutes(newEnd);
+    const startMin = timeToMinutes(startTime);
+    if (endMin <= startMin) {
+      setStartTime(minutesToTime(Math.max(0, endMin - 60)));
+    }
+  };
+
   const handleSave = () => {
+    if (timeToMinutes(startTime) >= timeToMinutes(endTime)) {
+      toast.error('O horário de início deve ser anterior ao horário de término');
+      return;
+    }
     // Localização só é considerada se o usuário selecionou uma sugestão (coords presentes).
     // Texto digitado livre é ignorado para evitar entradas que não sejam um lugar real.
     const hasValidLocation = !!coords;
@@ -176,7 +212,7 @@ export function AddNoteSheet({ open, onClose, onSave, dayNumber, totalDays, star
                   onChange={(e) => {
                     const newStart = e.target.value;
                     if (newStart) {
-                      setStartTime(newStart);
+                      handleStartTimeChange(newStart);
                     }
                   }}
                   className="text-[15px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-[70px] text-center"
@@ -193,7 +229,7 @@ export function AddNoteSheet({ open, onClose, onSave, dayNumber, totalDays, star
                   onChange={(e) => {
                     const newEnd = e.target.value;
                     if (newEnd) {
-                      setEndTime(newEnd);
+                      handleEndTimeChange(newEnd);
                     }
                   }}
                   className="text-[15px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-[70px] text-center"

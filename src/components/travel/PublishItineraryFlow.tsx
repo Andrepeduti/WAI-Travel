@@ -728,7 +728,7 @@ function ReviewScreen({
       className="absolute inset-0 overflow-y-auto bg-[#F2F2F2]"
     >
       <div
-        className="px-7 pb-36"
+        className="px-7 pb-8"
         style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 68px)' }}
       >
         <StepDots current={4} total={TOTAL_QUESTION_STEPS} />
@@ -846,35 +846,38 @@ function ReviewScreen({
         </motion.div>
       </div>
 
-      <div className="sticky bottom-0 px-6 pb-8 pt-4 mt-4 bg-gradient-to-t from-[#F2F2F2] via-[#F2F2F2] to-transparent">
-        <div className="flex items-start gap-2.5 px-1 pb-4">
-          <Info size={16} strokeWidth={2} className="text-[#6B6B6B] shrink-0 mt-0.5" />
-          <p className="text-[12px] text-[#6B6B6B] leading-normal flex-1">
-            Ao publicar este roteiro, você concorda com os nossos{' '}
-            <button
-              onClick={onReviewTerms}
-              className="text-[#6B6B6B] font-semibold underline decoration-[#6B6B6B]/40 hover:decoration-[#6B6B6B] transition-colors"
-            >
-              Termos de Uso para Criadores
-            </button>
-            .
-          </p>
-        </div>
+      <div className="sticky bottom-0 z-10">
+        <div className="h-8 bg-gradient-to-t from-[#F2F2F2] to-transparent pointer-events-none" />
+        <div className="px-6 pb-8 bg-[#F2F2F2]">
+          <div className="flex items-start gap-2.5 px-1 pb-4">
+            <Info size={16} strokeWidth={2} className="text-[#6B6B6B] shrink-0 mt-0.5" />
+            <p className="text-[12px] text-[#6B6B6B] leading-normal flex-1">
+              Ao publicar este roteiro, você concorda com os nossos{' '}
+              <button
+                onClick={onReviewTerms}
+                className="text-[#6B6B6B] font-semibold underline decoration-[#6B6B6B]/40 hover:decoration-[#6B6B6B] transition-colors"
+              >
+                Termos de Uso para Criadores
+              </button>
+              .
+            </p>
+          </div>
 
-        <button
-          onClick={onPublish}
-          disabled={isPublishing}
-          className="w-full h-14 rounded-2xl font-bold text-[15px] tracking-[-0.01em] bg-[#9DCC36] text-[#0A0A0A] hover:brightness-105 active:scale-[0.99] disabled:opacity-70 disabled:active:scale-100 shadow-[0_8px_22px_-8px_rgba(157,204,54,0.5)] transition-all flex items-center justify-center gap-2"
-        >
-          {isPublishing ? (
-            <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              Publicando...
-            </>
-          ) : (
-            'Publicar roteiro'
-          )}
-        </button>
+          <button
+            onClick={onPublish}
+            disabled={isPublishing}
+            className="w-full h-14 rounded-2xl font-bold text-[15px] tracking-[-0.01em] bg-[#9DCC36] text-[#0A0A0A] hover:brightness-105 active:scale-[0.99] disabled:opacity-70 disabled:active:scale-100 shadow-[0_8px_22px_-8px_rgba(157,204,54,0.5)] transition-all flex items-center justify-center gap-2"
+          >
+            {isPublishing ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Publicando...
+              </>
+            ) : (
+              'Publicar roteiro'
+            )}
+          </button>
+        </div>
       </div>
     </motion.div>
   );

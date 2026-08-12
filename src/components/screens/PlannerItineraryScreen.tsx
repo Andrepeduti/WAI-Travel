@@ -600,6 +600,21 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   const [isAiPlanning, setIsAiPlanning] = useState(false);
   const [aiProgress, setAiProgress] = useState({ current: 0, total: 0 });
   const [aiLoadingDays, setAiLoadingDays] = useState<Set<number>>(new Set());
+  const aiAbortRef = useRef(false);
+
+  const cancelAiPlanning = useCallback(() => {
+    aiAbortRef.current = true;
+    setIsAiPlanning(false);
+    setAiLoadingDays(new Set());
+    setShowAiPlanSheet(false);
+  }, []);
+
+  const mainCityName = useMemo(() => {
+    if (itineraryData.destinations && itineraryData.destinations.length > 0) {
+      return itineraryData.destinations[0].split(',')[0].trim();
+    }
+    return 'Lisboa';
+  }, [itineraryData.destinations]);
   const [optimizingDays, setOptimizingDays] = useState<Set<number>>(new Set());
   const [optimizedFlash, setOptimizedFlash] = useState<Set<number>>(new Set());
   const [confirmOptimizeDay, setConfirmOptimizeDay] = useState<number | null>(null);
@@ -1281,7 +1296,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   }, [effectiveDaysData, dayTransports]);
 
   const handlePlanWithAi = useCallback(async (mode: 'all' | 'empty') => {
-    setShowAiPlanSheet(false);
+    aiAbortRef.current = false;
 
     const tripDays = effectiveDaysData.length;
     const targetDays = effectiveDaysData
@@ -1315,6 +1330,8 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     let completed = 0;
 
     for (const day of targetDays) {
+      if (aiAbortRef.current) break;
+
       const destName = itineraryData.destinations?.length
         ? getDestinationForDay(itineraryData.destinations, day, tripDays)
         : 'Paris, França';
@@ -1325,6 +1342,8 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       } catch (e) {
         console.error('Error fetching places for AI planning:', e);
       }
+
+      if (aiAbortRef.current) break;
 
       if (!pool || pool.length === 0) {
         pool = getPlacesForDestinations([destName]);
@@ -1372,6 +1391,8 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
           };
         });
 
+        if (aiAbortRef.current) break;
+
         setDayActivities((prev) => ({ ...prev, [day]: generated }));
 
         const needed = Math.max(0, generated.length - 1);
@@ -1382,6 +1403,8 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         setDayTransports((prev) => ({ ...prev, [day]: newTransports }));
       }
 
+      if (aiAbortRef.current) break;
+
       completed++;
       setAiProgress({ current: completed, total: targetDays.length });
       setAiLoadingDays((prev) => {
@@ -1391,7 +1414,17 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       });
     }
 
+    if (aiAbortRef.current) {
+      setIsAiPlanning(false);
+      setAiLoadingDays(new Set());
+      setShowAiPlanSheet(false);
+      toast.info('Planejamento com IA cancelado.');
+      return;
+    }
+
     setIsAiPlanning(false);
+    setAiLoadingDays(new Set());
+    setShowAiPlanSheet(false);
     toast.success(
       mode === 'all'
         ? 'Roteiro inteiro planejado com sucesso pela IA!'
@@ -1970,7 +2003,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         }
       }
 
-      return { ...prev, [data.day]: updated };
+      return { ...prev, [data.day]: sortActivitiesChronologically(updated) };
     });
   };
 
@@ -2149,6 +2182,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         isAutoCover={isAutoCover}
         startDate={itineraryData.startDate}
         endDate={itineraryData.endDate}
+        currency={itineraryData.currency}
         destinations={itineraryData.destinations}
         invitedFriends={(() => {
           const myUserId = session?.user?.id;
@@ -2181,7 +2215,18 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
               : updated.tripName ? [updated.tripName] : prev.destinations,
             startDate: updated.startDate,
             endDate: updated.endDate,
+            currency: updated.currency || prev.currency,
           }));
+
+          if (typeof itineraryId === 'string' && !itineraryId.startsWith('pending-itinerary-')) {
+            updateItineraryRow(itineraryId, {
+              title: updated.tripName?.trim(),
+              images: updated.coverImage ? [updated.coverImage] : undefined,
+              destinations: updated.destinations && updated.destinations.length > 0 ? updated.destinations : undefined,
+              startDate: updated.startDate ? updated.startDate.toISOString() : undefined,
+              endDate: updated.endDate ? updated.endDate.toISOString() : undefined,
+            }).catch(console.error);
+          }
         }}
       />
     );
@@ -2860,28 +2905,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
               </div>
             </div>
 
-            {/* Indicator de progresso da IA */}
-            {isAiPlanning && (
-              <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-purple-500/10 border border-[#7C3AED]/30 flex items-center gap-3 animate-fade-in">
-                <div className="w-8 h-8 rounded-full bg-[#7C3AED]/20 flex items-center justify-center shrink-0">
-                  <Icon name="auto_awesome" size={18} className="text-[#7C3AED] animate-spin" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between text-[13px] font-semibold text-foreground mb-1">
-                    <span>Planejando com IA...</span>
-                    <span className="text-[12px] text-[#7C3AED] font-bold">
-                      {aiProgress.current} de {aiProgress.total} {aiProgress.total === 1 ? 'dia' : 'dias'}
-                    </span>
-                  </div>
-                  <div className="w-full h-1.5 bg-muted/60 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full transition-all duration-300"
-                      style={{ width: `${(aiProgress.current / (aiProgress.total || 1)) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
+
           </div>
 
           {/* All Days Timeline */}
@@ -2998,6 +3022,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                   >
                     <DraggableActivityList
                       compactView={compactView}
+                      itineraryCurrency={itineraryData.currency}
                       activities={dayActs}
                       transports={dayTrans}
                       dayTabsRef={tabsRef}
@@ -3069,53 +3094,126 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         }
 
         {/* Bottom sheet Planejar com IA */}
-        <Sheet open={showAiPlanSheet} onOpenChange={setShowAiPlanSheet}>
-          <SheetContent side="bottom" className="rounded-t-3xl p-0 max-h-[70vh]">
-            <SheetHeader className="px-5 pt-5 pb-2">
-              <SheetTitle className="text-left text-[18px] font-bold text-foreground flex items-center gap-2">
-                <Icon name="auto_awesome" size={20} className="text-[#7C3AED]" />
-                Planejar com IA
-              </SheetTitle>
-            </SheetHeader>
-            <div className="px-4 pt-2 pb-8 space-y-3">
-              <button
-                type="button"
-                onClick={() => handlePlanWithAi('all')}
-                className="w-full flex items-center gap-4 p-4 rounded-2xl bg-card hover:bg-muted/30 active:scale-[0.98] transition-all text-left border border-border/60 shadow-sm"
-              >
-                <div className="w-11 h-11 rounded-2xl bg-[#7C3AED]/10 flex items-center justify-center shrink-0">
-                  <Icon name="auto_awesome" size={22} className="text-[#7C3AED]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="text-[15px] font-bold text-foreground block">
-                    Planejar roteiro inteiro
-                  </span>
-                  <span className="text-[12px] text-muted-foreground block mt-0.5">
-                    Gera recomendações de lugares para todos os dias do roteiro
-                  </span>
-                </div>
-                <Icon name="chevron_right" size={20} className="text-muted-foreground shrink-0" />
-              </button>
+        <Sheet open={showAiPlanSheet || isAiPlanning} onOpenChange={(open) => {
+          if (!open) {
+            cancelAiPlanning();
+          }
+        }}>
+          <SheetContent side="bottom" className="rounded-t-[28px] p-0 max-h-[90vh] overflow-hidden border-t-0 shadow-2xl bg-background">
+            {/* Drag handle */}
+            <div className="w-9 h-[4px] bg-muted-foreground/30 rounded-full mx-auto mt-3 mb-1" />
 
+            {/* Botão de fechar no canto superior direito */}
+            <div className="absolute top-3 right-4 z-10">
               <button
                 type="button"
-                onClick={() => handlePlanWithAi('empty')}
-                className="w-full flex items-center gap-4 p-4 rounded-2xl bg-card hover:bg-muted/30 active:scale-[0.98] transition-all text-left border border-border/60 shadow-sm"
+                onClick={cancelAiPlanning}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+                aria-label="Fechar"
               >
-                <div className="w-11 h-11 rounded-2xl bg-indigo-500/10 flex items-center justify-center shrink-0">
-                  <Icon name="calendar_today" size={20} className="text-indigo-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="text-[15px] font-bold text-foreground block">
-                    Planejar dias vazios
-                  </span>
-                  <span className="text-[12px] text-muted-foreground block mt-0.5">
-                    Preenche apenas os dias que ainda não têm lugares
-                  </span>
-                </div>
-                <Icon name="chevron_right" size={20} className="text-muted-foreground shrink-0" />
+                <X className="w-5 h-5" />
               </button>
             </div>
+
+            {isAiPlanning ? (
+              /* State 1: Loading state matching the requested image */
+              <div className="px-6 pt-4 pb-8 flex flex-col items-center animate-fade-in">
+                {/* Spinner com anel roxo e ícone de sparkle */}
+                <div className="relative w-24 h-24 flex items-center justify-center my-3">
+                  <div className="absolute inset-0 rounded-full bg-[#7C3AED]/10 animate-pulse" />
+                  <div className="absolute inset-0 rounded-full border-[3.5px] border-[#7C3AED]/20 border-t-[#7C3AED] border-r-[#7C3AED]/60 animate-spin" />
+                  <Icon name="auto_awesome" size={28} className="text-[#7C3AED] relative z-10" />
+                </div>
+
+                {/* Título principal */}
+                <h3 className="text-[19px] font-extrabold text-foreground text-center tracking-tight mt-2">
+                  A IA está preenchendo seu roteiro...
+                </h3>
+
+                {/* Subtítulo com o nome do destino */}
+                <p className="text-[13px] text-muted-foreground text-center mt-2 px-2 leading-relaxed font-medium">
+                  Buscando os melhores lugares, restaurantes e experiências para você em {mainCityName}.
+                </p>
+
+                {/* Cards skeleton animados */}
+                <div className="w-full max-w-sm space-y-3 mt-6">
+                  {[0, 1, 2].map((i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-3 p-3.5 rounded-2xl bg-card border border-border/50"
+                      style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}
+                    >
+                      <div className="w-14 h-14 rounded-xl bg-muted animate-pulse shrink-0" />
+                      <div className="flex-1 space-y-2 py-0.5">
+                        <div className="h-3.5 bg-muted animate-pulse rounded-md w-3/4" />
+                        <div className="h-3 bg-muted animate-pulse rounded-md w-1/2" />
+                      </div>
+                      <div className="w-5 h-5 rounded-full bg-[#7C3AED]/15 animate-pulse shrink-0" />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Botão Cancelar */}
+                <button
+                  type="button"
+                  onClick={cancelAiPlanning}
+                  className="w-full max-w-sm mt-8 py-3.5 rounded-full border border-border/80 bg-background hover:bg-muted/40 active:scale-[0.98] text-[15px] font-bold text-foreground transition-all shadow-sm"
+                >
+                  Cancelar
+                </button>
+              </div>
+            ) : (
+              /* State 2: Options selection */
+              <div>
+                <SheetHeader className="px-5 pt-3 pb-3 pr-12">
+                  <SheetTitle className="text-left text-[19px] font-extrabold text-foreground tracking-tight">
+                    Planejar com WAI
+                  </SheetTitle>
+                  <p className="text-left text-[13px] text-muted-foreground leading-relaxed mt-1">
+                    Nossa IA especialista em viagens ajuda você a montar seu roteiro com recomendações de lugares para cada dia.
+                  </p>
+                </SheetHeader>
+                <div className="px-5 pt-2 pb-8 space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => handlePlanWithAi('all')}
+                    className="w-full flex items-center gap-4 p-4 rounded-2xl bg-card hover:bg-muted/30 active:scale-[0.98] transition-all text-left border border-border/60 shadow-sm"
+                  >
+                    <div className="w-11 h-11 rounded-2xl bg-[#7C3AED]/10 flex items-center justify-center shrink-0">
+                      <Icon name="auto_awesome" size={22} className="text-[#7C3AED]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[15px] font-bold text-foreground block">
+                        Planejar roteiro inteiro
+                      </span>
+                      <span className="text-[12px] text-muted-foreground block mt-0.5">
+                        Gera recomendações de lugares para todos os dias do roteiro
+                      </span>
+                    </div>
+                    <Icon name="chevron_right" size={20} className="text-muted-foreground shrink-0" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handlePlanWithAi('empty')}
+                    className="w-full flex items-center gap-4 p-4 rounded-2xl bg-card hover:bg-muted/30 active:scale-[0.98] transition-all text-left border border-border/60 shadow-sm"
+                  >
+                    <div className="w-11 h-11 rounded-2xl bg-indigo-500/10 flex items-center justify-center shrink-0">
+                      <Icon name="calendar_today" size={20} className="text-indigo-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[15px] font-bold text-foreground block">
+                        Planejar dias vazios
+                      </span>
+                      <span className="text-[12px] text-muted-foreground block mt-0.5">
+                        Preenche apenas os dias que ainda não têm lugares
+                      </span>
+                    </div>
+                    <Icon name="chevron_right" size={20} className="text-muted-foreground shrink-0" />
+                  </button>
+                </div>
+              </div>
+            )}
           </SheetContent>
         </Sheet>
 
@@ -3213,17 +3311,6 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
           }}
           isPurchased={isPurchased}
           isPublic={isItineraryPublic}
-          isCancelled={itineraryData.tags?.includes('_CANCELLED_') || itineraryData.tags?.includes('_CANCELED_')}
-          onToggleCancelled={async () => {
-            if (typeof itineraryId !== 'string') return;
-            const isCurrentlyCancelled = itineraryData.tags?.includes('_CANCELLED_') || itineraryData.tags?.includes('_CANCELED_');
-            const newTags = isCurrentlyCancelled
-              ? (itineraryData.tags || []).filter(t => t !== '_CANCELLED_' && t !== '_CANCELED_')
-              : [...(itineraryData.tags || []), '_CANCELLED_'];
-            await updateItinerary(itineraryId, { tags: newTags });
-            setItineraryData(prev => ({ ...prev, tags: newTags }));
-            toast.success(isCurrentlyCancelled ? 'Roteiro reativado!' : 'Roteiro cancelado.');
-          }}
           onTogglePublic={(v) => {
             if (v && !isItineraryPublic) {
               // Privado → público: abre o fluxo de publicação para criar uma cópia independente
@@ -3718,17 +3805,22 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                             if (newStart) {
                               setEditStartTime(newStart);
                               const [sh, sm] = newStart.split(':').map(Number);
-                              const totalStart = sh * 60 + sm;
-                              const newEndTotal = totalStart + editOriginalDuration;
-                              setEditEndTime(`${String(Math.floor(newEndTotal / 60)).padStart(2, '0')}:${String(newEndTotal % 60).padStart(2, '0')}`);
+                              const startMin = sh * 60 + sm;
+                              const [eh, em] = (editEndTime || '11:00').split(':').map(Number);
+                              const endMin = eh * 60 + em;
+                              if (startMin >= endMin) {
+                                const dur = editOriginalDuration > 0 ? editOriginalDuration : 60;
+                                const newEndTotal = startMin + dur;
+                                setEditEndTime(`${String(Math.floor(newEndTotal / 60) % 24).padStart(2, '0')}:${String(newEndTotal % 60).padStart(2, '0')}`);
+                              }
                             }
                           }}
                           className="text-[15px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-[70px] text-center"
                         />
                       </div>
-                      
+
                       <span className="text-[13px] text-muted-foreground">–</span>
-                      
+
                       <div className="flex items-center bg-[#F2F2F2] rounded-lg px-3 h-9 relative overflow-hidden cursor-pointer hover:bg-[#E5E5E5] transition-colors">
                         <input
                           type="time"
@@ -3737,6 +3829,14 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                             const newEnd = e.target.value;
                             if (newEnd) {
                               setEditEndTime(newEnd);
+                              const [eh, em] = newEnd.split(':').map(Number);
+                              const endMin = eh * 60 + em;
+                              const [sh, sm] = (editStartTime || '09:00').split(':').map(Number);
+                              const startMin = sh * 60 + sm;
+                              if (endMin <= startMin) {
+                                const newStartTotal = Math.max(0, endMin - 60);
+                                setEditStartTime(`${String(Math.floor(newStartTotal / 60)).padStart(2, '0')}:${String(newStartTotal % 60).padStart(2, '0')}`);
+                              }
                             }
                           }}
                           className="text-[15px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-[70px] text-center"
@@ -3782,6 +3882,12 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                         if (!m) return 0;
                         return Number(m[1]) * 60 + Number(m[2]);
                       };
+
+                      if (toMin(editStartTime) >= toMin(editEndTime)) {
+                        toast.error('O horário de início deve ser anterior ao horário de término');
+                        return;
+                      }
+
                       const toTime = (m: number) => { const h = Math.floor(m / 60) % 24; const mm = m % 60; return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`; };
                       const GAP = 15;
 
@@ -3965,7 +4071,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
               summary: note.content || '',
             };
             setTripNotes(prev => [newNote, ...prev]);
-            toast.success('Nota salva com sucesso!');
+            toast.success('Nota adicionada!');
             setShowTips(true);
           } catch (err) {
             toast.error('Erro ao salvar a nota. Tente novamente.');

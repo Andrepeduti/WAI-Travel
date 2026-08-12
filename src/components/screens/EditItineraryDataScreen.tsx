@@ -69,9 +69,15 @@ export function EditItineraryDataScreen({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    setCoverPreview(url);
-    setCoverImage(url);
+    
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result || '');
+      if (!dataUrl) return;
+      setCoverPreview(dataUrl);
+      setCoverImage(dataUrl);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSave = () => {

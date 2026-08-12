@@ -127,8 +127,8 @@ export function SuccessToast({
               )}
             </div>
 
-            {/* Right Side: Close Button & Circular Pie Timer */}
-            <div className="flex flex-col items-end justify-between self-stretch flex-shrink-0 min-h-[72px]">
+            {/* Right Side: Close Button & Circular Pie Timer (only when action/undo button exists) */}
+            <div className={`flex flex-col items-end flex-shrink-0 ${actionLabel && onAction ? 'justify-between self-stretch min-h-[72px]' : ''}`}>
               <button
                 onClick={handleClose}
                 className="w-6 h-6 rounded-full flex items-center justify-center transition-colors hover:bg-black/5 text-[#141530]"
@@ -140,35 +140,37 @@ export function SuccessToast({
               </button>
 
               {/* Circular Pie Chart Progress Timer */}
-              <div className="relative w-11 h-11 flex items-center justify-center mt-1">
-                <svg className="w-11 h-11 -rotate-90 transform" viewBox="0 0 44 44">
-                  {/* Background Track */}
-                  <circle
-                    cx="22"
-                    cy="22"
-                    r="16"
-                    fill="none"
-                    stroke="#E2F0BD"
-                    strokeWidth="3.5"
-                  />
-                  {/* Depleting Pie Ring */}
-                  <circle
-                    cx="22"
-                    cy="22"
-                    r="16"
-                    fill="none"
-                    stroke="#7AB51D"
-                    strokeWidth="3.5"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={strokeDashoffset}
-                    strokeLinecap="round"
-                  />
-                </svg>
-                {/* Remaining Seconds */}
-                <span className="absolute text-[12px] font-bold" style={{ color: '#141530' }}>
-                  {timeLeft}s
-                </span>
-              </div>
+              {actionLabel && onAction && (
+                <div className="relative w-11 h-11 flex items-center justify-center mt-1">
+                  <svg className="w-11 h-11 -rotate-90 transform" viewBox="0 0 44 44">
+                    {/* Background Track */}
+                    <circle
+                      cx="22"
+                      cy="22"
+                      r="16"
+                      fill="none"
+                      stroke="#E2F0BD"
+                      strokeWidth="3.5"
+                    />
+                    {/* Depleting Pie Ring */}
+                    <circle
+                      cx="22"
+                      cy="22"
+                      r="16"
+                      fill="none"
+                      stroke="#7AB51D"
+                      strokeWidth="3.5"
+                      strokeDasharray={circumference}
+                      strokeDashoffset={strokeDashoffset}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  {/* Remaining Seconds */}
+                  <span className="absolute text-[12px] font-bold" style={{ color: '#141530' }}>
+                    {timeLeft}s
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>

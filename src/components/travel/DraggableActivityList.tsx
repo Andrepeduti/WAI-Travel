@@ -45,6 +45,7 @@ interface DraggableActivityListProps {
   daysData: { day: number; date: Date }[];
   selectedDay: number;
   compactView?: boolean;
+  itineraryCurrency?: string;
   onReorder: (activities: Activity[]) => void;
   onDelete: (activity: Activity) => void;
   onMoveToDay: (activity: Activity, targetDay: number) => void;
@@ -104,6 +105,7 @@ export function DraggableActivityList({
   transports,
   selectedDay,
   compactView = false,
+  itineraryCurrency,
   onActivityClick,
   getTransportIcon,
   onUpdateTransport,
@@ -298,7 +300,7 @@ export function DraggableActivityList({
                                </span>
                              )}
                               {activity.price && (() => {
-                                const sym = detectCurrencySymbol(activity.price);
+                                const sym = detectCurrencySymbol(activity.price, itineraryCurrency);
                                 const numeric = extractNumericPrice(activity.price);
                                 if (!numeric) return null;
                                 return (

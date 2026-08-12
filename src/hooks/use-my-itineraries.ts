@@ -134,7 +134,17 @@ export function useMyItineraries() {
   // Disparado por createItinerary/updateItinerary/deleteItinerary após sucesso.
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const handler = () => { refetch(); };
+    const handler = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail?.type === 'delete' && customEvent.detail?.id) {
+        const idToDelete = customEvent.detail.id;
+        setItineraries(prev => prev.filter(it => it.id !== idToDelete));
+        if (cachedMyItineraries) {
+          cachedMyItineraries = cachedMyItineraries.filter(it => it.id !== idToDelete);
+        }
+      }
+      refetch(); 
+    };
     window.addEventListener(ITINERARIES_CHANGED_EVENT, handler);
     return () => window.removeEventListener(ITINERARIES_CHANGED_EVENT, handler);
   }, [refetch]);

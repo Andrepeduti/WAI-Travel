@@ -15,6 +15,22 @@ export function detectCurrencySymbol(
   currencyCode?: string,
   destinations?: string[]
 ): string {
+  // 1. Explicit currency code configured for the itinerary (highest priority)
+  if (currencyCode) {
+    const code = String(currencyCode).toUpperCase();
+    if (code === 'EUR' || code === '€') return '€';
+    if (code === 'GBP' || code === '£') return '£';
+    if (code === 'USD' || code === '$' || code === 'US$') return 'US$';
+    if (code === 'BRL' || code === 'R$') return 'R$';
+    if (code === 'ARS' || code === 'ARS$') return 'ARS$';
+    if (code === 'CLP' || code === 'CLP$') return 'CLP$';
+    if (code === 'JPY' || code === '¥') return '¥';
+    if (code === 'CZK' || code === 'KČ') return 'Kč';
+    if (code === 'HUF' || code === 'FT') return 'Ft';
+    if (code === 'PLN' || code === 'ZŁ') return 'zł';
+  }
+
+  // 2. Explicit symbol inside priceStr (fallback if no currencyCode set)
   if (priceStr) {
     const str = String(priceStr);
     // Check specific foreign currency symbols first (to handle legacy "R$ £33" / "R$ €20" corrupt strings)
@@ -29,20 +45,6 @@ export function detectCurrencySymbol(
     if (str.includes('¥')) return '¥';
     if (str.includes('$')) return '$';
     if (str.includes('R$')) return 'R$';
-  }
-
-  if (currencyCode) {
-    const code = String(currencyCode).toUpperCase();
-    if (code === 'EUR' || code === '€') return '€';
-    if (code === 'GBP' || code === '£') return '£';
-    if (code === 'USD' || code === '$' || code === 'US$') return '$';
-    if (code === 'BRL' || code === 'R$') return 'R$';
-    if (code === 'ARS' || code === 'ARS$') return 'ARS$';
-    if (code === 'CLP' || code === 'CLP$') return 'CLP$';
-    if (code === 'JPY' || code === '¥') return '¥';
-    if (code === 'CZK' || code === 'KČ') return 'Kč';
-    if (code === 'HUF' || code === 'FT') return 'Ft';
-    if (code === 'PLN' || code === 'ZŁ') return 'zł';
   }
 
   if (destinations && destinations.length > 0) {

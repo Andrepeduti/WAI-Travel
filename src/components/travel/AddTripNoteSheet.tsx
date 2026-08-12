@@ -103,7 +103,7 @@ export function AddTripNoteSheet({ open, onClose, onSave, editingNote }: AddTrip
             className="w-full py-3.5 rounded-2xl text-[15px] font-semibold transition-colors disabled:bg-[#D1D5DB] disabled:text-white"
             style={title.trim() ? { backgroundColor: '#9DCC36', color: '#141530' } : undefined}
           >
-            Salvar
+            Adicionar
           </button>
         </div>
       </div>

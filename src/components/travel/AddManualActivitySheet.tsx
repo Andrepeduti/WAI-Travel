@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { DaySelector } from './DaySelector';
 import { TimePickerSheet } from './TimePickerSheet';
+import { toast } from 'sonner';
 
 export interface ManualActivityData {
   name: string;
@@ -19,6 +20,19 @@ interface AddManualActivitySheetProps {
   dayNumber: number;
   totalDays: number;
   startDate?: Date;
+}
+
+function timeToMinutes(t: string): number {
+  const match = /^(\d{1,2}):(\d{2})/.exec((t || '').trim());
+  if (!match) return 0;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function minutesToTime(mins: number): string {
+  const clamped = Math.max(0, Math.min(24 * 60 - 1, mins));
+  const h = Math.floor(clamped / 60);
+  const m = clamped % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
 const categoryOptions = [
@@ -48,8 +62,30 @@ export function AddManualActivitySheet({ open, onClose, onSave, dayNumber, total
 
   const isValid = name.trim().length > 0;
 
+  const handleStartTimeChange = (newStart: string) => {
+    setStartTime(newStart);
+    const startMin = timeToMinutes(newStart);
+    const endMin = timeToMinutes(endTime);
+    if (startMin >= endMin) {
+      setEndTime(minutesToTime(startMin + 60));
+    }
+  };
+
+  const handleEndTimeChange = (newEnd: string) => {
+    setEndTime(newEnd);
+    const endMin = timeToMinutes(newEnd);
+    const startMin = timeToMinutes(startTime);
+    if (endMin <= startMin) {
+      setStartTime(minutesToTime(Math.max(0, endMin - 60)));
+    }
+  };
+
   const handleSave = () => {
     if (!isValid) return;
+    if (timeToMinutes(startTime) >= timeToMinutes(endTime)) {
+      toast.error('O horário de início deve ser anterior ao horário de término');
+      return;
+    }
     onSave({
       name: name.trim(),
       location: location.trim(),
@@ -161,7 +197,7 @@ export function AddManualActivitySheet({ open, onClose, onSave, dayNumber, total
                     type="time"
                     value={startTime}
                     onChange={(e) => {
-                      if (e.target.value) setStartTime(e.target.value);
+                      if (e.target.value) handleStartTimeChange(e.target.value);
                     }}
                     className="flex-1 text-[14px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-full"
                   />
@@ -176,7 +212,7 @@ export function AddManualActivitySheet({ open, onClose, onSave, dayNumber, total
                     type="time"
                     value={endTime}
                     onChange={(e) => {
-                      if (e.target.value) setEndTime(e.target.value);
+                      if (e.target.value) handleEndTimeChange(e.target.value);
                     }}
                     className="flex-1 text-[14px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-full"
                   />
@@ -223,7 +259,7 @@ export function AddManualActivitySheet({ open, onClose, onSave, dayNumber, total
       <TimePickerSheet
         isOpen={showStartPicker}
         onClose={() => setShowStartPicker(false)}
-        onConfirm={(h, m) => { setStartTime(`${h}:${m}`); setShowStartPicker(false); }}
+        onConfirm={(h, m) => { handleStartTimeChange(`${h}:${m}`); setShowStartPicker(false); }}
         initialHora={startTime.split(':')[0]}
         initialMinuto={startTime.split(':')[1]}
         label="Horário de início"
@@ -231,7 +267,7 @@ export function AddManualActivitySheet({ open, onClose, onSave, dayNumber, total
       <TimePickerSheet
         isOpen={showEndPicker}
         onClose={() => setShowEndPicker(false)}
-        onConfirm={(h, m) => { setEndTime(`${h}:${m}`); setShowEndPicker(false); }}
+        onConfirm={(h, m) => { handleEndTimeChange(`${h}:${m}`); setShowEndPicker(false); }}
         initialHora={endTime.split(':')[0]}
         initialMinuto={endTime.split(':')[1]}
         label="Horário de término"

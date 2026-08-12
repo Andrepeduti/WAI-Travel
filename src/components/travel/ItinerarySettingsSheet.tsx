@@ -28,10 +28,6 @@ interface ItinerarySettingsSheetProps {
   isParticipant?: boolean;
   /** Called when participant confirms leaving the itinerary */
   onLeave?: () => void;
-  /** Whether the itinerary is marked as cancelled */
-  isCancelled?: boolean;
-  /** Called when user toggles cancelled status */
-  onToggleCancelled?: () => void;
 }
 
 export function ItinerarySettingsSheet({
@@ -52,8 +48,6 @@ export function ItinerarySettingsSheet({
   onShare,
   isParticipant = false,
   onLeave,
-  isCancelled = false,
-  onToggleCancelled,
 }: ItinerarySettingsSheetProps) {
   const [isPublic, setIsPublic] = useState(isPublicProp);
   const [isLocked, setIsLocked] = useState(isLockedProp);
@@ -195,35 +189,8 @@ export function ItinerarySettingsSheet({
                   <Pencil size={18} className="text-foreground" />
                 </div>
                 <span className="text-[14px] font-medium text-foreground flex-1 text-left">Editar publicação</span>
-                <Icon name="chevron_right" size={18} className="text-muted-foreground" />
               </button>
             )}
-
-            {/* Cancelar / Reativar roteiro */}
-            {onToggleCancelled && !isParticipant && (
-              <button
-                onClick={() => { onClose(); onToggleCancelled(); }}
-                className="w-full flex items-center gap-3.5 py-3 px-1 rounded-xl hover:bg-muted/50 transition-colors">
-                <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#F2F2F2' }}>
-                  <Icon name={isCancelled ? "check_circle" : "cancel"} size={18} className="text-foreground" />
-                </div>
-                <span className="text-[14px] font-medium text-foreground flex-1 text-left">
-                  {isCancelled ? 'Reativar roteiro' : 'Cancelar roteiro'}
-                </span>
-                <Icon name="chevron_right" size={18} className="text-muted-foreground" />
-              </button>
-            )}
-
-
-
-
-
-
-
-
-
-
-            
 
             {/* Danger zone */}
             <div className="pt-3 mt-2 border-t border-border">

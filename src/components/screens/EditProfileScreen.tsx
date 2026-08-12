@@ -24,8 +24,8 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
   const { user: authUser } = useAuth();
 
   const [formData, setFormData] = useState({
-    name: (user.name ?? '').replace(/[0-9]/g, '').slice(0, 25),
-    username: (user.username ?? '').replace(/^@/, '').slice(0, 10),
+    name: (user.name ?? '').replace(/[0-9]/g, '').slice(0, 30),
+    username: (user.username ?? '').replace(/^@/, '').slice(0, 20),
     location: user.location ?? '',
     bio: user.bio ?? '',
     instagram: user.instagram ?? '',
@@ -72,8 +72,8 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
   // Sincroniza o formulário com os dados reais do perfil quando carregam
   useEffect(() => {
     setFormData({
-      name: (user.name ?? '').replace(/[0-9]/g, '').slice(0, 25),
-      username: (user.username ?? '').replace(/^@/, '').slice(0, 10),
+      name: (user.name ?? '').replace(/[0-9]/g, '').slice(0, 30),
+      username: (user.username ?? '').replace(/^@/, '').slice(0, 20),
       location: user.location ?? '',
       bio: user.bio ?? '',
       instagram: user.instagram ?? '',
@@ -365,15 +365,15 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
                     className="text-muted-foreground"
                     style={{ fontSize: 'var(--text-xs)' }}
                   >
-                    {formData.name.length}/25
+                    {formData.name.length}/30
                   </span>
                 </div>
                 <input
                   type="text"
                   value={formData.name}
-                  maxLength={25}
+                  maxLength={30}
                   onChange={(e) => {
-                    const cleanValue = e.target.value.replace(/[0-9]/g, '').slice(0, 25);
+                    const cleanValue = e.target.value.replace(/[0-9]/g, '').slice(0, 30);
                     handleChange('name', cleanValue);
                   }}
                   placeholder="Seu nome"
@@ -394,7 +394,7 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
                     className="text-muted-foreground"
                     style={{ fontSize: 'var(--text-xs)' }}
                   >
-                    {formData.username.length}/10
+                    {formData.username.length}/20
                   </span>
                 </div>
                 <div className="relative">
@@ -407,10 +407,10 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
                   <input
                     type="text"
                     value={formData.username}
-                    maxLength={10}
+                    maxLength={20}
                     onChange={(e) => {
                       if (usernameError) setUsernameError(null);
-                      const cleanValue = e.target.value.replace(/^@/, '').toLowerCase().slice(0, 10);
+                      const cleanValue = e.target.value.replace(/^@/, '').toLowerCase().slice(0, 20);
                       handleChange('username', cleanValue);
                     }}
                     placeholder="seunome"
