@@ -67,7 +67,7 @@ import { loadBudget, saveBudget } from '@/lib/budgetApi';
 import { listItineraryMembers, getMyRole, getItineraryOwnerProfile, getCachedOwnerProfile, getCachedItineraryMembers, type ItineraryMember, type ItineraryRole } from '@/lib/itineraryMembersApi';
 import { ShareItinerarySheet } from '@/components/travel/ShareItinerarySheet';
 import { useItineraryRealtime } from '@/hooks/use-itinerary-realtime';
-import { useMyItineraries, addOptimisticItinerary } from '@/hooks/use-my-itineraries';
+import { useMyItineraries, addOptimisticItinerary, applyOptimisticPatch } from '@/hooks/use-my-itineraries';
 import { PlanLimitReachedSheet } from '@/components/travel/PlanLimitReachedSheet';
 const LazyItineraryMapScreen = lazy(() => import('./ItineraryMapScreen').then((m) => ({ default: m.ItineraryMapScreen })));
 
@@ -619,18 +619,14 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   const [optimizedFlash, setOptimizedFlash] = useState<Set<number>>(new Set());
   const [confirmOptimizeDay, setConfirmOptimizeDay] = useState<number | null>(null);
   const persistKey = String(itineraryId ?? itineraryDataset?.id ?? data.destinations[0] ?? 'default');
-  const budgetExtraPeopleKey = `wai-budget-extra-people-${persistKey}`;
-  const [budgetExtraPeople, setBudgetExtraPeople] = useState<{ id: string; name: string; color: string }[]>(() => {
-    try {
-      const raw = localStorage.getItem(budgetExtraPeopleKey);
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [budgetExtraPeople, setBudgetExtraPeople] = useState<{ id: string; name: string; color: string }[]>(itineraryDataset?.extraPeople ?? []);
+  
+  // Persist budgetExtraPeople to backend when it changes
   useEffect(() => {
-    try { localStorage.setItem(budgetExtraPeopleKey, JSON.stringify(budgetExtraPeople)); } catch { }
-  }, [budgetExtraPeopleKey, budgetExtraPeople]);
+    if (itineraryId) {
+      updateItinerary(itineraryId, { extraPeople: budgetExtraPeople }).catch(e => console.error('Failed to update extraPeople', e));
+    }
+  }, [budgetExtraPeople, itineraryId]);
   const dataVersion = itineraryDataset?.dataVersion;
   const [dayActivities, setDayActivities] = useState<Record<number, Activity[]>>(() => loadPersistedActivities(persistKey, dataVersion));
   const [dayTransports, setDayTransports] = useState<Record<number, TransportBetween[]>>(() => loadPersistedTransports(persistKey, dataVersion));
@@ -1882,49 +1878,50 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     const placesArray = Array.isArray(placeOrPlaces) ? placeOrPlaces : [placeOrPlaces];
     if (placesArray.length === 0) return;
 
-    const base = effectiveDaysData.find((d) => d.day === day);
-    const currentActivities = dayActivities[day] !== undefined ? dayActivities[day] : (base?.activities ?? []);
+    let nextActivities: Activity[] = [];
+    setDayActivities((prev) => {
+      const currentActivities = prev[day] !== undefined ? prev[day] : (effectiveDaysData.find((d) => d.day === day)?.activities ?? []);
+      let workingActivities = [...currentActivities];
 
-    let workingActivities = [...currentActivities];
-
-    placesArray.forEach((place, index) => {
-      let start = '09:00';
-      let end = addMinutes('09:00', 90);
-      if (workingActivities.length > 0) {
-        const sortedCurrent = sortActivitiesChronologically(workingActivities);
-        const last = sortedCurrent[sortedCurrent.length - 1];
-        if (last.endTime && timeToMin(last.endTime) !== Infinity) {
-          start = addMinutes(last.endTime, 30);
-          end = addMinutes(start, 90);
-        } else if (last.startTime && timeToMin(last.startTime) !== Infinity) {
-          start = addMinutes(last.startTime, 120);
-          end = addMinutes(start, 90);
+      placesArray.forEach((place, index) => {
+        let start = '09:00';
+        let end = addMinutes('09:00', 90);
+        if (workingActivities.length > 0) {
+          const sortedCurrent = sortActivitiesChronologically(workingActivities);
+          const last = sortedCurrent[sortedCurrent.length - 1];
+          if (last.endTime && timeToMin(last.endTime) !== Infinity) {
+            start = addMinutes(last.endTime, 30);
+            end = addMinutes(start, 90);
+          } else if (last.startTime && timeToMin(last.startTime) !== Infinity) {
+            start = addMinutes(last.startTime, 120);
+            end = addMinutes(start, 90);
+          }
         }
-      }
 
-      const newActivity: Activity = {
-        id: Date.now() + index + Math.random(),
-        type: 'activity',
-        startTime: start,
-        endTime: end,
-        category: place.category,
-        categoryColor: place.categoryColor,
-        name: place.name,
-        image: place.image,
-        openHours: place.openHours,
-        rating: place.rating,
-        price: (place as any).price || estimatedPriceFor(place.name, (place as any).city),
-        lat: place.lat,
-        lng: place.lng,
-      };
+        const newActivity: Activity = {
+          id: Date.now() + index + Math.random(),
+          type: 'activity',
+          startTime: start,
+          endTime: end,
+          category: place.category,
+          categoryColor: place.categoryColor,
+          name: place.name,
+          image: place.image,
+          openHours: place.openHours,
+          rating: place.rating,
+          price: (place as any).price || estimatedPriceFor(place.name, (place as any).city),
+          lat: place.lat,
+          lng: place.lng,
+        };
 
-      workingActivities = sortActivitiesChronologically([...workingActivities, newActivity]);
+        workingActivities = sortActivitiesChronologically([...workingActivities, newActivity]);
+      });
+      
+      nextActivities = workingActivities;
+      return { ...prev, [day]: nextActivities };
     });
 
-    const nextActivities = workingActivities;
     const nextTransports = await buildTransportsForActivities(nextActivities);
-
-    setDayActivities((prev) => ({ ...prev, [day]: nextActivities }));
     setDayTransports((prev) => ({ ...prev, [day]: nextTransports }));
     toast.success(
       placesArray.length === 1
@@ -1962,7 +1959,8 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     };
 
     setDayActivities((prev) => {
-      const existing = [...getAllActivities(data.day)];
+      const existingRaw = prev[data.day] !== undefined ? prev[data.day] : (effectiveDaysData.find((d) => d.day === data.day)?.activities ?? []);
+      const existing = sortActivitiesChronologically(existingRaw);
       const noteStart = timeToMin(newNote.startTime);
       const noteEnd = timeToMin(newNote.endTime);
 
@@ -2031,14 +2029,17 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       rating: 0,
       price: data.price || ''
     };
-    const current = getAllActivities(data.day);
-    const updated = sortActivitiesChronologically([...current, newActivity]);
+    let updated: Activity[] = [];
+    setDayActivities((prev) => {
+      const existingRaw = prev[data.day] !== undefined ? prev[data.day] : (effectiveDaysData.find((d) => d.day === data.day)?.activities ?? []);
+      const current = sortActivitiesChronologically(existingRaw);
+      updated = sortActivitiesChronologically([...current, newActivity]);
+      return { ...prev, [data.day]: updated };
+    });
+    
+    // We compute the transports asynchronously and set them afterwards.
+    // If the state changed in the meantime, this might overwrite it, but it's consistent with previous behavior.
     const nextTransports = await buildTransportsForActivities(updated);
-
-    setDayActivities((prev) => ({
-      ...prev,
-      [data.day]: updated
-    }));
     setDayTransports((prev) => ({
       ...prev,
       [data.day]: nextTransports
@@ -2219,13 +2220,18 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
           }));
 
           if (typeof itineraryId === 'string' && !itineraryId.startsWith('pending-itinerary-')) {
-            updateItineraryRow(itineraryId, {
+            const patch = {
               title: updated.tripName?.trim(),
               images: updated.coverImage ? [updated.coverImage] : undefined,
               destinations: updated.destinations && updated.destinations.length > 0 ? updated.destinations : undefined,
               startDate: updated.startDate ? updated.startDate.toISOString() : undefined,
               endDate: updated.endDate ? updated.endDate.toISOString() : undefined,
-            }).catch(console.error);
+            };
+            
+            // Aplica instantaneamente no cache para a Home
+            applyOptimisticPatch(itineraryId, patch);
+
+            updateItineraryRow(itineraryId, patch).catch(console.error);
           }
         }}
       />

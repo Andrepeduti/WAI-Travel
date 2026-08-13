@@ -1,7 +1,7 @@
 /**
  * AI-curated place recommendations per city.
  * Calls the `ai-place-recommendations` edge function and caches results in
- * localStorage so we don't burn AI credits every time the user opens a trip.
+ * memory so we don't burn AI credits for repeated calls in the same session.
  */
 
 import type { CityPlace } from '@/data/cityRecommendations';
@@ -11,8 +11,7 @@ import { searchGooglePlacesText } from '@/lib/googlePlacesApi';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 
-const CACHE_PREFIX = 'wai_ai_recs_v7::';
-const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
 
 type AiCategoryKey = 'restaurants' | 'experiences' | 'attractions' | 'nightlife' | 'events';
 const MIN_EXACT_IMAGE_SCORE = 3;
@@ -65,26 +64,7 @@ function cityKey(cityName: string): string {
   return cityName.toLowerCase().trim().split(',')[0].trim();
 }
 
-function readLocal(key: string): CityPlace[] | null {
-  try {
-    const raw = localStorage.getItem(CACHE_PREFIX + key);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as { ts: number; places: CityPlace[] };
-    if (!parsed?.ts || !Array.isArray(parsed.places)) return null;
-    if (Date.now() - parsed.ts > CACHE_TTL_MS) return null;
-    return parsed.places;
-  } catch {
-    return null;
-  }
-}
 
-function writeLocal(key: string, places: CityPlace[]) {
-  try {
-    localStorage.setItem(CACHE_PREFIX + key, JSON.stringify({ ts: Date.now(), places }));
-  } catch {
-    // localStorage may be full / disabled — silently ignore.
-  }
-}
 
 let idCounter = 700000;
 function nextId(): number { return ++idCounter; }
@@ -183,7 +163,7 @@ async function enrichWithGooglePlaces(places: CityPlace[], city: string): Promis
 }
 
 /**
- * Fetch AI-curated places for a city. Cached in localStorage for 7 days.
+ * Fetch AI-curated places for a city. Cached in memory.
  * Returns [] on any failure so callers can fall back gracefully.
  */
 export async function fetchAiPlacesForCity(cityName: string): Promise<CityPlace[]> {
@@ -193,11 +173,7 @@ export async function fetchAiPlacesForCity(cityName: string): Promise<CityPlace[
   const cachedMem = memCache.get(key);
   if (cachedMem) return cachedMem;
 
-  const cachedLocal = readLocal(key);
-  if (cachedLocal) {
-    memCache.set(key, cachedLocal);
-    return cachedLocal;
-  }
+
 
   const inflight = pending.get(key);
   if (inflight) return inflight;
@@ -219,7 +195,6 @@ export async function fetchAiPlacesForCity(cityName: string): Promise<CityPlace[
       const places = rawPlaces.length > 0 ? await enrichWithGooglePlaces(rawPlaces, key) : rawPlaces;
       if (places.length > 0) {
         memCache.set(key, places);
-        writeLocal(key, places);
       }
       return places;
     } catch (e) {

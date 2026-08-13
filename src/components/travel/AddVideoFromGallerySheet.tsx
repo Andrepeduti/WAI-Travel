@@ -621,7 +621,7 @@ export function AddVideoFromGallerySheet({ isOpen, onClose, onBack, onSubmit, on
                   <Icon name="map" size={20} />
                   Adicionar ao roteiro
                 </Button>
-                <Button
+                {/* <Button
                   onClick={() => { setDestinationType('collection'); setStep('selectDestination'); setSearchQuery(''); }}
                   disabled={selectedPlaces.size === 0}
                   variant="outline"
@@ -629,7 +629,7 @@ export function AddVideoFromGallerySheet({ isOpen, onClose, onBack, onSubmit, on
                 >
                   <Icon name="bookmark" size={20} />
                   Adicionar à coleção
-                </Button>
+                </Button> */}
               </div>
             ) : (
               <Button

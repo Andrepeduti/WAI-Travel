@@ -106,6 +106,9 @@ export interface FriendProfileData {
   following: number;
   followers: string;
   countries: CountryVisit[];
+  dreamTrips?: any[];
+  highlightTrip?: string | null;
+  interests?: string[];
 }
 
 import { UserItinerary } from '@/lib/itinerariesApi';
@@ -331,9 +334,21 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
   const [reportSheetOpen, setReportSheetOpen] = useState(false);
   const [highlightPickerOpen, setHighlightPickerOpen] = useState(false);
   const [selectedHighlightId, setSelectedHighlightId] = useState<string>(() => {
+    if (!isSelf) return friend.highlightTrip || AVAILABLE_HIGHLIGHTS[0].id;
+    if (currentUser?.highlightTrip) return currentUser.highlightTrip;
     if (typeof window === 'undefined') return AVAILABLE_HIGHLIGHTS[0].id;
-    return localStorage.getItem(HIGHLIGHT_STORAGE_KEY) || AVAILABLE_HIGHLIGHTS[0].id;
+    return localStorage.getItem('wai-travel-highlight-trip') || AVAILABLE_HIGHLIGHTS[0].id;
   });
+  
+  useEffect(() => {
+    if (isSelf && currentUser?.highlightTrip) {
+      setSelectedHighlightId(currentUser.highlightTrip);
+      try { localStorage.setItem('wai-travel-highlight-trip', currentUser.highlightTrip); } catch { }
+    } else if (!isSelf) {
+      setSelectedHighlightId(friend.highlightTrip || AVAILABLE_HIGHLIGHTS[0].id);
+    }
+  }, [isSelf, currentUser?.highlightTrip, friend.highlightTrip]);
+  
   const selectedHighlight =
     AVAILABLE_HIGHLIGHTS.find(h => h.id === selectedHighlightId) || AVAILABLE_HIGHLIGHTS[0];
 
@@ -435,60 +450,34 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
     return () => { active = false; };
   }, [friend.userId, isSelf]);
 
-  // Interests — only what the user picked at onboarding (self) until they edit it here.
-  // We persist to localStorage ONLY after an explicit edit, so onboarding values from
-  // Supabase remain the source of truth for fresh profiles.
   const [interests, setInterests] = useState<Interest[]>(() => {
-    if (typeof window === 'undefined' || !isSelf) return [];
+    if (!isSelf) return mapOnboardingInterests(friend.interests);
+    if (currentUser?.interests) return mapOnboardingInterests(currentUser.interests);
+    if (typeof window === 'undefined') return [];
     try {
-      const stored = localStorage.getItem(INTERESTS_STORAGE_KEY);
+      const stored = localStorage.getItem('wai-travel-interests');
       return stored ? (JSON.parse(stored) as Interest[]) : [];
     } catch {
       return [];
     }
   });
-  // Seed self interests from onboarding (profiles.interests) when localStorage is empty.
+  
   useEffect(() => {
-    if (!isSelf || typeof window === 'undefined') return;
-    if (!authUser?.id) return;
-    if (localStorage.getItem(INTERESTS_STORAGE_KEY)) return;
-    let cancelled = false;
-    supabase
-      .from('profiles')
-      .select('interests')
-      .eq('user_id', authUser.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) { console.error('[FriendProfile] interests fetch failed', error); return; }
-        const mapped = mapOnboardingInterests((data as { interests?: unknown } | null)?.interests);
-        if (mapped.length > 0) setInterests(mapped);
-      });
-    return () => { cancelled = true; };
-  }, [isSelf, authUser?.id]);
-  // Carrega interesses do AMIGO (perfil de outra pessoa) para exibir publicamente.
-  useEffect(() => {
-    if (isSelf || !friend.userId) return;
-    let cancelled = false;
-    supabase
-      .from('profiles_public')
-      .select('interests')
-      .eq('user_id', friend.userId)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) { console.error('[FriendProfile] friend interests fetch failed', error); return; }
-        const mapped = mapOnboardingInterests((data as { interests?: unknown } | null)?.interests);
-        setInterests(mapped);
-        setFriendInterests(mapped.map(m => m.label));
-      });
-    return () => { cancelled = true; };
-  }, [isSelf, friend.userId]);
+    if (isSelf && currentUser?.interests) {
+      const mapped = mapOnboardingInterests(currentUser.interests);
+      setInterests(mapped);
+      try { localStorage.setItem('wai-travel-interests', JSON.stringify(mapped)); } catch { }
+    } else if (!isSelf) {
+      setInterests(mapOnboardingInterests(friend.interests));
+      setFriendInterests(friend.interests ?? []);
+    }
+  }, [isSelf, currentUser?.interests, friend.interests]);
 
-  const persistInterests = (next: Interest[]) => {
+  const persistInterests = async (next: Interest[]) => {
     setInterests(next);
-    if (typeof window !== 'undefined' && isSelf) {
-      localStorage.setItem(INTERESTS_STORAGE_KEY, JSON.stringify(next));
+    if (isSelf) {
+      try { localStorage.setItem('wai-travel-interests', JSON.stringify(next)); } catch { }
+      await update({ interests: next.map(i => i.label) }).catch(e => console.error('Failed to update interests', e));
     }
   };
   const [editInterestsOpen, setEditInterestsOpen] = useState(false);
@@ -617,19 +606,26 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
     setShowSalesSummary(true);
   }, [salesSeenKey]);
 
-  // Dream trips (próximas viagens futuras)
-  // - Self: persistido no localStorage; começa vazio até o usuário adicionar.
-  // - Outros perfis REAIS (com userId): vazio (sem dados ainda no banco).
-  // - Perfis legacy (sem userId): lista mockada para demonstração da feature.
   const [dreamTrips, setDreamTrips] = useState<DreamTrip[]>(() => {
-    if (!isSelf) return friend.userId ? [] : DEFAULT_DREAM_TRIPS;
+    if (!isSelf) return friend.dreamTrips ?? (friend.userId ? [] : DEFAULT_DREAM_TRIPS);
+    if (currentUser?.dreamTrips) return currentUser.dreamTrips;
     if (typeof window === 'undefined') return [];
-    const stored = localStorage.getItem(DREAM_TRIPS_STORAGE_KEY);
-    if (stored) {
-      try { return JSON.parse(stored) as DreamTrip[]; } catch { /* fallthrough */ }
+    try {
+      const stored = localStorage.getItem('wai-travel-dream-trips');
+      return stored ? (JSON.parse(stored) as DreamTrip[]) : [];
+    } catch {
+      return [];
     }
-    return [];
   });
+  
+  useEffect(() => {
+    if (isSelf && currentUser) {
+      setDreamTrips(currentUser.dreamTrips ?? []);
+      try { localStorage.setItem('wai-travel-dream-trips', JSON.stringify(currentUser.dreamTrips ?? [])); } catch { }
+    } else if (!isSelf) {
+      setDreamTrips(friend.dreamTrips ?? (friend.userId ? [] : DEFAULT_DREAM_TRIPS));
+    }
+  }, [isSelf, currentUser?.dreamTrips, friend.dreamTrips, friend.userId]);
   const [dreamTripSheetOpen, setDreamTripSheetOpen] = useState(false);
   const [dreamTripToRemove, setDreamTripToRemove] = useState<DreamTrip | null>(null);
   const [newDreamDest, setNewDreamDest] = useState('');
@@ -644,10 +640,13 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
   const [vibePickerOpen, setVibePickerOpen] = useState(false);
   const [isAddingDreamTrip, setIsAddingDreamTrip] = useState(false);
 
-  const persistDreamTrips = (trips: DreamTrip[]) => {
+  const { update } = useCurrentUser();
+  
+  const persistDreamTrips = async (trips: DreamTrip[]) => {
     setDreamTrips(trips);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(DREAM_TRIPS_STORAGE_KEY, JSON.stringify(trips));
+    if (isSelf) {
+      try { localStorage.setItem('wai-travel-dream-trips', JSON.stringify(trips)); } catch { }
+      await update({ dreamTrips: trips }).catch(e => console.error('Failed to update dream trips', e));
     }
   };
 
@@ -1380,7 +1379,9 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
                     key={h.id}
                     onClick={() => {
                       setSelectedHighlightId(h.id);
-                      try { localStorage.setItem(HIGHLIGHT_STORAGE_KEY, h.id); } catch { }
+                      if (isSelf) {
+                        update({ highlightTrip: h.id }).catch(e => console.error('Failed to update highlight', e));
+                      }
                       setHighlightPickerOpen(false);
                     }}
                     className="w-full flex items-center gap-3 px-3 py-3 rounded-xl mb-1 active:opacity-70"

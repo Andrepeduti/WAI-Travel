@@ -9,10 +9,10 @@ import { setCachedOwnerProfile, setCachedItineraryMembers, type ItineraryMember 
  */
 export const ITINERARIES_CHANGED_EVENT = 'itineraries:changed';
 
-function emitItinerariesChanged(type: 'create' | 'update' | 'delete', id?: string) {
+function emitItinerariesChanged(type: 'create' | 'update' | 'delete', id?: string, patch?: UpdateItineraryInput) {
   if (typeof window === 'undefined') return;
   try {
-    window.dispatchEvent(new CustomEvent(ITINERARIES_CHANGED_EVENT, { detail: { type, id } }));
+    window.dispatchEvent(new CustomEvent(ITINERARIES_CHANGED_EVENT, { detail: { type, id, patch } }));
   } catch {
     /* noop */
   }
@@ -38,6 +38,8 @@ export interface UserItinerary {
   description?: string;
   tags?: string[];
   userId: string;
+  isPaused?: boolean;
+  extraPeople?: any[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -69,6 +71,8 @@ export interface UpdateItineraryInput {
   priceCents?: number | null;
   description?: string;
   tags?: string[];
+  isPaused?: boolean;
+  extraPeople?: any[];
 }
 
 function rowToItinerary(row: any): UserItinerary {
@@ -83,10 +87,12 @@ function rowToItinerary(row: any): UserItinerary {
     places: row.places_count ?? 0,
     sourceDatasetId: row.source_dataset_id ?? null,
     isPublic: row.is_public ?? false,
-    priceCents: row.price_cents ?? null,
-    description: row.description ?? '',
-    tags: row.tags ?? [],
+    priceCents: row.price_cents,
+    description: row.description,
+    tags: row.tags || [],
     userId: row.user_id,
+    isPaused: row.is_paused ?? false,
+    extraPeople: row.extra_people ?? [],
     createdAt: row.created_at ? String(row.created_at) : undefined,
     updatedAt: row.updated_at ? String(row.updated_at) : (row.created_at ? String(row.created_at) : undefined),
   };
@@ -178,7 +184,9 @@ export async function createItinerary(input: CreateItineraryInput): Promise<User
       is_public: input.isPublic ?? false,
       price_cents: input.priceCents ?? null,
       description: input.description ?? '',
-      tags: input.tags ?? []
+      tags: input.tags ?? [],
+      is_paused: input.isPaused ?? false,
+      extra_people: input.extraPeople ?? []
     })
     .select('*')
     .single();
@@ -193,19 +201,7 @@ export async function createItinerary(input: CreateItineraryInput): Promise<User
 
 
 export async function updateItinerary(id: string, patch: UpdateItineraryInput): Promise<void> {
-  const updates: {
-    title?: string;
-    destinations?: string[];
-    start_date?: string | null;
-    end_date?: string | null;
-    images?: string[];
-    participants?: string[];
-    places_count?: number;
-    is_public?: boolean;
-    price_cents?: number | null;
-    description?: string;
-    tags?: string[];
-  } = {};
+  const updates: any = {};
   if (patch.title !== undefined) updates.title = patch.title;
   if (patch.destinations !== undefined) updates.destinations = patch.destinations;
   if (patch.startDate !== undefined) updates.start_date = toIsoDate(patch.startDate);
@@ -217,6 +213,9 @@ export async function updateItinerary(id: string, patch: UpdateItineraryInput): 
   if (patch.priceCents !== undefined) updates.price_cents = patch.priceCents;
   if (patch.description !== undefined) updates.description = patch.description;
   if (patch.tags !== undefined) updates.tags = patch.tags;
+  if (patch.isPaused !== undefined) updates.is_paused = patch.isPaused;
+  if (patch.extraPeople !== undefined) updates.extra_people = patch.extraPeople;
+  
   if (Object.keys(updates).length === 0) return;
   (updates as any).updated_at = new Date().toISOString();
   const { error } = await supabase.from('itineraries').update(updates as never).eq('id', id);
@@ -224,7 +223,7 @@ export async function updateItinerary(id: string, patch: UpdateItineraryInput): 
     console.error('[itinerariesApi] updateItinerary failed', error);
     return;
   }
-  emitItinerariesChanged('update', id);
+  emitItinerariesChanged('update', id, patch);
 }
 
 /**
@@ -505,26 +504,7 @@ export async function publishItineraryAsCopy(
     console.error('[itinerariesApi] cloneItineraryContent failed', err);
   }
 
-  // Fallback legado: cópia local em localStorage para componentes que
-  // ainda leem dali (ex.: marketplace público dos próprios roteiros).
-  const storageCopies = [
-    { key: 'wai-travel-planner-activities', data: snapshot?.activities },
-    { key: 'wai-travel-planner-transports', data: snapshot?.transports },
-  ];
-  for (const { key: storageKey, data } of storageCopies) {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      const all = raw ? JSON.parse(raw) : {};
-      const sourceEntry = data !== undefined
-        ? { __v: snapshot?.dataVersion ?? 0, data }
-        : all[source.id];
-      if (sourceEntry == null) continue;
-      all[created.id] = JSON.parse(JSON.stringify(sourceEntry));
-      localStorage.setItem(storageKey, JSON.stringify(all));
-    } catch (err) {
-      console.error('[itinerariesApi] publishItineraryAsCopy local clone failed', storageKey, err);
-    }
-  }
+
 
   return created;
 }

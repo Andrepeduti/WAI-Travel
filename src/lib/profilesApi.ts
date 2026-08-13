@@ -20,6 +20,9 @@ function rowToFriendProfileData(row: {
   youtube: string | null;
   followers_count: number | null;
   following_count: number | null;
+  dream_trips?: any[];
+  highlight_trip?: string | null;
+  interests?: string[];
 }): FriendProfileData {
   const usernameRaw = row.username || '';
   const username = usernameRaw ? `@${usernameRaw.replace(/^@/, '')}` : '@usuario';
@@ -36,11 +39,14 @@ function rowToFriendProfileData(row: {
     following: row.following_count ?? 0,
     followers: String(row.followers_count ?? 0),
     countries: [],
+    dreamTrips: row.dream_trips ?? [],
+    highlightTrip: row.highlight_trip ?? null,
+    interests: row.interests ?? [],
   };
 }
 
 const PROFILE_COLUMNS =
-  'user_id, name, username, location, avatar_url, bio, instagram, tiktok, youtube, followers_count, following_count';
+  'user_id, name, username, location, avatar_url, bio, instagram, tiktok, youtube, followers_count, following_count, dream_trips, highlight_trip, interests';
 
 export async function getProfileByUsername(
   username: string,

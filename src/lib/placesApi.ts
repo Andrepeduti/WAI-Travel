@@ -766,11 +766,45 @@ export async function searchGoogleFallback(query: string, city: string): Promise
       const type = r.primaryType || 'default';
       const meta = googleCategoryMap[type] || googleCategoryMap.default;
 
+      // Normalize strings to ignore accents and case
+      const normalize = (s: string) => (s || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const normReqCity = normalize(city);
+      const normResCity = normalize(r.city || '');
+      const normAddress = normalize(r.address || '');
+
+      let finalCity = r.city || city;
+
+      // Map of common pt-BR city names to their English/local equivalents that Google might return
+      const cityAliases: Record<string, string[]> = {
+        'londres': ['london', 'greater london'],
+        'nova york': ['new york', 'nyc'],
+        'amsterda': ['amsterdam'],
+        'roma': ['rome'],
+        'milao': ['milan'],
+        'veneza': ['venice'],
+        'florenca': ['florence', 'firenze'],
+        'atenas': ['athens'],
+        'miami': ['miami beach', 'greater miami'],
+      };
+
+      const aliases = cityAliases[normReqCity] || [];
+
+      // If the result city/address contains the requested city, OR matches a known alias, it's the same city.
+      const isSameCity = 
+        normResCity.includes(normReqCity) || 
+        normReqCity.includes(normResCity) ||
+        normAddress.includes(normReqCity) ||
+        aliases.some(alias => normResCity.includes(alias) || normAddress.includes(alias));
+
+      if (isSameCity) {
+        finalCity = city; // use the exact string requested by the app (e.g. 'Londres') to group correctly
+      }
+
       return {
         // Generate a random stable-ish ID
         id: Math.floor(Math.random() * 1000000) + 900000,
         name: r.name,
-        city: city.toLowerCase(),
+        city: finalCity.toLowerCase(),
         category: meta.category,
         categoryColor: meta.categoryColor,
         image: r.photoUrl || meta.image,

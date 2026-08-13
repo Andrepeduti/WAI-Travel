@@ -17,7 +17,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { PURCHASES_CHANGED_EVENT } from '@/lib/purchasesApi';
 import { ItineraryListSkeleton } from '@/components/ui/LoadingShimmers';
-import { isItineraryPaused } from '@/lib/itineraryPauseState';
+
 
 export type { UserItinerary };
 
@@ -365,7 +365,7 @@ function SwipeableItineraryCard({
           ) : (
             <>
               {(() => {
-                const paused = isItineraryPaused(item.id);
+                const paused = item.isPaused ?? false;
                 return (
                   <span
                     className="h-7 inline-flex items-center gap-1.5 self-start text-[12px] font-semibold px-2.5 rounded-2xl bg-[#F2F2F2]"
@@ -566,9 +566,6 @@ export function TripsScreen({
   }, {
     id: 'favorites' as TabType,
     label: 'Favoritos'
-  }, {
-    id: 'collections' as TabType,
-    label: 'Coleções'
   }];
 
   const { user: authUser } = useAuth();
@@ -1076,7 +1073,7 @@ export function TripsScreen({
     {/* Header — fixed title */}
     <header className="px-6 pt-safe-top pb-4">
       <div className="flex items-center justify-between gap-3 mb-2">
-        <h1 className="text-[22px] font-bold text-foreground">Roteiros e coleções</h1>
+        <h1 className="text-[22px] font-bold text-foreground">Roteiros</h1>
         <button
           onClick={() => setShowCreateSheet(true)}
           aria-label="Criar"
@@ -1531,21 +1528,6 @@ export function TripsScreen({
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-foreground">Novo roteiro</h3>
             <p className="text-xs text-muted-foreground mt-0.5">Planeje uma nova viagem do zero</p>
-          </div>
-        </button>
-        <button
-          onClick={() => {
-            setShowCreateSheet(false);
-            setShowCreateCollection(true);
-          }}
-          className="w-full flex items-center gap-4 p-4 rounded-2xl border border-border hover:bg-muted/50 transition-colors text-left"
-        >
-          <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
-            <Icon name="folder" size={24} className="text-foreground" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-sm font-semibold text-foreground">Nova coleção</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Organize lugares e ideias em uma pasta</p>
           </div>
         </button>
       </div>

@@ -18,13 +18,7 @@ const createOptions: CreateOption[] = [
     id: 'video',
     icon: 'video_call',
     title: 'Extrair de vídeo',
-    description: 'Transforme vídeos em roteiros ou coleções'
-  },
-  {
-    id: 'collection',
-    icon: 'add_box',
-    title: 'Criar coleção',
-    description: 'Organize seus itens favoritos'
+    description: 'Transforme vídeos em roteiros'
   },
 ];
 

@@ -74,15 +74,6 @@ function destKeywords(destinations: string[]): string[] {
     return kws;
 }
 
-/** Lê dream trips do localStorage */
-function readDreamDestinations(): string[] {
-    try {
-        const raw = localStorage.getItem('wai-travel-dream-trips');
-        if (!raw) return [];
-        const trips = JSON.parse(raw) as { destination?: string }[];
-        return trips.map(t => norm(t.destination || '')).filter(Boolean);
-    } catch { return []; }
-}
 
 /** Lê pesquisas recentes do localStorage */
 function readRecentSearches(): string[] {
@@ -186,7 +177,7 @@ export function useRecommendedItineraries(limit = 10) {
                     userId
                         ? supabase
                             .from('profiles')
-                            .select('interests')
+                            .select('interests, dream_trips')
                             .eq('user_id', userId)
                             .maybeSingle()
                             .then(({ data }) => data)
@@ -271,8 +262,10 @@ export function useRecommendedItineraries(limit = 10) {
                     if (snap.creator) favCreators.add(norm(snap.creator as string));
                 }
 
-                // Sinais de localStorage
-                const dreamDests = readDreamDestinations();
+                // Sinais
+                const dreamDests = Array.isArray(profileRow?.dream_trips)
+                    ? (profileRow!.dream_trips as any[]).map(t => norm(t.destination || '')).filter(Boolean)
+                    : [];
                 const recentSearches = readRecentSearches();
 
                 // ── 3. Scoring ───────────────────────────────────────────────────────

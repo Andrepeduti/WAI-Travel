@@ -56,7 +56,7 @@ export function AddVideoSheet({ isOpen, onClose, onOptionSelect }: AddVideoSheet
             <BackButton onClick={onClose} />
             <div>
               <h2 className="text-xl font-bold text-foreground my-0">Adicionar vídeo</h2>
-              <p className="text-sm text-muted-foreground mt-0.5">Usaremos o vídeo para identificar e extrair lugares da sua coleção</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Usaremos o vídeo para identificar e extrair lugares para o seu roteiro</p>
             </div>
           </div>
           

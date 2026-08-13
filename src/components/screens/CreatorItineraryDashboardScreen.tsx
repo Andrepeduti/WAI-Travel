@@ -13,7 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { resolveTripThumbnailImages } from '@/lib/coverImageResolver';
 import { updateItinerary } from '@/lib/itinerariesApi';
 import type { UserItinerary } from '@/lib/itinerariesApi';
-import { isItineraryPaused, setItineraryPaused } from '@/lib/itineraryPauseState';
+
 
 interface SaleRow {
   id: string;
@@ -199,8 +199,8 @@ export function CreatorItineraryDashboardScreen({
     onItineraryUpdated?.(updates);
   };
 
-  const [isPaused, setIsPaused] = useState(() => isItineraryPaused(itinerary.id));
-  useEffect(() => setIsPaused(isItineraryPaused(itinerary.id)), [itinerary.id]);
+  const [isPaused, setIsPaused] = useState(itinerary.isPaused ?? false);
+  useEffect(() => setIsPaused(itinerary.isPaused ?? false), [itinerary.isPaused]);
 
   const handleUnpublish = async () => {
     await updateItinerary(localItinerary.id, { isPublic: false });
@@ -208,9 +208,9 @@ export function CreatorItineraryDashboardScreen({
     onUnpublished?.();
   };
 
-  const handleTogglePause = (next: boolean) => {
+  const handleTogglePause = async (next: boolean) => {
     setIsPaused(next);
-    setItineraryPaused(localItinerary.id, next);
+    await handleUpdatePatch({ isPaused: next });
   };
 
   return (

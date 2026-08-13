@@ -598,40 +598,42 @@ export function AddPlaceSheet({ open, onClose, onSelect, onAddManually, dayNumbe
               {/* Local results grouped by city */}
               {localResults.length > 0 && (
                 <>
-                  {isMultiDest ? (
-                    (() => {
-                      // Separate current-day places from other destination places
-                      const currentDayPlaces = localResults.filter(p => p.city.toLowerCase() === dayCityLower);
-                      const otherDestPlaces = localResults.filter(p => p.city.toLowerCase() !== dayCityLower);
-                      const otherGroups = groupByCity(otherDestPlaces);
+                  {(() => {
+                    // Separate current-day places from other destination places
+                    const currentDayPlaces = localResults.filter(p => p.city.toLowerCase() === dayCityLower);
+                    const otherDestPlaces = localResults.filter(p => p.city.toLowerCase() !== dayCityLower);
 
-                      return (
-                        <>
-                          {/* Current destination first */}
-                          {currentDayPlaces.length > 0 && (
-                            <div>
-                              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-1 pt-1 pb-2">
-                                📍 {dayCity}
-                              </p>
-                              {currentDayPlaces.map(p => renderPlaceRow(p, false))}
-                            </div>
-                          )}
+                    if (otherDestPlaces.length === 0) {
+                      // Only current day places, no need to group
+                      return currentDayPlaces.map(p => renderPlaceRow(p, false));
+                    }
 
-                          {/* Other destinations */}
-                          {otherGroups.map(group => (
-                            <div key={group.city}>
-                              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-1 pt-safe-top pb-2">
-                                ✈️ {group.city} <span className="normal-case font-normal">· outro destino</span>
-                              </p>
-                              {group.places.map(p => renderPlaceRow(p, true))}
-                            </div>
-                          ))}
-                        </>
-                      );
-                    })()
-                  ) : (
-                    localResults.map(p => renderPlaceRow(p, false))
-                  )}
+                    const otherGroups = groupByCity(otherDestPlaces);
+
+                    return (
+                      <>
+                        {/* Current destination first */}
+                        {currentDayPlaces.length > 0 && (
+                          <div>
+                            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-1 pt-1 pb-2">
+                              📍 {dayCity}
+                            </p>
+                            {currentDayPlaces.map(p => renderPlaceRow(p, false))}
+                          </div>
+                        )}
+
+                        {/* Other destinations */}
+                        {otherGroups.map(group => (
+                          <div key={group.city}>
+                            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-1 pt-safe-top pb-2">
+                              ✈️ {group.city} <span className="normal-case font-normal">· outro destino</span>
+                            </p>
+                            {group.places.map(p => renderPlaceRow(p, true))}
+                          </div>
+                        ))}
+                      </>
+                    );
+                  })()}
                 </>
               )}
 

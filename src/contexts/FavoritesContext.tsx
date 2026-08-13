@@ -4,7 +4,6 @@ import {
   listFavorites,
   addFavorite as apiAddFavorite,
   removeFavorite as apiRemoveFavorite,
-  migrateLocalFavoritesIfNeeded,
   type FavoriteRecord,
 } from '@/lib/favoritesApi';
 
@@ -82,7 +81,6 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     (async () => {
       try {
-        await migrateLocalFavoritesIfNeeded(userId);
         const remote = await listFavorites();
         if (cancelled) return;
         setFavorites(remote);

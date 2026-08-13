@@ -1,6 +1,6 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { Icon } from '@/components/ui/Icon';
-import { Reorder, useDragControls, type PanInfo } from 'framer-motion';
+import { Reorder, useDragControls } from 'framer-motion';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { BackButton } from '@/components/ui/BackButton';
@@ -43,8 +43,6 @@ interface ActivityRowProps {
   onToggleMove: () => void;
   days: DayActivities[];
   onMoveToDay: (targetDay: number) => void;
-  onDragMove: (point: { x: number; y: number }, fromDay: number) => void;
-  onDragEnd: (fromDay: number, activityId: number) => void;
 }
 
 function ActivityRow({
@@ -56,31 +54,26 @@ function ActivityRow({
   onToggleMove,
   days,
   onMoveToDay,
-  onDragMove,
-  onDragEnd,
 }: ActivityRowProps) {
   const controls = useDragControls();
 
   return (
     <Reorder.Item
-      value={item}
+      value={`activity-${item.id}`}
       dragListener={false}
       dragControls={controls}
-      className="touch-manipulation"
-      whileDrag={{ scale: 1.03, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 50 }}
-      onDrag={(_, info: PanInfo) => onDragMove(info.point, dayNumber)}
-      onDragEnd={() => onDragEnd(dayNumber, item.id)}
+      className="touch-manipulation mb-2 relative"
+      whileDrag={{ scale: 1.03, zIndex: 50 }}
     >
       <div
-        className="flex items-center gap-3 bg-card rounded-2xl px-4 py-3.5"
+        className="flex items-center gap-3 bg-card rounded-2xl px-4 py-3.5 shadow-sm"
         style={{ border: '1px solid hsl(var(--border))' }}
       >
         <div
           onPointerDown={(e) => {
-            e.preventDefault();
             controls.start(e);
           }}
-          className="flex-shrink-0 text-muted-foreground/50 cursor-grab active:cursor-grabbing"
+          className="flex-shrink-0 text-muted-foreground/50 cursor-grab active:cursor-grabbing p-1 -ml-1"
           style={{ touchAction: 'none' }}
           aria-label="Arrastar para reordenar"
         >
@@ -160,6 +153,11 @@ function ActivityRow({
   );
 }
 
+// Flat Item type
+type FlatItem = 
+  | { type: 'header'; id: string; day: number; date: Date; dayData: DayActivities }
+  | { type: 'activity'; id: string; day: number; activity: Activity; index: number };
+
 export function ReorderActivitiesScreen({
   allDays,
   onSave,
@@ -170,15 +168,6 @@ export function ReorderActivitiesScreen({
   );
   const [movingActivity, setMovingActivity] = useState<{ activityId: number; fromDay: number } | null>(null);
   const [collapsedDays, setCollapsedDays] = useState<Set<number>>(new Set());
-  const [hoveredDay, setHoveredDay] = useState<number | null>(null);
-
-  const dayHeaderRefs = useRef<Map<number, HTMLDivElement>>(new Map());
-  const hoveredDayRef = useRef<number | null>(null);
-  const expandTimerRef = useRef<{ day: number; timer: ReturnType<typeof setTimeout> } | null>(null);
-
-  useEffect(() => {
-    hoveredDayRef.current = hoveredDay;
-  }, [hoveredDay]);
 
   const toggleCollapse = (day: number) => {
     setCollapsedDays(prev => {
@@ -188,10 +177,6 @@ export function ReorderActivitiesScreen({
       return next;
     });
   };
-
-  const updateDayActivities = useCallback((day: number, newActivities: Activity[]) => {
-    setDays(prev => prev.map(d => d.day === day ? { ...d, activities: newActivities } : d));
-  }, []);
 
   const moveActivityBetweenDays = useCallback((fromDay: number, targetDay: number, activityId: number) => {
     setDays(prev => {
@@ -212,159 +197,155 @@ export function ReorderActivitiesScreen({
     setMovingActivity(null);
   };
 
-  const handleDragMove = useCallback((point: { x: number; y: number }, fromDay: number) => {
-    let foundDay: number | null = null;
-    dayHeaderRefs.current.forEach((el, dayNum) => {
-      const rect = el.getBoundingClientRect();
-      if (point.y >= rect.top && point.y <= rect.bottom && point.x >= rect.left && point.x <= rect.right) {
-        foundDay = dayNum;
+  const flatItems = useMemo(() => {
+    const items: FlatItem[] = [];
+    days.forEach(d => {
+      items.push({ id: `header-${d.day}`, type: 'header', day: d.day, date: d.date, dayData: d });
+      if (!collapsedDays.has(d.day)) {
+        d.activities.forEach((a, idx) => {
+          items.push({ id: `activity-${a.id}`, type: 'activity', day: d.day, activity: a, index: idx });
+        });
       }
     });
+    return items;
+  }, [days, collapsedDays]);
 
-    const targetDay = foundDay !== null && foundDay !== fromDay ? foundDay : null;
-    if (targetDay !== hoveredDayRef.current) {
-      setHoveredDay(targetDay);
+  const itemIds = useMemo(() => flatItems.map(i => i.id), [flatItems]);
 
-      // Auto-expand collapsed day after hovering ~500ms
-      if (expandTimerRef.current) {
-        clearTimeout(expandTimerRef.current.timer);
-        expandTimerRef.current = null;
+  const handleReorder = (newIds: string[]) => {
+    const activitiesById = new Map<string, Activity>();
+    days.forEach(d => d.activities.forEach(a => activitiesById.set(String(a.id), a)));
+    
+    const newDays: DayActivities[] = [];
+    let currentDay: DayActivities | null = null;
+    const orphans: Activity[] = [];
+    
+    for (const id of newIds) {
+      if (id.startsWith('header-')) {
+        const dayNumStr = id.replace('header-', '');
+        const originalDay = days.find(d => String(d.day) === dayNumStr);
+        if (originalDay) {
+          currentDay = {
+            day: originalDay.day,
+            date: originalDay.date,
+            activities: []
+          };
+          if (collapsedDays.has(originalDay.day)) {
+            currentDay.activities.push(...originalDay.activities);
+          }
+          newDays.push(currentDay);
+        }
+      } else if (id.startsWith('activity-')) {
+        const actIdStr = id.replace('activity-', '');
+        const activity = activitiesById.get(actIdStr);
+        if (activity) {
+          if (currentDay) {
+            currentDay.activities.push(activity);
+          } else {
+            orphans.push(activity);
+          }
+        }
       }
-      if (targetDay !== null && collapsedDays.has(targetDay)) {
-        const dayToExpand = targetDay;
-        expandTimerRef.current = {
-          day: dayToExpand,
-          timer: setTimeout(() => {
-            if (hoveredDayRef.current === dayToExpand) {
-              setCollapsedDays(prev => {
-                const next = new Set(prev);
-                next.delete(dayToExpand);
-                return next;
-              });
-            }
-            expandTimerRef.current = null;
-          }, 500),
-        };
-      }
     }
-  }, [collapsedDays]);
-
-  const handleDragEnd = useCallback((fromDay: number, activityId: number) => {
-    const target = hoveredDayRef.current;
-    if (expandTimerRef.current) {
-      clearTimeout(expandTimerRef.current.timer);
-      expandTimerRef.current = null;
+    
+    if (orphans.length > 0 && newDays.length > 0) {
+      newDays[0].activities.unshift(...orphans);
     }
-    if (target !== null && target !== fromDay) {
-      moveActivityBetweenDays(fromDay, target, activityId);
-    }
-    setHoveredDay(null);
-  }, [moveActivityBetweenDays]);
-
-  const setDayHeaderRef = useCallback((dayNumber: number) => (el: HTMLDivElement | null) => {
-    if (el) dayHeaderRefs.current.set(dayNumber, el);
-    else dayHeaderRefs.current.delete(dayNumber);
-  }, []);
+    
+    newDays.sort((a, b) => Number(a.day) - Number(b.day));
+    
+    setDays(newDays);
+  };
 
   return (
     <div
       className="flex flex-col h-full bg-background"
       style={{ fontFamily: 'var(--font-family-primary)' }}
     >
-      {/* Header */}
- <header className="sticky top-0 z-20 bg-background px-5 pb-3">
+      <header className="sticky top-0 z-20 bg-background px-5 pb-3">
         <div className="flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />
           <h1 className="text-xl font-bold text-foreground my-0">Reordenar</h1>
         </div>
       </header>
 
-      {/* All days */}
-      <div className="flex-1 overflow-y-auto px-5 pb-28" style={{ paddingTop: 40 }}>
-        {days.map((dayData) => {
-          const weekday = format(dayData.date, 'EEE', { locale: ptBR });
-          const capitalizedWeekday = weekday.charAt(0).toUpperCase() + weekday.slice(1);
-          const dateStr = format(dayData.date, "d 'de' MMM", { locale: ptBR });
-          const isCollapsed = collapsedDays.has(dayData.day);
-          const actCount = dayData.activities.length;
-          const isHoverTarget = hoveredDay === dayData.day;
+      <div className="flex-1 overflow-y-auto px-5 pb-28" style={{ paddingTop: 20 }}>
+        <Reorder.Group
+          axis="y"
+          values={itemIds}
+          onReorder={handleReorder}
+          className="flex flex-col"
+        >
+          {flatItems.map((item) => {
+            if (item.type === 'header') {
+              const weekday = format(item.date, 'EEE', { locale: ptBR });
+              const capitalizedWeekday = weekday.charAt(0).toUpperCase() + weekday.slice(1);
+              const dateStr = format(item.date, "d 'de' MMM", { locale: ptBR });
+              const isCollapsed = collapsedDays.has(item.day);
+              const actCount = item.dayData.activities.length;
 
-          return (
-            <div key={dayData.day} ref={setDayHeaderRef(dayData.day)} className="mb-5">
-
-              {/* Day header - accordion toggle + drop target */}
-              <div
-                className={cn(
-                  "rounded-xl mb-3 transition-all",
-                  isHoverTarget && "ring-2 ring-primary bg-primary/5 -mx-2 px-2 py-1"
-                )}
-              >
-
-                <button
-                  onClick={() => toggleCollapse(dayData.day)}
-                  className="flex items-center justify-between w-full"
+              return (
+                <Reorder.Item
+                  key={item.id}
+                  value={item.id}
+                  dragListener={false}
+                  className="mb-3 mt-4 first:mt-0 relative z-10"
                 >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-bold"
-                      style={{ backgroundColor: '#1A1C40', color: '#FFFFFF' }}
+                  <div className="rounded-xl transition-all">
+                    <button
+                      onClick={() => toggleCollapse(item.day)}
+                      className="flex items-center justify-between w-full"
                     >
-                      {dayData.day}
-                    </div>
-                    <div className="flex flex-col items-start">
-                      <span className="text-[15px] font-bold text-foreground">
-                        {capitalizedWeekday}, {dateStr}
-                      </span>
-                      <span className="text-[12px] font-medium text-muted-foreground mt-0.5">
-                        {isHoverTarget ? 'Soltar aqui para mover' : `${actCount} ${actCount === 1 ? 'atividade' : 'atividades'}`}
-                      </span>
-                    </div>
-                  </div>
-                  <Icon
-                    name={isCollapsed ? 'chevron_down' : 'chevron_up'}
-                    size={20}
-                    className="text-muted-foreground"
-                  />
-                </button>
-              </div>
-
-              {/* Activities list - accordion content */}
-              {!isCollapsed && actCount > 0 && (
-                <Reorder.Group
-                  axis="y"
-                  values={dayData.activities}
-                  onReorder={(newOrder) => updateDayActivities(dayData.day, newOrder)}
-                  className="flex flex-col gap-2"
-                >
-                  {dayData.activities.map((item, index) => {
-                    const isMoving = movingActivity?.activityId === item.id && movingActivity?.fromDay === dayData.day;
-                    return (
-                      <ActivityRow
-                        key={item.id}
-                        item={item}
-                        index={index}
-                        dayNumber={dayData.day}
-                        daysCount={days.length}
-                        isMoving={isMoving}
-                        onToggleMove={() =>
-                          setMovingActivity(prev =>
-                            prev?.activityId === item.id && prev?.fromDay === dayData.day
-                              ? null
-                              : { activityId: item.id, fromDay: dayData.day }
-                          )
-                        }
-                        days={days}
-                        onMoveToDay={handleMoveToDay}
-                        onDragMove={handleDragMove}
-                        onDragEnd={handleDragEnd}
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-bold"
+                          style={{ backgroundColor: '#1A1C40', color: '#FFFFFF' }}
+                        >
+                          {item.day}
+                        </div>
+                        <div className="flex flex-col items-start">
+                          <span className="text-[15px] font-bold text-foreground">
+                            {capitalizedWeekday}, {dateStr}
+                          </span>
+                          <span className="text-[12px] font-medium text-muted-foreground mt-0.5">
+                            {actCount} {actCount === 1 ? 'atividade' : 'atividades'}
+                          </span>
+                        </div>
+                      </div>
+                      <Icon
+                        name={isCollapsed ? 'chevron_down' : 'chevron_up'}
+                        size={20}
+                        className="text-muted-foreground"
                       />
-                    );
-                  })}
-                </Reorder.Group>
-              )}
-            </div>
-          );
-        })}
+                    </button>
+                  </div>
+                </Reorder.Item>
+              );
+            }
+
+            const isMoving = movingActivity?.activityId === item.activity.id && movingActivity?.fromDay === item.day;
+            
+            return (
+              <ActivityRow
+                key={item.id}
+                item={item.activity}
+                index={item.index}
+                dayNumber={item.day}
+                daysCount={days.length}
+                isMoving={isMoving}
+                onToggleMove={() =>
+                  setMovingActivity(prev =>
+                    prev?.activityId === item.activity.id && prev?.fromDay === item.day
+                      ? null
+                      : { activityId: item.activity.id, fromDay: item.day }
+                  )
+                }
+                days={days}
+                onMoveToDay={handleMoveToDay}
+              />
+            );
+          })}
+        </Reorder.Group>
       </div>
 
       {/* Fixed footer save button */}
@@ -386,3 +367,4 @@ export function ReorderActivitiesScreen({
     </div>
   );
 }
+

@@ -25,6 +25,8 @@ export interface CurrentUser {
   birthdate: string;
   followers: number;
   following: number;
+  dreamTrips: any[];
+  highlightTrip: string | null;
 }
 
 const DEFAULT_USER: CurrentUser = {
@@ -43,6 +45,8 @@ const DEFAULT_USER: CurrentUser = {
   birthdate: '',
   followers: 0,
   following: 0,
+  dreamTrips: [],
+  highlightTrip: null,
 };
 
 interface ProfileRow {
@@ -61,6 +65,8 @@ interface ProfileRow {
   birthdate: string;
   followers_count: number;
   following_count: number;
+  dream_trips: any[];
+  highlight_trip: string | null;
 }
 
 function rowToUser(row: ProfileRow): CurrentUser {
@@ -80,6 +86,8 @@ function rowToUser(row: ProfileRow): CurrentUser {
     birthdate: row.birthdate ?? '',
     followers: row.followers_count ?? 0,
     following: row.following_count ?? 0,
+    dreamTrips: row.dream_trips ?? [],
+    highlightTrip: row.highlight_trip ?? null,
   };
 }
 
@@ -100,6 +108,8 @@ function userToRow(patch: Partial<CurrentUser>): Partial<ProfileRow> {
   if (patch.birthdate !== undefined) row.birthdate = patch.birthdate;
   if (patch.followers !== undefined) row.followers_count = patch.followers;
   if (patch.following !== undefined) row.following_count = patch.following;
+  if (patch.dreamTrips !== undefined) row.dream_trips = patch.dreamTrips;
+  if (patch.highlightTrip !== undefined) row.highlight_trip = patch.highlightTrip;
   return row;
 }
 
@@ -116,7 +126,7 @@ export function useCurrentUser(): {
   const fetchProfile = useCallback(async (userId: string) => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('name, username, location, avatar_url, bio, website, instagram, tiktok, youtube, email, phone, interests, birthdate, followers_count, following_count')
+      .select('name, username, location, avatar_url, bio, website, instagram, tiktok, youtube, email, phone, interests, birthdate, followers_count, following_count, dream_trips, highlight_trip')
       .eq('user_id', userId)
       .maybeSingle();
     if (error) {

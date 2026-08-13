@@ -19,6 +19,27 @@ let cachedMyItineraries: UserItinerary[] | null = null;
 
 const notifyOptimisticItineraries = () => optimisticListeners.forEach(listener => listener());
 
+export function applyOptimisticPatch(id: string, patch: UpdateItineraryInput) {
+  const applyPatch = (it: UserItinerary) => it.id === id ? {
+    ...it,
+    ...(patch.title !== undefined ? { title: patch.title } : {}),
+    ...(patch.destinations !== undefined ? { destinations: patch.destinations } : {}),
+    ...(patch.startDate !== undefined && patch.startDate ? { startDate: patch.startDate } : {}),
+    ...(patch.endDate !== undefined && patch.endDate ? { endDate: patch.endDate } : {}),
+    ...(patch.images !== undefined ? { images: patch.images } : {}),
+    ...(patch.participants !== undefined ? { participants: patch.participants } : {}),
+    ...(patch.places !== undefined ? { places: patch.places } : {}),
+  } : it;
+
+  if (cachedMyItineraries) {
+    cachedMyItineraries = cachedMyItineraries.map(applyPatch);
+  }
+  
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(ITINERARIES_CHANGED_EVENT, { detail: { type: 'update', id, patch, noRefetch: true } }));
+  }
+}
+
 const isPendingItinerary = (id: string) => id.startsWith('pending-itinerary-');
 
 function mergeWithOptimistic(userId: string | null, rows: UserItinerary[]) {
@@ -143,7 +164,29 @@ export function useMyItineraries() {
           cachedMyItineraries = cachedMyItineraries.filter(it => it.id !== idToDelete);
         }
       }
-      refetch(); 
+      if (customEvent.detail?.type === 'update' && customEvent.detail?.id && customEvent.detail?.patch) {
+        const idToUpdate = customEvent.detail.id;
+        const patch = customEvent.detail.patch as UpdateItineraryInput;
+        
+        const applyPatch = (it: UserItinerary) => it.id === idToUpdate ? {
+          ...it,
+          ...(patch.title !== undefined ? { title: patch.title } : {}),
+          ...(patch.destinations !== undefined ? { destinations: patch.destinations } : {}),
+          ...(patch.startDate !== undefined && patch.startDate ? { startDate: patch.startDate } : {}),
+          ...(patch.endDate !== undefined && patch.endDate ? { endDate: patch.endDate } : {}),
+          ...(patch.images !== undefined ? { images: patch.images } : {}),
+          ...(patch.participants !== undefined ? { participants: patch.participants } : {}),
+          ...(patch.places !== undefined ? { places: patch.places } : {}),
+        } : it;
+
+        setItineraries(prev => prev.map(applyPatch));
+        if (cachedMyItineraries) {
+          cachedMyItineraries = cachedMyItineraries.map(applyPatch);
+        }
+      }
+      if (!customEvent.detail?.noRefetch) {
+        refetch(); 
+      }
     };
     window.addEventListener(ITINERARIES_CHANGED_EVENT, handler);
     return () => window.removeEventListener(ITINERARIES_CHANGED_EVENT, handler);

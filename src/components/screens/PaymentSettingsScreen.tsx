@@ -15,10 +15,6 @@ interface ReceivingData {
 }
 
 const loadInitial = (): ReceivingData => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
   return { cpf: '000.000.000-00', pixKey: 'email@exemplo.com' };
 };
 
@@ -61,9 +57,6 @@ export function PaymentSettingsScreen({ onBack }: PaymentSettingsScreenProps) {
   const handleSave = () => {
     if (!isValid) return;
     const data = { cpf, pixKey };
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch {}
     setSavedData(data);
     setIsEditing(false);
     toast.success('Dados atualizados com sucesso');

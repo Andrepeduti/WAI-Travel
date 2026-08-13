@@ -71,9 +71,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Force logout if user is deleted or token is invalid
           try { await supabase.auth.signOut(); } catch { /* noop */ }
           try {
-            Object.keys(localStorage)
-              .filter((k) => k.startsWith('sb-') || k.includes('supabase.auth'))
-              .forEach((k) => localStorage.removeItem(k));
+            Object.keys(localStorage).forEach((k) => {
+              if (k.startsWith('sb-') || k.includes('supabase.auth') || k.startsWith('wai-travel-')) {
+                localStorage.removeItem(k);
+              }
+            });
           } catch { /* noop */ }
           activeSession = null;
         }
@@ -108,9 +110,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       // Limpa qualquer cache local que possa restaurar a sessão
       try {
-        Object.keys(localStorage)
-          .filter((k) => k.startsWith('sb-') || k.includes('supabase.auth'))
-          .forEach((k) => localStorage.removeItem(k));
+        Object.keys(localStorage).forEach((k) => {
+          if (k.startsWith('sb-') || k.includes('supabase.auth') || k.startsWith('wai-travel-')) {
+            localStorage.removeItem(k);
+          }
+        });
       } catch { /* noop */ }
       setSession(null);
       setOnboardingCompleted(null);

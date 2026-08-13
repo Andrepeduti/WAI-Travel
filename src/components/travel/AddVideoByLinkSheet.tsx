@@ -685,7 +685,7 @@ export function AddVideoByLinkSheet({ isOpen, onClose, onBack, onSubmit, onCreat
                 >
                   Adicionar ao roteiro
                 </Button>
-                <Button
+                {/* <Button
                   onClick={() => {
                     setDestinationType('collection');
                     setStep('selectDestination');
@@ -696,7 +696,7 @@ export function AddVideoByLinkSheet({ isOpen, onClose, onBack, onSubmit, onCreat
                   className="w-full h-14 rounded-2xl text-base font-semibold !bg-transparent !border-2 !border-[hsl(var(--premium-midnight))] !text-[hsl(var(--premium-midnight))] hover:!bg-[hsl(var(--premium-midnight))]/5"
                 >
                   Adicionar à coleção
-                </Button>
+                </Button> */}
               </div>
             ) : collectionMode ? (
               <Button

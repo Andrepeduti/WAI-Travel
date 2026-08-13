@@ -24,6 +24,7 @@ export interface GooglePlaceResult {
   lng: number;
   primaryType: string;
   photoUrl?: string;
+  city?: string;
 }
 
 function getApiKey(): string {
@@ -143,7 +144,7 @@ export async function searchGooglePlacesText(query: string, city?: string): Prom
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': apiKey,
-        'X-Goog-FieldMask': 'places.id,places.displayName,places.location,places.formattedAddress,places.primaryType,places.photos',
+        'X-Goog-FieldMask': 'places.id,places.displayName,places.location,places.formattedAddress,places.primaryType,places.photos,places.addressComponents',
       },
       body: JSON.stringify({
         textQuery: fullQuery,
@@ -159,6 +160,20 @@ export async function searchGooglePlacesText(query: string, city?: string): Prom
       if (p.photos && p.photos.length > 0) {
         photoUrl = `https://places.googleapis.com/v1/${p.photos[0].name}/media?maxHeightPx=600&maxWidthPx=600&key=${apiKey}`;
       }
+      
+      let city = '';
+      if (p.addressComponents) {
+        const locality = p.addressComponents.find((c: any) => c.types.includes('locality'));
+        if (locality) {
+          city = locality.longText;
+        } else {
+          const admin2 = p.addressComponents.find((c: any) => c.types.includes('administrative_area_level_2'));
+          if (admin2) {
+            city = admin2.longText;
+          }
+        }
+      }
+      
       return {
         id: p.id,
         name: p.displayName?.text || '',
@@ -167,6 +182,7 @@ export async function searchGooglePlacesText(query: string, city?: string): Prom
         lng: p.location?.longitude || 0,
         primaryType: p.primaryType || '',
         photoUrl,
+        city,
       };
     });
     
