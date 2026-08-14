@@ -4,8 +4,8 @@
   "description": "Marketplace de roteiros de viagem criados por viajantes experientes.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#9ECC38",
-  "theme_color": "#9ECC38",
+  "background_color": "#0B0F19",
+  "theme_color": "#0B0F19",
   "icons": [
     {
       "src": "/icons/icon-192.png",
