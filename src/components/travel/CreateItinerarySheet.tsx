@@ -1,35 +1,28 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Icon } from '@/components/ui/Icon';
-import { format, addDays, differenceInDays } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import type { DateRange } from 'react-day-picker';
-import { resolveNextRange } from '@/lib/dateRangeSelection';
-import { BackButton } from '@/components/ui/BackButton';
-import { supabase } from '@/integrations/supabase/client';
 import { searchGooglePlacesAutocomplete } from '@/lib/googlePlacesApi';
 import { Switch } from '@/components/ui/switch';
+import { ChevronLeft, X, Pencil, MapPin, Calendar as CalendarIcon, DollarSign, Compass } from 'lucide-react';
 
 export interface ItineraryFormData {
   destinations: string[];
   startDate: Date | undefined;
   endDate: Date | undefined;
   invitedFriends: InvitedFriend[];
-  /** User-edited title (overrides auto-generated one) */
   tripName?: string;
-  /** User-uploaded cover image URL */
   coverImage?: string;
-  /** Whether this itinerary is published to the marketplace */
+  isPersonal?: boolean;
   isPublic?: boolean;
-  /** Price in cents when published */
   priceCents?: number | null;
-  /** Public marketplace description */
   description?: string;
-  /** Up to 5 thematic tags */
   tags?: string[];
-  /** Primary highlighted tag */
+  isFlexible?: boolean;
+  durationDays?: number;
 }
 
 interface InvitedFriend {
@@ -41,14 +34,6 @@ interface InvitedFriend {
   status: 'pending' | 'accepted';
 }
 
-interface FriendSuggestion {
-  user_id: string;
-  name: string;
-  username: string | null;
-  avatar_url: string;
-  email: string;
-}
-
 interface CreateItinerarySheetProps {
   isOpen: boolean;
   onClose: () => void;
@@ -56,61 +41,54 @@ interface CreateItinerarySheetProps {
   initialDestinations?: string[];
 }
 
-// List of popular destinations
 const popularDestinations = [
-  { city: 'Paris', country: 'França', emoji: '🇫🇷', altCity: 'Paris', altCountry: 'France' },
-  { city: 'Londres', country: 'Reino Unido', emoji: '🇬🇧', altCity: 'London', altCountry: 'United Kingdom' },
-  { city: 'Roma', country: 'Itália', emoji: '🇮🇹', altCity: 'Rome', altCountry: 'Italy' },
-  { city: 'Barcelona', country: 'Espanha', emoji: '🇪🇸', altCity: 'Barcelona', altCountry: 'Spain' },
-  { city: 'Amsterdam', country: 'Países Baixos', emoji: '🇳🇱', altCity: 'Amsterdam', altCountry: 'Netherlands' },
-  { city: 'Berlim', country: 'Alemanha', emoji: '🇩🇪', altCity: 'Berlin', altCountry: 'Germany' },
-  { city: 'Praga', country: 'República Tcheca', emoji: '🇨🇿', altCity: 'Prague', altCountry: 'Czech Republic' },
-  { city: 'Viena', country: 'Áustria', emoji: '🇦🇹', altCity: 'Vienna', altCountry: 'Austria' },
-  { city: 'Lisboa', country: 'Portugal', emoji: '🇵🇹', altCity: 'Lisbon', altCountry: 'Portugal' },
-  { city: 'Budapeste', country: 'Hungria', emoji: '🇭🇺', altCity: 'Budapest', altCountry: 'Hungary' },
-  { city: 'Tóquio', country: 'Japão', emoji: '🇯🇵', altCity: 'Tokyo', altCountry: 'Japan' },
-  { city: 'Nova York', country: 'Estados Unidos', emoji: '🇺🇸', altCity: 'New York', altCountry: 'United States' },
-  { city: 'Sydney', country: 'Austrália', emoji: '🇦🇺', altCity: 'Sydney', altCountry: 'Australia' },
-  { city: 'Dubai', country: 'Emirados Árabes', emoji: '🇦🇪', altCity: 'Dubai', altCountry: 'United Arab Emirates' },
-  { city: 'Bangkok', country: 'Tailândia', emoji: '🇹🇭', altCity: 'Bangkok', altCountry: 'Thailand' },
-  { city: 'Singapura', country: 'Singapura', emoji: '🇸🇬', altCity: 'Singapore', altCountry: 'Singapore' },
-  { city: 'São Paulo', country: 'Brasil', emoji: '🇧🇷', altCity: 'Sao Paulo', altCountry: 'Brazil' },
-  { city: 'Rio de Janeiro', country: 'Brasil', emoji: '🇧🇷', altCity: 'Rio de Janeiro', altCountry: 'Brazil' },
-  { city: 'Buenos Aires', country: 'Argentina', emoji: '🇦🇷', altCity: 'Buenos Aires', altCountry: 'Argentina' },
-  { city: 'Cidade do México', country: 'México', emoji: '🇲🇽', altCity: 'Mexico City', altCountry: 'Mexico' },
-  { city: 'Cairo', country: 'Egito', emoji: '🇪🇬', altCity: 'Cairo', altCountry: 'Egypt' },
-  { city: 'Marrakech', country: 'Marrocos', emoji: '🇲🇦', altCity: 'Marrakech', altCountry: 'Morocco' },
-  { city: 'Cape Town', country: 'África do Sul', emoji: '🇿🇦', altCity: 'Cape Town', altCountry: 'South Africa' },
-  { city: 'Atenas', country: 'Grécia', emoji: '🇬🇷', altCity: 'Athens', altCountry: 'Greece' },
-  { city: 'Istambul', country: 'Turquia', emoji: '🇹🇷', altCity: 'Istanbul', altCountry: 'Turkey' },
+  { city: 'Paris', country: 'França', emoji: '🇫🇷' },
+  { city: 'Londres', country: 'Reino Unido', emoji: '🇬🇧' },
+  { city: 'Roma', country: 'Itália', emoji: '🇮🇹' },
+  { city: 'Amsterdam', country: 'Países Baixos', emoji: '🇳🇱' },
+  { city: 'Barcelona', country: 'Espanha', emoji: '🇪🇸' },
+  { city: 'Tóquio', country: 'Japão', emoji: '🇯🇵' },
+  { city: 'Nova York', country: 'Estados Unidos', emoji: '🇺🇸' },
+  { city: 'Rio de Janeiro', country: 'Brasil', emoji: '🇧🇷' },
+  { city: 'Lisboa', country: 'Portugal', emoji: '🇵🇹' },
+  { city: 'Berlim', country: 'Alemanha', emoji: '🇩🇪' },
 ];
 
-export function CreateItinerarySheet({ isOpen, onClose, onSubmit, initialDestinations }: CreateItinerarySheetProps) {
+export function CreateItinerarySheet({
+  isOpen,
+  onClose,
+  onSubmit,
+  initialDestinations,
+}: CreateItinerarySheetProps) {
+  // Step 1: selection ('type') | Step 2: form ('form')
+  const [step, setStep] = useState<'type' | 'form'>('type');
+  const [creationType, setCreationType] = useState<'personal' | 'seller'>('personal');
+
+  const [tripName, setTripName] = useState('');
   const [destinations, setDestinations] = useState<string[]>(initialDestinations ?? []);
   const [destinationInput, setDestinationInput] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [remoteResults, setRemoteResults] = useState<{ label: string; sub: string; full: string; emoji: string }[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [tripName, setTripName] = useState('');
+
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
-  const [isFixedDate, setIsFixedDate] = useState(true);
+  const [isFlexibleDates, setIsFlexibleDates] = useState(false);
   const [durationDays, setDurationDays] = useState<number | ''>(5);
-  const [friendInput, setFriendInput] = useState('');
-  const [invitedFriends, setInvitedFriends] = useState<InvitedFriend[]>([]);
-  const [friendSuggestions, setFriendSuggestions] = useState<FriendSuggestion[]>([]);
-  const [isSearchingFriends, setIsSearchingFriends] = useState(false);
-  const [showFriendSuggestions, setShowFriendSuggestions] = useState(false);
+
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingTextIndex, setLoadingTextIndex] = useState(0);
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const loadingPhrases = [
     'Criando roteiro...',
     'Buscando melhores locais...',
     'Organizando os dias...',
-    'Preparando sugestões de IA...',
-    'Quase pronto...'
+    'Quase pronto...',
   ];
 
   useEffect(() => {
@@ -119,42 +97,70 @@ export function CreateItinerarySheet({ isOpen, onClose, onSubmit, initialDestina
       setLoadingTextIndex(0);
       interval = setInterval(() => {
         setLoadingTextIndex((prev) => (prev + 1) % loadingPhrases.length);
-      }, 5000);
+      }, 3500);
     }
     return () => {
       if (interval) clearInterval(interval);
     };
   }, [isSubmitting]);
-  
-  const inputRef = useRef<HTMLInputElement>(null);
-  const suggestionsRef = useRef<HTMLDivElement>(null);
-  const friendInputRef = useRef<HTMLInputElement>(null);
-  const friendSuggestionsRef = useRef<HTMLDivElement>(null);
 
-  // Filter destinations based on input
-  const filteredDestinations = popularDestinations.filter(dest => {
-    const search = destinationInput.toLowerCase();
-    const fullName = `${dest.city}, ${dest.country}`;
-    return (
-      !destinations.includes(fullName) &&
-      (dest.city.toLowerCase().includes(search) || 
-       dest.country.toLowerCase().includes(search) ||
-       dest.altCity.toLowerCase().includes(search) ||
-       dest.altCountry.toLowerCase().includes(search))
-    );
-  });
-  // Sync initial destinations when prop changes
+  // Reset states on open/close
   useEffect(() => {
-    if (initialDestinations && initialDestinations.length > 0) {
-      setDestinations(initialDestinations);
+    if (!isOpen) {
+      setStep('type');
+      setCreationType('personal');
+      setTripName('');
+      setDestinations(initialDestinations ?? []);
+      setDestinationInput('');
+      setStartDate(undefined);
+      setEndDate(undefined);
+      setIsFlexibleDates(false);
+      setDurationDays(5);
+      setIsSubmitting(false);
     }
-  }, [initialDestinations]);
+  }, [isOpen, initialDestinations]);
 
+  // Handle autocomplete destination search
+  useEffect(() => {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
 
+    const term = destinationInput.trim();
+    if (term.length < 2) {
+      setRemoteResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const results = await searchGooglePlacesAutocomplete(term, ['(cities)']);
+        const mapped = results.map((r) => {
+          const rawDescription = r.description || r.fullText || (r.location ? `${r.name}, ${r.location}` : r.name) || '';
+          const parts = rawDescription.split(',');
+          const label = r.name || parts[0]?.trim() || term;
+          const sub = r.location || parts.slice(1).join(',').trim();
+          return { label, sub, full: rawDescription || label, emoji: '📍' };
+        });
+        setRemoteResults(mapped);
+      } catch (err) {
+        console.error('Failed to autocomplete destination:', err);
+        setRemoteResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 250);
+
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
+  }, [destinationInput]);
+
+  // Click outside suggestions
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
-        suggestionsRef.current && 
+        suggestionsRef.current &&
         !suggestionsRef.current.contains(e.target as Node) &&
         inputRef.current &&
         !inputRef.current.contains(e.target as Node)
@@ -166,535 +172,404 @@ export function CreateItinerarySheet({ isOpen, onClose, onSubmit, initialDestina
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Mapeia código de país (ISO 3166-1 alpha-2) -> emoji bandeira
-  const countryCodeToEmoji = (code?: string) => {
-    if (!code || code.length !== 2) return '🌍';
-    const cc = code.toUpperCase();
-    return String.fromCodePoint(...cc.split('').map(c => 0x1f1e6 - 65 + c.charCodeAt(0)));
-  };
-
-  // Busca cidades do mundo inteiro via Google Places com debounce
-  useEffect(() => {
-    const query = destinationInput.trim();
-    if (query.length < 2) {
-      setRemoteResults([]);
-      setIsSearching(false);
-      return;
-    }
-    setIsSearching(true);
-    let active = true;
-    const timeout = setTimeout(async () => {
-      try {
-        const predictions = await searchGooglePlacesAutocomplete(query, ['(cities)']);
-        
-        const seen = new Set<string>();
-        
-        const mapped = predictions
-          .map((p) => {
-            const cityName = p.name;
-            const sub = p.location || '';
-            const full = sub ? `${cityName}, ${sub}` : cityName;
-            return {
-              label: cityName,
-              sub: sub,
-              full: full,
-              emoji: '📍',
-            };
-          })
-          .filter((r) => {
-            if (destinations.includes(r.full)) return false;
-            const key = r.full.toLowerCase();
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return true;
-          })
-          .slice(0, 8);
-          
-        if (active) setRemoteResults(mapped);
-      } catch (err) {
-        if (active) setRemoteResults([]);
-      } finally {
-        if (active) setIsSearching(false);
-      }
-    }, 1000);
-    return () => {
-      active = false;
-      clearTimeout(timeout);
-    };
-  }, [destinationInput, destinations]);
-
-  const handleAddDestination = (destination: string) => {
-    if (!destinations.includes(destination)) {
-      setDestinations([...destinations, destination]);
+  const handleAddDestination = (dest: string) => {
+    const cityName = dest.split(',')[0].trim();
+    if (!destinations.includes(cityName)) {
+      setDestinations((prev) => [...prev, cityName]);
     }
     setDestinationInput('');
     setShowSuggestions(false);
-    inputRef.current?.focus();
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && destinationInput.trim()) {
-      e.preventDefault();
-      // Apenas cidades: aceita sugestão remota (Google) ou item da lista popular.
-      // Não aceita texto livre para evitar destinos genéricos (ex: "Japão").
-      if (remoteResults.length > 0) {
-        handleAddDestination(remoteResults[0].full);
-      } else if (filteredDestinations.length > 0) {
-        const first = filteredDestinations[0];
-        handleAddDestination(`${first.city}, ${first.country}`);
-      }
+    if (!tripName) {
+      setTripName(`${cityName} trip`);
     }
   };
 
   const handleRemoveDestination = (dest: string) => {
-    setDestinations(destinations.filter(d => d !== dest));
-  };
-
-  const handleSelectFriend = (s: FriendSuggestion) => {
-    if (invitedFriends.some(f => f.id === s.user_id)) return;
-    const newFriend: InvitedFriend = {
-      id: s.user_id,
-      name: s.name || s.username || 'Usuário',
-      email: s.email || '',
-      username: s.username || undefined,
-      avatar: s.avatar_url || undefined,
-      status: 'pending',
-    };
-    setInvitedFriends([...invitedFriends, newFriend]);
-    setFriendInput('');
-    setFriendSuggestions([]);
-    setShowFriendSuggestions(false);
-    friendInputRef.current?.focus();
-  };
-
-  const handleRemoveFriend = (id: string) => {
-    setInvitedFriends(invitedFriends.filter(f => f.id !== id));
-  };
-
-  // Live search profiles by name or @username
-  useEffect(() => {
-    const raw = friendInput.trim();
-    const query = raw.replace(/^@+/, '');
-    if (query.length < 2) {
-      setFriendSuggestions([]);
-      setIsSearchingFriends(false);
-      return;
-    }
-    
-    setIsSearchingFriends(true);
-    let active = true;
-    
-    const timeout = setTimeout(async () => {
-      try {
-        const { data: authData } = await supabase.auth.getUser();
-        const meId = authData?.user?.id;
-        
-        // Fetch users similar to FindPeopleScreen, filtering locally to avoid .or() syntax errors with special chars
-        const { data, error } = await supabase
-          .from('profiles_public')
-          .select('user_id, name, username, avatar_url')
-          .limit(100);
-          
-        if (!active) return;
-        
-        if (error || !data) {
-          console.error('Error fetching profiles:', error);
-          setFriendSuggestions([]);
-        } else {
-          const q = query.toLowerCase();
-          const filtered = data
-            .filter((p: any) => {
-              if (p.user_id === meId) return false;
-              if (invitedFriends.some(f => f.id === p.user_id)) return false;
-              
-              const nameMatch = p.name && p.name.toLowerCase().includes(q);
-              const userMatch = p.username && p.username.toLowerCase().includes(q);
-              return nameMatch || userMatch;
-            })
-            .slice(0, 8);
-            
-          setFriendSuggestions(filtered as FriendSuggestion[]);
-        }
-      } catch (err) {
-        console.error('Exception during friend search:', err);
-        if (active) setFriendSuggestions([]);
-      } finally {
-        if (active) setIsSearchingFriends(false);
-      }
-    }, 250);
-    
-    return () => { 
-      active = false; 
-      clearTimeout(timeout); 
-    };
-  }, [friendInput, invitedFriends]);
-
-  useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      if (
-        friendSuggestionsRef.current && !friendSuggestionsRef.current.contains(e.target as Node) &&
-        friendInputRef.current && !friendInputRef.current.contains(e.target as Node)
-      ) {
-        setShowFriendSuggestions(false);
-      }
-    };
-    document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
-  }, []);
-
-
-  const handleDateSelect = (range: DateRange | undefined, day: Date) => {
-    const currentRange: DateRange | undefined = startDate ? { from: startDate, to: endDate } : undefined;
-    const { range: next, isComplete } = resolveNextRange(currentRange, range, day);
-    setStartDate(next?.from);
-    setEndDate(next?.to);
-    if (isComplete) {
-      setIsCalendarOpen(false);
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-    try {
-      let finalStart = startDate;
-      let finalEnd = endDate;
-      const tags: string[] = [];
-      
-      if (!isFixedDate) {
-        finalStart = new Date();
-        finalEnd = addDays(new Date(), Math.max(1, Number(durationDays) || 1) - 1);
-        tags.push('_FLEXIBLE_DATES_');
-      }
-
-      await onSubmit({
-        destinations,
-        startDate: finalStart,
-        endDate: finalEnd,
-        invitedFriends,
-        tripName: tripName.trim() || undefined,
-        tags,
-      });
-      setIsSubmitting(false);
-    } catch {
-      setIsSubmitting(false);
-    }
+    setDestinations((prev) => prev.filter((d) => d !== dest));
   };
 
   const formatDateRange = () => {
     if (startDate && endDate) {
-      return `${format(startDate, "d 'de' MMM.", { locale: ptBR })} - ${format(endDate, "d 'de' MMM.", { locale: ptBR })}`;
+      return `${format(startDate, 'dd MMM', { locale: ptBR })} - ${format(endDate, 'dd MMM yyyy', { locale: ptBR })}`;
     }
     if (startDate) {
-      return format(startDate, "d 'de' MMM.", { locale: ptBR });
+      return `A partir de ${format(startDate, 'dd MMM yyyy', { locale: ptBR })}`;
     }
     return '';
   };
 
-  const isFormValid =
-    tripName.trim().length > 0 &&
-    destinations.length > 0 &&
-    (isFixedDate ? !!startDate && !!endDate : (typeof durationDays === 'number' && durationDays > 0));
+  const isFormValid = useMemo(() => {
+    if (destinations.length === 0) return false;
+    if (creationType === 'personal') {
+      return !!startDate && !!endDate;
+    }
+    // Seller
+    if (isFlexibleDates) {
+      return typeof durationDays === 'number' && durationDays > 0;
+    }
+    return !!startDate && !!endDate;
+  }, [destinations, creationType, isFlexibleDates, durationDays, startDate, endDate]);
+
+  const handleSubmit = async () => {
+    if (!isFormValid || isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      const isSelling = creationType === 'seller';
+      const isFlex = isSelling && isFlexibleDates;
+      const daysCount = isFlex && typeof durationDays === 'number' ? durationDays : (startDate && endDate ? differenceInDays(endDate, startDate) + 1 : 5);
+
+      const effectiveStartDate = startDate ?? new Date();
+      const effectiveEndDate = isFlex
+        ? new Date(effectiveStartDate.getTime() + (daysCount - 1) * 86400000)
+        : (endDate ?? new Date());
+
+      const tags = isFlex ? ['_FLEXIBLE_DATES_'] : [];
+
+      await onSubmit({
+        tripName: tripName.trim() || `${destinations[0]} trip`,
+        destinations,
+        startDate: effectiveStartDate,
+        endDate: effectiveEndDate,
+        invitedFriends: [],
+        isPersonal: !isSelling,
+        isPublic: isSelling,
+        priceCents: isSelling ? 2990 : null,
+        tags,
+        isFlexible: isFlex,
+        durationDays: daysCount,
+      });
+    } catch (err) {
+      console.error('Error submitting itinerary form:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (!isOpen) return null;
 
   return (
     <>
       {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/40 z-40 transition-opacity"
+      <div
+        className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 transition-opacity animate-in fade-in duration-200"
         onClick={onClose}
       />
-      
-      {/* Bottom Sheet */}
-      <div 
-        className="fixed bottom-0 left-0 right-0 z-50 flex justify-center"
-        style={{ fontFamily: 'var(--font-family-primary)' }}
-      >
-        <div className="bg-background rounded-t-3xl w-full w-full max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
-          {/* Handle */}
-          <div className="flex justify-center py-3 sticky top-0 bg-background z-10">
-            <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
-          </div>
-          
-          {/* Header with back button */}
-          <div className="px-6 pb-4 flex items-center gap-3">
-            <BackButton onClick={onClose} />
-            <h2 className="text-xl font-bold text-foreground my-0">Criar Roteiro</h2>
-          </div>
-          
-          {/* Content */}
-          <div className="px-6 pb-8 space-y-6">
-            {/* Trip name */}
-            <div>
-              <label className="text-sm font-semibold text-foreground mb-2 block">Nome do roteiro</label>
-              <div className="flex items-center gap-2 px-4 py-3 border border-border rounded-2xl">
-                <Icon name="edit" size={20} className="text-muted-foreground flex-shrink-0" />
-                <input
-                  type="text"
-                  value={tripName}
-                  onChange={(e) => setTripName(e.target.value.slice(0, 80))}
-                  placeholder="Ex: Lua de mel em Paris"
-                  maxLength={80}
-                  className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
-                />
-              </div>
-            </div>
 
-            {/* Destinations */}
-            <div className="relative">
-              <label className="text-sm font-semibold text-foreground mb-2 block">Destinos</label>
-              <div className="flex items-center gap-2 px-4 py-3 border border-border rounded-2xl">
-                <Icon name="location_on" size={20} className="text-muted-foreground flex-shrink-0" />
-                <div className="flex flex-wrap items-center gap-2 flex-1">
-                  {destinations.map((dest) => (
-                    <span 
-                      key={dest}
-                      className="inline-flex items-center gap-1 px-3 py-1 bg-muted rounded-full text-sm"
-                    >
-                      {dest}
-                      <button 
-                        onClick={() => handleRemoveDestination(dest)}
-                        className="hover:text-destructive"
-                      >
-                        <Icon name="close" size={14} />
-                      </button>
-                    </span>
-                  ))}
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    value={destinationInput}
-                    onChange={(e) => {
-                      setDestinationInput(e.target.value);
-                      setShowSuggestions(true);
-                    }}
-                    onFocus={() => setShowSuggestions(true)}
-                    onKeyDown={handleKeyDown}
-                    placeholder={destinations.length === 0 ? "Adicionar destino..." : ""}
-                    className="flex-1 min-w-[120px] bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
-                  />
-                </div>
-              </div>
-              
-              {/* Suggestions Dropdown */}
-              {showSuggestions && (destinationInput.length > 0 || destinations.length === 0) && (
-                <div 
-                  ref={suggestionsRef}
-                  className="absolute left-0 right-0 mt-2 bg-background border border-border rounded-xl shadow-lg z-50 max-h-[260px] overflow-y-auto"
-                >
-                  {/* Resultados globais via Google quando há texto */}
-                  {destinationInput.trim().length >= 2 && remoteResults.length > 0 && (
-                    remoteResults.map((dest, idx) => (
-                      <button
-                        key={`remote-${dest.full}-${idx}`}
-                        onClick={() => handleAddDestination(dest.full)}
-                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors text-left"
-                      >
-                        <span className="text-lg">{dest.emoji}</span>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-foreground truncate">{dest.label}</p>
-                          {dest.sub && <p className="text-xs text-muted-foreground truncate">{dest.sub}</p>}
-                        </div>
-                      </button>
-                    ))
-                  )}
+      {/* Bottom Sheet Container */}
+      <div className="fixed inset-x-0 bottom-0 z-50 max-h-[90vh] flex flex-col justify-end pointer-events-none">
+        <div className="bg-white rounded-t-[32px] w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden pointer-events-auto animate-in slide-in-from-bottom duration-300">
 
-                  {/* Lista popular como fallback inicial (sem texto) */}
-                  {destinationInput.trim().length < 2 && filteredDestinations.length > 0 && (
-                    filteredDestinations.slice(0, 8).map((dest) => (
-                      <button
-                        key={`${dest.city}-${dest.country}`}
-                        onClick={() => handleAddDestination(`${dest.city}, ${dest.country}`)}
-                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors text-left"
-                      >
-                        <span className="text-lg">{dest.emoji}</span>
-                        <div>
-                          <p className="text-sm font-medium text-foreground">{dest.city}</p>
-                          <p className="text-xs text-muted-foreground">{dest.country}</p>
-                        </div>
-                      </button>
-                    ))
-                  )}
+          {/* Top Bar with Back and Close */}
+          <div className="px-6 pt-5 pb-2 flex items-center justify-between">
+            {step === 'form' ? (
+              <button
+                onClick={() => setStep('type')}
+                className="w-9 h-9 rounded-full flex items-center justify-center bg-[#F4F4F5] text-[#1A1C40] hover:bg-[#ECECED] transition-colors -ml-1"
+                aria-label="Voltar"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+            ) : (
+              <div className="w-9 h-9" />
+            )}
 
-                  {/* Loading */}
-                  {destinationInput.trim().length >= 2 && isSearching && remoteResults.length === 0 && (
-                    <div className="px-4 py-3 text-xs text-muted-foreground">Buscando destinos...</div>
-                  )}
-
-                  {/* Nenhuma cidade encontrada */}
-                  {destinationInput.trim().length >= 2 && !isSearching && remoteResults.length === 0 && (
-                    <div className="px-4 py-3 text-xs text-muted-foreground">
-                      Nenhuma cidade encontrada. Tente outro termo.
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Date */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-semibold text-foreground">Data da viagem</label>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">Datas fixas?</span>
-                  <Switch checked={isFixedDate} onCheckedChange={setIsFixedDate} />
-                </div>
-              </div>
-              
-              {isFixedDate ? (
-                <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                  <PopoverTrigger asChild>
-                    <button className="w-full flex items-center gap-2 px-4 py-3 border border-border rounded-2xl text-left">
-                      <Icon name="calendar_today" size={20} className="text-muted-foreground flex-shrink-0" />
-                      <span className={cn(
-                        "text-sm",
-                        !startDate && "text-muted-foreground"
-                      )}>
-                        {formatDateRange() || "Ex: 14 de jun. - 21 de jun."}
-                      </span>
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="range"
-                      selected={{ from: startDate, to: endDate }}
-                      onSelect={handleDateSelect}
-                      disabled={(date) => date < new Date()}
-                      initialFocus
-                      scrollable
-                      className={cn("pointer-events-auto")}
-                    />
-                    {startDate && !endDate && (
-                      <p className="px-3 pb-3 text-xs text-muted-foreground">
-                        Selecione a data de término
-                      </p>
-                    )}
-                  </PopoverContent>
-                </Popover>
-              ) : (
-                <div className="flex items-center gap-2 px-4 py-3 border border-border rounded-2xl">
-                  <Icon name="schedule" size={20} className="text-muted-foreground flex-shrink-0" />
-                  <input
-                    type="number"
-                    min="1"
-                    max="365"
-                    value={durationDays}
-                    onChange={(e) => setDurationDays(e.target.value === '' ? '' : parseInt(e.target.value) || '')}
-                    className="flex-1 bg-transparent text-sm text-foreground focus:outline-none"
-                  />
-                  <span className="text-sm text-muted-foreground">dias</span>
-                </div>
-              )}
-            </div>
-
-            {/* Invite friends */}
-            <div className="relative">
-              <label className="text-sm font-semibold text-foreground mb-2 block">Convidar amigos</label>
-              <div className="flex items-center gap-2 px-4 py-3 border border-border rounded-2xl">
-                <Icon name="person_add" size={20} className="text-muted-foreground flex-shrink-0" />
-                <input
-                  ref={friendInputRef}
-                  type="text"
-                  value={friendInput}
-                  onChange={(e) => { setFriendInput(e.target.value); setShowFriendSuggestions(true); }}
-                  onFocus={() => setShowFriendSuggestions(true)}
-                  placeholder="Buscar por nome ou @usuário"
-                  className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
-                />
-              </div>
-
-              {/* Suggestions dropdown */}
-              {showFriendSuggestions && friendInput.trim().replace(/^@+/, '').length >= 2 && (
-                <div
-                  ref={friendSuggestionsRef}
-                  className="absolute left-0 right-0 mt-2 bg-background border border-border rounded-xl shadow-lg z-50 max-h-[260px] overflow-y-auto"
-                >
-                  {isSearchingFriends && friendSuggestions.length === 0 && (
-                    <div className="px-4 py-3 text-xs text-muted-foreground">Buscando pessoas...</div>
-                  )}
-                  {!isSearchingFriends && friendSuggestions.length === 0 && (
-                    <div className="px-4 py-3 text-xs text-muted-foreground">Nenhuma pessoa encontrada</div>
-                  )}
-                  {friendSuggestions.map((s) => (
-                    <button
-                      key={s.user_id}
-                      onClick={() => handleSelectFriend(s)}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors text-left"
-                    >
-                      <div className="w-9 h-9 rounded-full bg-muted overflow-hidden flex items-center justify-center flex-shrink-0">
-                        {s.avatar_url ? (
-                          <img src={s.avatar_url} alt={s.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <Icon name="person" size={18} className="text-muted-foreground" />
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-foreground truncate">{s.name || s.username}</p>
-                        {s.username && <p className="text-xs text-muted-foreground truncate">@{s.username}</p>}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Invited friends list */}
-              {invitedFriends.length > 0 && (
-                <div className="mt-3 space-y-2">
-                  {invitedFriends.map((friend) => (
-                    <div
-                      key={friend.id}
-                      className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl"
-                    >
-                      <div className="w-10 h-10 rounded-full bg-muted overflow-hidden flex items-center justify-center">
-                        {friend.avatar ? (
-                          <img src={friend.avatar} alt={friend.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <Icon name="person" size={20} className="text-muted-foreground" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">{friend.name}</p>
-                        {friend.username && <p className="text-xs text-muted-foreground truncate">@{friend.username}</p>}
-                      </div>
-                      <button
-                        onClick={() => handleRemoveFriend(friend.id)}
-                        className="w-8 h-8 rounded-full hover:bg-muted flex items-center justify-center flex-shrink-0"
-                        aria-label="Remover"
-                      >
-                        <Icon name="close" size={16} className="text-muted-foreground" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-              )}
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="px-6 pb-8 sticky bottom-0 bg-background">
             <button
-              onClick={handleSubmit}
-              disabled={!isFormValid || isSubmitting}
-              className="w-full py-4 rounded-2xl text-base font-semibold transition-colors flex items-center justify-center gap-2"
-              style={{
-                background: isFormValid ? '#9DCC36' : '#D1D5DB',
-                color: isFormValid ? '#1A1C40' : '#FFFFFF',
-              }}
+              onClick={onClose}
+              className="w-9 h-9 rounded-full flex items-center justify-center bg-[#F4F4F5] text-[#1A1C40] hover:bg-[#ECECED] transition-colors -mr-1"
+              aria-label="Fechar"
             >
-              {isSubmitting ? (
-                <>
-                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  {loadingPhrases[loadingTextIndex]}
-                </>
-              ) : (
-                'Criar Roteiro'
-              )}
+              <X className="w-5 h-5" />
             </button>
+          </div>
+
+          {/* Title Area */}
+          <div className="px-6 pt-1 pb-3">
+            <h2 className="text-[20px] font-bold text-[#1A1C40]">
+              {step === 'type' ? 'O que você quer fazer com seu roteiro?' : 'Criar roteiro'}
+            </h2>
+          </div>
+
+          {/* Content Area */}
+          <div className="p-6 overflow-y-auto space-y-4">
+            {step === 'type' ? (
+              /* Step 1: Type Selection (IMAGEM 2) */
+              <div className="space-y-4 pt-1">
+                {/* Opção 1: Planejar minha viagem */}
+                <button
+                  type="button"
+                  onClick={() => setCreationType('personal')}
+                  className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-left ${creationType === 'personal'
+                    ? 'border-[#9ecc3b] bg-[#F7FBEB]'
+                    : 'border-[#F0F0F0] bg-white hover:border-[#E0E0E0]'
+                    }`}
+                >
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-xl bg-[#F4F4F5] flex items-center justify-center text-[#1A1C40] flex-shrink-0">
+                      <Compass className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-[15px] font-bold text-[#1A1C40]">Planejar minha viagem</h3>
+                      <p className="text-[12px] text-[#8E8E93] mt-0.5">Organize sua viagem do seu jeito.</p>
+                    </div>
+                  </div>
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${creationType === 'personal'
+                      ? 'border-[#9ecc3b] bg-[#9ecc3b]'
+                      : 'border-[#D1D5DB] bg-white'
+                      }`}
+                  >
+                    {creationType === 'personal' && (
+                      <div className="w-2 h-2 rounded-full bg-white" />
+                    )}
+                  </div>
+                </button>
+
+                {/* Opção 2: Criar um roteiro para vender */}
+                <button
+                  type="button"
+                  onClick={() => setCreationType('seller')}
+                  className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-left ${creationType === 'seller'
+                    ? 'border-[#9ecc3b] bg-[#F7FBEB]'
+                    : 'border-[#F0F0F0] bg-white hover:border-[#E0E0E0]'
+                    }`}
+                >
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-xl bg-[#F4F4F5] flex items-center justify-center text-[#1A1C40] flex-shrink-0">
+                      <DollarSign className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-[15px] font-bold text-[#1A1C40]">Criar um roteiro para vender</h3>
+                      <p className="text-[12px] text-[#8E8E93] mt-0.5">Transforme seu roteiro em renda.</p>
+                    </div>
+                  </div>
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${creationType === 'seller'
+                      ? 'border-[#9ecc3b] bg-[#9ecc3b]'
+                      : 'border-[#D1D5DB] bg-white'
+                      }`}
+                  >
+                    {creationType === 'seller' && (
+                      <div className="w-2 h-2 rounded-full bg-white" />
+                    )}
+                  </div>
+                </button>
+
+                <div className="pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setStep('form')}
+                    className="w-full py-4 rounded-2xl text-[15px] font-bold bg-[#9ecc3b] text-[#1A1C40] hover:opacity-95 active:scale-[0.99] transition-all shadow-sm flex items-center justify-center"
+                  >
+                    Continuar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Step 2: Form (IMAGEM 2) */
+              <div className="space-y-4">
+                {/* Campo 1: Nome do roteiro */}
+                <div className="bg-[#F4F4F5] rounded-2xl p-3.5 flex items-start gap-3">
+                  <Pencil className="w-4 h-4 text-[#8E8E93] mt-1 flex-shrink-0" />
+                  <div className="flex-1">
+                    <label className="text-[11px] font-medium text-[#8E8E93] block">Nome do roteiro</label>
+                    <input
+                      type="text"
+                      value={tripName}
+                      onChange={(e) => setTripName(e.target.value)}
+                      placeholder="Dê um nome ao seu roteiro"
+                      className="w-full bg-transparent text-[14px] font-semibold text-[#1A1C40] placeholder:text-[#8E8E93] focus:outline-none mt-0.5"
+                    />
+                  </div>
+                </div>
+
+                {/* Campo 2: Destinos */}
+                <div className="bg-[#F4F4F5] rounded-2xl p-3.5 relative">
+                  <div className="flex items-start gap-3">
+                    <MapPin className="w-4 h-4 text-[#8E8E93] mt-1 flex-shrink-0" />
+                    <div className="flex-1">
+                      <label className="text-[11px] font-medium text-[#8E8E93] block">Destinos</label>
+
+                      {/* Chips & Input Container */}
+                      <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                        {destinations.map((dest) => (
+                          <span
+                            key={dest}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#1A1C40] text-white text-[13px] font-medium shadow-sm"
+                          >
+                            <span>{dest}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveDestination(dest)}
+                              className="text-white hover:opacity-75 transition-opacity flex items-center justify-center"
+                            >
+                              <X className="w-3.5 h-3.5 text-white" />
+                            </button>
+                          </span>
+                        ))}
+
+                        {/* Autocomplete Input */}
+                        <input
+                          ref={inputRef}
+                          type="text"
+                          value={destinationInput}
+                          onChange={(e) => {
+                            setDestinationInput(e.target.value);
+                            setShowSuggestions(true);
+                          }}
+                          onFocus={() => setShowSuggestions(true)}
+                          placeholder={destinations.length === 0 ? "Adicione os destinos" : ""}
+                          className={`bg-transparent text-[13px] font-medium text-[#1A1C40] placeholder:text-[#8E8E93] focus:outline-none ${
+                            destinations.length === 0 ? 'w-full mt-0.5' : 'min-w-[50px] flex-1 py-1'
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Suggestions Popover */}
+                  {showSuggestions && (
+                    <div
+                      ref={suggestionsRef}
+                      className="absolute left-0 right-0 top-full mt-2 bg-white border border-[#E5E5E5] rounded-2xl shadow-xl z-50 max-h-56 overflow-y-auto divide-y divide-[#F0F0F0]"
+                    >
+                      {isSearching && (
+                        <div className="p-3 text-xs text-[#8E8E93]">Buscando destinos...</div>
+                      )}
+
+                      {remoteResults.length > 0
+                        ? remoteResults.map((r, idx) => (
+                          <button
+                            key={`rem-${idx}`}
+                            type="button"
+                            onClick={() => handleAddDestination(r.full || `${r.label}, ${r.sub}`)}
+                            className="w-full px-4 py-2.5 text-left flex items-center gap-2 hover:bg-[#F4F4F5] transition-colors"
+                          >
+                            <span className="text-base">{r.emoji}</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[13px] font-semibold text-[#1A1C40] truncate">{r.label}</p>
+                              {r.sub && <p className="text-[11px] text-[#8E8E93] truncate">{r.sub}</p>}
+                            </div>
+                          </button>
+                        ))
+                        : !isSearching && (
+                          (destinationInput.trim().length >= 2
+                            ? popularDestinations.filter(p =>
+                              p.city.toLowerCase().includes(destinationInput.trim().toLowerCase()) ||
+                              p.country.toLowerCase().includes(destinationInput.trim().toLowerCase())
+                            )
+                            : popularDestinations
+                          ).map((p, idx) => (
+                            <button
+                              key={`pop-${idx}`}
+                              type="button"
+                              onClick={() => handleAddDestination(`${p.city}, ${p.country}`)}
+                              className="w-full px-4 py-2.5 text-left flex items-center gap-2 hover:bg-[#F4F4F5] transition-colors"
+                            >
+                              <span className="text-base">{p.emoji}</span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[13px] font-semibold text-[#1A1C40] truncate">{p.city}</p>
+                                <p className="text-[11px] text-[#8E8E93] truncate">{p.country}</p>
+                              </div>
+                            </button>
+                          ))
+                        )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Campo 3: Data / Período */}
+                <div className="bg-[#F4F4F5] rounded-2xl p-3.5 flex items-start gap-3">
+                  <CalendarIcon className="w-4 h-4 text-[#8E8E93] mt-1 flex-shrink-0" />
+                  <div className="flex-1">
+                    <label className="text-[11px] font-medium text-[#8E8E93] block">
+                      {isFlexibleDates ? 'Quantidade de dias' : 'Selecione a data da viagem'}
+                    </label>
+
+                    {isFlexibleDates ? (
+                      <div className="flex items-center justify-between gap-2 mt-0.5">
+                        <input
+                          type="number"
+                          min="1"
+                          max="365"
+                          value={durationDays}
+                          onChange={(e) =>
+                            setDurationDays(e.target.value === '' ? '' : parseInt(e.target.value) || 1)
+                          }
+                          className="w-full bg-transparent text-[14px] font-semibold text-[#1A1C40] focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        <span className="text-[13px] font-semibold text-[#8E8E93] shrink-0 select-none">dias</span>
+                      </div>
+                    ) : (
+                      <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            className="w-full text-left mt-1 text-[14px] font-semibold text-[#1A1C40]"
+                          >
+                            {formatDateRange() || (
+                              <span className="text-[#8E8E93] font-normal">23 nov - 23 dez 2026</span>
+                            )}
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0 z-50 bg-white border border-[#E5E5E5] rounded-2xl shadow-2xl" align="start">
+                          <Calendar
+                            mode="range"
+                            selected={{ from: startDate, to: endDate }}
+                            onSelect={(range) => {
+                              setStartDate(range?.from);
+                              setEndDate(range?.to);
+                              if (range?.from && range?.to) {
+                                setIsCalendarOpen(false);
+                              }
+                            }}
+                            disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                            initialFocus
+                            className={cn('pointer-events-auto p-3')}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                  </div>
+                </div>
+
+                {/* Toggle "Não tenho datas fixas" (exclusivo para "Criar um roteiro para vender") */}
+                {creationType === 'seller' && (
+                  <div className="flex items-center justify-end gap-3 pt-1 px-1">
+                    <span className="text-[13px] font-medium text-[#1A1C40]">Não tenho datas fixas</span>
+                    <Switch
+                      checked={isFlexibleDates}
+                      onCheckedChange={setIsFlexibleDates}
+                    />
+                  </div>
+                )}
+
+                {/* Botão Criar */}
+                <div className="pt-3">
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={!isFormValid || isSubmitting}
+                    className={`w-full py-4 rounded-2xl text-[15px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 ${isFormValid && !isSubmitting
+                      ? 'bg-[#9ecc3b] text-[#1A1C40] hover:opacity-95 active:scale-[0.99]'
+                      : 'bg-[#E5E5E7] text-[#8E8E93] cursor-not-allowed'
+                      }`}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <svg className="animate-spin h-5 w-5 text-[#1A1C40]" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        <span>{loadingPhrases[loadingTextIndex]}</span>
+                      </>
+                    ) : (
+                      'Criar'
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

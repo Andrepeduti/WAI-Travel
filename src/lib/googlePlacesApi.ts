@@ -8,6 +8,7 @@ export interface GoogleAutocompleteSuggestion {
   name: string;      // e.g. "Eiffel Tower"
   location: string;  // e.g. "Paris, France"
   fullText: string;  // e.g. "Eiffel Tower, Paris, France"
+  description?: string; // backwards compatibility e.g. "Paris, France"
 }
 
 export interface GooglePlaceDetails {
@@ -76,11 +77,15 @@ export async function searchGooglePlacesAutocomplete(
     const data = await res.json();
     const suggestions = (data.suggestions || []).map((s: any) => {
       const placePrediction = s.placePrediction;
+      const fullText = placePrediction?.text?.text || placePrediction?.structuredFormat?.mainText?.text || '';
+      const name = placePrediction?.structuredFormat?.mainText?.text || fullText;
+      const location = placePrediction?.structuredFormat?.secondaryText?.text || '';
       return {
-        placeId: placePrediction.place,
-        name: placePrediction.structuredFormat?.mainText?.text || placePrediction.text.text,
-        location: placePrediction.structuredFormat?.secondaryText?.text || '',
-        fullText: placePrediction.text.text,
+        placeId: placePrediction?.place || placePrediction?.placeId || '',
+        name,
+        location,
+        fullText,
+        description: fullText || (location ? `${name}, ${location}` : name),
       };
     }).filter((s: any) => s.placeId);
     
@@ -162,14 +167,14 @@ export async function searchGooglePlacesText(query: string, city?: string): Prom
       }
       
       let city = '';
-      if (p.addressComponents) {
-        const locality = p.addressComponents.find((c: any) => c.types.includes('locality'));
+      if (Array.isArray(p.addressComponents)) {
+        const locality = p.addressComponents.find((c: any) => c?.types?.includes('locality'));
         if (locality) {
-          city = locality.longText;
+          city = locality.longText || locality.text || '';
         } else {
-          const admin2 = p.addressComponents.find((c: any) => c.types.includes('administrative_area_level_2'));
+          const admin2 = p.addressComponents.find((c: any) => c?.types?.includes('administrative_area_level_2'));
           if (admin2) {
-            city = admin2.longText;
+            city = admin2.longText || admin2.text || '';
           }
         }
       }
@@ -211,12 +216,14 @@ export async function reverseGeocodeGoogle(lat: number, lng: number): Promise<{ 
       let state = '';
       const addressComponents = data.results[0].address_components;
       
-      for (const component of addressComponents) {
-        if (component.types.includes('locality') || component.types.includes('administrative_area_level_2')) {
-          if (!city) city = component.long_name;
-        }
-        if (component.types.includes('administrative_area_level_1')) {
-          state = component.short_name;
+      if (Array.isArray(addressComponents)) {
+        for (const component of addressComponents) {
+          if (component?.types?.includes('locality') || component?.types?.includes('administrative_area_level_2')) {
+            if (!city) city = component.long_name;
+          }
+          if (component?.types?.includes('administrative_area_level_1')) {
+            state = component.short_name;
+          }
         }
       }
       return { city, state };

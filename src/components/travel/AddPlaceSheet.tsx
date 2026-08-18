@@ -381,25 +381,33 @@ export function AddPlaceSheet({ open, onClose, onSelect, onAddManually, dayNumbe
       >
         <div className="w-10 h-1 rounded-full bg-muted mx-auto mt-3 mb-2" />
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 pb-3">
-          <div className="flex items-center gap-2 min-w-0">
-            {activeTab === 'collections' && openCollection && (
+        {/* Top Bar with Back and Close */}
+        <div className="flex items-center justify-between px-5 pt-2 pb-1 min-h-[36px]">
+          <div>
+            {activeTab === 'collections' && openCollection ? (
               <button
                 onClick={() => { setOpenCollectionId(null); setSelectedIds(new Set()); setSearch(''); }}
-                className="w-8 h-8 -ml-2 rounded-full flex items-center justify-center active:bg-secondary/60"
+                className="w-8 h-8 -ml-1 rounded-full flex items-center justify-center active:bg-secondary/60 transition-colors"
                 aria-label="Voltar"
               >
-                <Icon name="chevron_left" size={20} className="text-foreground" />
+                <Icon name="chevron_left" size={22} className="text-foreground" />
               </button>
-            )}
-            <h3 className="text-[16px] font-semibold text-foreground truncate">
-              {activeTab === 'collections' && openCollection ? openCollection.title : 'Adicionar lugar'}
-            </h3>
+            ) : null}
           </div>
-          <button onClick={handleClose} className="w-8 h-8 rounded-full flex items-center justify-center active:bg-secondary/60">
+          <button
+            onClick={handleClose}
+            className="w-8 h-8 rounded-full flex items-center justify-center active:bg-secondary/60 transition-colors -mr-1"
+            aria-label="Fechar"
+          >
             <Icon name="close" size={20} className="text-foreground" />
           </button>
+        </div>
+
+        {/* Title */}
+        <div className="px-5 pt-1 pb-3">
+          <h3 className="text-[20px] font-bold text-foreground truncate">
+            {activeTab === 'collections' && openCollection ? openCollection.title : 'Adicionar lugar'}
+          </h3>
         </div>
 
         {/* Tabs */}

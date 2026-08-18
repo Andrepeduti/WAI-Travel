@@ -558,8 +558,8 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
   // Roteiros públicos reais do próprio usuário (vindos do banco)
   const { itineraries: myItineraries, loading: myItinerariesLoading } = useMyItineraries();
   const myPublicItineraries = useMemo(
-    () => (isSelf ? myItineraries.filter(it => it.isPublic) : []),
-    [isSelf, myItineraries],
+    () => (isSelf ? myItineraries.filter(it => it.isPublic && it.userId === authUser?.id && !it.deletedAt) : []),
+    [isSelf, myItineraries, authUser?.id],
   );
 
   // Roteiros do próprio usuário publicados À VENDA (priceCents > 0).

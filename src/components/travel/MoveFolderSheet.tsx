@@ -43,25 +43,28 @@ export function MoveFolderSheet({ isOpen, onClose, folders, onSelect, placeName,
             <div className="w-9 h-[4px] bg-muted-foreground/20 rounded-full" />
           </div>
 
-          {/* Header */}
-          <div className="flex items-center justify-between px-5 py-3">
-            <h2 className="text-[17px] font-bold text-foreground">
-              Mover para pasta
-            </h2>
+          {/* Top Bar with Close Button */}
+          <div className="flex items-center justify-end px-5 pt-1 pb-1">
             <button
               onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors"
+              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors -mr-1"
+              aria-label="Fechar"
             >
               <Icon name="close" size={20} className="text-muted-foreground" />
             </button>
           </div>
 
-          {/* Subtitle */}
-          {subtitle && (
-            <p className="text-[13px] font-medium text-muted-foreground px-6">
-              {subtitle}
-            </p>
-          )}
+          {/* Title & Subtitle */}
+          <div className="px-5 pt-1 pb-2">
+            <h2 className="text-[20px] font-bold text-foreground">
+              Mover para pasta
+            </h2>
+            {subtitle && (
+              <p className="text-[13px] font-medium text-muted-foreground mt-1">
+                {subtitle}
+              </p>
+            )}
+          </div>
 
           {/* Folder list */}
           <div

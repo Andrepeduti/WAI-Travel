@@ -118,6 +118,7 @@ export async function getPublicItinerariesByUserId(
     .select('id, title, destinations, images, start_date, end_date, places_count, price_cents, main_tag, description, tags')
     .eq('user_id', userId)
     .eq('is_public', true)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false });
   if (error) {
     console.error('[profilesApi] getPublicItinerariesByUserId error', error);

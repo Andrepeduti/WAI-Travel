@@ -116,16 +116,21 @@ export function SaveToCollectionSheet({ open, onClose, place, onSaved }: SaveToC
           <div className="w-10 h-1 rounded-full bg-muted-foreground/20" />
         </div>
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 pb-4 pt-2">
-          <h2 className="text-lg font-bold text-foreground">Salvar na coleção</h2>
+        {/* Top Bar with Close Button */}
+        <div className="flex items-center justify-end px-5 pt-1 pb-1">
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center"
+            className="w-8 h-8 rounded-full flex items-center justify-center -mr-1"
             style={{ background: '#F2F2F2' }}
+            aria-label="Fechar"
           >
             <Icon name="close" size={18} className="text-foreground" />
           </button>
+        </div>
+
+        {/* Title */}
+        <div className="px-5 pb-3">
+          <h2 className="text-[20px] font-bold text-foreground">Salvar na coleção</h2>
         </div>
 
         {/* Place being saved */}

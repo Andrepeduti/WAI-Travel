@@ -17,7 +17,6 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { BackButton } from '@/components/ui/BackButton';
-import { OwnerPublishedSheet } from '@/components/travel/OwnerPublishedSheet';
 import { recordPurchase } from '@/lib/purchasesApi';
 import { getInterestIcon } from '@/lib/interestIcons';
 import { ReportSheet } from '@/components/social/ReportSheet';
@@ -101,7 +100,6 @@ export interface MarketplaceItineraryScreenProps {
   onManageItinerary?: () => void;
   onViewSalesDashboard?: () => void;
   onUnpublish?: () => void;
-  onDownloadPdf?: () => void;
   onDeleteItinerary?: () => void;
   /** Abre o chat com o autor do roteiro (deep-link para a tela de Mensagens). */
   onOpenChat?: (
@@ -128,7 +126,7 @@ export interface MarketplaceItineraryScreenProps {
  * Exibe: criador, avaliações, curtidas, descrição, tags, dia-a-dia com lock,
  * locais incluídos, reviews e botão de compra.
  */
-export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchasedItinerary, onViewCreator, authorOverride, authorImageOverride, datasetOverride, isOwner = false, onManageItinerary, onViewSalesDashboard, onUnpublish, onDownloadPdf, onDeleteItinerary, onOpenChat, autoOpenCheckout }: MarketplaceItineraryScreenProps) {
+export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchasedItinerary, onViewCreator, authorOverride, authorImageOverride, datasetOverride, isOwner = false, onManageItinerary, onViewSalesDashboard, onUnpublish, onDeleteItinerary, onOpenChat, autoOpenCheckout }: MarketplaceItineraryScreenProps) {
 
   const idStr = String(itineraryId);
 

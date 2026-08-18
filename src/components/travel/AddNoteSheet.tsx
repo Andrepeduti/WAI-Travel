@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Icon } from '@/components/ui/Icon';
-import { DaySelector } from './DaySelector';
-import { searchGooglePlacesText } from '@/lib/googlePlacesApi';
-import { toast } from 'sonner';
+import { X, MapPin, ChevronDown, Check } from 'lucide-react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface AddNoteSheetProps {
   open: boolean;
@@ -11,329 +11,191 @@ interface AddNoteSheetProps {
     title: string;
     text: string;
     day: number;
-    startTime?: string;
-    endTime?: string;
-    location?: string;
-    lat?: number;
-    lng?: number;
+    activityId?: number;
   }) => void;
   dayNumber: number;
   totalDays: number;
-  startDate?: Date;
+  daysData?: Array<{ day: number; date: Date }>;
+  activityId?: number;
+  activityName?: string;
+  initialText?: string;
 }
 
-interface AddressSuggestion {
-  display_name: string;
-  lat: string;
-  lon: string;
-  place_id: number;
-}
-
-function timeToMinutes(t: string): number {
-  const match = /^(\d{1,2}):(\d{2})/.exec((t || '').trim());
-  if (!match) return 0;
-  return Number(match[1]) * 60 + Number(match[2]);
-}
-
-function minutesToTime(mins: number): string {
-  const clamped = Math.max(0, Math.min(24 * 60 - 1, mins));
-  const h = Math.floor(clamped / 60);
-  const m = clamped % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
-
-function parseTime(t: string): [number, number] {
-  const [h, m] = t.split(':').map(Number);
-  return [h, m];
-}
-
-function formatTime(h: number, m: number): string {
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
-
-function stepTime(time: string, delta: number): string {
-  let [h, m] = parseTime(time);
-  m += delta;
-  if (m >= 60) { h += 1; m -= 60; }
-  if (m < 0) { h -= 1; m += 60; }
-  if (h >= 24) h = 0;
-  if (h < 0) h = 23;
-  return formatTime(h, m);
-}
-
-export function AddNoteSheet({ open, onClose, onSave, dayNumber, totalDays, startDate }: AddNoteSheetProps) {
-  const [text, setText] = useState('');
+export function AddNoteSheet({
+  open,
+  onClose,
+  onSave,
+  dayNumber,
+  totalDays,
+  daysData = [],
+  activityId,
+  activityName,
+  initialText = '',
+}: AddNoteSheetProps) {
+  const [text, setText] = useState(initialText);
   const [selectedDay, setSelectedDay] = useState(dayNumber);
-  const [startTime, setStartTime] = useState('11:00');
-  const [endTime, setEndTime] = useState('13:15');
+  const [isDayDropdownOpen, setIsDayDropdownOpen] = useState(false);
 
-  // Localização opcional — quando preenchida com lat/lng, o planner usa
-  // para calcular automaticamente o trajeto até o próximo ponto turístico.
-  const [location, setLocation] = useState('');
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
-  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => { setSelectedDay(dayNumber); }, [dayNumber]);
-
-  const searchAddress = useCallback((query: string) => {
-    if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    if (query.trim().length < 3) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      setIsSearching(false);
-      return;
+  useEffect(() => {
+    if (open) {
+      setSelectedDay(dayNumber);
+      setText(initialText);
+      setIsDayDropdownOpen(false);
     }
-    setIsSearching(true);
-    let active = true;
-    searchTimeout.current = setTimeout(async () => {
-      try {
-        const results = await searchGooglePlacesText(query);
-        const mapped: AddressSuggestion[] = results.map(r => ({
-            display_name: r.address ? `${r.name}, ${r.address}` : r.name,
-            lat: String(r.lat),
-            lon: String(r.lng),
-            place_id: parseInt(r.id.replace(/\D/g, '').substring(0, 8)) || Math.floor(Math.random() * 1000000)
-        }));
-        if (active) {
-            setSuggestions(mapped);
-            setShowSuggestions(mapped.length > 0);
-        }
-      } catch {
-        if (active) setSuggestions([]);
-      } finally {
-        if (active) setIsSearching(false);
-      }
-    }, 1000);
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setLocation(val);
-    // Qualquer edição manual invalida as coordenadas resolvidas anteriormente
-    setCoords(null);
-    searchAddress(val);
-  };
-
-  const selectSuggestion = (s: AddressSuggestion) => {
-    setLocation(s.display_name);
-    setCoords({ lat: parseFloat(s.lat), lng: parseFloat(s.lon) });
-    setShowSuggestions(false);
-    setSuggestions([]);
-  };
+  }, [open, dayNumber, initialText]);
 
   if (!open) return null;
 
-  const handleStartTimeChange = (newStart: string) => {
-    setStartTime(newStart);
-    const startMin = timeToMinutes(newStart);
-    const endMin = timeToMinutes(endTime);
-    if (startMin >= endMin) {
-      setEndTime(minutesToTime(startMin + 60));
-    }
-  };
-
-  const handleEndTimeChange = (newEnd: string) => {
-    setEndTime(newEnd);
-    const endMin = timeToMinutes(newEnd);
-    const startMin = timeToMinutes(startTime);
-    if (endMin <= startMin) {
-      setStartTime(minutesToTime(Math.max(0, endMin - 60)));
-    }
-  };
+  const currentDayInfo = daysData.find((d) => d.day === selectedDay);
+  const formattedDayStr = currentDayInfo?.date
+    ? `Dia ${selectedDay} (${format(currentDayInfo.date, 'dd/MM - EEEE', { locale: ptBR })})`
+    : `Dia ${selectedDay}`;
 
   const handleSave = () => {
-    if (timeToMinutes(startTime) >= timeToMinutes(endTime)) {
-      toast.error('O horário de início deve ser anterior ao horário de término');
-      return;
-    }
-    // Localização só é considerada se o usuário selecionou uma sugestão (coords presentes).
-    // Texto digitado livre é ignorado para evitar entradas que não sejam um lugar real.
-    const hasValidLocation = !!coords;
+    if (!text.trim()) return;
     onSave({
-      title: '',
+      title: activityName ? `Nota sobre ${activityName}` : 'Anotação pessoal',
       text: text.trim(),
       day: selectedDay,
-      startTime,
-      endTime,
-      location: hasValidLocation ? location.trim() : undefined,
-      lat: hasValidLocation ? coords?.lat : undefined,
-      lng: hasValidLocation ? coords?.lng : undefined,
+      activityId,
     });
-    setText('');
-    setStartTime('11:00');
-    setEndTime('13:15');
-    setLocation('');
-    setCoords(null);
-    setSuggestions([]);
-    setShowSuggestions(false);
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-[210]" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
+    <>
+      {/* Backdrop */}
       <div
-        className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl animate-in slide-in-from-bottom duration-300 flex flex-col"
-        style={{ maxHeight: '85vh' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="w-10 h-1 rounded-full bg-muted mx-auto mt-3 mb-2" />
+        className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 transition-opacity animate-in fade-in duration-200"
+        onClick={onClose}
+      />
 
-        {/* Header */}
-        <div className="px-5 pb-4 flex items-center justify-between">
-          <h2 className="text-[17px] font-bold text-foreground">Adicionar tempo livre</h2>
-          <button onClick={onClose} className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#F2F2F2' }}>
-            <Icon name="close" size={20} className="text-foreground" />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="px-5 pb-6 space-y-4 overflow-y-auto flex-1">
-          {/* Day selector */}
-          <DaySelector selectedDay={selectedDay} totalDays={totalDays} onChange={setSelectedDay} startDate={startDate} />
-
-          {/* Time steppers */}
-          <div>
-            <label className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
-              Horário
-            </label>
-            <div className="flex items-center gap-2">
-              {/* Start time stepper */}
-              <div className="flex items-center bg-[#F2F2F2] rounded-lg px-3 h-10 relative overflow-hidden cursor-pointer hover:bg-[#E5E5E5] transition-colors">
-                <input
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => {
-                    const newStart = e.target.value;
-                    if (newStart) {
-                      handleStartTimeChange(newStart);
-                    }
-                  }}
-                  className="text-[15px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-[70px] text-center"
-                />
-              </div>
-
-              <span className="text-[13px] text-muted-foreground font-medium">-</span>
-
-              {/* End time stepper */}
-              <div className="flex items-center bg-[#F2F2F2] rounded-lg px-3 h-10 relative overflow-hidden cursor-pointer hover:bg-[#E5E5E5] transition-colors">
-                <input
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => {
-                    const newEnd = e.target.value;
-                    if (newEnd) {
-                      handleEndTimeChange(newEnd);
-                    }
-                  }}
-                  className="text-[15px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-[70px] text-center"
-                />
-              </div>
-            </div>
+      {/* Modal / Bottom Sheet */}
+      <div className="fixed inset-x-0 bottom-0 z-50 flex justify-center pointer-events-none">
+        <div className="bg-white rounded-t-[32px] w-full shadow-2xl p-6 pointer-events-auto animate-in slide-in-from-bottom duration-300 max-w-lg mx-auto">
+          
+          {/* Top Bar with Close Button */}
+          <div className="flex items-center justify-end pb-2">
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-full flex items-center justify-center bg-[#F4F4F5] text-[#1A1C40] hover:bg-[#ECECED] transition-colors -mr-1"
+              aria-label="Fechar"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
-          {/* Localização (opcional) — usada para calcular o trajeto até o próximo ponto */}
-          <div>
-            <label className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
-              Localização (opcional)
-            </label>
-            <div className="relative">
-              <Icon
-                name="location_on"
-                size={18}
-                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-              />
-              <input
-                type="text"
-                value={location}
-                onChange={handleLocationChange}
-                onFocus={() => location.length >= 3 && suggestions.length > 0 && setShowSuggestions(true)}
-                onBlur={() => setTimeout(() => {
-                  setShowSuggestions(false);
-                  // Se o usuário digitou mas não selecionou um endereço, limpamos
-                  // o campo para forçar a seleção de um lugar real.
-                  if (!coords && location.trim().length > 0) {
-                    setLocation('');
-                  }
-                }, 150)}
-                placeholder="Buscar local (ex: Torre Eiffel, Av. Paulista)"
-                className="w-full rounded-xl pl-10 pr-10 py-3 text-[16px] text-foreground placeholder:text-muted-foreground outline-none"
-                style={{ background: '#F2F2F2' }}
-                autoComplete="off"
-              />
-              {coords && (
-                <Icon
-                  name="check_circle"
-                  size={18}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2"
-                  style={{ color: '#9DCC36' }}
-                />
-              )}
-              {showSuggestions && (
-                <div className="absolute left-0 right-0 top-full mt-1 z-30 rounded-xl border border-border bg-background shadow-lg max-h-64 overflow-y-auto">
-                  {isSearching && suggestions.length === 0 && (
-                    <div className="px-4 py-3 text-[13px] text-muted-foreground">Buscando...</div>
-                  )}
-                  {!isSearching && suggestions.length === 0 && (
-                    <div className="px-4 py-3 text-[13px] text-muted-foreground">
-                      Nenhum endereço encontrado
+          {/* Title */}
+          <div className="pb-3 border-b border-[#F4F4F5]">
+            <h2 className="text-[20px] font-bold text-[#1A1C40]">
+              {activityName ? `Anotação para ${activityName}` : 'Adicionar anotação pessoal'}
+            </h2>
+          </div>
+
+          <div className="space-y-4 pt-4">
+            {/* Day Selector - only displayed for standalone notes not bound to an existing activity */}
+            {!activityName && !activityId && (
+              <div>
+                <label className="text-[12px] font-medium text-[#8E8E93] block mb-1.5">
+                  Escolha o dia
+                </label>
+
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsDayDropdownOpen(!isDayDropdownOpen)}
+                    className="w-full flex items-center justify-between px-4 py-3 bg-[#F4F4F5] rounded-2xl text-[14px] font-semibold text-[#1A1C40] text-left"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <MapPin className="w-4 h-4 text-[#8E8E93]" />
+                      <span>{formattedDayStr}</span>
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-[#8E8E93]" />
+                  </button>
+
+                  {isDayDropdownOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-[#E5E5E7] rounded-2xl shadow-xl z-20 max-h-48 overflow-y-auto divide-y divide-[#F4F4F5]">
+                      {daysData.length > 0
+                        ? daysData.map((d) => {
+                            const str = `Dia ${d.day} (${format(d.date, 'dd/MM - EEEE', { locale: ptBR })})`;
+                            return (
+                              <button
+                                key={d.day}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedDay(d.day);
+                                  setIsDayDropdownOpen(false);
+                                }}
+                                className={`w-full px-4 py-2.5 text-left text-[13px] flex items-center justify-between ${
+                                  selectedDay === d.day
+                                    ? 'bg-[#F5F3FF] text-[#7C3AED] font-bold'
+                                    : 'text-[#1A1C40] hover:bg-[#F4F4F5]'
+                                }`}
+                              >
+                                <span>{str}</span>
+                                {selectedDay === d.day && <Check className="w-4 h-4" />}
+                              </button>
+                            );
+                          })
+                        : Array.from({ length: totalDays || 1 }).map((_, i) => (
+                            <button
+                              key={i + 1}
+                              type="button"
+                              onClick={() => {
+                                setSelectedDay(i + 1);
+                                setIsDayDropdownOpen(false);
+                              }}
+                              className={`w-full px-4 py-2.5 text-left text-[13px] ${
+                                selectedDay === i + 1
+                                  ? 'bg-[#F5F3FF] text-[#7C3AED] font-bold'
+                                  : 'text-[#1A1C40] hover:bg-[#F4F4F5]'
+                              }`}
+                            >
+                              Dia {i + 1}
+                            </button>
+                          ))}
                     </div>
                   )}
-                  {suggestions.map((s) => (
-                    <button
-                      key={s.place_id}
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => selectSuggestion(s)}
-                      className="w-full text-left px-4 py-3 hover:bg-muted/40 flex items-start gap-2 border-b border-border last:border-b-0"
-                    >
-                      <Icon
-                        name="location_on"
-                        size={16}
-                        className="text-muted-foreground flex-shrink-0 mt-0.5"
-                      />
-                      <span className="text-[13px] text-foreground leading-snug">
-                        {s.display_name}
-                      </span>
-                    </button>
-                  ))}
                 </div>
-              )}
+              </div>
+            )}
+
+            {/* Note Textarea */}
+            <div className="bg-[#F4F4F5] rounded-2xl p-3.5 relative">
+              <textarea
+                value={text}
+                onChange={(e) => {
+                  if (e.target.value.length <= 500) {
+                    setText(e.target.value);
+                  }
+                }}
+                rows={5}
+                placeholder="Escreva sua anotação pessoal..."
+                className="w-full bg-transparent text-[14px] text-[#1A1C40] placeholder:text-[#8E8E93] focus:outline-none resize-none"
+              />
+              <div className="text-right text-[11px] font-medium text-[#8E8E93] mt-1">
+                {text.length}/500
+              </div>
+            </div>
+
+            {/* Save Button */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={!text.trim()}
+                className={`w-full py-4 rounded-2xl text-[15px] font-bold transition-all shadow-sm flex items-center justify-center ${
+                  text.trim()
+                    ? 'bg-[#9ecc3b] text-[#1A1C40] hover:opacity-95 active:scale-[0.99]'
+                    : 'bg-[#E5E5E7] text-[#8E8E93] cursor-not-allowed'
+                }`}
+              >
+                Salvar
+              </button>
             </div>
           </div>
-
-          {/* Note */}
-          <div>
-            <label className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
-              Anotação
-            </label>
-            <textarea
-              placeholder="Ex: Dormir, comer, aproveitar o pôr do sol, visitar alguém..."
-              value={text}
-              onChange={e => setText(e.target.value)}
-              rows={3}
-              className="w-full rounded-xl px-4 py-3 text-[16px] text-foreground placeholder:text-muted-foreground outline-none resize-none leading-relaxed"
-              style={{ background: '#F2F2F2' }}
-            />
-          </div>
-        </div>
-
-        {/* Footer button */}
-        <div className="px-5 pb-8 pt-3 border-t border-border/40">
-          <button
-            onClick={handleSave}
-            className="w-full py-3.5 rounded-2xl text-[15px] font-semibold bg-primary text-primary-foreground transition-colors"
-          >
-            Salvar
-          </button>
         </div>
       </div>
-    </div>
+    </>
   );
 }

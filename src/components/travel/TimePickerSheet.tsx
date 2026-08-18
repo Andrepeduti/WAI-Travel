@@ -46,13 +46,21 @@ export function TimePickerSheet({
             <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
           </div>
 
+          {/* Top Bar with Close Button */}
+          <div className="flex items-center justify-end px-6 pt-1 pb-1">
+            <button
+              onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center -mr-1"
+              aria-label="Fechar"
+            >
+              <Icon name="close" size={20} className="text-muted-foreground" />
+            </button>
+          </div>
+
           <div className="px-6">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4">
+            {/* Title */}
+            <div className="mb-4">
               <h2 className="text-lg font-bold text-foreground">{label}</h2>
-              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center">
-                <Icon name="close" size={20} className="text-muted-foreground" />
-              </button>
             </div>
 
             {/* Inputs */}

@@ -40,7 +40,7 @@ function tripStatusLabel(start?: Date, end?: Date): string {
   const s = new Date(start); s.setHours(0, 0, 0, 0);
   const e = end ? new Date(end) : s; e.setHours(0, 0, 0, 0);
   const msDay = 86400000;
-  if (today >= s && today <= e) return 'Em andamento';
+  if (today >= s && today <= e) return 'Em viagem';
   const diff = Math.round((s.getTime() - today.getTime()) / msDay);
   if (diff === 1) return 'Amanhã';
   if (diff > 1) return `Em ${diff} dias`;

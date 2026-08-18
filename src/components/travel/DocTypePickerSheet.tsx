@@ -43,13 +43,22 @@ export function DocTypePickerSheet({ isOpen, onClose, onSelect }: DocTypePickerS
             <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
           </div>
 
+          {/* Top Bar with Close Button */}
+          <div className="flex items-center justify-end px-5 pt-1 pb-2">
+            <button
+              onClick={onClose}
+              className="w-9 h-9 rounded-full flex items-center justify-center -mr-1"
+              style={{ background: '#F2F2F2' }}
+              aria-label="Fechar"
+            >
+              <Icon name="close" size={18} className="text-foreground" />
+            </button>
+          </div>
+
           <div className="px-5">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-[17px] font-bold text-foreground">Que tipo de documento?</h3>
-              <button onClick={onClose} className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#F2F2F2' }}>
-                <Icon name="close" size={18} className="text-foreground" />
-              </button>
+            {/* Title */}
+            <div className="mb-5">
+              <h3 className="text-[20px] font-bold text-foreground">Que tipo de documento?</h3>
             </div>
 
             {/* Options */}

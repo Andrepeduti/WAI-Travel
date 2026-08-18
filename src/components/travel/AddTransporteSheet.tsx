@@ -268,12 +268,21 @@ export function AddTransporteSheet({ isOpen, onClose, onAdd, editingTransporte }
             <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
           </div>
 
+          {/* Top Bar with Close Button */}
+          <div className="flex justify-end items-center px-6 pt-1 pb-2">
+            <button
+              onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center -mr-1"
+              aria-label="Fechar"
+            >
+              <Icon name="close" size={20} className="text-muted-foreground" />
+            </button>
+          </div>
+
           <div className="px-6">
-            <div className="flex items-center justify-between mb-6">
+            {/* Title */}
+            <div className="mb-6">
               <h2 className="text-lg font-bold text-foreground">{editingTransporte ? 'Editar transporte' : 'Novo transporte'}</h2>
-              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center">
-                <Icon name="close" size={20} className="text-muted-foreground" />
-              </button>
             </div>
 
             {/* Tipo */}

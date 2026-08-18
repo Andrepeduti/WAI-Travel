@@ -119,12 +119,20 @@ export function AddManualActivitySheet({ open, onClose, onSave, dayNumber, total
             <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
           </div>
 
-          {/* Header */}
-          <div className="px-6 pb-4 flex items-center justify-between">
-            <h2 className="text-[18px] font-bold text-foreground">Adicionar atividade</h2>
-            <button onClick={onClose} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+          {/* Top Bar with Close Button */}
+          <div className="px-6 pt-1 pb-2 flex items-center justify-end">
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-full bg-muted flex items-center justify-center -mr-1"
+              aria-label="Fechar"
+            >
               <Icon name="close" size={18} className="text-muted-foreground" />
             </button>
+          </div>
+
+          {/* Title */}
+          <div className="px-6 pb-3">
+            <h2 className="text-[20px] font-bold text-foreground">Adicionar atividade</h2>
           </div>
 
           {/* Form */}

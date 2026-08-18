@@ -1716,16 +1716,20 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
               <div className="flex justify-center pt-3 pb-1">
                 <div className="w-9 h-[4px] bg-muted-foreground/20 rounded-full" />
               </div>
-              <div className="relative flex items-center justify-center px-5 py-3">
-                <h2 className="text-[17px] font-bold" style={{ color: '#1A1C40' }}>
-                  Renomear coleção
-                </h2>
+              {/* Top Bar with Close Button */}
+              <div className="flex items-center justify-end px-5 pt-1 pb-1">
                 <button
                   onClick={() => setShowRenameSheet(false)}
-                  className="absolute right-5 w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors"
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors -mr-1"
+                  aria-label="Fechar"
                 >
                   <Icon name="close" size={20} style={{ color: '#999' }} />
                 </button>
+              </div>
+              <div className="px-5 pt-1 pb-2">
+                <h2 className="text-[20px] font-bold" style={{ color: '#1A1C40' }}>
+                  Renomear coleção
+                </h2>
               </div>
               <RenameForm
                 currentName={customTitle || collection.title}

@@ -9,6 +9,7 @@ import { ContactUsSheet } from '@/components/travel/ContactUsSheet';
 import { BackButton } from '@/components/ui/BackButton';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { useCurrentUser } from '@/hooks/use-current-user';
+import { useAuth } from '@/contexts/AuthContext';
 import { useMyItineraries } from '@/hooks/use-my-itineraries';
 import { resolveTripThumbnailImages, GENERIC_TRAVEL_PLACEHOLDER } from '@/lib/coverImageResolver';
 import type { UserItinerary } from '@/lib/itinerariesApi';
@@ -50,11 +51,13 @@ export function UserProfileScreen({
   onChatClick,
   onPublicItineraryClick,
 }: UserProfileScreenProps) {
+  const { session } = useAuth();
+  const authUserId = session?.user?.id;
   const { user, refresh, loading } = useCurrentUser();
   // Garante que o card sempre exibe os dados mais recentes ao voltar de outra tela
   useEffect(() => { refresh(); }, [refresh]);
   const { itineraries } = useMyItineraries();
-  const publicItineraries = itineraries.filter((it) => it.isPublic);
+  const publicItineraries = itineraries.filter((it) => it.isPublic && it.userId === authUserId && !it.deletedAt);
   const [countries, setCountries] = useState<CountryVisit[]>([]);
   const [selectedCountry, setSelectedCountry] = useState<CountryVisit | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);

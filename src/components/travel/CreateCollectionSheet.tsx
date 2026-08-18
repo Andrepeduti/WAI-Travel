@@ -67,17 +67,22 @@ export function CreateCollectionSheet({ isOpen, onClose, onSubmit, hideShare = f
             <div className="w-9 h-[4px] bg-muted-foreground/20 rounded-full" />
           </div>
 
-          {/* Header — Title + Close */}
-          <div className="flex items-center justify-between px-5 py-3">
-            <h2 className="text-[17px] font-bold text-foreground">
-              Nova coleção
-            </h2>
+          {/* Top Bar with Close Button */}
+          <div className="flex items-center justify-end px-5 pt-1 pb-1">
             <button
               onClick={handleClose}
-              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors"
+              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors -mr-1"
+              aria-label="Fechar"
             >
               <Icon name="close" size={20} className="text-muted-foreground" />
             </button>
+          </div>
+
+          {/* Title */}
+          <div className="px-5 pt-1 pb-2">
+            <h2 className="text-[20px] font-bold text-foreground">
+              Nova coleção
+            </h2>
           </div>
 
           {/* Content */}

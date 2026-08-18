@@ -51,13 +51,15 @@ export function AddVideoSheet({ isOpen, onClose, onOptionSelect }: AddVideoSheet
             <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
           </div>
           
-          {/* Header with back button */}
-          <div className="px-6 pb-4 flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
+          {/* Top Bar with Back/Close Button */}
+          <div className="px-6 pt-2 pb-1 flex items-center justify-between min-h-[36px]">
             <BackButton onClick={onClose} />
-            <div>
-              <h2 className="text-xl font-bold text-foreground my-0">Adicionar vídeo</h2>
-              <p className="text-sm text-muted-foreground mt-0.5">Usaremos o vídeo para identificar e extrair lugares para o seu roteiro</p>
-            </div>
+          </div>
+
+          {/* Title Area */}
+          <div className="px-6 pb-4 pt-1">
+            <h2 className="text-xl font-bold text-foreground my-0">Adicionar vídeo</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">Usaremos o vídeo para identificar e extrair lugares para o seu roteiro</p>
           </div>
           
           {/* Options */}

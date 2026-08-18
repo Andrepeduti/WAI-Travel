@@ -321,19 +321,29 @@ export function AddVideoFromGallerySheet({ isOpen, onClose, onBack, onSubmit, on
             <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
           </div>
 
-          {/* Header */}
-          <div className="px-6 pb-4 flex-shrink-0">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleBack}
-                aria-label="Voltar"
-                className="w-8 h-8 -ml-1 flex items-center justify-center active:scale-95 active:opacity-70 transition-all flex-shrink-0"
-              >
-                <Icon name="chevron_left" size={24} className="text-foreground [&>svg]:stroke-[2.5]" />
-              </button>
-              <h2 className="text-xl font-bold text-foreground my-0">{header.title}</h2>
-            </div>
+          {/* Top Bar with Back and Close */}
+          <div className="px-6 pt-1 pb-2 flex items-center justify-between flex-shrink-0 min-h-[36px]">
+            <button
+              type="button"
+              onClick={handleBack}
+              aria-label="Voltar"
+              className="w-8 h-8 -ml-1 flex items-center justify-center active:scale-95 active:opacity-70 transition-all flex-shrink-0 rounded-full hover:bg-muted/60"
+            >
+              <Icon name="chevron_left" size={24} className="text-foreground [&>svg]:stroke-[2.5]" />
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Fechar"
+              className="w-8 h-8 -mr-1 flex items-center justify-center active:scale-95 active:opacity-70 transition-all flex-shrink-0 rounded-full hover:bg-muted/60"
+            >
+              <Icon name="close" size={20} className="text-foreground" />
+            </button>
+          </div>
+
+          {/* Title Area */}
+          <div className="px-6 pb-4 pt-1 flex-shrink-0">
+            <h2 className="text-xl font-bold text-foreground my-0">{header.title}</h2>
             {header.subtitle && (
               <p className="text-sm text-muted-foreground mt-1">{header.subtitle}</p>
             )}

@@ -148,16 +148,21 @@ export function ParticipantsSheet({ open, onClose, itineraryId, currentUserId, o
       >
         <div className="w-10 h-1 rounded-full bg-muted mx-auto mt-3 mb-2" />
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 pb-3">
-          <h2 className="text-[17px] font-bold text-foreground">Participantes</h2>
+        {/* Top Bar with Close Button */}
+        <div className="flex items-center justify-end px-5 pt-1 pb-2">
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-full flex items-center justify-center"
+            className="w-9 h-9 rounded-full flex items-center justify-center -mr-1"
             style={{ background: '#F2F2F2' }}
+            aria-label="Fechar"
           >
             <X size={18} className="text-foreground" />
           </button>
+        </div>
+
+        {/* Title */}
+        <div className="px-5 pb-3">
+          <h2 className="text-[20px] font-bold text-foreground">Participantes</h2>
         </div>
 
         {/* List */}

@@ -55,15 +55,17 @@ export function SelectDaySheet({
             <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
           </div>
 
-          {/* Header */}
-          <div className="px-6 pb-4 flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
+          {/* Top Bar with Back Button */}
+          <div className="px-6 pt-1 pb-2 flex items-center justify-between min-h-[36px]">
             <BackButton onClick={onBack} />
-            <div>
-              <h2 className="text-xl font-bold text-foreground my-0">Selecionar dia</h2>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Em qual dia de <span className="font-semibold text-foreground">{itineraryName}</span> deseja adicionar?
-              </p>
-            </div>
+          </div>
+
+          {/* Title Area */}
+          <div className="px-6 pb-4 pt-1">
+            <h2 className="text-xl font-bold text-foreground my-0">Selecionar dia</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Em qual dia de <span className="font-semibold text-foreground">{itineraryName}</span> deseja adicionar?
+            </p>
           </div>
 
           {/* Days List */}

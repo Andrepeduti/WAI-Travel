@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
-import { Share2, Trash2, BarChart3, Pencil, Download, EyeOff } from 'lucide-react';
+import { Share2, Trash2, BarChart3, Pencil, EyeOff } from 'lucide-react';
 import { shareItinerary } from '@/lib/shareItinerary';
 
 interface OwnerPublishedSheetProps {
@@ -12,7 +12,6 @@ interface OwnerPublishedSheetProps {
   onManageItinerary?: () => void;
   onViewSalesDashboard?: () => void;
   onUnpublish?: () => void;
-  onDownloadPdf?: () => void;
   onDelete?: () => void;
 }
 
@@ -28,7 +27,6 @@ export function OwnerPublishedSheet({
   onManageItinerary,
   onViewSalesDashboard,
   onUnpublish,
-  onDownloadPdf,
   onDelete,
 }: OwnerPublishedSheetProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -103,12 +101,6 @@ export function OwnerPublishedSheet({
                 await shareItinerary({ title: tripName, datasetId });
                 onClose();
               }}
-            />
-
-            <Row
-              icon={<Download size={18} className="text-foreground" />}
-              label="Baixar em PDF"
-              onClick={() => { onClose(); onDownloadPdf?.(); }}
             />
 
             <Row

@@ -430,30 +430,37 @@ export function ActivityDetailSheet({ activity, videoLink, onClose }: ActivityDe
           <div className="w-9 h-1 rounded-full bg-muted" />
         </div>
 
+        {/* Top Bar with Close Button */}
+        <div className="flex items-center justify-end px-5 pt-2 pb-1">
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-[#F2F2F2] flex items-center justify-center flex-shrink-0 -mr-1"
+            aria-label="Fechar"
+          >
+            <Icon name="close" size={18} className="text-foreground" />
+          </button>
+        </div>
+
         {/* Header info */}
-        <div className="px-5 pt-[40px] pb-3">
+        <div className="px-5 pt-1 pb-3">
           <div className="flex items-start justify-between mb-1">
             <div className="flex-1 min-w-0">
               <h2 className="text-[20px] font-bold text-foreground leading-tight">{activity.name}</h2>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
-                {activity.category &&
-                <span className="inline-flex items-center text-[12px] font-medium text-[#8E8E93] px-3 h-6 rounded-2xl bg-[#F2F2F2]">
+                {activity.category && (
+                  <span className="inline-flex items-center text-[12px] font-medium text-[#8E8E93] px-3 h-6 rounded-2xl bg-[#F2F2F2]">
                     {activity.category}
                   </span>
-                }
-                {activity.rating > 0 &&
-                <div className="flex items-center gap-1">
+                )}
+                {activity.rating > 0 && (
+                  <div className="flex items-center gap-1">
                     <Icon name="star" size={14} filled className="text-[hsl(var(--warning))]" />
                     <span className="text-[13px] font-semibold text-foreground">{activity.rating}</span>
                   </div>
-                }
+                )}
               </div>
             </div>
-            <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#F2F2F2] flex items-center justify-center flex-shrink-0">
-              <Icon name="close" size={18} className="text-foreground" />
-            </button>
           </div>
-
         </div>
 
         {/* Description */}

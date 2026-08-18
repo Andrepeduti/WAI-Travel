@@ -19,16 +19,17 @@ import { touchItinerary } from '@/lib/itinerariesApi';
 export interface PlannerActivity {
   id: number;
   type?: 'activity' | 'note';
-  startTime: string;
-  endTime: string;
+  startTime?: string;
+  endTime?: string;
   category: string;
-  categoryColor: string;
+  categoryColor?: string;
   name: string;
   image: string;
-  openHours: string;
-  rating: number;
-  price: string;
+  openHours?: string;
+  rating?: number;
+  price?: string;
   noteText?: string;
+  personalNote?: string;
   observation?: string;
   lat?: number;
   lng?: number;
@@ -51,6 +52,7 @@ function isUuid(id: string): boolean {
 }
 
 function activityRowToObject(row: any): PlannerActivity {
+  const noteContent = row.note_text ?? row.metadata?.personalNote ?? undefined;
   return {
     id: typeof row.metadata?.legacyId === 'number' ? row.metadata.legacyId : Date.now() + Math.random(),
     type: (row.type as 'activity' | 'note') ?? 'activity',
@@ -63,7 +65,8 @@ function activityRowToObject(row: any): PlannerActivity {
     openHours: row.open_hours ?? '',
     rating: Number(row.rating ?? 0),
     price: row.price ?? '',
-    noteText: row.note_text ?? undefined,
+    noteText: noteContent,
+    personalNote: noteContent,
     observation: row.observation ?? undefined,
     lat: row.lat ?? undefined,
     lng: row.lng ?? undefined,
@@ -143,6 +146,7 @@ export async function savePlannerData(
   for (const [dayStr, list] of Object.entries(data.activities)) {
     const day = Number(dayStr);
     list.forEach((a, position) => {
+      const noteContent = a.noteText ?? a.personalNote ?? null;
       activityRows.push({
         itinerary_id: itineraryId,
         user_id: userId,
@@ -160,9 +164,9 @@ export async function savePlannerData(
         rating: a.rating ?? 0,
         lat: a.lat ?? null,
         lng: a.lng ?? null,
-        note_text: a.noteText ?? null,
+        note_text: noteContent,
         observation: a.observation ?? null,
-        metadata: { legacyId: a.id },
+        metadata: { legacyId: a.id, personalNote: noteContent },
       });
     });
   }

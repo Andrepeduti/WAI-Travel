@@ -55,12 +55,22 @@ export function AddDayTransportSheet({ open, onClose, onSave, dayNumber, totalDa
       >
         <div className="w-10 h-1 rounded-full bg-muted mx-auto mt-3 mb-2" />
 
-        {/* Header */}
-        <div className="px-5 pb-4 flex items-center justify-between">
-          <h2 className="text-[17px] font-bold text-foreground">Adicionar transporte</h2>
-          <button onClick={onClose} className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#F2F2F2' }}>
+        {/* Top Bar with Close Button */}
+        <div className="px-5 pt-1 pb-2 flex items-center justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-9 h-9 rounded-full flex items-center justify-center -mr-1"
+            style={{ background: '#F2F2F2' }}
+            aria-label="Fechar"
+          >
             <Icon name="close" size={20} className="text-foreground" />
           </button>
+        </div>
+
+        {/* Title */}
+        <div className="px-5 pb-3">
+          <h2 className="text-[20px] font-bold text-foreground">Adicionar transporte</h2>
         </div>
 
         {/* Content */}

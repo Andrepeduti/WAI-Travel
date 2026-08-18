@@ -279,14 +279,23 @@ export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva, initia
             <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
           </div>
 
+          {/* Top Bar with Close Button */}
+          <div className="flex justify-end items-center px-6 pt-1 pb-2">
+            <button
+              onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center -mr-1"
+              aria-label="Fechar"
+            >
+              <Icon name="close" size={20} className="text-muted-foreground" />
+            </button>
+          </div>
+
           <div className="px-6">
-            <div className="flex justify-between items-center mb-6">
+            {/* Title */}
+            <div className="mb-6">
               <h3 className="text-xl font-bold text-foreground">
                 {editingReserva ? 'Editar reserva' : `Adicionar ${tipo === 'hospedagem' ? 'Hospedagem' : 'Atividade'}`}
               </h3>
-              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center">
-                <Icon name="close" size={20} className="text-muted-foreground" />
-              </button>
             </div>
 
             {tipo === 'hospedagem' ? (

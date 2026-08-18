@@ -3,10 +3,12 @@ import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/utils';
 
 interface BottomSheetProps {
-  open: boolean;
+  open?: boolean;
+  isOpen?: boolean;
   onClose: () => void;
+  onBack?: () => void;
   title?: ReactNode;
-  /** Optional element shown to the right of the title (before close button) */
+  /** Optional element shown to the right in top bar (before close button) */
   headerExtra?: ReactNode;
   /** Optional element shown below the title row, still inside the fixed header */
   headerBelow?: ReactNode;
@@ -33,17 +35,19 @@ interface BottomSheetProps {
  * Canonical bottom sheet shell used across the app.
  *
  * Layout (always):
- *   ┌─ Fixed header: handle + title + close (solid bg) ─┐
- *   │                                                    │
- *   │           Scrollable body (flex-1)                 │
- *   │                                                    │
- *   ├─ Fixed footer (solid bg, safe-area inset) ────────┤
+ *   ┌─ Fixed header: handle + top bar (back/close) + title (solid bg) ─┐
+ *   │                                                                 │
+ *   │           Scrollable body (flex-1)                              │
+ *   │                                                                 │
+ *   ├─ Fixed footer (solid bg, safe-area inset) ──────────────────────┤
  *
  * Only the body scrolls — header and footer stay pinned.
  */
 export function BottomSheet({
   open,
+  isOpen,
   onClose,
+  onBack,
   title,
   headerExtra,
   headerBelow,
@@ -57,16 +61,18 @@ export function BottomSheet({
   zIndex = 80,
   dismissOnBackdrop = true,
 }: BottomSheetProps) {
+  const isVisible = open ?? isOpen ?? false;
+
   useEffect(() => {
-    if (!open) return;
+    if (!isVisible) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  }, [isVisible, onClose]);
 
-  if (!open) return null;
+  if (!isVisible) return null;
 
   const bg = surface === 'card' ? 'bg-card' : 'bg-background';
 
@@ -84,7 +90,7 @@ export function BottomSheet({
       {/* Container */}
       <div
         className={cn(
-          'relative w-full w-full mt-auto rounded-t-3xl shadow-2xl flex flex-col',
+          'relative w-full mt-auto rounded-t-3xl shadow-2xl flex flex-col',
           'animate-in slide-in-from-bottom duration-300',
           bg,
         )}
@@ -98,21 +104,29 @@ export function BottomSheet({
               <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
             </div>
           )}
-          {(title || showClose || headerExtra) && (
-            <div className="flex items-center justify-between gap-3 px-5 pt-2 pb-3">
-              <div className="flex-1 min-w-0">
-                {typeof title === 'string' ? (
-                  <h3 className="text-[17px] font-bold text-foreground truncate">{title}</h3>
-                ) : (
-                  title
-                )}
+
+          {/* Top action bar with back button on left and extra/close on right */}
+          {(onBack || showClose || headerExtra) && (
+            <div className="flex items-center justify-between px-5 pt-2 pb-1 min-h-[36px]">
+              <div>
+                {onBack ? (
+                  <button
+                    type="button"
+                    onClick={onBack}
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-foreground hover:bg-muted/60 transition-colors -ml-1.5"
+                    aria-label="Voltar"
+                  >
+                    <Icon name="chevron_left" size={22} className="text-foreground" />
+                  </button>
+                ) : null}
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 {headerExtra}
                 {showClose && (
                   <button
+                    type="button"
                     onClick={onClose}
-                    className="w-8 h-8 rounded-full bg-muted/60 hover:bg-muted flex items-center justify-center transition-colors"
+                    className="w-8 h-8 rounded-full bg-muted/60 hover:bg-muted flex items-center justify-center transition-colors -mr-1.5"
                     aria-label="Fechar"
                   >
                     <Icon name="close" size={18} className="text-foreground" />
@@ -121,6 +135,18 @@ export function BottomSheet({
               </div>
             </div>
           )}
+
+          {/* Title row below action buttons */}
+          {title && (
+            <div className="px-5 pt-1 pb-3">
+              {typeof title === 'string' ? (
+                <h3 className="text-[20px] font-bold text-foreground leading-tight">{title}</h3>
+              ) : (
+                title
+              )}
+            </div>
+          )}
+
           {headerBelow}
         </div>
 

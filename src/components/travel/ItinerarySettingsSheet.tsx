@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
-import { Share2, Copy, Trash2, Pencil, Download, LogOut, DollarSign } from 'lucide-react';
+import { Share2, Copy, Trash2, Pencil, LogOut, DollarSign } from 'lucide-react';
 import { shareItinerary } from '@/lib/shareItinerary';
 
 interface ItinerarySettingsSheetProps {
@@ -20,8 +20,6 @@ interface ItinerarySettingsSheetProps {
   onPublish?: () => void;
   /** Called when user wants to edit existing publication (price, description, tags) */
   onEditPublish?: () => void;
-  /** Called when the user wants to download the itinerary as a PDF */
-  onDownloadPdf?: () => void;
   /** Called when the user wants to open the share-with-people sheet */
   onShare?: () => void;
   /** When true, hides delete and shows "Sair do roteiro" with leave confirmation */
@@ -44,7 +42,6 @@ export function ItinerarySettingsSheet({
   isPurchased = false,
   onPublish,
   onEditPublish,
-  onDownloadPdf,
   onShare,
   isParticipant = false,
   onLeave,
@@ -145,18 +142,6 @@ export function ItinerarySettingsSheet({
               <Icon name="chevron_right" size={18} className="text-muted-foreground" />
             </button>
             )}
-
-            {/* Baixar em PDF */}
-            <button
-              onClick={() => {onClose();onDownloadPdf?.();}}
-              className="w-full flex items-center gap-3.5 py-3 px-1 rounded-xl hover:bg-muted/50 transition-colors">
-              
-               <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#F2F2F2' }}>
-                <Download size={18} className="text-foreground" />
-              </div>
-              <span className="text-[14px] font-medium text-foreground flex-1 text-left">Baixar em PDF</span>
-              <Icon name="chevron_right" size={18} className="text-muted-foreground" />
-            </button>
 
             {/* Colocar à venda - hidden for purchased itineraries */}
             {!isPurchased && (

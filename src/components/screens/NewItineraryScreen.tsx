@@ -1,7 +1,6 @@
 import { useState, useRef } from 'react';
 import { SuccessToast } from '@/components/travel/SuccessToast';
 import { ItinerarySettingsSheet } from '@/components/travel/ItinerarySettingsSheet';
-import { downloadItineraryPdf } from '@/lib/itineraryPdf';
 import { PublishItineraryFlow } from '@/components/travel/PublishItineraryFlow';
 import { EditPublishSheet } from '@/components/travel/EditPublishSheet';
 import { ManageItineraryScreen } from './ManageItineraryScreen';
@@ -143,7 +142,15 @@ export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales, 
   }
 
   if (showReservas) {
-    return <ReservasScreen onBack={() => setShowReservas(false)} reservas={reservas} onReservasChange={setReservas} />;
+    return (
+      <ReservasScreen
+        onBack={() => setShowReservas(false)}
+        reservas={reservas}
+        onReservasChange={setReservas}
+        transportes={transportes}
+        onTransportesChange={setTransportes}
+      />
+    );
   }
 
   if (showManageItinerary) {
@@ -544,31 +551,6 @@ export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales, 
         onTogglePublic={(v) => setIsItineraryPublic(v)}
         onEditPublish={() => setShowEditPublish(true)}
         onPublish={() => setShowPublishFlow(true)}
-        onDownloadPdf={() => {
-          const title = itineraryData.destinations.length > 0
-            ? `${itineraryData.destinations[0].split(',')[0]} trip`
-            : 'Roteiro';
-          downloadItineraryPdf({
-            title,
-            destinations: itineraryData.destinations,
-            startDate: itineraryData.startDate
-              ? format(itineraryData.startDate, "d 'de' MMM yyyy", { locale: ptBR })
-              : undefined,
-            endDate: itineraryData.endDate
-              ? format(itineraryData.endDate, "d 'de' MMM yyyy", { locale: ptBR })
-              : undefined,
-            days: days.map((d) => ({
-              dayNumber: d.day,
-              date: d.date ? format(d.date, "EEE, d 'de' MMM", { locale: ptBR }) : undefined,
-              activities: d.activities.map((a: any) => ({
-                time: a.startTime && a.endTime ? `${a.startTime}–${a.endTime}` : a.startTime,
-                name: a.type === 'note' ? (a.noteText || 'Tempo livre') : a.name,
-                location: a.category,
-                notes: a.observation,
-              })),
-            })),
-          });
-        }}
       />
       <PublishItineraryFlow
         open={showPublishFlow}

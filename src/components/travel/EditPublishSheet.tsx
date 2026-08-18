@@ -113,7 +113,7 @@ export function EditPublishSheet({
           return;
         }
         const total = Object.values(itinData as Record<string, any[]>).reduce(
-          (sum: number, list) => sum + list.filter((a) => a.type !== 'note').length,
+          (sum: number, list) => sum + (Array.isArray(list) ? list.length : 0),
           0,
         );
         setActivitiesCount(total);

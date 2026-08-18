@@ -221,20 +221,22 @@ export function ManageMembersScreen({ onBack, invitedFriends = [] }: ManageMembe
             <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setMenuOpen(null)} />
             <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center">
               <div className="bg-card rounded-t-3xl w-full w-full px-5 pt-3 animate-in slide-in-from-bottom duration-300 flex flex-col">
-                <div className="flex justify-center mb-2">
+                <div className="flex justify-center mb-1">
                   <div className="w-10 h-1 rounded-full bg-muted" />
                 </div>
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <p className="text-[17px] font-bold text-foreground">Editar permissão</p>
-                    
-                  </div>
+                {/* Top Bar with Close Button */}
+                <div className="flex items-center justify-end pb-1">
                   <button
                     onClick={() => setMenuOpen(null)}
-                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors">
-                    
+                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors -mr-1"
+                    aria-label="Fechar"
+                  >
                     <X size={20} className="text-muted-foreground" />
                   </button>
+                </div>
+                {/* Title */}
+                <div className="mb-4">
+                  <p className="text-[20px] font-bold text-foreground">Editar permissão</p>
                 </div>
 
                 {/* Role selection */}

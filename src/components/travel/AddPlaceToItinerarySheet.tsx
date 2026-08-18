@@ -77,7 +77,7 @@ export function AddPlaceToItinerarySheet({ open, onClose, place }: AddPlaceToIti
       const current = (await loadPlannerData(selectedItinerary.id)) ?? { activities: {}, transports: {} };
       const dayList = current.activities[selectedDay] ?? [];
       const newActivity: PlannerActivity = {
-        id: Date.now(),
+        id: Date.now() + Math.floor(Math.random() * 1000000),
         type: 'activity',
         startTime: '09:00',
         endTime: '10:00',

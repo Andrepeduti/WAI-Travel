@@ -252,18 +252,22 @@ export function AddPlaceToCollectionSheetV2({
       >
         <div className="w-10 h-1 rounded-full bg-muted mx-auto mt-3 mb-2" />
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 pb-3">
-          <h3 className="text-[16px] font-semibold text-foreground truncate">
-            Salvar na coleção
-          </h3>
+        {/* Top Bar with Close Button */}
+        <div className="flex items-center justify-end px-5 pt-1 pb-2">
           <button
             onClick={handleClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center active:bg-secondary/60"
+            className="w-8 h-8 rounded-full flex items-center justify-center active:bg-secondary/60 -mr-1"
             aria-label="Fechar"
           >
             <Icon name="close" size={20} className="text-foreground" />
           </button>
+        </div>
+
+        {/* Title */}
+        <div className="px-5 pb-3">
+          <h3 className="text-[20px] font-bold text-foreground truncate">
+            Salvar na coleção
+          </h3>
         </div>
 
         {/* Search */}

@@ -33,6 +33,7 @@ export interface UserItinerary {
   participants: string[];
   places: number;
   sourceDatasetId?: number | null;
+  isPersonal?: boolean;
   isPublic: boolean;
   priceCents?: number | null;
   description?: string;
@@ -40,6 +41,7 @@ export interface UserItinerary {
   userId: string;
   isPaused?: boolean;
   extraPeople?: any[];
+  deletedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -53,6 +55,7 @@ export interface CreateItineraryInput {
   participants?: string[];
   places?: number;
   sourceDatasetId?: number | null;
+  isPersonal?: boolean;
   isPublic?: boolean;
   priceCents?: number | null;
   description?: string;
@@ -67,12 +70,14 @@ export interface UpdateItineraryInput {
   images?: string[];
   participants?: string[];
   places?: number;
+  isPersonal?: boolean;
   isPublic?: boolean;
   priceCents?: number | null;
   description?: string;
   tags?: string[];
   isPaused?: boolean;
   extraPeople?: any[];
+  deletedAt?: string | null;
 }
 
 function rowToItinerary(row: any): UserItinerary {
@@ -86,6 +91,7 @@ function rowToItinerary(row: any): UserItinerary {
     participants: row.participants ?? [],
     places: row.places_count ?? 0,
     sourceDatasetId: row.source_dataset_id ?? null,
+    isPersonal: row.is_personal !== undefined ? row.is_personal : (row.is_public ? false : true),
     isPublic: row.is_public ?? false,
     priceCents: row.price_cents,
     description: row.description,
@@ -93,6 +99,7 @@ function rowToItinerary(row: any): UserItinerary {
     userId: row.user_id,
     isPaused: row.is_paused ?? false,
     extraPeople: row.extra_people ?? [],
+    deletedAt: row.deleted_at ? String(row.deleted_at) : null,
     createdAt: row.created_at ? String(row.created_at) : undefined,
     updatedAt: row.updated_at ? String(row.updated_at) : (row.created_at ? String(row.created_at) : undefined),
   };
@@ -109,7 +116,13 @@ export async function listMyItineraries(): Promise<UserItinerary[]> {
   const userId = userData.user?.id;
   if (!userId) return [];
   const [ownedRes, memberRes] = await Promise.all([
-    supabase.from('itineraries').select('*').eq('user_id', userId).order('updated_at', { ascending: false }).order('created_at', { ascending: false }),
+    supabase
+      .from('itineraries')
+      .select('*')
+      .eq('user_id', userId)
+      .is('deleted_at', null)
+      .order('updated_at', { ascending: false })
+      .order('created_at', { ascending: false }),
     supabase.from('itinerary_members').select('itinerary_id').eq('user_id', userId),
   ]);
   if (ownedRes.error) {
@@ -123,6 +136,7 @@ export async function listMyItineraries(): Promise<UserItinerary[]> {
       .from('itineraries')
       .select('*')
       .in('id', memberIds)
+      .is('deleted_at', null)
       .order('updated_at', { ascending: false })
       .order('created_at', { ascending: false });
     if (sErr) {
@@ -169,6 +183,7 @@ export async function createItinerary(input: CreateItineraryInput): Promise<User
     console.error('[itinerariesApi] createItinerary called without an auth session');
     return null;
   }
+  const isPersonal = input.isPersonal !== undefined ? input.isPersonal : !input.isPublic;
   const { data, error } = await supabase
     .from('itineraries')
     .insert({
@@ -181,6 +196,7 @@ export async function createItinerary(input: CreateItineraryInput): Promise<User
       participants: input.participants ?? [],
       places_count: input.places ?? 0,
       source_dataset_id: input.sourceDatasetId ?? null,
+      is_personal: isPersonal,
       is_public: input.isPublic ?? false,
       price_cents: input.priceCents ?? null,
       description: input.description ?? '',
@@ -209,12 +225,14 @@ export async function updateItinerary(id: string, patch: UpdateItineraryInput): 
   if (patch.images !== undefined) updates.images = patch.images;
   if (patch.participants !== undefined) updates.participants = patch.participants;
   if (patch.places !== undefined) updates.places_count = patch.places;
+  if (patch.isPersonal !== undefined) updates.is_personal = patch.isPersonal;
   if (patch.isPublic !== undefined) updates.is_public = patch.isPublic;
   if (patch.priceCents !== undefined) updates.price_cents = patch.priceCents;
   if (patch.description !== undefined) updates.description = patch.description;
   if (patch.tags !== undefined) updates.tags = patch.tags;
   if (patch.isPaused !== undefined) updates.is_paused = patch.isPaused;
   if (patch.extraPeople !== undefined) updates.extra_people = patch.extraPeople;
+  if (patch.deletedAt !== undefined) updates.deleted_at = patch.deletedAt;
   
   if (Object.keys(updates).length === 0) return;
   (updates as any).updated_at = new Date().toISOString();
@@ -365,9 +383,19 @@ export async function fetchItineraryMemberAvatars(
 }
 
 export async function deleteItinerary(id: string): Promise<void> {
-  const { error } = await supabase.from('itineraries').delete().eq('id', id);
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from('itineraries')
+    .update({
+      deleted_at: now,
+      is_public: false,
+      is_paused: true,
+      updated_at: now,
+    } as never)
+    .eq('id', id);
+
   if (error) {
-    console.error('[itinerariesApi] deleteItinerary failed', error);
+    console.error('[itinerariesApi] deleteItinerary (soft delete) failed', error);
     return;
   }
   emitItinerariesChanged('delete', id);
@@ -417,6 +445,7 @@ export async function listPublicItineraries(limit = 200): Promise<PublicItinerar
     .from('itineraries')
     .select('*')
     .eq('is_public', true)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .limit(limit);
   if (error) {

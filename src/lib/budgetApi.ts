@@ -19,6 +19,10 @@ function rowToExpense(row: any): Expense {
     amountBRL: Number(row.amount_cents ?? 0) / 100,
     amountEUR: Number(row.metadata?.amountEUR ?? 0),
     assignedTo: Array.isArray(row.metadata?.assignedTo) ? row.metadata.assignedTo : [],
+    splitType: row.metadata?.splitType ?? 'equal',
+    customSplits: row.metadata?.customSplits ?? {},
+    activityId: row.metadata?.activityId,
+    activityName: row.metadata?.activityName,
   };
 }
 
@@ -56,6 +60,10 @@ export async function saveBudget(itineraryId: string, expenses: Expense[]): Prom
       name: e.name,
       amountEUR: e.amountEUR ?? 0,
       assignedTo: Array.isArray(e.assignedTo) ? e.assignedTo : [],
+      splitType: e.splitType ?? 'equal',
+      customSplits: e.customSplits ?? {},
+      activityId: e.activityId,
+      activityName: e.activityName,
     },
   }));
 

@@ -28,6 +28,7 @@ export async function getMarketplaceItinerary(id: string): Promise<MarketplaceIt
     .select('*')
     .eq('id', id)
     .eq('is_public', true)
+    .is('deleted_at', null)
     .maybeSingle();
 
   if (error || !data) {

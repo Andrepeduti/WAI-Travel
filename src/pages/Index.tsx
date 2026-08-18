@@ -444,8 +444,14 @@ const Index = () => {
       setShowCreateSheet(true);
     } else if (tab === 'ai') {
       setShowAIAssistant(true);
+    } else if (tab === 'profile') {
+      setActiveTab('home');
+      setProfileSubScreen('user');
     } else {
       setActiveTab(tab);
+      if (tab === 'home') {
+        setProfileSubScreen('main');
+      }
     }
   };
 
@@ -576,6 +582,10 @@ const Index = () => {
       images: getDestinationImages(data.destinations),
       participants: [],
       places: placesFromVideo ? placesFromVideo.length : 0,
+      isPersonal: data.isPersonal !== undefined ? data.isPersonal : !data.isPublic,
+      isPublic: !!data.isPublic,
+      priceCents: data.priceCents ?? null,
+      tags: data.tags || [],
     };
     const tempId = `pending-itinerary-${Date.now()}`;
     if (session?.user?.id) {
@@ -596,6 +606,12 @@ const Index = () => {
     if (placesFromVideo) {
       console.log('Adding', placesFromVideo.length, 'places from video to new itinerary:', created.id);
       setPendingVideoPlaces(null);
+    }
+
+    if (data.isPublic) {
+      setReturnToPublic(true);
+    } else {
+      setReturnToPublic(false);
     }
 
     setNewItineraryData(data);
@@ -809,6 +825,9 @@ const Index = () => {
       const finalPlaces = hasAnyPersistedActivities
         ? derivePlacesFromDays(finalDays)
         : baseDataset.places;
+      const currentUserId = session?.user?.id;
+      const isOwner = !!currentUserId && userItinerary.userId === currentUserId;
+
       marketplaceDataset = {
         ...baseDataset,
         id: userItinerary.id,
@@ -820,8 +839,8 @@ const Index = () => {
         title: userItinerary.title || baseDataset.title,
         coverImage,
         destinations: userItinerary.destinations.length > 0 ? userItinerary.destinations : baseDataset.destinations,
-        author: currentUser.name || baseDataset.author || 'Você',
-        authorImage: currentUser.avatar || baseDataset.authorImage || '',
+        author: isOwner ? (currentUser.name || 'Você') : ((userItinerary as any).authorName || baseDataset.author || 'Criador'),
+        authorImage: isOwner ? (currentUser.avatar || '') : ((userItinerary as any).authorAvatar || baseDataset.authorImage || ''),
         price: priceFromCents,
         description: userItinerary.description ?? baseDataset.description ?? '',
         tags: userItinerary.tags && userItinerary.tags.length > 0 ? userItinerary.tags : (baseDataset.tags ?? [])
@@ -833,6 +852,9 @@ const Index = () => {
         title: '',
       }));
       const hydratedDays = buildHydratedDays(skeleton);
+      const currentUserId = session?.user?.id;
+      const isOwner = !!currentUserId && userItinerary.userId === currentUserId;
+
       marketplaceDataset = {
         id: userItinerary.id,
         title: userItinerary.title || 'Roteiro',
@@ -846,8 +868,8 @@ const Index = () => {
         days: hydratedDays,
         places: derivePlacesFromDays(hydratedDays),
         suggestions: [],
-        author: currentUser.name || 'Você',
-        authorImage: currentUser.avatar || '',
+        author: isOwner ? (currentUser.name || 'Você') : ((userItinerary as any).authorName || 'Criador'),
+        authorImage: isOwner ? (currentUser.avatar || '') : ((userItinerary as any).authorAvatar || ''),
         rating: 0,
         reviewCount: 0,
         price: priceFromCents,
@@ -856,8 +878,11 @@ const Index = () => {
       };
     }
 
+    const currentUserId = session?.user?.id;
+    const isOwner = !!currentUserId && userItinerary.userId === currentUserId;
+
     setInjectedMarketplaceDataset(marketplaceDataset);
-    setOwnedPublicUserItinerary(userItinerary);
+    setOwnedPublicUserItinerary(isOwner ? userItinerary : null);
     setSelectedItinerary(marketplaceDataset);
     window.scrollTo(0, 0);
   };
@@ -1089,29 +1114,6 @@ const Index = () => {
                   void updateItinerary(ownedPublicUserItinerary.id, { isPublic: false });
                   handleItineraryBack();
                 }
-              }}
-              onDownloadPdf={async () => {
-                if (!ownedPublicUserItinerary || !selectedItinerary) return;
-                const ds = selectedItinerary;
-                const totalDays = differenceInDays(ds.endDate, ds.startDate) + 1;
-                // Dynamic import: jspdf + html2canvas só baixam quando o usuário clica em "Baixar PDF".
-                const { downloadItineraryPdf } = await import('@/lib/itineraryPdf');
-                downloadItineraryPdf({
-                  title: ds.title,
-                  destinations: ds.destinations,
-                  startDate: format(ds.startDate, "d 'de' MMM yyyy", { locale: ptBR }),
-                  endDate: format(ds.endDate, "d 'de' MMM yyyy", { locale: ptBR }),
-                  days: Array.from({ length: totalDays }, (_, i) => ({
-                    dayNumber: i + 1,
-                    date: format(addDays(ds.startDate, i), "EEE, d 'de' MMM", { locale: ptBR }),
-                    activities: (ds.days[i]?.activities ?? []).map((a: any) => ({
-                      time: a.startTime && a.endTime ? `${a.startTime}–${a.endTime}` : a.startTime,
-                      name: a.type === 'note' ? (a.noteText || 'Tempo livre') : a.name,
-                      location: a.category,
-                      notes: a.observation,
-                    })),
-                  })),
-                });
               }}
               onDeleteItinerary={() => {
                 if (ownedPublicUserItinerary) {
@@ -1806,7 +1808,10 @@ const Index = () => {
       )}
       {activeTab === 'ai' && null}
 
-      <BottomNavigation activeTab={activeTab} onTabChange={handleTabChange} />
+      <BottomNavigation
+        activeTab={activeTab === 'home' && profileSubScreen !== 'main' ? 'profile' : activeTab}
+        onTabChange={handleTabChange}
+      />
 
       <CreateBottomSheet
         isOpen={showCreateSheet}
