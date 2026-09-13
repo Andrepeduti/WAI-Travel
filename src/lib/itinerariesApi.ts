@@ -38,7 +38,6 @@ export interface UserItinerary {
   isPublic: boolean;
   priceCents?: number | null;
   description?: string;
-  description?: string;
   status?: 'draft' | 'published' | 'suspended';
   isFlexible?: boolean;
   durationDays?: number;
@@ -49,6 +48,7 @@ export interface UserItinerary {
   deletedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
+  myRole?: 'owner' | 'editor' | 'viewer';
 }
 
 export interface CreateItineraryInput {
@@ -63,7 +63,6 @@ export interface CreateItineraryInput {
   isPersonal?: boolean;
   isPublic?: boolean;
   priceCents?: number | null;
-  description?: string;
   description?: string;
   status?: 'draft' | 'published' | 'suspended';
   isFlexible?: boolean;
@@ -83,7 +82,6 @@ export interface UpdateItineraryInput {
   isPublic?: boolean;
   priceCents?: number | null;
   description?: string;
-  description?: string;
   status?: 'draft' | 'published' | 'suspended';
   isFlexible?: boolean;
   durationDays?: number;
@@ -93,7 +91,7 @@ export interface UpdateItineraryInput {
   deletedAt?: string | null;
 }
 
-function rowToItinerary(row: any): UserItinerary {
+function rowToItinerary(row: any, myRole?: 'owner' | 'editor' | 'viewer'): UserItinerary {
   return {
     id: row.id,
     title: row.title ?? '',
@@ -118,6 +116,7 @@ function rowToItinerary(row: any): UserItinerary {
     deletedAt: row.deleted_at ? String(row.deleted_at) : null,
     createdAt: row.created_at ? String(row.created_at) : undefined,
     updatedAt: row.updated_at ? String(row.updated_at) : (row.created_at ? String(row.created_at) : undefined),
+    myRole,
   };
 }
 
@@ -139,13 +138,14 @@ export async function listMyItineraries(): Promise<UserItinerary[]> {
       .is('deleted_at', null)
       .order('updated_at', { ascending: false })
       .order('created_at', { ascending: false }),
-    supabase.from('itinerary_members').select('itinerary_id').eq('user_id', userId),
+    supabase.from('itinerary_members').select('itinerary_id, role').eq('user_id', userId),
   ]);
   if (ownedRes.error) {
     console.error('[itinerariesApi] listMyItineraries owned failed', ownedRes.error);
   }
-  const owned = (ownedRes.data ?? []).map(rowToItinerary);
-  const memberIds = (memberRes.data ?? []).map((r) => r.itinerary_id);
+  const owned = (ownedRes.data ?? []).map(r => rowToItinerary(r, 'owner'));
+  const sharedRoles = new Map((memberRes.data ?? []).map((r) => [r.itinerary_id, r.role]));
+  const memberIds = Array.from(sharedRoles.keys());
   let shared: UserItinerary[] = [];
   if (memberIds.length > 0) {
     const { data: sharedRows, error: sErr } = await supabase
@@ -158,7 +158,7 @@ export async function listMyItineraries(): Promise<UserItinerary[]> {
     if (sErr) {
       console.error('[itinerariesApi] listMyItineraries shared failed', sErr);
     } else {
-      shared = (sharedRows ?? []).map(rowToItinerary);
+      shared = (sharedRows ?? []).map(r => rowToItinerary(r, sharedRoles.get(r.id) as 'editor' | 'viewer'));
     }
   }
   // Dedupe (caso o user seja owner e member por algum motivo)

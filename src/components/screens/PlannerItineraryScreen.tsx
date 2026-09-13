@@ -138,6 +138,7 @@ export interface PlannerItineraryScreenProps {
   onOpenItinerary?: (dataset: UserItinerary) => void;
   onUpgrade?: () => void;
   onNavigateToFAQ?: () => void;
+  initialRole?: 'owner' | 'editor' | 'viewer';
 }
 
 // ─── Persistence helpers ─────────────────────────────────────────────────────
@@ -419,7 +420,7 @@ async function getRouteInfo(
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, isPurchased, creatorEditMode, autoOpenPublishFlow, onBack, onDelete, onUpdate, onNavigateToAI, onSaveCreatorEdit, onNavigateToSales, onOpenItinerary, onNavigateToFAQ }: PlannerItineraryScreenProps) {
+export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, isPurchased, creatorEditMode, autoOpenPublishFlow, onBack, onDelete, onUpdate, onNavigateToAI, onSaveCreatorEdit, onNavigateToSales, onOpenItinerary, onNavigateToFAQ, initialRole }: PlannerItineraryScreenProps) {
   const { user: currentUser } = useCurrentUser();
   const { session } = useAuth();
   const ownerAvatar = currentUser.avatar || '';
@@ -742,7 +743,24 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     }
     return [];
   });
-  const [myRole, setMyRole] = useState<ItineraryRole | null>(null);
+  const [myRole, setMyRole] = useState<ItineraryRole | null>(() => {
+    if (initialRole) return initialRole;
+    if (typeof itineraryId === 'string' && session?.user?.id) {
+      if (itineraryDataset && 'myRole' in itineraryDataset && (itineraryDataset as any).myRole) {
+        return (itineraryDataset as any).myRole;
+      }
+      if (itineraryDataset && 'userId' in itineraryDataset && (itineraryDataset as any).userId === session.user.id) {
+        return 'owner';
+      }
+      const owner = getCachedOwnerProfile(itineraryId);
+      if (owner?.userId === session.user.id) return 'owner';
+      
+      const members = getCachedItineraryMembers(itineraryId) || [];
+      const me = members.find(m => m.userId === session.user.id);
+      if (me) return me.role;
+    }
+    return null;
+  });
   const [ownerProfile, setOwnerProfile] = useState<{ userId: string; name: string; avatar?: string } | null>(() => {
     if (typeof itineraryId === 'string') {
       return getCachedOwnerProfile(itineraryId);
@@ -755,7 +773,13 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     }
     return false;
   });
-  const isViewer = myRole === 'viewer';
+  const isViewer = useMemo(() => {
+    if (myRole === 'viewer') return true;
+    if (myRole === 'editor' || myRole === 'owner') return false;
+    // Assume viewer during initial load to prevent edit buttons from flickering to guests
+    if (loadingMembers && isUuidId) return true;
+    return false;
+  }, [myRole, loadingMembers, isUuidId]);
   const reloadMembers = useCallback(async () => {
     if (!isUuidId || typeof itineraryId !== 'string') {
       setLoadingMembers(false);

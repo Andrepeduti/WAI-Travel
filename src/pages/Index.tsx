@@ -246,6 +246,7 @@ const Index = () => {
   const [newItineraryData, setNewItineraryData] = useState<ItineraryFormData | null>(null);
   const [activeUserItineraryId, setActiveUserItineraryId] = useState<string | null>(null);
   const [activeUserItineraryDataset, setActiveUserItineraryDataset] = useState<ItineraryDataset | null>(null);
+  const [activeUserItineraryRole, setActiveUserItineraryRole] = useState<'owner' | 'editor' | 'viewer' | null>(null);
   const [activeUserItineraryIsPurchased, setActiveUserItineraryIsPurchased] = useState(false);
   const [autoOpenPublishFlow, setAutoOpenPublishFlow] = useState(false);
   const [selectedItinerary, setSelectedItinerary] = useState<ItineraryDataset | null>(null);
@@ -333,6 +334,7 @@ const Index = () => {
       selectedFriend ? `friend:${(selectedFriend as any).id ?? (selectedFriend as any).name}` : '',
       selectedItinerary ? `it:${selectedItinerary.id}` : '',
       activeUserItineraryId ? `userIt:${activeUserItineraryId}` : '',
+      activeUserItineraryRole ? `role:${activeUserItineraryRole}` : '',
       creatorDashboardItinerary ? `dash:${creatorDashboardItinerary.id}` : '',
       selectedCollectionId != null ? `col:${selectedCollectionId}` : '',
       selectedExperienceId != null ? `exp:${selectedExperienceId}` : '',
@@ -350,7 +352,7 @@ const Index = () => {
     ].filter(Boolean).join('|');
   }, [
     activeTab, profileSubScreen, selectedCreator, selectedFriend, selectedItinerary,
-    activeUserItineraryId, creatorDashboardItinerary, selectedCollectionId,
+    activeUserItineraryId, activeUserItineraryRole, creatorDashboardItinerary, selectedCollectionId,
     selectedExperienceId, destinationList, showSearch, showChat, showNotifications,
     showAIAssistant, showAIHistory, showCart, showTripReminders, showPromoDetail,
     showSimilarTravelers, newItineraryData,
@@ -367,6 +369,7 @@ const Index = () => {
       selectedItinerary,
       activeUserItineraryId,
       activeUserItineraryDataset,
+      activeUserItineraryRole,
       creatorDashboardItinerary,
       selectedCollectionId,
       selectedExperienceId,
@@ -399,6 +402,7 @@ const Index = () => {
       setSelectedItinerary(snap.selectedItinerary);
       setActiveUserItineraryId(snap.activeUserItineraryId);
       setActiveUserItineraryDataset(snap.activeUserItineraryDataset);
+      setActiveUserItineraryRole(snap.activeUserItineraryRole);
       setCreatorDashboardItinerary(snap.creatorDashboardItinerary);
       setSelectedCollectionId(snap.selectedCollectionId);
       setSelectedExperienceId(snap.selectedExperienceId);
@@ -425,7 +429,7 @@ const Index = () => {
     };
   }, [
     activeTab, profileSubScreen, selectedCreator, selectedFriend, selectedItinerary,
-    activeUserItineraryId, activeUserItineraryDataset, creatorDashboardItinerary,
+    activeUserItineraryId, activeUserItineraryDataset, activeUserItineraryRole, creatorDashboardItinerary,
     selectedCollectionId, selectedExperienceId, destinationList, showSearch, showChat,
     showNotifications, showAIAssistant, showAIHistory, showCart, showTripReminders,
     showPromoDetail, showSimilarTravelers, newItineraryData, injectedMarketplaceDataset,
@@ -649,6 +653,7 @@ const Index = () => {
       status: userItinerary.status,
     };
     setActiveUserItineraryId(userItinerary.id);
+    setActiveUserItineraryRole(userItinerary.myRole ?? null);
     // Try to load the original dataset for purchased itineraries (linked via sourceDatasetId)
     const datasetId = userItinerary.sourceDatasetId ?? null;
     const dataset = datasetId ? getItineraryById(datasetId) : null;
@@ -1258,6 +1263,7 @@ const Index = () => {
             data={newItineraryData}
             itineraryDataset={activeUserItineraryDataset ?? undefined}
             itineraryId={activeUserItineraryId ?? undefined}
+            initialRole={activeUserItineraryRole ?? undefined}
             isPurchased={activeUserItineraryIsPurchased}
             creatorEditMode={!!creatorEditingItinerary}
             autoOpenPublishFlow={autoOpenPublishFlow}
@@ -1265,16 +1271,16 @@ const Index = () => {
               setAutoOpenPublishFlow(false);
               if (creatorEditingItinerary) {
                 const it = creatorEditingItinerary;
-                setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryIsPurchased(false);
+                setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryRole(null); setActiveUserItineraryIsPurchased(false);
                 setCreatorEditingItinerary(null);
                 setCreatorDashboardItinerary(it);
                 return;
               }
-              setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryIsPurchased(false); setActiveTab('trips'); setReturnToCollections(false);
+              setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryRole(null); setActiveUserItineraryIsPurchased(false); setActiveTab('trips'); setReturnToCollections(false);
             })}
             onSaveCreatorEdit={() => {
               const it = creatorEditingItinerary;
-              setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryIsPurchased(false);
+              setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryRole(null); setActiveUserItineraryIsPurchased(false);
               setCreatorEditingItinerary(null);
               if (it) setCreatorDashboardItinerary(it);
             }}
@@ -1285,6 +1291,7 @@ const Index = () => {
               setNewItineraryData(null);
               setActiveUserItineraryId(null);
               setActiveUserItineraryDataset(null);
+              setActiveUserItineraryRole(null);
               setActiveUserItineraryIsPurchased(false);
               setCreatorEditingItinerary(null);
               setActiveTab('trips');
@@ -1293,15 +1300,16 @@ const Index = () => {
             }}
             onUpdate={handleItineraryUpdate}
             onDuplicateSuccess={() => {
-              setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryIsPurchased(false); setActiveTab('trips'); setReturnToCollections(false);
+              setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryRole(null); setActiveUserItineraryIsPurchased(false); setActiveTab('trips'); setReturnToCollections(false);
               setShowDuplicateSuccessToast(true);
             }}
-            onNavigateToAI={() => { setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryIsPurchased(false); setShowAIAssistant(true); }}
-            onNavigateToSales={() => { setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryIsPurchased(false); setCreatorEditingItinerary(null); setReturnToPublic(true); setActiveTab('trips'); }}
+            onNavigateToAI={() => { setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryRole(null); setActiveUserItineraryIsPurchased(false); setShowAIAssistant(true); }}
+            onNavigateToSales={() => { setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryRole(null); setActiveUserItineraryIsPurchased(false); setCreatorEditingItinerary(null); setReturnToPublic(true); setActiveTab('trips'); }}
             onUpgrade={() => {
               setNewItineraryData(null);
               setActiveUserItineraryId(null);
               setActiveUserItineraryDataset(null);
+              setActiveUserItineraryRole(null);
               setActiveUserItineraryIsPurchased(false);
               setCreatorEditingItinerary(null);
               setSubscriptionOrigin('trips');

@@ -140,6 +140,9 @@ export function ManageItineraryScreen({
   const [toastMessage, setToastMessage] = useState('');
 
   const isOwner = !!owner && !!currentUserId && owner.userId === currentUserId;
+  const currentUserMember = members.find((m) => m.userId === currentUserId);
+  const currentUserRole = currentUserMember?.role || 'viewer';
+  const canEdit = isOwner || currentUserRole === 'editor';
 
   useEffect(() => {
     if (!itineraryId || itineraryId === 'default') {
@@ -363,12 +366,16 @@ export function ManageItineraryScreen({
         {/* Capa Block */}
         <div className="bg-white rounded-[16px] p-4 flex flex-col gap-4">
           <h3 className="font-semibold text-[16px] text-[#171F2C]">Capa</h3>
-          <label className="relative rounded-[16px] overflow-hidden h-[141px] block cursor-pointer active:scale-[0.98] transition-transform">
+          <label className={cn("relative rounded-[16px] overflow-hidden h-[141px] block", canEdit ? "cursor-pointer active:scale-[0.98] transition-transform" : "")}>
             <img src={coverPreview || initialCoverImage || defaultCover} alt="Capa" className="w-full h-full object-cover" />
-            <div className="absolute inset-0 m-auto w-10 h-10 bg-[#FEFEFE] rounded-full shadow-[0px_4px_20px_rgba(0,0,0,0.1)] flex items-center justify-center">
-              <Camera size={20} className="text-[#141530]" />
-            </div>
-            <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+            {canEdit && (
+              <>
+                <div className="absolute inset-0 m-auto w-10 h-10 bg-[#FEFEFE] rounded-full shadow-[0px_4px_20px_rgba(0,0,0,0.1)] flex items-center justify-center">
+                  <Camera size={20} className="text-[#141530]" />
+                </div>
+                <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+              </>
+            )}
           </label>
           {isAutoCover && !coverPreview && (
             <p className="text-[11px] text-[#7F7F7F] flex items-center gap-1">
@@ -386,7 +393,7 @@ export function ManageItineraryScreen({
             {/* Título */}
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between group">
-                <div className="flex items-center gap-3 flex-1" onClick={() => { setTempTripName(tripName); setShowTitlePicker(true); }}>
+                <div className="flex items-center gap-3 flex-1" onClick={() => { if (canEdit) { setTempTripName(tripName); setShowTitlePicker(true); } }}>
                   <div className="w-6 h-6 flex items-center justify-center relative shrink-0">
                       <div className="absolute inset-0 rounded-full border-[1.5px] border-[#141530]"></div>
                       <div className="w-3 h-3 rounded-full border-[1.5px] border-[#141530]"></div>
@@ -396,16 +403,18 @@ export function ManageItineraryScreen({
                     <span className="font-medium text-[14px] text-[#7F7F7F]">{tripName || 'Sem título'}</span>
                   </div>
                 </div>
-                <button onClick={() => { setTempTripName(tripName); setShowTitlePicker(true); }} className="p-2 shrink-0">
-                  <ChevronRight size={20} className="text-[#7F7F7F]" />
-                </button>
+                {canEdit && (
+                  <button onClick={() => { setTempTripName(tripName); setShowTitlePicker(true); }} className="p-2 shrink-0">
+                    <ChevronRight size={20} className="text-[#7F7F7F]" />
+                  </button>
+                )}
               </div>
               <div className="h-px bg-[#F2F2F2] w-full" />
             </div>
 
             {/* Moeda */}
             <div className="flex flex-col gap-4">
-              <button onClick={() => { setTempCurrency(currency); setShowCurrencyPicker(true); }} className="flex items-center justify-between group">
+              <button onClick={() => { if (canEdit) { setTempCurrency(currency); setShowCurrencyPicker(true); } }} className="flex items-center justify-between group w-full">
                 <div className="flex items-center gap-3">
                   <div className="w-6 h-6 flex items-center justify-center relative shrink-0">
                       <div className="absolute inset-0 rounded-full border-[1.5px] border-[#141530]"></div>
@@ -416,7 +425,7 @@ export function ManageItineraryScreen({
                     <span className="font-medium text-[14px] text-[#7F7F7F]">{`${selectedCurrency.symbol} - ${selectedCurrency.label}`}</span>
                   </div>
                 </div>
-                <ChevronRight size={20} className="text-[#7F7F7F]" />
+                {canEdit && <ChevronRight size={20} className="text-[#7F7F7F]" />}
               </button>
               <div className="h-px bg-[#F2F2F2] w-full" />
             </div>
@@ -424,12 +433,14 @@ export function ManageItineraryScreen({
             {/* Período */}
             <div className="flex flex-col gap-4">
               <button onClick={() => {
-                setTempStartDate(startDate);
-                setTempEndDate(endDate);
-                setTempDuration(durationDays);
-                setTempDateMode(dateMode);
-                setShowPeriodPicker(true);
-              }} className="flex items-center justify-between group">
+                if (canEdit) {
+                  setTempStartDate(startDate);
+                  setTempEndDate(endDate);
+                  setTempDuration(durationDays);
+                  setTempDateMode(dateMode);
+                  setShowPeriodPicker(true);
+                }
+              }} className="flex items-center justify-between group w-full">
                 <div className="flex items-center gap-3">
                   <div className="w-6 h-6 flex items-center justify-center relative shrink-0">
                       <div className="absolute inset-0 rounded-full border-[1.5px] border-[#141530]"></div>
@@ -440,7 +451,7 @@ export function ManageItineraryScreen({
                     <span className="font-medium text-[14px] text-[#7F7F7F]">{formattedDate}</span>
                   </div>
                 </div>
-                <ChevronRight size={20} className="text-[#7F7F7F]" />
+                {canEdit && <ChevronRight size={20} className="text-[#7F7F7F]" />}
               </button>
               <div className="h-px bg-[#F2F2F2] w-full" />
             </div>
@@ -448,9 +459,11 @@ export function ManageItineraryScreen({
             {/* Destinos */}
             <div className="flex flex-col gap-4">
               <button onClick={() => {
-                setTempDestinations(destinations);
-                setShowDestinationsPicker(true);
-              }} className="flex items-center justify-between group">
+                if (canEdit) {
+                  setTempDestinations(destinations);
+                  setShowDestinationsPicker(true);
+                }
+              }} className="flex items-center justify-between group w-full">
                 <div className="flex items-center gap-3 w-full">
                   <div className="w-6 h-6 flex items-center justify-center relative shrink-0">
                       <div className="absolute inset-0 rounded-full border-[1.5px] border-[#141530]"></div>
@@ -463,7 +476,7 @@ export function ManageItineraryScreen({
                     </span>
                   </div>
                 </div>
-                <ChevronRight size={20} className="text-[#7F7F7F] shrink-0" />
+                {canEdit && <ChevronRight size={20} className="text-[#7F7F7F] shrink-0" />}
               </button>
             </div>
 
@@ -580,12 +593,16 @@ export function ManageItineraryScreen({
                   </React.Fragment>
                 ))}
 
-            <div className="h-px bg-[#F2F2F2] w-full mt-2" />
+            {canEdit && (
+              <>
+                <div className="h-px bg-[#F2F2F2] w-full mt-2" />
 
-            <button onClick={() => setShowShareSheet(true)} className="flex items-center gap-2 w-fit active:opacity-70 transition-opacity">
-              <UserPlus size={16} className="text-[#141530]" />
-              <span className="font-bold text-[14px] text-[#141530]">Convidar viajante</span>
-            </button>
+                <button onClick={() => setShowShareSheet(true)} className="flex items-center gap-2 w-fit active:opacity-70 transition-opacity">
+                  <UserPlus size={16} className="text-[#141530]" />
+                  <span className="font-bold text-[14px] text-[#141530]">Convidar viajante</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -594,61 +611,50 @@ export function ManageItineraryScreen({
           <h3 className="font-semibold text-[16px] text-[#171F2C]">Ferramentas</h3>
           <div className="flex flex-col gap-6">
             
-            <div className="flex flex-col gap-4">
-              <button onClick={onPublish} className="flex items-center justify-between group text-left">
-                <div className="flex items-center gap-3">
-                  <div className="w-6 h-6 flex items-center justify-center relative shrink-0">
-                      <div className="absolute inset-0 rounded-full border-[1.5px] border-[#141530]"></div>
-                      <div className="w-3 h-3 rounded-full border-[1.5px] border-[#141530]"></div>
+            {canEdit && (
+              <div className="flex flex-col gap-4">
+                <button onClick={onPublish} className="flex items-center justify-between group text-left">
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 flex items-center justify-center relative shrink-0">
+                        <div className="absolute inset-0 rounded-full border-[1.5px] border-[#141530]"></div>
+                        <div className="w-3 h-3 rounded-full border-[1.5px] border-[#141530]"></div>
+                    </div>
+                    <div className="flex flex-col text-left gap-[2px]">
+                      <span className="font-semibold text-[16px] text-[#141530]">Publicar na loja WAI</span>
+                      <span className="font-medium text-[14px] text-[#7F7F7F]">Venda seu roteiro para outros viajantes</span>
+                    </div>
                   </div>
-                  <div className="flex flex-col text-left gap-[2px]">
-                    <span className="font-semibold text-[16px] text-[#141530]">Publicar na loja WAI</span>
-                    <span className="font-medium text-[14px] text-[#7F7F7F]">Venda seu roteiro para outros viajantes</span>
-                  </div>
-                </div>
-                <ChevronRight size={20} className="text-[#7F7F7F]" />
-              </button>
-              <div className="h-px bg-[#F2F2F2] w-full" />
-            </div>
+                  <ChevronRight size={20} className="text-[#7F7F7F]" />
+                </button>
+                <div className="h-px bg-[#F2F2F2] w-full" />
+              </div>
+            )}
 
-            <div className="flex flex-col gap-4">
-              <button className="flex items-center justify-between group text-left">
-                <div className="flex items-center gap-3">
-                  <div className="w-6 h-6 flex items-center justify-center relative shrink-0">
-                      <div className="absolute inset-0 rounded-full border-[1.5px] border-[#141530]"></div>
-                      <div className="w-3 h-3 rounded-full border-[1.5px] border-[#141530]"></div>
-                  </div>
-                  <div className="flex flex-col text-left gap-[2px]">
-                    <span className="font-semibold text-[16px] text-[#141530]">Baixar roteiro</span>
-                    <span className="font-medium text-[14px] text-[#7F7F7F]">Leve seu roteiro em PDF com você</span>
-                  </div>
-                </div>
-                <ChevronRight size={20} className="text-[#7F7F7F]" />
-              </button>
-              <div className="h-px bg-[#F2F2F2] w-full" />
-            </div>
 
-            <div className="flex flex-col gap-4">
-              <button className="flex items-center justify-between group text-left">
-                <div className="flex items-center gap-3">
-                  <div className="w-6 h-6 flex items-center justify-center relative shrink-0">
-                      <div className="absolute inset-0 rounded-full border-[1.5px] border-[#141530]"></div>
-                      <div className="w-3 h-3 rounded-full border-[1.5px] border-[#141530]"></div>
+
+            {canEdit && (
+              <div className="flex flex-col gap-4">
+                <button className="flex items-center justify-between group text-left">
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 flex items-center justify-center relative shrink-0">
+                        <div className="absolute inset-0 rounded-full border-[1.5px] border-[#141530]"></div>
+                        <div className="w-3 h-3 rounded-full border-[1.5px] border-[#141530]"></div>
+                    </div>
+                    <div className="flex flex-col text-left gap-[2px]">
+                      <span className="font-semibold text-[16px] text-[#141530]">Preencher deslocamentos</span>
+                      <span className="font-medium text-[14px] text-[#7F7F7F]">A WAI sugere os trajetos</span>
+                    </div>
                   </div>
-                  <div className="flex flex-col text-left gap-[2px]">
-                    <span className="font-semibold text-[16px] text-[#141530]">Preencher deslocamentos</span>
-                    <span className="font-medium text-[14px] text-[#7F7F7F]">A WAI sugere os trajetos</span>
+                  <div className="flex items-center gap-4">
+                      <span className="bg-[#141530] text-white text-[12px] font-medium px-3 py-1 rounded-[9px] flex items-center justify-center">
+                          <Star size={12} className="fill-white mr-1" /> Pro
+                      </span>
+                      <ChevronRight size={20} className="text-[#7F7F7F]" />
                   </div>
-                </div>
-                <div className="flex items-center gap-4">
-                    <span className="bg-[#141530] text-white text-[12px] font-medium px-3 py-1 rounded-[9px] flex items-center justify-center">
-                        <Star size={12} className="fill-white mr-1" /> Pro
-                    </span>
-                    <ChevronRight size={20} className="text-[#7F7F7F]" />
-                </div>
-              </button>
-              <div className="h-px bg-[#F2F2F2] w-full" />
-            </div>
+                </button>
+                <div className="h-px bg-[#F2F2F2] w-full" />
+              </div>
+            )}
 
             <div className="flex flex-col gap-4">
               <button className="flex items-center justify-between group text-left">
@@ -675,13 +681,15 @@ export function ManageItineraryScreen({
         </div>
 
         {/* Excluir Block */}
-        <button onClick={() => setShowDeleteConfirm(true)} className="bg-white rounded-[16px] p-4 flex items-center justify-between group active:scale-[0.98] transition-transform">
-          <div className="flex items-center gap-3">
-            <Trash2 size={20} className="text-[#D00004]" />
-            <span className="font-medium text-[16px] text-[#D00004]">Excluir roteiro</span>
-          </div>
-          <ChevronRight size={20} className="text-[#D00004]" />
-        </button>
+        {isOwner && (
+          <button onClick={() => setShowDeleteConfirm(true)} className="bg-white rounded-[16px] p-4 flex items-center justify-between group active:scale-[0.98] transition-transform">
+            <div className="flex items-center gap-3">
+              <Trash2 size={20} className="text-[#D00004]" />
+              <span className="font-medium text-[16px] text-[#D00004]">Excluir roteiro</span>
+            </div>
+            <ChevronRight size={20} className="text-[#D00004]" />
+          </button>
+        )}
 
       </div>
       )}
