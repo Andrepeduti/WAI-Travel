@@ -103,9 +103,11 @@ export interface PublicItineraryRow {
   end_date: string | null;
   places_count: number;
   price_cents: number | null;
-  main_tag: string;
   description?: string | null;
-  tags?: string[] | null;
+  status?: string | null;
+  is_flexible?: boolean | null;
+  duration_days?: number | null;
+  travel_month?: string | null;
 }
 
 /** Busca os roteiros públicos publicados por um usuário. */
@@ -115,7 +117,7 @@ export async function getPublicItinerariesByUserId(
   if (!userId) return [];
   const { data, error } = await supabase
     .from('itineraries')
-    .select('id, title, destinations, images, start_date, end_date, places_count, price_cents, main_tag, description, tags')
+    .select('id, title, destinations, images, start_date, end_date, places_count, price_cents, description, status, is_flexible, duration_days, travel_month')
     .eq('user_id', userId)
     .eq('is_public', true)
     .is('deleted_at', null)

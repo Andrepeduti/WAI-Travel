@@ -34,6 +34,7 @@ dist-ssr
 
 # Lovable (legacy)
 .lovable/
+scratch/
 
 # Supabase
 supabase/.temp/

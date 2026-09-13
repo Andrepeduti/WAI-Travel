@@ -62,7 +62,7 @@ export function AddReservationSheet({ open, onClose, onSave, dayNumber }: AddRes
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-full flex items-center justify-center -mr-1"
+            className="w-10 h-10 rounded-full flex items-center justify-center -mr-1"
             style={{ background: '#F2F2F2' }}
             aria-label="Fechar"
           >
@@ -83,7 +83,7 @@ export function AddReservationSheet({ open, onClose, onSave, dayNumber }: AddRes
             <label className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
               Nome do lugar
             </label>
-            <div className="rounded-xl px-4 py-3" style={{ background: '#F2F2F2' }}>
+            <div className="rounded-[10px] px-4 py-3" style={{ background: '#F2F2F2' }}>
               <input
                 type="text"
                 placeholder="Ex: Hotel Le Marais"
@@ -101,7 +101,7 @@ export function AddReservationSheet({ open, onClose, onSave, dayNumber }: AddRes
               <label className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
                 Data
               </label>
-              <div className="flex items-center gap-2 rounded-xl px-4 py-3" style={{ background: '#F2F2F2' }}>
+              <div className="flex items-center gap-2 rounded-[10px] px-4 py-3" style={{ background: '#F2F2F2' }}>
                 <Icon name="calendar_today" size={16} className="text-muted-foreground" />
                 <input
                   type="text"
@@ -116,7 +116,7 @@ export function AddReservationSheet({ open, onClose, onSave, dayNumber }: AddRes
               <label className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
                 Horário
               </label>
-              <div className="flex items-center gap-2 rounded-xl px-4 py-3 relative overflow-hidden cursor-pointer" style={{ background: '#F2F2F2' }}>
+              <div className="flex items-center gap-2 rounded-[10px] px-4 py-3 relative overflow-hidden cursor-pointer" style={{ background: '#F2F2F2' }}>
                 <Icon name="schedule" size={16} className="text-muted-foreground flex-shrink-0" />
                 <input
                   type="time"
@@ -133,7 +133,7 @@ export function AddReservationSheet({ open, onClose, onSave, dayNumber }: AddRes
             <label className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
               Número de pessoas
             </label>
-            <div className="flex items-center gap-2 rounded-xl px-4 py-3" style={{ background: '#F2F2F2' }}>
+            <div className="flex items-center gap-2 rounded-[10px] px-4 py-3" style={{ background: '#F2F2F2' }}>
               <Icon name="group" size={18} className="text-muted-foreground" />
               <input
                 type="text"
@@ -150,7 +150,7 @@ export function AddReservationSheet({ open, onClose, onSave, dayNumber }: AddRes
             <label className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
               Link da reserva (opcional)
             </label>
-            <div className="flex items-center gap-2 rounded-xl px-4 py-3" style={{ background: '#F2F2F2' }}>
+            <div className="flex items-center gap-2 rounded-[10px] px-4 py-3" style={{ background: '#F2F2F2' }}>
               <Icon name="link" size={18} className="text-muted-foreground" />
               <input
                 type="url"

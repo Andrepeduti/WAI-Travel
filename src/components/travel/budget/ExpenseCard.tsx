@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChevronRight, Building2, Plane, UtensilsCrossed, Ticket, CircleDot } from 'lucide-react';
 import { BudgetPerson } from './TravelerBudgetCard';
+import { formatCurrency } from '@/lib/currencyUtils';
 
 export interface ExpenseItem {
   id: string;
@@ -18,6 +19,7 @@ export interface ExpenseItem {
 interface ExpenseCardProps {
   expense: ExpenseItem;
   people: BudgetPerson[];
+  currency?: string;
   onClick?: () => void;
   className?: string;
 }
@@ -39,9 +41,7 @@ const categoryIcons: Record<string, typeof Building2> = {
 
 const defaultColors = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444', '#EC4899', '#14B8A6', '#F97316'];
 
-export function ExpenseCard({ expense, people, onClick, className = '' }: ExpenseCardProps) {
-  const formatBRL = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
+export function ExpenseCard({ expense, people, currency = 'BRL', onClick, className = '' }: ExpenseCardProps) {
   const categoryLabel = categoryLabels[expense.category] || expense.category || 'Gasto';
   
   // Find assigned people objects
@@ -54,36 +54,35 @@ export function ExpenseCard({ expense, people, onClick, className = '' }: Expens
       onClick={onClick}
       role="button"
       tabIndex={0}
-      className={`group flex items-center justify-between py-3.5 px-3 rounded-2xl bg-card hover:bg-muted/30 border border-transparent hover:border-border/40 transition-all cursor-pointer select-none active:scale-[0.99] ${className}`}
+      className={`group flex flex-col items-start w-[345px] gap-[25px] pb-5 pt-3 mx-auto cursor-pointer select-none active:scale-[0.99] transition-all ${className}`}
       style={{ fontFamily: 'var(--font-family-primary, "Urbanist", sans-serif)' }}
     >
-      {/* Left section: Icon + Title & Category */}
-      <div className="flex items-center gap-3 min-w-0 flex-1 pr-2">
-        {/* Concentric / Category stylish icon */}
-        <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 border border-border/70 bg-[#F8F9FA] group-hover:border-[#1A1C40]/20 transition-colors">
-          <CircleDot size={20} strokeWidth={1.75} className="text-[#171F2C]" />
+      <div className="flex flex-row items-start gap-4 w-[345px]">
+        {/* Left section: Icon */}
+        <div className="flex flex-row items-center gap-2 flex-1">
+          <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 text-[#141530]">
+            <CircleDot size={24} strokeWidth={2} />
+          </div>
+
+          <div className="flex flex-col items-start gap-1 flex-1">
+            <span className="font-['Urbanist'] font-semibold text-[14px] leading-[17px] text-[#1A1C40] block truncate">
+              {expense.name || 'Sem nome'}
+            </span>
+            <span className="font-['Urbanist'] font-medium text-[12px] leading-[14px] text-[#7F7F7F] block truncate">
+              {categoryLabel}
+            </span>
+          </div>
         </div>
 
-        <div className="flex-1 min-w-0">
-          <span className="text-[15px] font-bold text-[#171F2C] block truncate leading-tight">
-            {expense.name || 'Sem nome'}
-          </span>
-          <span className="text-[12px] font-medium text-[#7F7F7F] block truncate mt-0.5">
-            {categoryLabel}
-          </span>
-        </div>
-      </div>
-
-      {/* Right section: Price, Stacked Avatars & Chevron */}
-      <div className="flex items-center gap-2.5 flex-shrink-0">
-        <div className="flex flex-col items-end">
-          <span className="text-[14px] font-bold text-[#171F2C] block tracking-tight">
-            {formatBRL(expense.amountBRL)}
-          </span>
+        {/* Right section: Price & Avatars */}
+        <div className="flex flex-col items-end justify-center gap-1">
+          <div className="font-['Urbanist'] font-bold text-[15px] leading-[18px] text-[#171F2C]">
+            {formatCurrency(expense.amountBRL, currency)}
+          </div>
 
           {/* Stacked traveler avatars */}
           {assignedPeople.length > 0 && (
-            <div className="flex items-center -space-x-1.5 mt-1">
+            <div className="flex items-center -space-x-1.5 flex-shrink-0">
               {assignedPeople.slice(0, 3).map((person, idx) => {
                 const initials = person.initials || person.name.slice(0, 2).toUpperCase();
                 return person.avatar ? (
@@ -91,29 +90,25 @@ export function ExpenseCard({ expense, people, onClick, className = '' }: Expens
                     key={person.id}
                     src={person.avatar}
                     alt={person.name}
-                    className="w-5 h-5 rounded-full object-cover ring-2 ring-background"
+                    className="w-[26px] h-[26px] rounded-full object-cover border-[1px] border-white"
                   />
                 ) : (
                   <div
                     key={person.id}
-                    className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[8px] font-bold ring-2 ring-background"
+                    className="w-[26px] h-[26px] rounded-full flex items-center justify-center text-white text-[10px] font-bold border-[1px] border-white"
                     style={{ backgroundColor: person.color || defaultColors[idx % defaultColors.length] }}
                   >
                     {initials}
                   </div>
                 );
               })}
-              {assignedPeople.length > 3 && (
-                <div className="w-5 h-5 rounded-full bg-[#E5E7EB] text-[#4B5563] ring-2 ring-background flex items-center justify-center text-[8px] font-bold">
-                  +{assignedPeople.length - 3}
-                </div>
-              )}
             </div>
           )}
         </div>
-
-        <ChevronRight size={18} className="text-[#9CA3AF] group-hover:text-[#171F2C] group-hover:translate-x-0.5 transition-all flex-shrink-0" />
       </div>
+      
+      {/* Divider */}
+      <div className="w-[345px] border-t border-[#F2F2F2]" />
     </div>
   );
 }

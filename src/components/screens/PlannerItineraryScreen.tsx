@@ -8,9 +8,8 @@ import { ItinerarySettingsSheet } from '@/components/travel/ItinerarySettingsShe
 import { parseLocalDate } from '@/lib/localDate';
 import { PublishItineraryFlow } from '@/components/travel/PublishItineraryFlow';
 import { EditPublishSheet } from '@/components/travel/EditPublishSheet';
-import { ActivityDetailSheet } from '@/components/travel/ActivityDetailSheet';
 import { ManageItineraryScreen } from './ManageItineraryScreen';
-import { ParticipantsSheet } from '@/components/travel/ParticipantsSheet';
+import { ActivityDetailScreen } from './ActivityDetailScreen';
 import { Icon } from '@/components/ui/Icon';
 import { DocumentosScreen } from './DocumentosScreen';
 import { BudgetScreen, Expense } from './BudgetScreen';
@@ -25,7 +24,7 @@ import { TripNotesScreen, TripNote } from './TripNotesScreen';
 import { TripChecklistScreen } from './TripChecklistScreen';
 import { AddTransporteSheet, Transporte } from '@/components/travel/AddTransporteSheet';
 import { AddActionSheet } from '@/components/travel/AddActionSheet';
-import { AddPlaceSheet, PlaceResult } from '@/components/travel/AddPlaceSheet';
+import { AddPlacesScreen, PlaceResult } from '@/components/travel/AddPlacesScreen';
 import { AddNoteSheet } from '@/components/travel/AddNoteSheet';
 import { AddTripNoteSheet } from '@/components/travel/AddTripNoteSheet';
 import { AddDeslocamentoSheet, DeslocamentoData } from '@/components/travel/AddDeslocamentoSheet';
@@ -69,6 +68,7 @@ import { ShareItinerarySheet } from '@/components/travel/ShareItinerarySheet';
 import { useItineraryRealtime } from '@/hooks/use-itinerary-realtime';
 import { useMyItineraries, addOptimisticItinerary, applyOptimisticPatch } from '@/hooks/use-my-itineraries';
 import { PlanLimitReachedSheet } from '@/components/travel/PlanLimitReachedSheet';
+import type { MapPlace } from './ItineraryMapScreen';
 const LazyItineraryMapScreen = lazy(() => import('./ItineraryMapScreen').then((m) => ({ default: m.ItineraryMapScreen })));
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -488,7 +488,6 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   const [dayTitles, setDayTitles] = useState<Record<number, string>>({});
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [selectedActivityDay, setSelectedActivityDay] = useState<number | null>(null);
-  const [activityActionTarget, setActivityActionTarget] = useState<Activity | null>(null);
   const [activityEditMode, setActivityEditMode] = useState(false);
   const [showMapOptions, setShowMapOptions] = useState(false);
   const [editStartTime, setEditStartTime] = useState('');
@@ -534,7 +533,6 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
 
 
   const [showManageItinerary, setShowManageItinerary] = useState(false);
-  const [showParticipantsSheet, setShowParticipantsSheet] = useState(false);
 
   const { itineraries: myItinerariesForLimit } = useMyItineraries();
   const FREE_PLAN_ITINERARY_LIMIT = Infinity;
@@ -576,6 +574,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   const [duplicateToast, setDuplicateToast] = useState(false);
   const [isOpeningDuplicate, setIsOpeningDuplicate] = useState(false);
   const [showMap, setShowMap] = useState(false);
+  const [mapFocusedPlace, setMapFocusedPlace] = useState<MapPlace | null>(null);
   const [openDays, setOpenDays] = useState<Set<number>>(new Set());
   const openDaysRef = useRef<Set<number>>(openDays);
   openDaysRef.current = openDays;
@@ -661,7 +660,6 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   const [dayActivities, setDayActivities] = useState<Record<number, Activity[]>>(() => loadPersistedActivities(persistKey, dataVersion));
   const [dayTransports, setDayTransports] = useState<Record<number, TransportBetween[]>>(() => loadPersistedTransports(persistKey, dataVersion));
   const [deletedUndo, setDeletedUndo] = useState<{ activity: Activity; day: number; index: number; } | null>(null);
-  const [moveToDayTarget, setMoveToDayTarget] = useState<Activity | null>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
   const stickyTabsRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -1783,7 +1781,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       })
     );
     setDayTransports((prev) => ({ ...prev, [day]: newTransports }));
-    toast('Atividade removida', {
+    toast.success('Atividade removida', {
       action: {
         label: 'Desfazer',
         onClick: () => {
@@ -1836,7 +1834,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         ? `Dia ${targetDay}`
         : `Dia ${targetDay}`;
 
-    toast(`Movido para ${dayLabel}`, {
+    toast.success(`Movido para ${dayLabel}`, {
       action: {
         label: 'Desfazer',
         onClick: () => {
@@ -2072,7 +2070,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
           // Normal quick tap: open activity sheet!
           setSelectedDay(day);
           setSelectedActivityDay(day);
-          setActivityActionTarget(activity);
+          setSelectedActivity(activity);
           return;
         }
 
@@ -2466,6 +2464,47 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
 
   // ─── Sub-screen routing ──────────────────────────────────────────────────
 
+  if (selectedActivity) {
+    return (
+      <ActivityDetailScreen
+        activity={{
+          id: selectedActivity.id,
+          name: selectedActivity.name,
+          image: selectedActivity.image,
+          category: selectedActivity.category,
+          rating: selectedActivity.rating,
+          price: selectedActivity.price,
+          lat: selectedActivity.lat,
+          lng: selectedActivity.lng,
+          openHours: selectedActivity.openHours,
+          startTime: selectedActivity.startTime,
+          endTime: selectedActivity.endTime,
+        }}
+        onBack={() => {
+          setSelectedActivity(null);
+          setSelectedActivityDay(null);
+        }}
+        onOpenMap={(activity) => {
+          setMapFocusedPlace({
+            id: activity.id,
+            name: activity.name,
+            lat: activity.lat ?? 0,
+            lng: activity.lng ?? 0,
+            category: activity.category,
+            image: activity.image,
+            rating: activity.rating,
+            price: activity.price,
+            day: selectedActivityDay,
+            location: activity.location,
+            city: activity.city
+          });
+          setShowMap(true);
+          setSelectedActivity(null);
+        }}
+      />
+    );
+  }
+
   if (showMap) {
     const mapTitle = itineraryDataset?.title ||
       (itineraryData.destinations.length > 0 ?
@@ -2478,6 +2517,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
           places={mapPlaces}
           days={effectiveDaysData}
           destinations={itineraryData.destinations}
+          focusedPlace={mapFocusedPlace}
           onMovePlaceToDay={(placeId, sourceDay, targetDay) => {
             const fallbackDay = sourceDay ?? mapPlaces.find((place) => place.id === placeId)?.day ?? null;
             if (fallbackDay === null) return;
@@ -2487,16 +2527,26 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
 
             void handleMoveToDay(activity, targetDay, fallbackDay);
           }}
-          onBack={() => setShowMap(false)}
-          onSwitchToItinerary={() => setShowMap(false)}
+          onBack={() => {
+            setShowMap(false);
+            setMapFocusedPlace(null);
+          }}
+          onSwitchToItinerary={() => {
+            setShowMap(false);
+            setMapFocusedPlace(null);
+          }}
+          onSelectPlaceDetails={(place) => {
+            if (place.day === undefined || place.day === null) return;
+            const activity = getAllActivities(place.day).find((item) => item.id === place.id);
+            if (activity) {
+              setSelectedActivityDay(place.day);
+              setSelectedActivity(activity);
+            }
+          }}
         />
       </Suspense>
     );
   }
-
-  // Sub-telas (Reservas/Documentos, Orçamento, Notas, Checklist) são renderizadas
-  // como overlays no final do componente para preservar o estado e o scroll do
-  // Planner enquanto estão abertas. Veja o bloco de overlays antes do fechamento.
 
   if (showManageItinerary) {
     return (
@@ -2509,6 +2559,11 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         endDate={itineraryData.endDate}
         currency={itineraryData.currency}
         destinations={itineraryData.destinations}
+        onDelete={onDelete}
+        itineraryId={typeof itineraryId === 'string' ? itineraryId : undefined}
+        currentUserId={session?.user?.id}
+        initialOwner={ownerProfile}
+        initialMembers={sharedMembers}
         invitedFriends={(() => {
           const myUserId = session?.user?.id;
           // Membros aceitos reais (excluindo eu mesmo, que aparece como "Você"/owner na tela).
@@ -2603,7 +2658,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
           setDayActivities(prev => ({ ...prev, ...newDayActivities }));
           setDayTransports(prev => ({ ...prev, ...newDayTransports }));
           setShowReorder(false);
-          toast('Itinerário atualizado');
+          toast.success('Itinerário atualizado');
         }}
       />
     );
@@ -2696,7 +2751,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   const runOptimize = async (day: number) => {
     const rawActs = getAllActivities(day);
     if (rawActs.length < 2) {
-      toast('Adicione ao menos 2 lugares para otimizar');
+      toast.success('Adicione ao menos 2 lugares para otimizar');
       return;
     }
     const coordMap = new Map<string, { lat: number; lng: number }>();
@@ -2717,7 +2772,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     });
     const withCoords = acts.filter((a) => a.lat != null && a.lng != null);
     if (withCoords.length < 2) {
-      toast('Lugares sem localização — não foi possível otimizar');
+      toast.success('Lugares sem localização — não foi possível otimizar');
       return;
     }
     setOptimizingDays((prev) => { const n = new Set(prev); n.add(day); return n; });
@@ -2948,7 +3003,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
               })()}
 
               {/* Avatars (Figma: 27x26px, border 1px solid #FFFFFF, -space-x-[6px]) */}
-              <div className={`flex -space-x-[6px] items-center transition-transform ${creatorEditMode ? '' : 'cursor-pointer active:scale-95'}`} onClick={creatorEditMode ? undefined : () => setShowParticipantsSheet(true)}>
+              <div className={`flex -space-x-[6px] items-center transition-transform ${creatorEditMode ? '' : 'cursor-pointer active:scale-95'}`} onClick={creatorEditMode ? undefined : () => setShowManageItinerary(true)}>
                 {(() => {
                   if (loadingMembers && isUuidId) {
                     return (
@@ -3034,7 +3089,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
           <div className="px-5 -mt-5 relative z-20 mb-4">
             <div
               onClick={() => { if (!isViewer) setShowEditTripInfo(true); }}
-              className="bg-white rounded-[16px] px-4 py-3 flex items-center justify-between cursor-pointer active:scale-[0.98] transition-transform"
+              className="bg-white rounded-[16px] px-4 py-3 flex items-center justify-center cursor-pointer active:scale-[0.98] transition-transform"
               style={{ boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.1)' }}
             >
               <div className="flex items-center gap-2 min-w-0">
@@ -3080,23 +3135,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
               className="flex gap-3 overflow-x-auto scrollbar-hide -mx-4 px-4"
               style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorX: 'contain' }}
             >
-              {/* Card 1: Reservas */}
-              {!isItineraryPublic && (
-                <button
-                  onClick={() => setShowDocumentos(true)}
-                  className="flex-shrink-0 w-[146px] h-[102px] rounded-[16px] bg-white p-4 text-left flex flex-col justify-between active:scale-[0.98] transition-transform"
-                >
-                  <Plane size={24} strokeWidth={1.5} className="text-[#141530]" />
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[14px] font-semibold text-[#141530] font-['Urbanist',sans-serif] leading-none">Reservas</span>
-                    <span className="text-[14px] font-medium text-[#7F7F7F] font-['Urbanist',sans-serif] leading-none">
-                      {transportes.length + reservas.length > 0 ? `${transportes.length + reservas.length}` : 'Nenhuma'}
-                    </span>
-                  </div>
-                </button>
-              )}
-
-              {/* Card 2: Orçamento */}
+              {/* Card 1: Orçamento */}
               <button
                 onClick={() => setShowBudget(true)}
                 className="flex-shrink-0 w-[146px] h-[102px] rounded-[16px] bg-white p-4 text-left flex flex-col justify-between active:scale-[0.98] transition-transform"
@@ -3112,19 +3151,35 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                 </div>
               </button>
 
-              {/* Card 3: Notas */}
+              {/* Card 2: Observação */}
               <button
                 onClick={() => setShowTips(true)}
                 className="flex-shrink-0 w-[146px] h-[102px] rounded-[16px] bg-white p-4 text-left flex flex-col justify-between active:scale-[0.98] transition-transform"
               >
                 <Icon name="edit_note" size={24} className="text-[#141530]" />
                 <div className="flex flex-col gap-1">
-                  <span className="text-[14px] font-semibold text-[#141530] font-['Urbanist',sans-serif] leading-none">Notas</span>
+                  <span className="text-[14px] font-semibold text-[#141530] font-['Urbanist',sans-serif] leading-none">Observação</span>
                   <span className="text-[14px] font-medium text-[#7F7F7F] font-['Urbanist',sans-serif] leading-none">
-                    {tripNotes.length > 0 ? `${tripNotes.length} ${tripNotes.length === 1 ? 'nota' : 'notas'}` : 'Nenhuma'}
+                    {tripNotes.length > 0 ? `${tripNotes.length} ${tripNotes.length === 1 ? 'observação' : 'observações'}` : 'Nenhuma'}
                   </span>
                 </div>
               </button>
+
+              {/* Card 3: Reservas */}
+              {!isItineraryPublic && (
+                <button
+                  onClick={() => setShowDocumentos(true)}
+                  className="flex-shrink-0 w-[146px] h-[102px] rounded-[16px] bg-white p-4 text-left flex flex-col justify-between active:scale-[0.98] transition-transform"
+                >
+                  <Plane size={24} strokeWidth={1.5} className="text-[#141530]" />
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[14px] font-semibold text-[#141530] font-['Urbanist',sans-serif] leading-none">Reservas</span>
+                    <span className="text-[14px] font-medium text-[#7F7F7F] font-['Urbanist',sans-serif] leading-none">
+                      {transportes.length + reservas.length > 0 ? `${transportes.length + reservas.length}` : 'Nenhuma'}
+                    </span>
+                  </div>
+                </button>
+              )}
 
               {/* Card 4: Checklist */}
               <button
@@ -3294,7 +3349,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                           onActivityClick={(activity) => {
                             setSelectedDay(dayItem.day);
                             setSelectedActivityDay(dayItem.day);
-                            setActivityActionTarget(activity);
+                            setSelectedActivity(activity);
                           }}
                           onEditNote={(activity) => {
                             setSelectedDay(dayItem.day);
@@ -3638,22 +3693,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
             tripName={itineraryData.tripName?.trim() || (itineraryData.destinations[0] ?? 'Roteiro')}
           />
         )}
-        {isUuidId && typeof itineraryId === 'string' && (
-          <ParticipantsSheet
-            open={showParticipantsSheet}
-            onClose={() => {
-              setShowParticipantsSheet(false);
-              if (isUuidId && typeof itineraryId === 'string') {
-                listItineraryMembers(itineraryId)
-                  .then(setSharedMembers)
-                  .catch((e) => console.error('[PlannerItineraryScreen] Failed to reload members', e));
-              }
-            }}
-            itineraryId={itineraryId}
-            currentUserId={session?.user?.id}
-            onInvite={() => setShowShareSheet(true)}
-          />
-        )}
+
         <PublishItineraryFlow
           open={showPublishFlow}
           tripName={itineraryData.tripName?.trim() || itineraryDataset?.title || (itineraryData.destinations.length > 0 ? `${itineraryData.destinations[0].split(',')[0]} trip` : 'Paris trip')}
@@ -3774,11 +3814,10 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
             }, 700);
           }} />
 
-        <AddPlaceSheet
+        <AddPlacesScreen
           open={showAddPlace}
           onClose={() => setShowAddPlace(false)}
           onSelect={handleAddPlace}
-          onAddManually={() => { setShowAddPlace(false); setShowManualActivity(true); }}
           dayNumber={selectedDay}
           totalDays={tripDays}
           startDate={itineraryData.startDate}
@@ -3903,296 +3942,8 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
           }} />
 
         {/* Activity Action Sheet */}
-        {activityActionTarget && !selectedActivity &&
-          <div className="fixed inset-0 z-[210]" onClick={() => { setActivityActionTarget(null); setActivityEditMode(false); setShowMapOptions(false); }}>
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
-            <div
-              className="absolute bottom-0 left-0 right-0 bg-card rounded-t-2xl max-h-[85vh] overflow-y-auto scrollbar-hide"
-              onClick={(e) => e.stopPropagation()}>
-
-              <div className="flex justify-center pt-3 pb-1">
-                <div className="w-9 h-1 rounded-full bg-muted" />
-              </div>
-              <div className="px-5 pb-4 pt-2 flex items-center justify-between">
-                <h3 className="text-[18px] font-bold text-foreground">Editar</h3>
-              </div>
-
-              {!activityEditMode ? (
-                /* Menu options */
-                <div className="px-5 pb-6 space-y-1">
-                  <button
-                    onClick={() => {
-                      const start = activityActionTarget.startTime || '09:00';
-                      const end = activityActionTarget.endTime || '10:00';
-                      const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
-                      setEditStartTime(start);
-                      setEditEndTime(end);
-                      setEditOriginalDuration(Math.max(0, toMin(end) - toMin(start)));
-                      const sym = detectCurrencySymbol(
-                        activityActionTarget.price,
-                        (itineraryData as any)?.currency,
-                        itineraryData?.destinations
-                      );
-                      const numericVal = extractNumericPrice(activityActionTarget.price);
-                      setEditCurrencySymbol(sym);
-                      setEditPrice(numericVal);
-                      setEditObservation(activityActionTarget.observation || '');
-                      setActivityEditMode(true);
-                    }}
-                    className="w-full flex items-center gap-3.5 py-3 px-1 rounded-xl hover:bg-muted/50 transition-colors">
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#F2F2F2' }}>
-                      <Icon name="edit" size={18} className="text-foreground" />
-                    </div>
-                    <span className="text-[14px] font-medium text-foreground flex-1 text-left">Editar</span>
-                    <Icon name="chevron_right" size={18} className="text-muted-foreground" />
-                  </button>
-                  {activityActionTarget.type !== 'note' && (
-                    <button
-                      onClick={() => {
-                        setSelectedActivityDay(selectedDay);
-                        setSelectedActivity(activityActionTarget);
-                        setActivityActionTarget(null);
-                      }}
-                      className="w-full flex items-center gap-3.5 py-3 px-1 rounded-xl hover:bg-muted/50 transition-colors">
-                      <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#F2F2F2' }}>
-                        <Icon name="visibility" size={18} className="text-foreground" />
-                      </div>
-                      <span className="text-[14px] font-medium text-foreground flex-1 text-left">Ver detalhes</span>
-                      <Icon name="chevron_right" size={18} className="text-muted-foreground" />
-                    </button>
-                  )}
-                  {activityActionTarget.type !== 'note' && (
-                    <button
-                      onClick={() => {
-                        const q = encodeURIComponent(activityActionTarget.name);
-                        const geoUri = `geo:0,0?q=${q}`;
-                        const fallback = `https://www.google.com/maps/search/?api=1&query=${q}`;
-                        const link = document.createElement('a');
-                        link.href = geoUri;
-                        link.click();
-                        setTimeout(() => {
-                          if (document.hasFocus()) {
-                            window.open(fallback, '_blank');
-                          }
-                        }, 500);
-                      }}
-                      className="w-full flex items-center gap-3.5 py-3 px-1 rounded-xl hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#F2F2F2' }}>
-                        <Icon name="map" size={18} className="text-foreground" />
-                      </div>
-                      <span className="text-[14px] font-medium text-foreground flex-1 text-left">Abrir no mapa</span>
-                      <Icon name="chevron_right" size={18} className="text-muted-foreground" />
-                    </button>
-                  )}
-                  <button
-                    onClick={() => {
-                      const target = activityActionTarget;
-                      setActivityActionTarget(null);
-                      setNoteTargetActivity(target);
-                      setShowAddNote(true);
-                    }}
-                    className="w-full flex items-center gap-3.5 py-3 px-1 rounded-xl hover:bg-muted/50 transition-colors">
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#F2F2F2' }}>
-                      <Icon name="sticky_note_2" size={18} className="text-foreground" />
-                    </div>
-                    <span className="text-[14px] font-medium text-foreground flex-1 text-left">
-                      {activityActionTarget.personalNote ? 'Editar anotação pessoal' : 'Adicionar anotação pessoal'}
-                    </span>
-                    <Icon name="chevron_right" size={18} className="text-muted-foreground" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      setMoveToDayTarget(activityActionTarget);
-                      setActivityActionTarget(null);
-                    }}
-                    className="w-full flex items-center gap-3.5 py-3 px-1 rounded-xl hover:bg-muted/50 transition-colors">
-
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#F2F2F2' }}>
-                      <Icon name="swap_horiz" size={18} className="text-foreground" />
-                    </div>
-                    <span className="text-[14px] font-medium text-foreground flex-1 text-left">Mover para outro dia</span>
-                    <Icon name="chevron_right" size={18} className="text-muted-foreground" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      const target = activityActionTarget;
-                      const dayToUse = selectedActivityDay ?? selectedDay;
-                      setActivityActionTarget(null);
-                      if (target && dayToUse !== null && dayToUse !== undefined) {
-                        handleDeleteActivity(target, dayToUse);
-                      }
-                    }}
-                    className="w-full flex items-center gap-3.5 py-3 px-1 rounded-xl hover:bg-muted/50 transition-colors">
-
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#FEE2E2' }}>
-                      <Icon name="delete" size={18} className="text-destructive" />
-                    </div>
-                    <span className="text-[14px] font-medium text-destructive flex-1 text-left">Excluir</span>
-                  </button>
-                </div>) : (
-
-                /* Inline edit fields */
-                <div className="px-5 pb-6">
-                  {/* Time steppers */}
-                  <div className="py-3.5 border-b border-border/40">
-                    <span className="text-[11px] text-muted-foreground block mb-2">Horário</span>
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center bg-[#F2F2F2] rounded-lg px-3 h-9 relative overflow-hidden cursor-pointer hover:bg-[#E5E5E5] transition-colors">
-                        <input
-                          type="time"
-                          value={editStartTime || '09:00'}
-                          onChange={(e) => {
-                            const newStart = e.target.value;
-                            if (newStart) {
-                              setEditStartTime(newStart);
-                              const [sh, sm] = newStart.split(':').map(Number);
-                              const startMin = sh * 60 + sm;
-                              const [eh, em] = (editEndTime || '11:00').split(':').map(Number);
-                              const endMin = eh * 60 + em;
-                              if (startMin >= endMin) {
-                                const dur = editOriginalDuration > 0 ? editOriginalDuration : 60;
-                                const newEndTotal = startMin + dur;
-                                setEditEndTime(`${String(Math.floor(newEndTotal / 60) % 24).padStart(2, '0')}:${String(newEndTotal % 60).padStart(2, '0')}`);
-                              }
-                            }
-                          }}
-                          className="text-[15px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-[70px] text-center"
-                        />
-                      </div>
-
-                      <span className="text-[13px] text-muted-foreground">–</span>
-
-                      <div className="flex items-center bg-[#F2F2F2] rounded-lg px-3 h-9 relative overflow-hidden cursor-pointer hover:bg-[#E5E5E5] transition-colors">
-                        <input
-                          type="time"
-                          value={editEndTime || '11:00'}
-                          onChange={(e) => {
-                            const newEnd = e.target.value;
-                            if (newEnd) {
-                              setEditEndTime(newEnd);
-                              const [eh, em] = newEnd.split(':').map(Number);
-                              const endMin = eh * 60 + em;
-                              const [sh, sm] = (editStartTime || '09:00').split(':').map(Number);
-                              const startMin = sh * 60 + sm;
-                              if (endMin <= startMin) {
-                                const newStartTotal = Math.max(0, endMin - 60);
-                                setEditStartTime(`${String(Math.floor(newStartTotal / 60)).padStart(2, '0')}:${String(newStartTotal % 60).padStart(2, '0')}`);
-                              }
-                            }
-                          }}
-                          className="text-[15px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-[70px] text-center"
-                        />
-                      </div>
-                    </div>
-                    {/* Overlap info removed — auto-adjusted on save */}
-                  </div>
-
-                  <div className="py-3.5 border-b border-border/40">
-                    <span className="text-[11px] text-muted-foreground block mb-2">Valor</span>
-                    <div className="w-full bg-[#F2F2F2] rounded-xl px-3 h-9 flex items-center gap-1">
-                      <span className="text-[14px] font-medium text-muted-foreground">{editCurrencySymbol}</span>
-                      <input
-                        value={editPrice}
-                        onChange={(e) => {
-                          setEditPrice(formatNumericInput(e.target.value));
-                        }}
-                        placeholder="0,00"
-                        inputMode="numeric"
-                        className="flex-1 text-[14px] font-medium text-foreground bg-transparent outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Observation field */}
-                  <div className="py-3.5 border-b border-border/40">
-                    <span className="text-[11px] text-muted-foreground block mb-2">Observação</span>
-                    <input
-                      value={editObservation}
-                      onChange={(e) => setEditObservation(e.target.value)}
-                      placeholder="Ex: chegar 15min antes"
-                      maxLength={80}
-                      className="w-full text-[14px] font-medium text-foreground bg-[#F2F2F2] rounded-xl px-3 h-9 outline-none"
-                    />
-                  </div>
-
-                  {/* Save button */}
-                  <button
-                    onClick={async () => {
-                      const toMin = (t: string) => {
-                        const m = /^(\d{1,2}):(\d{2})/.exec((t || '').trim());
-                        if (!m) return 0;
-                        return Number(m[1]) * 60 + Number(m[2]);
-                      };
-
-                      if (toMin(editStartTime) >= toMin(editEndTime)) {
-                        toast.error('O horário de início deve ser anterior ao horário de término');
-                        return;
-                      }
-
-                      const toTime = (m: number) => { const h = Math.floor(m / 60) % 24; const mm = m % 60; return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`; };
-                      const GAP = 15;
-
-                      const formattedPrice = editPrice ? `${editCurrencySymbol} ${editPrice}` : '';
-                      const allCurrent = getAllActivities(selectedDay);
-                      // Apply edit to target activity
-                      let updated = allCurrent.map((a) =>
-                        a.id === activityActionTarget.id
-                          ? { ...a, startTime: editStartTime, endTime: editEndTime, price: formattedPrice, observation: editObservation || undefined }
-                          : a
-                      );
-
-                      // Re-sort chronologically by startTime
-                      updated = sortActivitiesChronologically(updated);
-
-                      // Cascade: push subsequent activities forward if overlapping
-                      let adjusted = false;
-                      for (let i = 0; i < updated.length - 1; i++) {
-                        const endCurrent = toMin(updated[i].endTime || '00:00');
-                        const startNext = toMin(updated[i + 1].startTime || '00:00');
-                        if (endCurrent + GAP > startNext) {
-                          const nextStart = toMin(updated[i + 1].startTime || '00:00');
-                          const nextEnd = toMin(updated[i + 1].endTime || '00:00');
-                          const duration = Math.max(nextEnd - nextStart, 0);
-                          const newStart = endCurrent + GAP;
-                          updated[i + 1] = { ...updated[i + 1], startTime: toTime(newStart), endTime: toTime(newStart + duration) };
-                          adjusted = true;
-                        }
-                      }
-
-                      // Re-sort chronologically after cascade
-                      updated = sortActivitiesChronologically(updated);
-
-                      // Rebuild transports for the new chronological order
-                      const newTransports = await buildTransportsForActivities(updated);
-
-                      setDayActivities((prev) => ({
-                        ...prev,
-                        [selectedDay]: updated
-                      }));
-                      setDayTransports((prev) => ({
-                        ...prev,
-                        [selectedDay]: newTransports
-                      }));
-                      setActivityEditMode(false);
-                      setActivityActionTarget(null);
-                      toast.success(adjusted ? 'Horários ajustados e itens reordenados' : 'Atividade atualizada e reordenada');
-                    }}
-                    className="w-full h-[41px] rounded-[16px] bg-primary text-primary-foreground font-semibold text-[14px] flex items-center justify-center mt-5">
-
-                    Salvar
-                  </button>
-                </div>)
-              }
-            </div>
-          </div>
-        }
-        <ActivityDetailSheet
-          activity={selectedActivity}
-          onClose={() => {
-            setSelectedActivity(null);
-            setSelectedActivityDay(null);
-          }} />
+        
+        
         <AddBudgetExpenseSheet
           open={showAddExpense}
           onClose={() => setShowAddExpense(false)}
@@ -4204,69 +3955,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         />
 
         {/* Move to Day Sheet */}
-        {moveToDayTarget && (
-          <>
-            <div className="fixed inset-0 z-[220] bg-black/40 backdrop-blur-[2px]" onClick={() => setMoveToDayTarget(null)} />
-            <div className="fixed bottom-0 left-0 right-0 z-[230] flex justify-center" onClick={() => setMoveToDayTarget(null)}>
-              <div className="bg-card rounded-t-2xl w-full w-full animate-in slide-in-from-bottom duration-300" onClick={(e) => e.stopPropagation()}>
-                <div className="flex justify-center pt-3 pb-1">
-                  <div className="w-9 h-1 rounded-full bg-muted" />
-                </div>
-                {/* Top Bar with Close Button */}
-                <div className="flex items-center justify-end px-5 pt-1 pb-1">
-                  <button
-                    onClick={() => setMoveToDayTarget(null)}
-                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors -mr-1"
-                    aria-label="Fechar"
-                  >
-                    <Icon name="close" size={20} className="text-muted-foreground" />
-                  </button>
-                </div>
-                {/* Title & Subtitle */}
-                <div className="px-5 pt-1 pb-2">
-                  <h2 className="text-[20px] font-bold text-foreground">Mover para outro dia</h2>
-                  <p className="text-[13px] font-medium text-left text-muted-foreground mt-1">
-                    Selecione o dia para "{moveToDayTarget.name}"
-                  </p>
-                </div>
-                <div className="px-5 pt-4" style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom, 20px))' }}>
-                  <div className="flex flex-col gap-1 pb-2 max-h-[60vh] overflow-y-auto hide-scrollbar">
-                    {effectiveDaysData.filter(d => d.day !== selectedDay).map((dayItem) => {
-                      const weekday = format(dayItem.date, 'EEE', { locale: ptBR });
-                      const capitalizedWeekday = weekday.charAt(0).toUpperCase() + weekday.slice(1);
-                      const dayOfMonth = format(dayItem.date, 'd');
-                      const activitiesCount = getAllActivities(dayItem.day).length;
-                      return (
-                        <button
-                          key={dayItem.day}
-                          onClick={() => {
-                            handleMoveToDay(moveToDayTarget, dayItem.day);
-                            setMoveToDayTarget(null);
-                          }}
-                          className="w-full flex items-center gap-4 py-3.5 px-2 rounded-xl active:bg-muted/30 transition-colors"
-                        >
-                          <div className="flex-1 text-left">
-                            <span className="block text-[15px] font-semibold text-foreground">
-                              {isFlexibleDates ? (
-                                `Dia ${dayItem.day}`
-                              ) : (
-                                <>{capitalizedWeekday}, {format(dayItem.date, "d 'de' MMMM", { locale: ptBR })}</>
-                              )}
-                            </span>
-                            <span className="block text-[12px] font-medium text-muted-foreground">
-                              {activitiesCount} {activitiesCount === 1 ? 'atividade' : 'atividades'}
-                            </span>
-                          </div>
-                          <Icon name="chevron_right" size={18} className="text-muted-foreground" />
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
+        
       </div>
 
       {/* Overlays — sub-telas montadas sobre o Planner para preservar estado/scroll ao voltar */}

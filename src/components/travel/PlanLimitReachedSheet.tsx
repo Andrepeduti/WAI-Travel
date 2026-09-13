@@ -41,7 +41,7 @@ export function PlanLimitReachedSheet({
         <div className="flex justify-end px-5 pt-1">
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-muted/60 flex items-center justify-center"
+            className="w-10 h-10 rounded-full bg-muted/60 flex items-center justify-center"
             aria-label="Fechar"
           >
             <Icon name="close" size={18} className="text-foreground" />

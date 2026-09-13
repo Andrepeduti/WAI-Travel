@@ -7,6 +7,7 @@ import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { TimePickerSheet } from '@/components/travel/TimePickerSheet';
+import { getCurrencySymbol } from '@/lib/currencyUtils';
 import { AirportSelect } from '@/components/travel/AirportSelect';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -140,6 +141,7 @@ interface AddDocumentoSheetProps {
   editingReserva?: Reserva | null;
   preSelectedType?: DocType;
   splitPeople?: SplitPerson[];
+  currency?: string;
 }
 
 const transportSubs: { tipo: TransportSub; label: string; icon: typeof Plane }[] = [
@@ -160,6 +162,7 @@ export function AddDocumentoSheet({
   editingReserva,
   preSelectedType,
   splitPeople,
+  currency = 'BRL',
 }: AddDocumentoSheetProps) {
   const peopleList: SplitPerson[] = (splitPeople && splitPeople.length > 0) ? splitPeople : fallbackSplitPeople;
   const isEditing = !!(editingTransporte || editingReserva);
@@ -841,7 +844,7 @@ export function AddDocumentoSheet({
                           <Calendar mode="single" selected={partidaDate} onSelect={(date) => { setPartidaDate(date); setIsPartidaCalendarOpen(false); }} locale={ptBR} className="p-3 pointer-events-auto" />
                         </PopoverContent>
                       </Popover>
-                      <div className="w-full h-12 rounded-xl border border-border bg-card px-4 text-left text-[14px] flex items-center gap-2 relative overflow-hidden cursor-pointer">
+                      <div className="w-full h-12 rounded-[10px] border border-border bg-card px-4 text-left text-[14px] flex items-center gap-2 relative overflow-hidden cursor-pointer">
                         <Icon name="schedule" size={16} className="text-muted-foreground flex-shrink-0" />
                         <input
                           type="time"
@@ -902,7 +905,7 @@ export function AddDocumentoSheet({
                             <Calendar mode="single" selected={chegadaDate} onSelect={(date) => { setChegadaDate(date); setIsChegadaCalendarOpen(false); }} locale={ptBR} className="p-3 pointer-events-auto" />
                           </PopoverContent>
                         </Popover>
-                        <div className="w-full h-12 rounded-xl border border-border bg-card px-4 text-left text-[14px] flex items-center gap-2 relative overflow-hidden cursor-pointer">
+                        <div className="w-full h-12 rounded-[10px] border border-border bg-card px-4 text-left text-[14px] flex items-center gap-2 relative overflow-hidden cursor-pointer">
                           <Icon name="schedule" size={16} className="text-muted-foreground flex-shrink-0" />
                           <input
                             type="time"
@@ -1019,7 +1022,7 @@ export function AddDocumentoSheet({
                     </div>
                     <div>
                       <label className="text-[12px] font-semibold text-muted-foreground mb-1 block">Horário</label>
-                      <div className="w-full h-12 rounded-xl border border-border bg-card px-4 text-left text-[14px] flex items-center gap-2 relative overflow-hidden cursor-pointer">
+                      <div className="w-full h-12 rounded-[10px] border border-border bg-card px-4 text-left text-[14px] flex items-center gap-2 relative overflow-hidden cursor-pointer">
                         <Icon name="schedule" size={16} className="text-muted-foreground flex-shrink-0" />
                         <input
                           type="time"
@@ -1044,9 +1047,9 @@ export function AddDocumentoSheet({
               <div>
                 <label className="text-[12px] font-semibold text-muted-foreground mb-1 block">Valor</label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[14px] text-muted-foreground pointer-events-none">R$</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[14px] text-muted-foreground pointer-events-none">{getCurrencySymbol(currency)}</span>
                   <input
-                    value={valor.replace(/^R\$\s?/, '')}
+                    value={valor.replace(/^R\$\s?/, '').replace(new RegExp(`^${getCurrencySymbol(currency)}\\s?`), '')}
                     onChange={(e) => {
                       const digits = e.target.value.replace(/\D/g, '');
                       if (!digits) { setValor(''); return; }

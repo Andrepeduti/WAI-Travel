@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Icon } from '@/components/ui/Icon';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { useCurrentUser } from '@/hooks/use-current-user';
 
 interface ContactUsSheetProps {
@@ -36,10 +36,7 @@ export function ContactUsSheet({ isOpen, onClose }: ContactUsSheetProps) {
 
   const handleSubmit = () => {
     if (!canSubmit) return;
-    toast({
-      title: 'Mensagem enviada!',
-      description: 'Recebemos sua mensagem e responderemos em breve.',
-    });
+    toast.success('Mensagem enviada!');
     setMessage('');
     setType('');
     onClose();

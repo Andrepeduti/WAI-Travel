@@ -120,7 +120,7 @@ export function SaveToCollectionSheet({ open, onClose, place, onSaved }: SaveToC
         <div className="flex items-center justify-end px-5 pt-1 pb-1">
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center -mr-1"
+            className="w-10 h-10 rounded-full flex items-center justify-center -mr-1"
             style={{ background: '#F2F2F2' }}
             aria-label="Fechar"
           >

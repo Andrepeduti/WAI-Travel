@@ -179,7 +179,7 @@ export function AddDeslocamentoSheet({ open, onClose, onSave, totalDays, startDa
           <button
             type="button"
             onClick={handleClose}
-            className="w-9 h-9 rounded-full flex items-center justify-center -mr-1"
+            className="w-10 h-10 rounded-full flex items-center justify-center -mr-1"
             style={{ background: '#F2F2F2' }}
             aria-label="Fechar"
           >

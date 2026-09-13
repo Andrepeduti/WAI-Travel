@@ -370,7 +370,7 @@ export function AddVideoByLinkSheet({ isOpen, onClose, onBack, onSubmit, onCreat
               type="button"
               onClick={handleBack}
               aria-label="Voltar"
-              className="w-8 h-8 -ml-1 flex items-center justify-center active:scale-95 active:opacity-70 transition-all flex-shrink-0 rounded-full hover:bg-muted/60"
+              className="w-10 h-10 -ml-1 flex items-center justify-center active:scale-95 active:opacity-70 transition-all flex-shrink-0 rounded-full hover:bg-muted/60"
             >
               <Icon name="chevron_left" size={24} className="text-foreground [&>svg]:stroke-[2.5]" />
             </button>
@@ -378,7 +378,7 @@ export function AddVideoByLinkSheet({ isOpen, onClose, onBack, onSubmit, onCreat
               type="button"
               onClick={onClose}
               aria-label="Fechar"
-              className="w-8 h-8 -mr-1 flex items-center justify-center active:scale-95 active:opacity-70 transition-all flex-shrink-0 rounded-full hover:bg-muted/60"
+              className="w-10 h-10 -mr-1 flex items-center justify-center active:scale-95 active:opacity-70 transition-all flex-shrink-0 rounded-full hover:bg-muted/60"
             >
               <Icon name="close" size={20} className="text-foreground" />
             </button>

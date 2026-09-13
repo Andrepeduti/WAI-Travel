@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatCurrency } from '@/lib/currencyUtils';
 
 export interface BudgetPerson {
   id: string;
@@ -11,13 +12,14 @@ export interface BudgetPerson {
 interface TravelerBudgetCardProps {
   person: BudgetPerson;
   amount: number;
+  currency?: string;
   onClick?: () => void;
   className?: string;
 }
 
 const defaultColors = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444', '#EC4899', '#14B8A6', '#F97316'];
 
-export function TravelerBudgetCard({ person, amount, onClick, className = '' }: TravelerBudgetCardProps) {
+export function TravelerBudgetCard({ person, amount, currency = 'BRL', onClick, className = '' }: TravelerBudgetCardProps) {
   const initials = person.initials || (
     person.name
       .trim()
@@ -28,41 +30,39 @@ export function TravelerBudgetCard({ person, amount, onClick, className = '' }: 
       .toUpperCase() || 'VI'
   );
 
-  const formatCurrency = (val: number) => {
-    return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
-  };
-
   return (
     <div
       onClick={onClick}
       role="button"
       tabIndex={0}
-      className={`flex-shrink-0 bg-card rounded-2xl p-4 min-w-[145px] max-w-[170px] border border-border/50 shadow-xs cursor-pointer active:scale-[0.98] hover:border-border transition-all select-none ${className}`}
+      className={`box-border flex flex-col items-start p-4 gap-4 w-[181px] h-[84px] bg-[#FFFFFF] border border-[#EBEBEB] rounded-[16px] cursor-pointer active:scale-[0.98] hover:border-[#D1D1D1] transition-all select-none flex-shrink-0 ${className}`}
       style={{ fontFamily: 'var(--font-family-primary, "Urbanist", sans-serif)' }}
     >
-      <div className="flex items-center gap-2.5 mb-2.5">
+      <div className="flex flex-row items-center gap-2 w-full h-[25px]">
         {person.avatar ? (
           <img
             src={person.avatar}
             alt={person.name}
-            className="w-8 h-8 rounded-full object-cover flex-shrink-0 ring-1 ring-border/20"
+            className="w-[26px] h-[25px] rounded-full object-cover flex-shrink-0"
           />
         ) : (
           <div
-            className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0 shadow-xs"
+            className="w-[26px] h-[25px] rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
             style={{ backgroundColor: person.color || defaultColors[0] }}
           >
             {initials}
           </div>
         )}
-        <span className="text-[13px] font-semibold text-[#171F2C] truncate block flex-1">
-          {person.name}
-        </span>
+        <div className="flex flex-col items-start gap-[8px] flex-1">
+          <span className="font-['Urbanist'] font-medium text-[14px] leading-[17px] text-[#676767] truncate w-full">
+            {person.name}
+          </span>
+        </div>
       </div>
 
-      <span className="text-[15px] font-bold text-[#171F2C] block tracking-tight">
-        {formatCurrency(amount)}
-      </span>
+      <div className="font-['Urbanist'] font-bold text-[18px] leading-[22px] text-[#141530] flex-shrink-0">
+        {formatCurrency(amount, currency)}
+      </div>
     </div>
   );
 }

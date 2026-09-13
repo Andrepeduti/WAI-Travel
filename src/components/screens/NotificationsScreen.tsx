@@ -139,7 +139,7 @@ export function NotificationsScreen({ onBack, onNavigateToItinerary, onNavigateT
         if (currentStatus === 'accepted' && notif.itineraryId != null) {
           onNavigateToItinerary?.(notif.itineraryId);
         } else if (!currentStatus) {
-          toast('Aceite o convite antes de acessar o roteiro!');
+          toast.success('Aceite o convite antes de acessar o roteiro!');
         }
         break;
       }
@@ -208,7 +208,7 @@ export function NotificationsScreen({ onBack, onNavigateToItinerary, onNavigateT
       
       if (isAlreadyProcessed) {
         // If it was already processed, just update the local notification to reflect it
-        toast('O convite já havia sido processado.');
+        toast.success('O convite já havia sido processado.');
         if (dbNotif) {
           await supabase.from('notifications').update({
             metadata: { ...(dbNotif.metadata as Record<string, unknown> || {}), status: 'accepted' }
@@ -230,7 +230,7 @@ export function NotificationsScreen({ onBack, onNavigateToItinerary, onNavigateT
   const hasNotifications = notifications.length > 0;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-[100dvh] bg-background flex flex-col">
       <header className="sticky top-0 z-20 bg-background px-5 pb-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">

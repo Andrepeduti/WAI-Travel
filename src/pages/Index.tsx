@@ -135,6 +135,7 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [showCreateSheet, setShowCreateSheet] = useState(false);
   const [showItinerarySheet, setShowItinerarySheet] = useState(false);
+  const [createItineraryInitialType, setCreateItineraryInitialType] = useState<'personal' | 'seller' | undefined>();
   const [showPlanLimitSheet, setShowPlanLimitSheet] = useState(false);
   const { itineraries: myItinerariesForLimit } = useMyItineraries();
   const FREE_PLAN_ITINERARY_LIMIT = Infinity;
@@ -165,11 +166,12 @@ const Index = () => {
    * and already has the maximum number of itineraries, shows the upgrade
    * sheet instead.
    */
-  const tryOpenItinerarySheet = () => {
+  const tryOpenItinerarySheet = (type?: 'personal' | 'seller') => {
     if (ownCreatedCount >= FREE_PLAN_ITINERARY_LIMIT) {
       setShowPlanLimitSheet(true);
       return;
     }
+    setCreateItineraryInitialType(type);
     setShowItinerarySheet(true);
   };
 
@@ -306,6 +308,8 @@ const Index = () => {
   const [navigatedFromPurchases, setNavigatedFromPurchases] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [showDeleteSuccessToast, setShowDeleteSuccessToast] = useState(false);
+  const [showLeaveSuccessToast, setShowLeaveSuccessToast] = useState(false);
+  const [showDuplicateSuccessToast, setShowDuplicateSuccessToast] = useState(false);
   const [showDeleteCollectionToast, setShowDeleteCollectionToast] = useState(false);
   const [returnToCollections, setReturnToCollections] = useState(false);
   const [returnToPublic, setReturnToPublic] = useState(false);
@@ -441,7 +445,7 @@ const Index = () => {
 
   const handleTabChange = (tab: TabType) => {
     if (tab === 'create') {
-      setShowCreateSheet(true);
+      tryOpenItinerarySheet();
     } else if (tab === 'ai') {
       setShowAIAssistant(true);
     } else if (tab === 'profile') {
@@ -469,8 +473,10 @@ const Index = () => {
 
   const handleCreateOptionSelect = (optionId: string) => {
     setShowCreateSheet(false);
-    if (optionId === 'itinerary') {
-      tryOpenItinerarySheet();
+    if (optionId === 'personal') {
+      tryOpenItinerarySheet('personal');
+    } else if (optionId === 'seller') {
+      tryOpenItinerarySheet('seller');
     } else if (optionId === 'video') {
       setShowAddVideoSheet(true);
     } else if (optionId === 'collection') {
@@ -585,13 +591,14 @@ const Index = () => {
       isPersonal: data.isPersonal !== undefined ? data.isPersonal : !data.isPublic,
       isPublic: !!data.isPublic,
       priceCents: data.priceCents ?? null,
-      tags: data.tags || [],
+      status: data.isPublic ? 'draft' : 'published',
+      isFlexible: data.isFlexible ?? false,
+      durationDays: data.durationDays,
+      travelMonth: data.travelMonth,
     };
     const tempId = `pending-itinerary-${Date.now()}`;
-    if (session?.user?.id) {
-      addOptimisticItinerary(buildOptimisticItinerary(input, session.user.id, tempId));
-    }
-
+    // Removed addOptimisticItinerary here to prevent showing it behind the sheet while loading.
+    
     const created = await createItinerary(input);
     if (!created) {
       console.error('Failed to create itinerary');
@@ -614,7 +621,10 @@ const Index = () => {
       setReturnToPublic(false);
     }
 
-    setNewItineraryData(data);
+    setNewItineraryData({
+      ...data,
+      status: data.isPublic ? 'draft' : 'published'
+    });
     resetStack();
     setActiveUserItineraryId(created.id);
   };
@@ -631,8 +641,12 @@ const Index = () => {
         userItinerary.images?.find((image) => image && !image.startsWith('blob:')),
       )[0],
       isPublic: userItinerary.isPublic,
+      isPersonal: userItinerary.isPersonal,
       priceCents: userItinerary.priceCents,
-      tags: userItinerary.tags,
+      isFlexible: userItinerary.isFlexible,
+      durationDays: userItinerary.durationDays,
+      travelMonth: userItinerary.travelMonth,
+      status: userItinerary.status,
     };
     setActiveUserItineraryId(userItinerary.id);
     // Try to load the original dataset for purchased itineraries (linked via sourceDatasetId)
@@ -672,7 +686,6 @@ const Index = () => {
         destinations: updatedData.destinations,
         startDate: formatLocalDate(updatedData.startDate) || formatLocalDate(new Date()),
         endDate: formatLocalDate(updatedData.endDate) || formatLocalDate(new Date()),
-        tags: updatedData.tags,
         ...(updatedData.coverImage ? { images: [updatedData.coverImage] } : {}),
       });
     }
@@ -843,7 +856,7 @@ const Index = () => {
         authorImage: isOwner ? (currentUser.avatar || '') : ((userItinerary as any).authorAvatar || baseDataset.authorImage || ''),
         price: priceFromCents,
         description: userItinerary.description ?? baseDataset.description ?? '',
-        tags: userItinerary.tags && userItinerary.tags.length > 0 ? userItinerary.tags : (baseDataset.tags ?? [])
+        tags: baseDataset.tags ?? []
       };
     } else {
       const skeleton = Array.from({ length: totalDays }, (_, i) => ({
@@ -874,7 +887,7 @@ const Index = () => {
         reviewCount: 0,
         price: priceFromCents,
         description: userItinerary.description ?? '',
-        tags: userItinerary.tags ?? []
+        tags: []
       };
     }
 
@@ -1219,7 +1232,6 @@ const Index = () => {
                   destinations: updatedData.destinations,
                   startDate: formatLocalDate(updatedData.startDate) || formatLocalDate(new Date()),
                   endDate: formatLocalDate(updatedData.endDate) || formatLocalDate(new Date()),
-                  tags: updatedData.tags,
                   ...(updatedData.coverImage ? { images: [updatedData.coverImage] } : {}),
                 });
               }
@@ -1280,6 +1292,10 @@ const Index = () => {
               setShowDeleteSuccessToast(true);
             }}
             onUpdate={handleItineraryUpdate}
+            onDuplicateSuccess={() => {
+              setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryIsPurchased(false); setActiveTab('trips'); setReturnToCollections(false);
+              setShowDuplicateSuccessToast(true);
+            }}
             onNavigateToAI={() => { setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryIsPurchased(false); setShowAIAssistant(true); }}
             onNavigateToSales={() => { setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryIsPurchased(false); setCreatorEditingItinerary(null); setReturnToPublic(true); setActiveTab('trips'); }}
             onUpgrade={() => {
@@ -1299,6 +1315,7 @@ const Index = () => {
           isVisible={showSuccessToast}
           onClose={() => setShowSuccessToast(false)}
         />
+
       </div>
     );
   }
@@ -1796,13 +1813,16 @@ const Index = () => {
             onUserItineraryClick={handleUserItineraryClick}
             onUserPublicItineraryClick={(it) => setCreatorDashboardItinerary(it)}
             onCollectionClick={(id) => { setSelectedCollectionId(id); setReturnToCollections(false); }}
-            onCreateItinerary={() => tryOpenItinerarySheet()}
+            onCreateItinerary={(type) => tryOpenItinerarySheet(type)}
+            onOpenCreateSheet={() => tryOpenItinerarySheet()}
             onBecomeCreator={() => { setCreatorProgramOrigin('trips'); setActiveTab('home'); setProfileSubScreen('creator-program'); }}
             onExplore={() => setActiveTab('explore')}
             onUpgrade={() => { setSubscriptionOrigin('trips'); setActiveTab('home'); setProfileSubScreen('subscription'); }}
             itineraryUsedCount={ownCreatedCount}
             itineraryLimit={FREE_PLAN_ITINERARY_LIMIT}
             defaultTab={returnToPublic ? 'public' : returnToCollections ? 'collections' : 'private'}
+            onDeleteSuccess={() => setShowDeleteSuccessToast(true)}
+            onLeaveSuccess={() => setShowLeaveSuccessToast(true)}
           />
         </Suspense>
       )}
@@ -1824,9 +1844,10 @@ const Index = () => {
         {showItinerarySheet && (
           <CreateItinerarySheet
             isOpen={showItinerarySheet}
-            onClose={() => { setShowItinerarySheet(false); setPendingVideoPlaces(null); }}
+            onClose={() => { setShowItinerarySheet(false); setPendingVideoPlaces(null); setCreateItineraryInitialType(undefined); }}
             onSubmit={handleItinerarySubmit}
             initialDestinations={pendingVideoPlaces ? [...new Set(pendingVideoPlaces.map((p: any) => p.location as string))] : undefined}
+            initialCreationType={createItineraryInitialType}
           />
         )}
 
@@ -1900,13 +1921,25 @@ const Index = () => {
         isVisible={showDeleteSuccessToast}
         onClose={() => setShowDeleteSuccessToast(false)}
         title="Roteiro excluído!"
-        description="O roteiro foi removido com sucesso."
+        description=""
+      />
+      <SuccessToast
+        isVisible={showLeaveSuccessToast}
+        onClose={() => setShowLeaveSuccessToast(false)}
+        title="Você saiu do roteiro!"
+        description=""
       />
       <SuccessToast
         isVisible={showDeleteCollectionToast}
         onClose={() => setShowDeleteCollectionToast(false)}
         title="Coleção excluída!"
-        description="A coleção foi removida com sucesso."
+        description=""
+      />
+      <SuccessToast
+        isVisible={showDuplicateSuccessToast}
+        onClose={() => setShowDuplicateSuccessToast(false)}
+        title="Roteiro duplicado!"
+        description=""
       />
     </div>
   );

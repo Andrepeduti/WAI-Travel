@@ -34,7 +34,6 @@ interface RecordPurchaseInput {
     images?: string[];
     places?: number;
     description?: string;
-    tags?: string[];
     days?: number;
   };
 }
@@ -94,7 +93,7 @@ export async function recordPurchase({ datasetId, priceBRL, snapshot }: RecordPu
       is_public: false,
       price_cents: null,
       description: snapshot.description ?? '',
-      tags: snapshot.tags ?? []
+      status: 'draft'
     });
   };
 

@@ -106,7 +106,7 @@ export function SplitExpenseSheet({
           <div className="flex items-center justify-end mb-3">
             <button
               onClick={onClose}
-              className="w-9 h-9 rounded-full flex items-center justify-center text-[#141530] hover:bg-muted/60 transition-colors -mr-1"
+              className="w-10 h-10 rounded-full flex items-center justify-center text-[#141530] hover:bg-muted/60 transition-colors -mr-1"
               aria-label="Fechar"
             >
               <X size={20} />

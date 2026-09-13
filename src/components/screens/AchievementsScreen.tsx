@@ -86,7 +86,7 @@ const currentLevel = {
 
 export function AchievementsScreen({ onBack }: AchievementsScreenProps) {
   return (
-    <div className="min-h-screen bg-background pb-8">
+    <div className="min-h-[100dvh] bg-background pb-8">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background border-b border-border">
         <div className="flex items-center gap-3 px-4" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>

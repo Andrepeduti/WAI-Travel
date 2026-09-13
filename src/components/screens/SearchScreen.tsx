@@ -697,7 +697,7 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
           countResults={countFilteredResults}
         />
       )}
-      <div className="min-h-screen pb-24" style={{ backgroundColor: '#F2F2F2' }}>
+      <div className="min-h-[100dvh] pb-24" style={{ backgroundColor: '#F2F2F2' }}>
         {/* Header */}
         <header className="sticky top-0 z-20 px-5 pb-3" style={{ backgroundColor: '#F2F2F2' }}>
           <div className="flex items-center gap-2 w-full min-w-0" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>

@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { searchPlaces, type CityPlace } from '@/data/cityRecommendations';
-import { fetchPlacesForCity, mergePlaces, searchGoogleFallback } from '@/lib/placesApi';
+import { fetchPlacesForCity, mergePlaces } from '@/lib/placesApi';
 import type { CollectionPlaceResult } from './AddPlaceToCollectionSheet';
 
 interface AddPlaceToCollectionSheetV2Props {
@@ -72,80 +72,48 @@ export function AddPlaceToCollectionSheetV2({
   const [apiPlaces, setApiPlaces] = useState<Record<string, CityPlace[]>>({});
   const [loadingApi, setLoadingApi] = useState(false);
   const [fetchedCities, setFetchedCities] = useState<Set<string>>(new Set());
-  // City detected from Google Places (e.g. user types "tokyo" -> we fetch Tokyo places)
-  const [detectedCity, setDetectedCity] = useState<string>('');
-
-  const fetchApiPlaces = useCallback(async (cityName: string) => {
-    const key = cityName.toLowerCase().trim().split(',')[0].trim();
-    if (!key || fetchedCities.has(key)) return;
-
-    setLoadingApi(true);
-    setFetchedCities(prev => new Set(prev).add(key));
-
-    try {
-      const places = await fetchPlacesForCity(cityName);
-      if (places.length > 0) {
-        setApiPlaces(prev => ({ ...prev, [key]: places }));
-      }
-    } catch (e) {
-      console.error('Failed to fetch places for', cityName, e);
-    } finally {
-      setLoadingApi(false);
-    }
-  }, [fetchedCities]);
-
-  // Fetch when an inferred or detected city appears
-  useEffect(() => {
-    if (!open) return;
-    const target = inferredCity || detectedCity;
-    if (!target) return;
-    fetchApiPlaces(target);
-  }, [open, inferredCity, detectedCity, fetchApiPlaces]);
-
-  // Google Places fallback for global search + city detection
   const [googleResults, setGoogleResults] = useState<CityPlace[]>([]);
   const [searchingGoogle, setSearchingGoogle] = useState(false);
 
-  useEffect(() => {
+  // Manual Google Places API search
+  const handleManualGoogleSearch = async () => {
     const q = debouncedSearch.trim();
-    if (!q || q.length < 2) {
-      setGoogleResults([]);
-      setDetectedCity('');
-      setSearchingGoogle(false);
-      return;
-    }
+    if (!q || q.length < 2) return;
 
-    let cancelled = false;
     setSearchingGoogle(true);
+    try {
+      const { searchGooglePlacesAutocomplete } = await import('@/lib/googlePlacesApi');
+      const { incrementApiCounter } = await import('@/lib/placesCache');
 
-    const t = setTimeout(async () => {
-      try {
-        const results = await searchGoogleFallback(q, inferredCity || '');
-        if (cancelled) return;
-        setGoogleResults(results);
+      const targetCity = inferredCity || '';
+      const searchQuery = targetCity ? `${q} ${targetCity}` : q;
+      const suggestions = await searchGooglePlacesAutocomplete(searchQuery);
+      await incrementApiCounter('google_places', 1);
 
-        // If the top result is a populated place (city/town/village/municipality),
-        // assume the user typed a city name and load that city's places.
-        const top = results[0] as (CityPlace & { _osmCategory?: string }) | undefined;
-        const topCity = top?.city?.trim();
-        const looksLikeCity = !!topCity && (
-          top?.category === 'Bairro' ||
-          topCity === q.toLowerCase() ||
-          q.toLowerCase().includes(topCity)
-        );
-        if (looksLikeCity && topCity) {
-          setDetectedCity(topCity);
-        } else if (!inferredCity) {
-          setDetectedCity('');
-        }
-      } catch (e) {
-        console.error('Google fallback search error:', e);
-      } finally {
-        if (!cancelled) setSearchingGoogle(false);
-      }
-    }, 150);
-    return () => { cancelled = true; clearTimeout(t); };
-  }, [debouncedSearch, inferredCity]);
+      const converted: CityPlace[] = suggestions.map(s => ({
+        id: Math.floor(Math.random() * 1000000) + 900000,
+        name: s.name,
+        city: targetCity || s.location,
+        category: 'Local',
+        categoryColor: '#6B7280',
+        image: 'https://images.unsplash.com/photo-1503220317375-aaad61436b1b?w=300', // placeholder
+        rating: 0,
+        price: '',
+        openHours: '',
+        lat: 0,
+        lng: 0,
+        address: s.location,
+        description: s.description,
+        googlePlaceId: s.placeId,
+      } as any));
+
+      setGoogleResults(converted);
+    } catch (e) {
+      console.error('Google search error:', e);
+    } finally {
+      setSearchingGoogle(false);
+    }
+  };
 
   // Combine results
   const results = useMemo<CityPlace[]>(() => {
@@ -156,7 +124,7 @@ export function AddPlaceToCollectionSheetV2({
     let combined = [...staticLocal, ...staticGlobal];
 
     const queryLower = debouncedSearch.toLowerCase().trim();
-    const targetCity = (inferredCity || detectedCity).split(',')[0].trim().toLowerCase();
+    const targetCity = inferredCity.split(',')[0].trim().toLowerCase();
     const apiCityPlaces = targetCity ? (apiPlaces[targetCity] || []) : [];
 
     // If the query basically IS the city name, show ALL places of that city.
@@ -185,7 +153,7 @@ export function AddPlaceToCollectionSheetV2({
     if (googleResults.length > 0) combined = mergePlaces(combined, googleResults);
 
     return combined;
-  }, [debouncedSearch, inferredCity, detectedCity, apiPlaces, googleResults]);
+  }, [debouncedSearch, inferredCity, apiPlaces, googleResults]);
 
   // Track selected places (from current results + previously selected ones)
   useEffect(() => {
@@ -256,7 +224,7 @@ export function AddPlaceToCollectionSheetV2({
         <div className="flex items-center justify-end px-5 pt-1 pb-2">
           <button
             onClick={handleClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center active:bg-secondary/60 -mr-1"
+            className="w-10 h-10 rounded-full flex items-center justify-center active:bg-secondary/60 -mr-1"
             aria-label="Fechar"
           >
             <Icon name="close" size={20} className="text-foreground" />
@@ -315,16 +283,25 @@ export function AddPlaceToCollectionSheetV2({
           ) : !hasResults && !loadingApi && !searchingGoogle ? (
             <div className="text-center py-12">
               <Icon name="search" size={40} className="text-muted-foreground mx-auto mb-3 opacity-40" />
-              <p className="text-[14px] text-muted-foreground mb-4">Nenhum lugar encontrado</p>
-              {onAddManually && (
+              <p className="text-[14px] text-muted-foreground mb-4">Nenhum lugar local encontrado</p>
+              <div className="flex flex-col items-center gap-3">
                 <button
-                  onClick={() => { handleClose(); onAddManually(); }}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold text-foreground border border-border bg-card"
+                  onClick={handleManualGoogleSearch}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold text-primary-foreground bg-primary"
                 >
-                  <Icon name="add" size={18} />
-                  Adicionar manualmente
+                  <Icon name="travel_explore" size={18} />
+                  Buscar no Google Places
                 </button>
-              )}
+                {onAddManually && (
+                  <button
+                    onClick={() => { handleClose(); onAddManually(); }}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold text-foreground border border-border bg-card"
+                  >
+                    <Icon name="add" size={18} />
+                    Adicionar manualmente
+                  </button>
+                )}
+              </div>
             </div>
           ) : (
             <div className="space-y-1">
@@ -371,9 +348,18 @@ export function AddPlaceToCollectionSheetV2({
                 );
               })}
 
-              {/* Add manually option at the bottom */}
-              {onAddManually && (
-                <div className="pt-safe-top pb-2">
+              {/* Manual search options at the bottom */}
+              <div className="pt-safe-top pb-2 flex flex-col gap-2">
+                {debouncedSearch.length >= 2 && googleResults.length === 0 && (
+                  <button
+                    onClick={handleManualGoogleSearch}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-[13px] font-semibold text-primary bg-primary/10 transition-colors"
+                  >
+                    <Icon name="travel_explore" size={18} />
+                    Buscar "{debouncedSearch}" no Google
+                  </button>
+                )}
+                {onAddManually && (
                   <button
                     onClick={() => { handleClose(); onAddManually(); }}
                     className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-[13px] font-semibold text-muted-foreground border border-dashed border-border bg-transparent active:bg-secondary/40"
@@ -381,8 +367,8 @@ export function AddPlaceToCollectionSheetV2({
                     <Icon name="add" size={18} />
                     Não encontrou? Adicionar manualmente
                   </button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
         </div>

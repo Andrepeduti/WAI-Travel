@@ -1,13 +1,21 @@
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Icon } from '@/components/ui/Icon';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { searchGooglePlacesAutocomplete } from '@/lib/googlePlacesApi';
-import { Switch } from '@/components/ui/switch';
-import { ChevronLeft, X, Pencil, MapPin, Calendar as CalendarIcon, DollarSign, Compass } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronDown,
+  X,
+  Pencil,
+  MapPin,
+  Calendar as CalendarIcon,
+  Clock,
+  DollarSign,
+  Compass,
+} from 'lucide-react';
 
 export interface ItineraryFormData {
   destinations: string[];
@@ -20,9 +28,10 @@ export interface ItineraryFormData {
   isPublic?: boolean;
   priceCents?: number | null;
   description?: string;
-  tags?: string[];
   isFlexible?: boolean;
   durationDays?: number;
+  travelMonth?: string;
+  status?: 'draft' | 'published' | 'suspended';
 }
 
 interface InvitedFriend {
@@ -39,7 +48,23 @@ interface CreateItinerarySheetProps {
   onClose: () => void;
   onSubmit: (data: ItineraryFormData) => void | Promise<void>;
   initialDestinations?: string[];
+  initialCreationType?: 'personal' | 'seller';
 }
+
+const monthsOfYear = [
+  'Janeiro',
+  'Fevereiro',
+  'Março',
+  'Abril',
+  'Maio',
+  'Junho',
+  'Julho',
+  'Agosto',
+  'Setembro',
+  'Outubro',
+  'Novembro',
+  'Dezembro',
+];
 
 const popularDestinations = [
   { city: 'Paris', country: 'França', emoji: '🇫🇷' },
@@ -59,10 +84,11 @@ export function CreateItinerarySheet({
   onClose,
   onSubmit,
   initialDestinations,
+  initialCreationType,
 }: CreateItinerarySheetProps) {
   // Step 1: selection ('type') | Step 2: form ('form')
-  const [step, setStep] = useState<'type' | 'form'>('type');
-  const [creationType, setCreationType] = useState<'personal' | 'seller'>('personal');
+  const [step, setStep] = useState<'type' | 'form'>(initialCreationType ? 'form' : 'type');
+  const [creationType, setCreationType] = useState<'personal' | 'seller'>(initialCreationType || 'personal');
 
   const [tripName, setTripName] = useState('');
   const [destinations, setDestinations] = useState<string[]>(initialDestinations ?? []);
@@ -71,10 +97,12 @@ export function CreateItinerarySheet({
   const [remoteResults, setRemoteResults] = useState<{ label: string; sub: string; full: string; emoji: string }[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
+  // Date Control: 'specific' (Data específica) | 'flexible' (Data flexível)
+  const [dateMode, setDateMode] = useState<'specific' | 'flexible'>('specific');
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
-  const [isFlexibleDates, setIsFlexibleDates] = useState(false);
-  const [durationDays, setDurationDays] = useState<number | ''>(5);
+  const [durationDays, setDurationDays] = useState<number | ''>('');
+  const [travelMonth, setTravelMonth] = useState<string>('');
 
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -106,26 +134,28 @@ export function CreateItinerarySheet({
 
   // Reset states on open/close
   useEffect(() => {
-    if (!isOpen) {
-      setStep('type');
-      setCreationType('personal');
+    if (isOpen) {
+      setStep(initialCreationType ? 'form' : 'type');
+      setCreationType(initialCreationType || 'personal');
+    } else {
       setTripName('');
       setDestinations(initialDestinations ?? []);
       setDestinationInput('');
+      setDateMode('specific');
       setStartDate(undefined);
       setEndDate(undefined);
-      setIsFlexibleDates(false);
-      setDurationDays(5);
+      setDurationDays('');
+      setTravelMonth('');
       setIsSubmitting(false);
     }
-  }, [isOpen, initialDestinations]);
+  }, [isOpen, initialDestinations, initialCreationType]);
 
   // Handle autocomplete destination search
   useEffect(() => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
 
     const term = destinationInput.trim();
-    if (term.length < 2) {
+    if (term.length < 3) {
       setRemoteResults([]);
       setIsSearching(false);
       return;
@@ -149,7 +179,7 @@ export function CreateItinerarySheet({
       } finally {
         setIsSearching(false);
       }
-    }, 250);
+    }, 500);
 
     return () => {
       if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
@@ -198,17 +228,16 @@ export function CreateItinerarySheet({
     return '';
   };
 
+  // Reatividade e Validação dinâmica
   const isFormValid = useMemo(() => {
     if (destinations.length === 0) return false;
-    if (creationType === 'personal') {
-      return !!startDate && !!endDate;
-    }
-    // Seller
-    if (isFlexibleDates) {
+
+    if (dateMode === 'flexible') {
       return typeof durationDays === 'number' && durationDays > 0;
     }
+
     return !!startDate && !!endDate;
-  }, [destinations, creationType, isFlexibleDates, durationDays, startDate, endDate]);
+  }, [destinations, dateMode, durationDays, startDate, endDate]);
 
   const handleSubmit = async () => {
     if (!isFormValid || isSubmitting) return;
@@ -216,15 +245,21 @@ export function CreateItinerarySheet({
     setIsSubmitting(true);
     try {
       const isSelling = creationType === 'seller';
-      const isFlex = isSelling && isFlexibleDates;
-      const daysCount = isFlex && typeof durationDays === 'number' ? durationDays : (startDate && endDate ? differenceInDays(endDate, startDate) + 1 : 5);
+      const isFlex = dateMode === 'flexible';
+      const daysCount = isFlex && typeof durationDays === 'number' ? durationDays : (startDate && endDate ? differenceInDays(endDate, startDate) + 1 : 7);
 
       const effectiveStartDate = startDate ?? new Date();
       const effectiveEndDate = isFlex
         ? new Date(effectiveStartDate.getTime() + (daysCount - 1) * 86400000)
         : (endDate ?? new Date());
 
-      const tags = isFlex ? ['_FLEXIBLE_DATES_'] : [];
+      const tags: string[] = [];
+      if (isFlex) {
+        tags.push('_FLEXIBLE_DATES_');
+        if (travelMonth) {
+          tags.push(`_TRAVEL_MONTH_${travelMonth}_`);
+        }
+      }
 
       await onSubmit({
         tripName: tripName.trim() || `${destinations[0]} trip`,
@@ -234,10 +269,11 @@ export function CreateItinerarySheet({
         invitedFriends: [],
         isPersonal: !isSelling,
         isPublic: isSelling,
-        priceCents: isSelling ? 2990 : null,
+        priceCents: null,
         tags,
         isFlexible: isFlex,
         durationDays: daysCount,
+        travelMonth: isFlex && travelMonth ? travelMonth : undefined,
       });
     } catch (err) {
       console.error('Error submitting itinerary form:', err);
@@ -258,64 +294,61 @@ export function CreateItinerarySheet({
 
       {/* Bottom Sheet Container */}
       <div className="fixed inset-x-0 bottom-0 z-50 max-h-[90vh] flex flex-col justify-end pointer-events-none">
-        <div className="bg-white rounded-t-[32px] w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden pointer-events-auto animate-in slide-in-from-bottom duration-300">
+        <div className="bg-[#FFFFFF] rounded-t-[24px] w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden pointer-events-auto animate-in slide-in-from-bottom duration-300 font-sans">
 
-          {/* Top Bar with Back and Close */}
-          <div className="px-6 pt-5 pb-2 flex items-center justify-between">
-            {step === 'form' ? (
+          {/* Header Block */}
+          <div className="px-6 pt-6 pb-3 flex items-center justify-between bg-[#FFFFFF] border-b border-transparent">
+            {step === 'form' && !initialCreationType ? (
               <button
                 onClick={() => setStep('type')}
-                className="w-9 h-9 rounded-full flex items-center justify-center bg-[#F4F4F5] text-[#1A1C40] hover:bg-[#ECECED] transition-colors -ml-1"
+                className="w-6 h-6 flex items-center justify-center text-[#141530] hover:opacity-75 transition-opacity active:scale-95"
                 aria-label="Voltar"
               >
-                <ChevronLeft className="w-5 h-5" />
+                <ChevronLeft className="w-5 h-5 stroke-[1.5]" />
               </button>
             ) : (
-              <div className="w-9 h-9" />
+              <div className="w-6 h-6" />
             )}
 
             <button
               onClick={onClose}
-              className="w-9 h-9 rounded-full flex items-center justify-center bg-[#F4F4F5] text-[#1A1C40] hover:bg-[#ECECED] transition-colors -mr-1"
+              className="w-[18px] h-[18px] flex items-center justify-center text-[#141530] hover:opacity-75 transition-opacity active:scale-95"
               aria-label="Fechar"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4 stroke-[1.5]" />
             </button>
           </div>
 
-          {/* Title Area */}
-          <div className="px-6 pt-1 pb-3">
-            <h2 className="text-[20px] font-bold text-[#1A1C40]">
-              {step === 'type' ? 'O que você quer fazer com seu roteiro?' : 'Criar roteiro'}
-            </h2>
-          </div>
-
-          {/* Content Area */}
-          <div className="p-6 overflow-y-auto space-y-4">
+          {/* Content Block */}
+          <div className="px-6 pb-6 pt-1 overflow-y-auto space-y-6">
             {step === 'type' ? (
-              /* Step 1: Type Selection (IMAGEM 2) */
-              <div className="space-y-4 pt-1">
+              /* Step 1: Type Selection */
+              <div className="space-y-4">
+                <h2 className="text-[22px] font-semibold text-[#171F2C] leading-[26px]">
+                  O que você quer fazer com seu roteiro?
+                </h2>
+
                 {/* Opção 1: Planejar minha viagem */}
                 <button
                   type="button"
                   onClick={() => setCreationType('personal')}
                   className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-left ${creationType === 'personal'
-                    ? 'border-[#9ecc3b] bg-[#F7FBEB]'
+                    ? 'border-[#9DCC36] bg-[#F7FBEB]'
                     : 'border-[#F0F0F0] bg-white hover:border-[#E0E0E0]'
                     }`}
                 >
                   <div className="flex items-center gap-3.5">
-                    <div className="w-10 h-10 rounded-xl bg-[#F4F4F5] flex items-center justify-center text-[#1A1C40] flex-shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-[#F4F4F4] flex items-center justify-center text-[#141530] flex-shrink-0">
                       <Compass className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="text-[15px] font-bold text-[#1A1C40]">Planejar minha viagem</h3>
-                      <p className="text-[12px] text-[#8E8E93] mt-0.5">Organize sua viagem do seu jeito.</p>
+                      <h3 className="text-[15px] font-semibold text-[#141530]">Planejar uma viagem pessoal</h3>
+                      <p className="text-[12px] text-[#949494] mt-0.5">Organize sua viagem do seu jeito.</p>
                     </div>
                   </div>
                   <div
                     className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${creationType === 'personal'
-                      ? 'border-[#9ecc3b] bg-[#9ecc3b]'
+                      ? 'border-[#9DCC36] bg-[#9DCC36]'
                       : 'border-[#D1D5DB] bg-white'
                       }`}
                   >
@@ -330,22 +363,22 @@ export function CreateItinerarySheet({
                   type="button"
                   onClick={() => setCreationType('seller')}
                   className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-left ${creationType === 'seller'
-                    ? 'border-[#9ecc3b] bg-[#F7FBEB]'
+                    ? 'border-[#9DCC36] bg-[#F7FBEB]'
                     : 'border-[#F0F0F0] bg-white hover:border-[#E0E0E0]'
                     }`}
                 >
                   <div className="flex items-center gap-3.5">
-                    <div className="w-10 h-10 rounded-xl bg-[#F4F4F5] flex items-center justify-center text-[#1A1C40] flex-shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-[#F4F4F4] flex items-center justify-center text-[#141530] flex-shrink-0">
                       <DollarSign className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="text-[15px] font-bold text-[#1A1C40]">Criar um roteiro para vender</h3>
-                      <p className="text-[12px] text-[#8E8E93] mt-0.5">Transforme seu roteiro em renda.</p>
+                      <h3 className="text-[15px] font-semibold text-[#141530]">Criar roteiro para vender</h3>
+                      <p className="text-[12px] text-[#949494] mt-0.5">Transforme seu roteiro em renda.</p>
                     </div>
                   </div>
                   <div
                     className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${creationType === 'seller'
-                      ? 'border-[#9ecc3b] bg-[#9ecc3b]'
+                      ? 'border-[#9DCC36] bg-[#9DCC36]'
                       : 'border-[#D1D5DB] bg-white'
                       }`}
                   >
@@ -355,57 +388,77 @@ export function CreateItinerarySheet({
                   </div>
                 </button>
 
-                <div className="pt-4">
+                <div className="pt-2">
                   <button
                     type="button"
-                    onClick={() => setStep('form')}
-                    className="w-full py-4 rounded-2xl text-[15px] font-bold bg-[#9ecc3b] text-[#1A1C40] hover:opacity-95 active:scale-[0.99] transition-all shadow-sm flex items-center justify-center"
+                    onClick={() => {
+                      if (creationType === 'seller') {
+                        setDateMode('flexible');
+                      } else {
+                        setDateMode('specific');
+                      }
+                      setStep('form');
+                    }}
+                    className="w-full h-[48px] rounded-[16px] bg-[#9DCC36] text-[#141530] text-[16px] font-bold leading-[19px] flex items-center justify-center hover:opacity-95 active:scale-[0.99] transition-all shadow-none"
                   >
                     Continuar
                   </button>
                 </div>
               </div>
             ) : (
-              /* Step 2: Form (IMAGEM 2) */
+              /* Step 2: Form */
               <div className="space-y-4">
-                {/* Campo 1: Nome do roteiro */}
-                <div className="bg-[#F4F4F5] rounded-2xl p-3.5 flex items-start gap-3">
-                  <Pencil className="w-4 h-4 text-[#8E8E93] mt-1 flex-shrink-0" />
-                  <div className="flex-1">
-                    <label className="text-[11px] font-medium text-[#8E8E93] block">Nome do roteiro</label>
-                    <input
-                      type="text"
-                      value={tripName}
-                      onChange={(e) => setTripName(e.target.value)}
-                      placeholder="Dê um nome ao seu roteiro"
-                      className="w-full bg-transparent text-[14px] font-semibold text-[#1A1C40] placeholder:text-[#8E8E93] focus:outline-none mt-0.5"
-                    />
+                {/* Title */}
+                <h2 className="text-[22px] font-semibold text-[#171F2C] leading-[26px]">
+                  {creationType === 'personal' ? 'Criar viagem pessoal' : 'Criar roteiro pra venda'}
+                </h2>
+
+                {/* Form Elements Container (gap: 16px) */}
+                <div className="space-y-4">
+                  {/* Input 1: Nome do roteiro (height: 60px, bg: #EEEEEE, radius: 12px) */}
+                  <div className="bg-[#EEEEEE] rounded-[12px] p-3 min-h-[60px] flex items-center gap-3">
+                    <Pencil className="w-4 h-4 text-[#141530] flex-shrink-0" />
+                    <div className="flex-1 flex flex-col justify-center gap-1">
+                      <label className="text-[12px] font-medium text-[#949494] leading-4 block">
+                        Nome do roteiro
+                      </label>
+                      <input
+                        type="text"
+                        value={tripName}
+                        onChange={(e) => setTripName(e.target.value)}
+                        placeholder="Dê um nome ao seu roteiro"
+                        className="w-full bg-transparent text-[14px] font-medium text-[#141530] leading-4 placeholder:text-[#949494] focus:outline-none"
+                      />
+                    </div>
                   </div>
-                </div>
 
-                {/* Campo 2: Destinos */}
-                <div className="bg-[#F4F4F5] rounded-2xl p-3.5 relative">
-                  <div className="flex items-start gap-3">
-                    <MapPin className="w-4 h-4 text-[#8E8E93] mt-1 flex-shrink-0" />
-                    <div className="flex-1">
-                      <label className="text-[11px] font-medium text-[#8E8E93] block">Destinos</label>
+                  {/* Input 2: Destinos (Multiple input, bg: #EEEEEE, radius: 12px) */}
+                  <div className="bg-[#EEEEEE] rounded-[12px] p-3 min-h-[78px] flex items-center justify-center gap-3 relative">
+                    <MapPin className="w-4 h-4 text-[#141530] flex-shrink-0" />
+                    <div className="flex-1 flex flex-col justify-center gap-1">
+                      <label className="text-[12px] font-medium text-[#949494] leading-4 block">
+                        Destinos
+                      </label>
 
-                      {/* Chips & Input Container */}
-                      <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                      {/* Chips Container */}
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
                         {destinations.map((dest) => (
-                          <span
+                          <div
                             key={dest}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#1A1C40] text-white text-[13px] font-medium shadow-sm"
+                            className="bg-[#E7E7EE] border border-[#141530] rounded-[24px] px-[16px] py-[8px] h-[34px] inline-flex items-center gap-[10px] transition-all box-border"
                           >
-                            <span>{dest}</span>
+                            <span className="text-[14px] font-medium text-[#141530] leading-4">
+                              {dest}
+                            </span>
                             <button
                               type="button"
                               onClick={() => handleRemoveDestination(dest)}
-                              className="text-white hover:opacity-75 transition-opacity flex items-center justify-center"
+                              className="text-[#141530] hover:opacity-70 transition-opacity flex items-center justify-center"
+                              aria-label={`Remover ${dest}`}
                             >
-                              <X className="w-3.5 h-3.5 text-white" />
+                              <X className="w-3 h-3 stroke-[2]" />
                             </button>
-                          </span>
+                          </div>
                         ))}
 
                         {/* Autocomplete Input */}
@@ -418,146 +471,207 @@ export function CreateItinerarySheet({
                             setShowSuggestions(true);
                           }}
                           onFocus={() => setShowSuggestions(true)}
-                          placeholder={destinations.length === 0 ? "Adicione os destinos" : ""}
-                          className={`bg-transparent text-[13px] font-medium text-[#1A1C40] placeholder:text-[#8E8E93] focus:outline-none ${
-                            destinations.length === 0 ? 'w-full mt-0.5' : 'min-w-[50px] flex-1 py-1'
-                          }`}
+                          placeholder={destinations.length === 0 ? "Adicione os destinos" : "+ Adicionar..."}
+                          className={`bg-transparent text-[14px] font-medium text-[#141530] leading-4 placeholder:text-[#949494] focus:outline-none ${destinations.length === 0 ? 'w-full' : 'min-w-[80px] flex-1 py-1'
+                            }`}
                         />
                       </div>
                     </div>
-                  </div>
 
-                  {/* Suggestions Popover */}
-                  {showSuggestions && (
-                    <div
-                      ref={suggestionsRef}
-                      className="absolute left-0 right-0 top-full mt-2 bg-white border border-[#E5E5E5] rounded-2xl shadow-xl z-50 max-h-56 overflow-y-auto divide-y divide-[#F0F0F0]"
-                    >
-                      {isSearching && (
-                        <div className="p-3 text-xs text-[#8E8E93]">Buscando destinos...</div>
-                      )}
+                    {/* Suggestions Popover */}
+                    {showSuggestions && (
+                      <div
+                        ref={suggestionsRef}
+                        className="absolute left-0 right-0 top-full mt-2 bg-white border border-[#E5E5E5] rounded-2xl shadow-xl z-50 max-h-56 overflow-y-auto divide-y divide-[#F0F0F0]"
+                      >
+                        {isSearching && (
+                          <div className="p-3 text-xs text-[#949494]">Buscando destinos...</div>
+                        )}
 
-                      {remoteResults.length > 0
-                        ? remoteResults.map((r, idx) => (
-                          <button
-                            key={`rem-${idx}`}
-                            type="button"
-                            onClick={() => handleAddDestination(r.full || `${r.label}, ${r.sub}`)}
-                            className="w-full px-4 py-2.5 text-left flex items-center gap-2 hover:bg-[#F4F4F5] transition-colors"
-                          >
-                            <span className="text-base">{r.emoji}</span>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[13px] font-semibold text-[#1A1C40] truncate">{r.label}</p>
-                              {r.sub && <p className="text-[11px] text-[#8E8E93] truncate">{r.sub}</p>}
-                            </div>
-                          </button>
-                        ))
-                        : !isSearching && (
-                          (destinationInput.trim().length >= 2
-                            ? popularDestinations.filter(p =>
-                              p.city.toLowerCase().includes(destinationInput.trim().toLowerCase()) ||
-                              p.country.toLowerCase().includes(destinationInput.trim().toLowerCase())
-                            )
-                            : popularDestinations
-                          ).map((p, idx) => (
+                        {remoteResults.length > 0
+                          ? remoteResults.map((r, idx) => (
                             <button
-                              key={`pop-${idx}`}
+                              key={`rem-${idx}`}
                               type="button"
-                              onClick={() => handleAddDestination(`${p.city}, ${p.country}`)}
-                              className="w-full px-4 py-2.5 text-left flex items-center gap-2 hover:bg-[#F4F4F5] transition-colors"
+                              onClick={() => handleAddDestination(r.full || `${r.label}, ${r.sub}`)}
+                              className="w-full px-4 py-2.5 text-left flex items-center gap-2 hover:bg-[#F4F4F4] transition-colors"
                             >
-                              <span className="text-base">{p.emoji}</span>
+                              <span className="text-base">{r.emoji}</span>
                               <div className="flex-1 min-w-0">
-                                <p className="text-[13px] font-semibold text-[#1A1C40] truncate">{p.city}</p>
-                                <p className="text-[11px] text-[#8E8E93] truncate">{p.country}</p>
+                                <p className="text-[13px] font-semibold text-[#141530] truncate">{r.label}</p>
+                                {r.sub && <p className="text-[11px] text-[#949494] truncate">{r.sub}</p>}
                               </div>
                             </button>
                           ))
+                          : !isSearching && (
+                            (destinationInput.trim().length >= 2
+                              ? popularDestinations.filter(p =>
+                                p.city.toLowerCase().includes(destinationInput.trim().toLowerCase()) ||
+                                p.country.toLowerCase().includes(destinationInput.trim().toLowerCase())
+                              )
+                              : popularDestinations
+                            ).map((p, idx) => (
+                              <button
+                                key={`pop-${idx}`}
+                                type="button"
+                                onClick={() => handleAddDestination(`${p.city}, ${p.country}`)}
+                                className="w-full px-4 py-2.5 text-left flex items-center gap-2 hover:bg-[#F4F4F4] transition-colors"
+                              >
+                                <span className="text-base">{p.emoji}</span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-[13px] font-semibold text-[#141530] truncate">{p.city}</p>
+                                  <p className="text-[11px] text-[#949494] truncate">{p.country}</p>
+                                </div>
+                              </button>
+                            ))
+                          )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Frame 2087325080: Date Control + Dynamic Fields (gap: 12px) */}
+                  <div className="space-y-3">
+                    {/* Control (Segment/Tabs, height: 44px, bg: #F4F4F4, radius: rounded-full) */}
+                    <div className="bg-[#F4F4F4] rounded-full p-[3.37px] flex items-center h-[44px]">
+                      <button
+                        type="button"
+                        onClick={() => setDateMode('specific')}
+                        className={cn(
+                          "flex-1 h-[37.23px] rounded-[20.23px] text-[14px] font-semibold leading-[17px] transition-all flex items-center justify-center px-[26.98px]",
+                          dateMode === 'specific'
+                            ? "bg-[#1A1C40] text-[#FEFEFE] shadow-xs"
+                            : "bg-transparent text-[#141530] hover:bg-black/5"
                         )}
+                      >
+                        Data específica
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDateMode('flexible')}
+                        className={cn(
+                          "flex-1 h-[37.23px] rounded-[20.23px] text-[14px] font-semibold leading-[17px] transition-all flex items-center justify-center px-[26.98px]",
+                          dateMode === 'flexible'
+                            ? "bg-[#1A1C40] text-[#FEFEFE] shadow-xs"
+                            : "bg-transparent text-[#141530] hover:bg-black/5"
+                        )}
+                      >
+                        Data flexível
+                      </button>
                     </div>
-                  )}
-                </div>
 
-                {/* Campo 3: Data / Período */}
-                <div className="bg-[#F4F4F5] rounded-2xl p-3.5 flex items-start gap-3">
-                  <CalendarIcon className="w-4 h-4 text-[#8E8E93] mt-1 flex-shrink-0" />
-                  <div className="flex-1">
-                    <label className="text-[11px] font-medium text-[#8E8E93] block">
-                      {isFlexibleDates ? 'Quantidade de dias' : 'Selecione a data da viagem'}
-                    </label>
+                    {/* Dynamic Fields */}
+                    {dateMode === 'flexible' ? (
+                      <div className="space-y-4">
+                        {/* 1. Duração da viagem (height: 60px, bg: #EDEDED, radius: 12px) */}
+                        <div className="bg-[#EDEDED] rounded-[12px] p-3 min-h-[60px] flex items-center gap-3">
+                          <Clock className="w-4 h-4 text-[#555555] flex-shrink-0" />
+                          <div className="flex-1 flex flex-col justify-center gap-1">
+                            <label className="text-[12px] font-medium text-[#949494] leading-4 block">
+                              Duração da viagem
+                            </label>
+                            <div className="flex items-center justify-between gap-2">
+                              <input
+                                type="number"
+                                min="1"
+                                max="365"
+                                value={durationDays}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setDurationDays(val === '' ? '' : Math.max(1, parseInt(val) || 1));
+                                }}
+                                placeholder="Informe a quantidade de dias"
+                                className="w-full bg-transparent text-[14px] font-medium text-[#141530] leading-4 placeholder:text-[#949494] focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              />
+                              <span className="text-[14px] font-medium text-[#555555] leading-4 shrink-0 select-none">
+                                dias
+                              </span>
+                            </div>
+                          </div>
+                        </div>
 
-                    {isFlexibleDates ? (
-                      <div className="flex items-center justify-between gap-2 mt-0.5">
-                        <input
-                          type="number"
-                          min="1"
-                          max="365"
-                          value={durationDays}
-                          onChange={(e) =>
-                            setDurationDays(e.target.value === '' ? '' : parseInt(e.target.value) || 1)
-                          }
-                          className="w-full bg-transparent text-[14px] font-semibold text-[#1A1C40] focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        />
-                        <span className="text-[13px] font-semibold text-[#8E8E93] shrink-0 select-none">dias</span>
+                        {/* 2. Mês da viagem (Opcional) (Select, height: 60px, bg: #EEEEEE, radius: 12px) */}
+                        <div className="bg-[#EEEEEE] rounded-[12px] p-3 min-h-[60px] flex items-center gap-3 relative">
+                          <CalendarIcon className="w-4 h-4 text-[#141530] flex-shrink-0" />
+                          <div className="flex-1 flex flex-col justify-center gap-1 relative">
+                            <label className="text-[12px] font-medium text-[#949494] leading-4 block">
+                              Mês da viagem (Opcional)
+                            </label>
+                            <select
+                              value={travelMonth}
+                              onChange={(e) => setTravelMonth(e.target.value)}
+                              className={`w-full bg-transparent text-[14px] font-medium leading-4 focus:outline-none appearance-none cursor-pointer pr-6 ${travelMonth ? 'text-[#141530]' : 'text-[#949494]'}`}
+                            >
+                              <option value="" className="text-[#949494]">Selecione o mês</option>
+                              {monthsOfYear.map((m) => (
+                                <option key={m} value={m} className="text-[#141530]">
+                                  {m}
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown className="w-4 h-4 text-[#141530] absolute right-0 bottom-0 pointer-events-none stroke-[2]" />
+                          </div>
+                        </div>
                       </div>
                     ) : (
-                      <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                        <PopoverTrigger asChild>
-                          <button
-                            type="button"
-                            className="w-full text-left mt-1 text-[14px] font-semibold text-[#1A1C40]"
-                          >
-                            {formatDateRange() || (
-                              <span className="text-[#8E8E93] font-normal">23 nov - 23 dez 2026</span>
-                            )}
-                          </button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0 z-50 bg-white border border-[#E5E5E5] rounded-2xl shadow-2xl" align="start">
-                          <Calendar
-                            mode="range"
-                            selected={{ from: startDate, to: endDate }}
-                            onSelect={(range) => {
-                              setStartDate(range?.from);
-                              setEndDate(range?.to);
-                              if (range?.from && range?.to) {
-                                setIsCalendarOpen(false);
-                              }
-                            }}
-                            disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                            initialFocus
-                            className={cn('pointer-events-auto p-3')}
-                          />
-                        </PopoverContent>
-                      </Popover>
+                      /* Modo: Data específica (Select/Popover) */
+                      <div className="bg-[#EEEEEE] rounded-[12px] p-3 min-h-[60px] flex items-center gap-3">
+                        <CalendarIcon className="w-4 h-4 text-[#141530] flex-shrink-0" />
+                        <div className="flex-1 flex flex-col justify-center gap-1">
+                          <label className="text-[12px] font-medium text-[#949494] leading-4 block">
+                            Data da viagem
+                          </label>
+
+                          <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                            <PopoverTrigger asChild>
+                              <button
+                                type="button"
+                                className="w-full flex items-center justify-between text-left text-[14px] font-medium text-[#141530] leading-4 focus:outline-none"
+                              >
+                                <span>
+                                  {formatDateRange() || (
+                                    <span className="text-[#949494] font-medium">Selecione a data da viagem</span>
+                                  )}
+                                </span>
+                                <ChevronDown className={`w-4 h-4 text-[#141530] shrink-0 stroke-[2] transition-transform duration-200 ${isCalendarOpen ? 'rotate-180' : ''}`} />
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0 z-50 bg-white border border-[#E5E5E5] rounded-2xl shadow-2xl" align="start">
+                              <Calendar
+                                mode="range"
+                                selected={{ from: startDate, to: endDate }}
+                                onSelect={(range) => {
+                                  setStartDate(range?.from);
+                                  setEndDate(range?.to);
+                                  if (range?.from && range?.to) {
+                                    setIsCalendarOpen(false);
+                                  }
+                                }}
+                                disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                                initialFocus
+                                className={cn('pointer-events-auto p-3')}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>
 
-                {/* Toggle "Não tenho datas fixas" (exclusivo para "Criar um roteiro para vender") */}
-                {creationType === 'seller' && (
-                  <div className="flex items-center justify-end gap-3 pt-1 px-1">
-                    <span className="text-[13px] font-medium text-[#1A1C40]">Não tenho datas fixas</span>
-                    <Switch
-                      checked={isFlexibleDates}
-                      onCheckedChange={setIsFlexibleDates}
-                    />
-                  </div>
-                )}
-
-                {/* Botão Criar */}
-                <div className="pt-3">
+                {/* Main Button ("Criar", height: 48px, bg: #9DCC36, radius: 16px) */}
+                <div className="pt-2">
                   <button
                     type="button"
                     onClick={handleSubmit}
                     disabled={!isFormValid || isSubmitting}
-                    className={`w-full py-4 rounded-2xl text-[15px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 ${isFormValid && !isSubmitting
-                      ? 'bg-[#9ecc3b] text-[#1A1C40] hover:opacity-95 active:scale-[0.99]'
-                      : 'bg-[#E5E5E7] text-[#8E8E93] cursor-not-allowed'
+                    className={`w-full h-[48px] rounded-[16px] text-[16px] font-bold leading-[19px] transition-all shadow-none flex items-center justify-center gap-2 ${isFormValid && !isSubmitting
+                      ? 'bg-[#9DCC36] text-[#141530] hover:opacity-95 active:scale-[0.99]'
+                      : 'bg-[#E5E5E7] text-[#949494] cursor-not-allowed'
                       }`}
                   >
                     {isSubmitting ? (
                       <>
-                        <svg className="animate-spin h-5 w-5 text-[#1A1C40]" viewBox="0 0 24 24" fill="none">
+                        <svg className="animate-spin h-5 w-5 text-[#141530]" viewBox="0 0 24 24" fill="none">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                         </svg>

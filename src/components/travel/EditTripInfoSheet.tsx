@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -77,7 +78,7 @@ export function EditTripInfoSheet({
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
 
     const term = destinationInput.trim();
-    if (term.length < 2) {
+    if (term.length < 3) {
       setSuggestions([]);
       setIsSearching(false);
       return;
@@ -98,7 +99,7 @@ export function EditTripInfoSheet({
       } finally {
         setIsSearching(false);
       }
-    }, 300);
+    }, 500);
 
     return () => {
       if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
@@ -202,7 +203,7 @@ export function EditTripInfoSheet({
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 active:scale-95 transition-all text-[#171F2C] -mr-1"
+            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 active:scale-95 transition-all text-[#171F2C] -mr-1"
             aria-label="Fechar"
           >
             <Icon name="close" size={18} className="text-[#171F2C]" />
@@ -219,8 +220,8 @@ export function EditTripInfoSheet({
         {/* Content Body */}
         <div className="px-6 pb-8 flex flex-col gap-4">
           {/* Destinos Card */}
-          <div className="relative bg-[#EEEEEE] rounded-[12px] p-3 flex items-start gap-3">
-            <Icon name="location_on" size={16} className="text-[#555555] mt-0.5 flex-shrink-0" />
+          <div className="relative bg-[#EEEEEE] rounded-[12px] p-3 flex items-center justify-center gap-3 min-h-[78px]">
+            <Icon name="location_on" size={16} className="text-[#555555] flex-shrink-0" />
             <div className="flex-1 min-w-0 flex flex-col gap-1">
               <label className="text-[12px] font-medium text-[#949494] leading-[16px] block">
                 Destinos
@@ -231,17 +232,17 @@ export function EditTripInfoSheet({
                 {destinations.map((dest, i) => (
                   <div
                     key={i}
-                    className="inline-flex items-center gap-2 bg-[#1A1C40] text-white rounded-full px-3.5 py-1.5 shadow-sm"
+                    className="bg-[#E7E7EE] border border-[#141530] rounded-[24px] px-[16px] py-[8px] h-[34px] inline-flex items-center gap-[10px] transition-all box-border"
                   >
-                    <span className="text-[13px] font-medium text-white">
+                    <span className="text-[14px] font-medium text-[#141530] leading-4">
                       {dest.split(',')[0].trim()}
                     </span>
                     <button
                       type="button"
                       onClick={() => handleRemoveDestination(i)}
-                      className="w-3.5 h-3.5 flex items-center justify-center hover:opacity-75 transition-opacity"
+                      className="text-[#141530] hover:opacity-70 transition-opacity flex items-center justify-center"
                     >
-                      <Icon name="close" size={12} className="text-white" />
+                      <Icon name="close" size={12} className="text-[#141530]" />
                     </button>
                   </div>
                 ))}
@@ -308,9 +309,10 @@ export function EditTripInfoSheet({
                     <PopoverTrigger asChild>
                       <button
                         type="button"
-                        className="w-full text-left text-[14px] font-medium text-[#141530] leading-[16px] focus:outline-none truncate py-0.5"
+                        className="w-full flex items-center justify-between text-left text-[14px] font-medium text-[#141530] leading-[16px] focus:outline-none py-0.5"
                       >
-                        {formatDateDisplay()}
+                        <span className="truncate">{formatDateDisplay()}</span>
+                        <ChevronDown className={`w-4 h-4 text-[#141530] shrink-0 transition-transform duration-200 ${showCalendar ? 'rotate-180' : ''}`} />
                       </button>
                     </PopoverTrigger>
                     <PopoverContent

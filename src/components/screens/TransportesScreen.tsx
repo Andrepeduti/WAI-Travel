@@ -88,7 +88,7 @@ export function TransportesScreen({ onBack, transportes: externalTransportes, on
 
   return (
     <div
-      className="min-h-screen bg-background flex flex-col"
+      className="min-h-[100dvh] bg-background flex flex-col"
       style={{ fontFamily: 'var(--font-family-primary)' }}
     >
       {/* Header */}

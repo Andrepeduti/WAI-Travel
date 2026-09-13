@@ -117,7 +117,7 @@ export function PurchasesScreen({ onBack, onNavigateToItinerary, onResumeCheckou
   };
 
   return (
-    <div className="min-h-screen bg-background pb-8">
+    <div className="min-h-[100dvh] bg-background pb-8">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 pb-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
         <BackButton onClick={onBack} />
@@ -254,7 +254,7 @@ export function PurchasesScreen({ onBack, onNavigateToItinerary, onResumeCheckou
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <button
-                          className="flex items-center justify-center w-8 h-8 rounded-full active:scale-95 transition-transform"
+                          className="flex items-center justify-center w-10 h-10 rounded-full active:scale-95 transition-transform"
                           style={{ color: '#1A1C40' }}
                         >
                           <Icon name="more_vert" size={18} />

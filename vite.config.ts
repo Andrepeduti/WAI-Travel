@@ -11,6 +11,14 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
+    // proxy: {
+    //   '/api/aeroapi': {
+    //     target: 'https://aeroapi.flightaware.com/aeroapi',
+    //     changeOrigin: true,
+    //     secure: true,
+    //     rewrite: (path) => path.replace(/^\/api\/aeroapi/, ''),
+    //   },
+    // },
   },
   plugins: [react()].filter(Boolean),
   resolve: {

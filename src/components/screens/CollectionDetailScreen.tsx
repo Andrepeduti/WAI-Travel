@@ -349,7 +349,7 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
       return cleaned;
     }));
     const target = folders.find(f => f.id === folderId);
-    toast(`${selectedPlaceIds.length} ${selectedPlaceIds.length === 1 ? 'lugar movido' : 'lugares movidos'}${target ? ` para "${target.name}"` : ''}`);
+    toast.success(`${selectedPlaceIds.length} ${selectedPlaceIds.length === 1 ? 'lugar movido' : 'lugares movidos'}${target ? ` para "${target.name}"` : ''}`);
     setShowMoveMultipleSheet(false);
     exitSelectionMode();
   };
@@ -359,7 +359,7 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
     const prevFolders = folders;
     setAddedPlaces(p => p.filter(x => x.id !== place.id));
     setFolders(fs => fs.map(f => ({ ...f, placeIds: safePlaceIds(f).filter(id => id !== place.id) })));
-    toast('Lugar removido da coleção', {
+    toast.success('Lugar removido da coleção', {
       action: {
         label: 'Desfazer',
         onClick: () => {
@@ -419,7 +419,7 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
       setImportedVideos(data.videos || []);
       const skipped = detail?.skippedCount ?? 0;
       if (skipped > 0) {
-        toast(`${skipped} ${skipped === 1 ? 'lugar foi ignorado por já existir' : 'lugares foram ignorados por já existirem'} na coleção`);
+        toast.success(`${skipped} ${skipped === 1 ? 'lugar foi ignorado por já existir' : 'lugares foram ignorados por já existirem'} na coleção`);
       }
     };
     window.addEventListener('collection:updated', handler);
@@ -461,7 +461,7 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
     if (selectionMode && selectedPlaceIds.length > 0) {
       newFolder.placeIds = [...selectedPlaceIds];
       setFolders(prev => prev.map(f => ({ ...f, placeIds: safePlaceIds(f).filter(id => !selectedPlaceIds.includes(id)) })).concat(newFolder));
-      toast(`${selectedPlaceIds.length} ${selectedPlaceIds.length === 1 ? 'lugar movido' : 'lugares movidos'} para "${name}"`);
+      toast.success(`${selectedPlaceIds.length} ${selectedPlaceIds.length === 1 ? 'lugar movido' : 'lugares movidos'} para "${name}"`);
       setShowMoveMultipleSheet(false);
       exitSelectionMode();
       return;
@@ -513,7 +513,7 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
       }));
     const skipped = places.length - newPlaces.length;
     if (skipped > 0) {
-      toast(`${skipped} ${skipped === 1 ? 'lugar foi ignorado por já existir' : 'lugares foram ignorados por já existirem'} na coleção`);
+      toast.success(`${skipped} ${skipped === 1 ? 'lugar foi ignorado por já existir' : 'lugares foram ignorados por já existirem'} na coleção`);
     }
     if (newPlaces.length === 0) return;
     setAddedPlaces(prev => {
@@ -627,7 +627,7 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
               return prev;
             });
             setShowVideoByLinkSheet(false);
-            toast('Vídeo adicionado como referência');
+            toast.success('Vídeo adicionado como referência');
             return;
           }
 
@@ -665,7 +665,7 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
             return updated;
           });
           setShowVideoByLinkSheet(false);
-          toast('Lugares extraídos e vídeo adicionado!');
+          toast.success('Lugares extraídos e vídeo adicionado!');
         }}
       />
       <AddVideoFromGallerySheet
@@ -809,7 +809,7 @@ export function CollectionDetailScreen({ collectionId, collectionName, sharedWit
   }
 
   return (
-    <div className="min-h-screen pb-24 bg-white relative">
+    <div className="min-h-[100dvh] pb-24 bg-white relative">
       {modals}
       {/* Clean Header */}
       <header className="px-5 pt-5 pb-2 bg-zinc-100">

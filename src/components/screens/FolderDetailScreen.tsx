@@ -85,7 +85,7 @@ export function FolderDetailScreen({
   };
 
   return (
-    <div className="min-h-screen pb-24 bg-white relative">
+    <div className="min-h-[100dvh] pb-24 bg-white relative">
       {/* Sticky Header */}
       <header className="sticky top-0 z-20 bg-white px-5 pt-5 pb-3">
         <div className="flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>

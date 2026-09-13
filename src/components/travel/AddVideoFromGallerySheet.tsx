@@ -327,7 +327,7 @@ export function AddVideoFromGallerySheet({ isOpen, onClose, onBack, onSubmit, on
               type="button"
               onClick={handleBack}
               aria-label="Voltar"
-              className="w-8 h-8 -ml-1 flex items-center justify-center active:scale-95 active:opacity-70 transition-all flex-shrink-0 rounded-full hover:bg-muted/60"
+              className="w-10 h-10 -ml-1 flex items-center justify-center active:scale-95 active:opacity-70 transition-all flex-shrink-0 rounded-full hover:bg-muted/60"
             >
               <Icon name="chevron_left" size={24} className="text-foreground [&>svg]:stroke-[2.5]" />
             </button>
@@ -335,7 +335,7 @@ export function AddVideoFromGallerySheet({ isOpen, onClose, onBack, onSubmit, on
               type="button"
               onClick={onClose}
               aria-label="Fechar"
-              className="w-8 h-8 -mr-1 flex items-center justify-center active:scale-95 active:opacity-70 transition-all flex-shrink-0 rounded-full hover:bg-muted/60"
+              className="w-10 h-10 -mr-1 flex items-center justify-center active:scale-95 active:opacity-70 transition-all flex-shrink-0 rounded-full hover:bg-muted/60"
             >
               <Icon name="close" size={20} className="text-foreground" />
             </button>
@@ -372,7 +372,7 @@ export function AddVideoFromGallerySheet({ isOpen, onClose, onBack, onSubmit, on
                       {videoPreview && (
                         <video src={videoPreview} className="w-full h-full object-cover" controls />
                       )}
-                      <button onClick={handleRemoveVideo} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center">
+                      <button onClick={handleRemoveVideo} className="absolute top-3 right-3 w-10 h-10 rounded-full bg-black/60 flex items-center justify-center">
                         <Icon name="close" size={18} className="text-white" />
                       </button>
                     </div>

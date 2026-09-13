@@ -69,6 +69,7 @@ export function buildOptimisticItinerary(input: CreateItineraryInput, userId: st
     description: input.description ?? '',
     tags: input.tags ?? [],
     userId,
+    status: input.status,
   };
 }
 

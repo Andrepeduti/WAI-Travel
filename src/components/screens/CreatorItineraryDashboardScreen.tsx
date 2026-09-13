@@ -214,7 +214,7 @@ export function CreatorItineraryDashboardScreen({
   };
 
   return (
-    <div className="min-h-screen" style={{ background: '#F2F2F2' }}>
+    <div className="min-h-[100dvh]" style={{ background: '#F2F2F2' }}>
       {/* Sticky header */}
       <div className="sticky top-0 z-20" style={{ background: '#F2F2F2' }}>
         <div className="flex items-center gap-3 px-4 pb-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>

@@ -519,7 +519,10 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
           isPublic: true,
           priceCents: r.price_cents,
           description: r.description || '',
-          tags: r.tags || (r.main_tag ? [r.main_tag] : []),
+          status: r.status || 'published',
+          isFlexible: r.is_flexible || false,
+          durationDays: r.duration_days,
+          travelMonth: r.travel_month,
           userId: friend.userId!,
         };
 
@@ -537,7 +540,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
           cities: uniqueCities.size,
           places: r.places_count ?? 0,
           comments: [],
-          theme: r.main_tag ? { emoji: '✈️', label: r.main_tag } : undefined,
+          theme: undefined,
           userItinerary,
         };
       });
@@ -659,12 +662,27 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
     let placeImage = resolveCoverImage([destination]).url; // fallback
 
     try {
-      // Usa Google Places diretamente para buscar a melhor foto do lugar escolhido
-      const places = await searchGooglePlacesText(`${destination} tourist destination`);
-      if (places && places.length > 0 && places[0].photoUrl) {
-        placeImage = places[0].photoUrl;
-      } else {
-        // Fallback para a function caso o Places não retorne nada (raro)
+      // Usa Wikipedia (gratuito) para buscar foto do destino
+      const langs = ['pt', 'en'];
+      for (const lang of langs) {
+        try {
+          const wikiUrl = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(destination)}`;
+          const wikiRes = await fetch(wikiUrl, { headers: { Accept: 'application/json' } });
+          if (wikiRes.ok) {
+            const wikiData = await wikiRes.json();
+            const wikiImg = wikiData?.originalimage?.source || wikiData?.thumbnail?.source;
+            if (wikiImg) {
+              placeImage = wikiImg;
+              break;
+            }
+          }
+        } catch {
+          // continue to next language
+        }
+      }
+
+      // Fallback para a function caso a Wikipedia não retorne nada
+      if (placeImage === resolveCoverImage([destination]).url) {
         const { data, error } = await supabase.functions.invoke('google-image-search', {
           body: { query: `turismo ${destination} landmark travel` }
         });
@@ -902,7 +920,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
     if (settingsScreen === 'help-center') return <HelpCenterScreen onBack={closeSub} />;
 
     return (
-      <div className="min-h-screen bg-white pb-12">
+      <div className="min-h-[100dvh] bg-white pb-12">
         {/* Header */}
         <div className="sticky top-0 z-20 bg-white">
           <div className="flex items-center gap-3 px-4 pt-safe-top pb-3">
@@ -992,7 +1010,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
 
   if (isScreenLoading) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] pb-24 animate-pulse">
+      <div className="min-h-[100dvh] bg-[#F2F2F2] pb-24 animate-pulse">
         {/* Header */}
         <div className="relative flex items-center justify-between px-4 pb-2" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <div className="flex items-center">
@@ -1039,7 +1057,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
   }
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] pb-24">
+    <div className="min-h-[100dvh] bg-[#F2F2F2] pb-24">
       {/* Header */}
       <div className="relative flex items-center justify-between px-4 pb-2" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
         <div className="flex items-center">
@@ -1053,7 +1071,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
             {hasItinerariesForSale && (
               <button
                 onClick={handleOpenSalesSummary}
-                className="relative w-11 h-11 rounded-full bg-white flex items-center justify-center shadow-sm active:scale-95 active:opacity-80 transition-all"
+                className="relative w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm active:scale-95 active:opacity-80 transition-all"
                 aria-label="Resumo de vendas"
               >
                 <Icon name="account_balance_wallet" size={22} style={{ color: '#1A1C40' }} />

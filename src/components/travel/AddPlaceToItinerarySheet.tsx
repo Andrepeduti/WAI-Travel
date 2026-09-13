@@ -6,6 +6,8 @@ import { loadPlannerData, savePlannerData, PlannerActivity } from '@/lib/planner
 import { UserItinerary } from '@/lib/itinerariesApi';
 import { toast } from 'sonner';
 
+import { resolveCountryFromText } from '@/lib/countryResolver';
+
 interface PlaceLike {
   id: number;
   name: string;
@@ -14,6 +16,11 @@ interface PlaceLike {
   rating?: number;
   lat?: number;
   lng?: number;
+  city?: string;
+  country?: string;
+  description?: string;
+  observation?: string;
+  address?: string;
 }
 
 interface AddPlaceToItinerarySheetProps {
@@ -76,6 +83,11 @@ export function AddPlaceToItinerarySheet({ open, onClose, place }: AddPlaceToIti
     try {
       const current = (await loadPlannerData(selectedItinerary.id)) ?? { activities: {}, transports: {} };
       const dayList = current.activities[selectedDay] ?? [];
+      const dayDest = selectedItinerary.destinations?.[0] || '';
+      const fallbackCity = dayDest.split(',')[0].trim();
+      const placeCity = place.city || place.address || fallbackCity;
+      const placeCountry = place.country || resolveCountryFromText(placeCity || dayDest);
+
       const newActivity: PlannerActivity = {
         id: Date.now() + Math.floor(Math.random() * 1000000),
         type: 'activity',
@@ -90,6 +102,9 @@ export function AddPlaceToItinerarySheet({ open, onClose, place }: AddPlaceToIti
         price: '',
         lat: place.lat,
         lng: place.lng,
+        city: placeCity,
+        country: placeCountry,
+        observation: place.description || place.observation,
       };
       const next = {
         activities: { ...current.activities, [selectedDay]: [...dayList, newActivity] },

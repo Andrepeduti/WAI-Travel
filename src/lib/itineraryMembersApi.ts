@@ -47,6 +47,16 @@ export function getCachedItineraryMembers(itineraryId: string): ItineraryMember[
   return itineraryMembersCache.get(itineraryId) || null;
 }
 
+const itineraryPendingInvitesCache = new Map<string, ItineraryInvite[]>();
+
+export function getCachedPendingInvites(itineraryId: string): ItineraryInvite[] | null {
+  return itineraryPendingInvitesCache.get(itineraryId) || null;
+}
+
+export function setCachedPendingInvites(itineraryId: string, invites: ItineraryInvite[]) {
+  itineraryPendingInvitesCache.set(itineraryId, invites);
+}
+
 export function setCachedOwnerProfile(itineraryId: string, owner: ItineraryOwnerProfile | null) {
   if (owner) {
     ownerProfileCache.set(itineraryId, owner);
@@ -181,7 +191,10 @@ export async function listPendingInvitesForItinerary(itineraryId: string): Promi
     .eq('itinerary_id', itineraryId)
     .eq('status', 'pending');
   if (error) throw error;
-  if (!data || data.length === 0) return [];
+  if (!data || data.length === 0) {
+    setCachedPendingInvites(itineraryId, []);
+    return [];
+  }
   const inviteeIds = data.map((i) => i.invitee_user_id).filter(Boolean) as string[];
   const profMap = new Map<string, any>();
   if (inviteeIds.length > 0) {
@@ -191,7 +204,7 @@ export async function listPendingInvitesForItinerary(itineraryId: string): Promi
       .in('user_id', inviteeIds);
     (profiles || []).forEach((p) => profMap.set(p.user_id, p));
   }
-  return data.map((i) => {
+  const result = data.map((i) => {
     const prof = i.invitee_user_id ? profMap.get(i.invitee_user_id) : null;
     return {
       id: i.id,
@@ -207,6 +220,8 @@ export async function listPendingInvitesForItinerary(itineraryId: string): Promi
       inviterAvatar: prof?.avatar_url || undefined,
     };
   });
+  setCachedPendingInvites(itineraryId, result);
+  return result;
 }
 
 /** Cancela (revoga) um convite pendente — apenas dono. */

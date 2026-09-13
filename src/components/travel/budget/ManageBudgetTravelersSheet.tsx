@@ -96,7 +96,7 @@ export function ManageBudgetTravelersSheet({
               <button
                 type="button"
                 onClick={onClose}
-                className="w-9 h-9 rounded-full flex items-center justify-center text-[#171F2C] hover:bg-muted/60 transition-colors -mr-1"
+                className="w-10 h-10 rounded-full flex items-center justify-center text-[#171F2C] hover:bg-muted/60 transition-colors -mr-1"
                 aria-label="Fechar"
               >
                 <X size={20} />
@@ -198,7 +198,7 @@ export function ManageBudgetTravelersSheet({
               <button
                 type="button"
                 onClick={onClose}
-                className="w-9 h-9 rounded-full flex items-center justify-center text-[#171F2C] hover:bg-muted/60 transition-colors -mr-1"
+                className="w-10 h-10 rounded-full flex items-center justify-center text-[#171F2C] hover:bg-muted/60 transition-colors -mr-1"
                 aria-label="Fechar"
               >
                 <X size={20} />
@@ -242,7 +242,7 @@ export function ManageBudgetTravelersSheet({
               <button
                 type="button"
                 onClick={onClose}
-                className="w-9 h-9 rounded-full flex items-center justify-center text-[#171F2C] hover:bg-muted/60 transition-colors -mr-1"
+                className="w-10 h-10 rounded-full flex items-center justify-center text-[#171F2C] hover:bg-muted/60 transition-colors -mr-1"
                 aria-label="Fechar"
               >
                 <X size={20} />

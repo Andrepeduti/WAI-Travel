@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, MapPin, ChevronRight, Trash2, Check, ChevronDown } from 'lucide-react';
+import { X, MapPin, ChevronRight, Trash2, Check, ChevronDown, CircleDot } from 'lucide-react';
 import { BudgetPerson } from './TravelerBudgetCard';
 import { SplitBudgetExpenseSheet, SplitResult } from './SplitBudgetExpenseSheet';
+import { SoleTravelerInfoSheet } from './SoleTravelerInfoSheet';
 
 export interface BudgetExpense {
   id: string;
@@ -34,6 +35,8 @@ interface AddBudgetExpenseSheetProps {
   editingExpense?: BudgetExpense | null;
   people: BudgetPerson[];
   activities?: ActivityOption[];
+  onSoleTravelerInvite?: () => void;
+  isHidden?: boolean;
 }
 
 const categoryOptions = [
@@ -54,12 +57,14 @@ export function AddBudgetExpenseSheet({
   editingExpense,
   people,
   activities = [],
+  onSoleTravelerInvite,
+  isHidden = false,
 }: AddBudgetExpenseSheetProps) {
   // Form fields
   const [name, setName] = useState('');
   const [activityName, setActivityName] = useState('');
   const [activityId, setActivityId] = useState<string | number | undefined>(undefined);
-  const [category, setCategory] = useState<BudgetExpense['category']>('atividade');
+  const [category, setCategory] = useState<BudgetExpense['category'] | ''>('');
   const [amountInput, setAmountInput] = useState('');
 
   // Cost splitting state
@@ -70,6 +75,7 @@ export function AddBudgetExpenseSheet({
 
   // Sub-modal state
   const [showSplitSubSheet, setShowSplitSubSheet] = useState(false);
+  const [showSoleInfo, setShowSoleInfo] = useState(false);
 
   // Category dropdown open state
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
@@ -95,7 +101,7 @@ export function AddBudgetExpenseSheet({
         setName(editingExpense.name || '');
         setActivityName(editingExpense.activityName || '');
         setActivityId(editingExpense.activityId);
-        setCategory(editingExpense.category || 'atividade');
+        setCategory(editingExpense.category || '');
 
         const cents = Math.round((editingExpense.amountBRL || 0) * 100);
         setAmountInput(cents > 0 ? formatCurrency(String(cents)) : '');
@@ -112,7 +118,7 @@ export function AddBudgetExpenseSheet({
         setName('');
         setActivityName('');
         setActivityId(undefined);
-        setCategory('atividade');
+        setCategory('');
         setAmountInput('');
         setSplitType('equal');
         setAssignedTo(people.map(p => p.id));
@@ -120,6 +126,7 @@ export function AddBudgetExpenseSheet({
         setIsSplitExplicitlyConfigured(false);
       }
       setShowSplitSubSheet(false);
+      setShowSoleInfo(false);
       setShowCategoryPicker(false);
       setShowActivityPicker(false);
     }
@@ -144,9 +151,19 @@ export function AddBudgetExpenseSheet({
       else setCategory('atividade');
     }
     if (act.price && (!amountInput || amountInput === '0,00')) {
-      const digits = act.price.replace(/\D/g, '');
-      if (digits) {
-        setAmountInput(formatCurrency(digits.length <= 3 ? digits + '00' : digits));
+      const matches = String(act.price).match(/\d{1,3}(?:\.\d{3})*(?:,\d{2})?|\d+(?:,\d{2})?|\d+(?:\.\d{2})?/g);
+      if (matches && matches.length > 0) {
+        // Pega o último número assumindo que, se houver conversão (ex: € 26 (~R$ 170)), o BRL está no fim
+        const lastMatch = matches[matches.length - 1];
+        let num = 0;
+        if (lastMatch.includes(',')) {
+          num = parseFloat(lastMatch.replace(/\./g, '').replace(',', '.'));
+        } else {
+          num = parseFloat(lastMatch);
+        }
+        if (!isNaN(num) && num > 0) {
+          setAmountInput(formatCurrency(Math.round(num * 100).toString()));
+        }
       }
     }
     setShowActivityPicker(false);
@@ -162,7 +179,7 @@ export function AddBudgetExpenseSheet({
   };
 
   const handleSave = () => {
-    if (!name.trim() || currentNumericAmount <= 0) return;
+    if (!name.trim() || currentNumericAmount <= 0 || !category) return;
 
     const finalAssignedTo = assignedTo.length > 0 ? assignedTo : people.map(p => p.id);
 
@@ -170,7 +187,7 @@ export function AddBudgetExpenseSheet({
       id: editingExpense?.id || `exp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       name: name.trim(),
       description: editingExpense?.description || '',
-      category,
+      category: category as BudgetExpense['category'],
       amountBRL: currentNumericAmount,
       amountEUR: currentNumericAmount * 0.1792,
       assignedTo: finalAssignedTo,
@@ -193,7 +210,7 @@ export function AddBudgetExpenseSheet({
 
   return (
     <>
-      <div className="fixed inset-0 z-[100] flex items-end justify-center">
+      <div className="fixed inset-0 z-[100] flex items-end justify-center" style={{ display: isHidden ? 'none' : undefined }}>
         {/* Backdrop */}
         <div
           className="absolute inset-0 bg-black/40 backdrop-blur-[2px] animate-in fade-in duration-200"
@@ -202,75 +219,83 @@ export function AddBudgetExpenseSheet({
 
         {/* Main Sheet */}
         <div
-          className="relative w-full max-w-lg bg-[#FFFFFF] rounded-t-[24px] p-6 pb-8 animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col"
-          style={{ fontFamily: 'var(--font-family-primary, "Urbanist", sans-serif)' }}
+          className="relative w-full bg-[#FFFFFF] rounded-t-[24px] overflow-hidden animate-in slide-in-from-bottom duration-300 shadow-2xl flex flex-col"
+          style={{ fontFamily: 'var(--font-family-primary, "Urbanist", sans-serif)', display: (showSplitSubSheet || showSoleInfo) ? 'none' : 'flex' }}
         >
           {/* Top Bar with Close Button */}
-          <div className="flex items-center justify-end mb-3">
+          <div className="flex flex-row justify-end items-center px-6 pt-6 pb-3 w-full h-[54px] bg-[#FFFFFF]">
             <button
               type="button"
               onClick={onClose}
-              className="w-9 h-9 rounded-full flex items-center justify-center text-[#171F2C] hover:bg-muted/60 transition-colors -mr-1"
+              className="w-[18px] h-[18px] flex items-center justify-center text-[#000000] transition-colors"
               aria-label="Fechar"
             >
-              <X size={18} />
+              <X size={18} strokeWidth={1.5} />
             </button>
           </div>
 
-          {/* Title & Subtitle */}
-          <div className="mb-6">
-            <h2 className="font-['Urbanist'] font-semibold text-[22px] leading-[26px] text-[#171F2C] mb-1.5">
-              {editingExpense ? 'Editar gasto' : 'Adicionar orçamento'}
-            </h2>
-            <p className="font-['Urbanist'] font-medium text-[14px] leading-[20px] text-[#7F7F7F]">
-              Preencha as informações do gasto para o planejamento da viagem.
-            </p>
-          </div>
+          {/* Main Content Block */}
+          <div className="flex flex-col items-start px-6 py-4 gap-10 w-full bg-[#FFFFFF] overflow-y-auto max-h-[85vh]">
+            
+            <div className="flex flex-col items-start gap-6 w-full">
+              {/* Title & Subtitle */}
+              <div className="flex flex-col items-start gap-2 w-full">
+                <h2 className="font-['Urbanist'] font-semibold text-[22px] leading-[26px] text-[#171F2C]">
+                  {editingExpense ? 'Editar gasto' : 'Adicionar gasto'}
+                </h2>
+                <p className="font-['Urbanist'] font-medium text-[14px] leading-[20px] text-[#7F7F7F]">
+                  Preencha as informações do gasto para o planejamento da viagem.
+                </p>
+              </div>
 
           {/* Form Fields Stack */}
-          <div className="space-y-4 mb-6">
+          <div className="flex flex-col gap-6 w-full mb-6">
             {/* Field 1: Nome */}
-            <div className="bg-[#EDEDED] rounded-[12px] h-[54px] px-3 py-2 flex items-center gap-3 border border-transparent focus-within:border-[#949494] transition-all">
-              <MapPin size={16} className="text-[#7F7F7F] flex-shrink-0" />
-              <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
+            <div className="bg-[#EEEEEE] rounded-[12px] h-[60px] p-3 flex flex-row items-center gap-3 border border-transparent focus-within:border-[#949494] transition-all w-full">
+              <div className="w-4 h-4 flex items-center justify-center text-[#141530] flex-shrink-0">
+                <CircleDot size={16} strokeWidth={2} />
+              </div>
+              <div className="flex-1 min-w-0 flex flex-col justify-center items-start gap-1">
                 <label className="font-['Urbanist'] font-medium text-[12px] leading-[16px] text-[#949494] block">
-                  Nome
+                  Descrição
                 </label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Ex: Summit NYC"
+                  placeholder="Dê um nome para este gasto..."
                   className="w-full bg-transparent font-['Urbanist'] font-medium text-[14px] leading-[16px] text-[#141530] outline-none placeholder:text-[#949494]"
                 />
               </div>
             </div>
 
             {/* Field 2: Vincule à uma atividade (opcional) */}
-            <div className="relative">
+            <div className="relative w-full">
               <div
                 onClick={() => activities.length > 0 && setShowActivityPicker(prev => !prev)}
-                className={`bg-[#EDEDED] rounded-[12px] h-[54px] px-3 py-2 flex items-center gap-3 border border-transparent transition-all ${activities.length > 0 ? 'cursor-pointer hover:bg-[#E5E5E5]' : ''
+                className={`bg-[#EEEEEE] rounded-[12px] h-[60px] p-3 flex flex-row items-center gap-3 border border-transparent transition-all w-full ${activities.length > 0 ? 'cursor-pointer active:bg-[#E5E5E5]' : ''
                   }`}
               >
-                <MapPin size={16} className="text-[#7F7F7F] flex-shrink-0" />
-                <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
+                <div className="w-4 h-4 flex items-center justify-center text-[#141530] flex-shrink-0">
+                  <MapPin size={16} strokeWidth={2} />
+                </div>
+                <div className="flex-1 min-w-0 flex flex-col justify-center items-start gap-1">
                   <label className="font-['Urbanist'] font-medium text-[12px] leading-[16px] text-[#949494] block">
-                    Vincule à uma atividade do roteiro (opcional)
+                    Vincular à atividade (opcional)
                   </label>
                   {activities.length > 0 ? (
-                    <div className="flex items-center justify-between">
-                      <span className="font-['Urbanist'] font-medium text-[14px] leading-[16px] text-[#141530] truncate block">
-                        {activityName || 'Selecionar atividade do roteiro'}
+                    <div className="flex items-center justify-between w-full">
+                      <span className={`font-['Urbanist'] font-medium text-[14px] leading-[16px] truncate block ${activityName ? 'text-[#141530]' : 'text-[#949494]'}`}>
+                        {activityName || 'Selecione uma atividade do roteiro'}
                       </span>
-                      <ChevronDown size={16} className={`text-[#7F7F7F] transition-transform ${showActivityPicker ? 'rotate-180' : ''}`} />
+                      <ChevronRight size={16} className={`text-[#141530] transition-transform ${showActivityPicker ? 'rotate-90' : ''}`} />
                     </div>
                   ) : (
                     <input
                       type="text"
                       value={activityName}
                       onChange={(e) => setActivityName(e.target.value)}
-                      placeholder="Ex: Passeio no Central Park"
+                      placeholder="Selecione uma atividade do roteiro"
                       className="w-full bg-transparent font-['Urbanist'] font-medium text-[14px] leading-[16px] text-[#141530] outline-none placeholder:text-[#949494]"
                     />
                   )}
@@ -310,89 +335,96 @@ export function AddBudgetExpenseSheet({
             </div>
 
             {/* Field 3: Categoria */}
-            <div className="relative">
+            <div className="relative w-full">
               <div
                 onClick={() => setShowCategoryPicker(prev => !prev)}
-                className="bg-[#EDEDED] rounded-[12px] h-[54px] px-3 py-2 flex items-center gap-3 border border-transparent hover:bg-[#E5E5E5] cursor-pointer transition-all"
+                className="bg-[#EEEEEE] rounded-[12px] h-[60px] p-3 flex flex-row items-center gap-3 border border-transparent active:bg-[#E5E5E5] cursor-pointer transition-all w-full"
               >
-                <MapPin size={16} className="text-[#7F7F7F] flex-shrink-0" />
-                <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
+                <div className="w-4 h-4 flex items-center justify-center text-[#141530] flex-shrink-0">
+                  <CircleDot size={16} strokeWidth={2} />
+                </div>
+                <div className="flex-1 min-w-0 flex flex-col justify-center items-start gap-1">
                   <label className="font-['Urbanist'] font-medium text-[12px] leading-[16px] text-[#949494] block">
                     Categoria
                   </label>
-                  <div className="flex items-center justify-between">
-                    <span className="font-['Urbanist'] font-medium text-[14px] leading-[16px] text-[#141530] capitalize block truncate">
-                      {categoryOptions.find(c => c.key === category)?.label || 'Atividade'}
+                  <div className="flex items-center justify-between w-full">
+                    <span className={`font-['Urbanist'] font-medium text-[14px] leading-[16px] capitalize block truncate ${category ? 'text-[#141530]' : 'text-[#949494]'}`}>
+                      {category ? categoryOptions.find(c => c.key === category)?.label : 'Selecione uma categoria'}
                     </span>
-                    <ChevronDown size={16} className={`text-[#7F7F7F] transition-transform ${showCategoryPicker ? 'rotate-180' : ''}`} />
+                    <ChevronRight size={16} className={`text-[#141530] transition-transform ${showCategoryPicker ? 'rotate-90' : ''}`} />
                   </div>
                 </div>
               </div>
 
               {/* Category Dropdown Picker */}
               {showCategoryPicker && (
-                <div className="absolute left-0 right-0 top-full mt-2 bg-card rounded-2xl border border-border shadow-xl p-2 z-30 animate-in fade-in zoom-in-95">
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {categoryOptions.map((opt) => (
-                      <button
-                        key={opt.key}
-                        type="button"
-                        onClick={() => {
-                          setCategory(opt.key);
-                          setShowCategoryPicker(false);
-                        }}
-                        className={`px-3 py-2.5 rounded-xl text-[13px] font-semibold text-left transition-colors flex items-center justify-between ${category === opt.key ? 'bg-[#1A1C40] text-white' : 'text-[#141530] hover:bg-muted/50'
-                          }`}
-                      >
-                        <span>{opt.label}</span>
-                        {category === opt.key && <Check size={14} />}
-                      </button>
-                    ))}
-                  </div>
+                <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl border border-border shadow-xl p-2 z-30 max-h-56 overflow-y-auto animate-in fade-in zoom-in-95 space-y-1">
+                  {categoryOptions.map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => {
+                        setCategory(opt.key);
+                        setShowCategoryPicker(false);
+                      }}
+                      className={`w-full text-left px-3 py-2.5 rounded-xl text-[13px] transition-colors flex items-center justify-between gap-2 ${category === opt.key ? 'bg-[#9DCC36]/20 text-[#141530] font-bold' : 'hover:bg-muted/50 text-[#141530] font-medium'
+                        }`}
+                    >
+                      <span>{opt.label}</span>
+                      {category === opt.key && <Check size={16} className="text-[#86B32D] flex-shrink-0" />}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
 
             {/* Field 4: Valor */}
-            <div className="bg-[#EDEDED] rounded-[12px] h-[54px] px-3 py-2 flex items-center gap-3 border border-transparent focus-within:border-[#949494] transition-all">
-              <MapPin size={16} className="text-[#7F7F7F] flex-shrink-0" />
-              <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
+            <div className="bg-[#EEEEEE] rounded-[12px] h-[60px] p-3 flex flex-row items-center gap-3 border border-transparent focus-within:border-[#949494] transition-all w-full">
+              <div className="w-4 h-4 flex items-center justify-center text-[#141530] flex-shrink-0">
+                <CircleDot size={16} strokeWidth={2} />
+              </div>
+              <div className="flex-1 min-w-0 flex flex-col justify-center items-start gap-1">
                 <label className="font-['Urbanist'] font-medium text-[12px] leading-[16px] text-[#949494] block">
                   Valor
                 </label>
-                <div className="flex items-center">
-                  <span className="font-['Urbanist'] font-medium text-[14px] leading-[16px] text-[#141530] mr-1">R$</span>
+                <div className="flex flex-row items-center w-full gap-1">
+                  <span className="font-['Urbanist'] font-medium text-[14px] leading-[16px] text-[#141530]">R$</span>
                   <input
                     type="text"
                     inputMode="numeric"
                     value={amountInput}
                     onChange={(e) => setAmountInput(formatCurrency(e.target.value))}
-                    placeholder="0,00"
+                    placeholder="Digite um valor"
                     className="w-full bg-transparent font-['Urbanist'] font-medium text-[14px] leading-[16px] text-[#141530] outline-none placeholder:text-[#949494]"
                   />
                 </div>
               </div>
             </div>
           </div>
+          </div>
 
           {/* Dynamic Cost Splitting Row */}
-          <div className="mb-6 pt-1">
+          <div className="w-full">
             <button
               type="button"
-              onClick={() => setShowSplitSubSheet(true)}
-              className="w-full flex items-center justify-between py-2 px-1 text-left rounded-xl hover:bg-muted/30 transition-colors group"
+              disabled={currentNumericAmount <= 0}
+              onClick={() => {
+                if (people.length === 1) {
+                  setShowSoleInfo(true);
+                } else {
+                  setShowSplitSubSheet(true);
+                }
+              }}
+              className="w-full flex items-center justify-between text-left rounded-xl hover:bg-muted/30 transition-colors group h-[26px] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSplitActive && selectedPeopleObjects.length > 0 ? (
-                /* Configured state with Stacked Avatars (Image 2) */
                 <div className="flex items-center justify-between w-full">
-                  <span className="font-['Urbanist'] font-semibold text-[14px] leading-[17px] text-[#141530]">
-                    {splitType === 'custom'
-                      ? 'Gasto dividido por valor específico entre:'
-                      : 'Gasto dividido igualmente entre:'}
+                  <span className="font-['Urbanist'] font-semibold text-[14px] leading-[17px] text-[#1A1C40]">
+                    Gasto dividido entre:
                   </span>
 
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <div className="flex items-center -space-x-2">
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <div className="flex items-center -space-x-1.5 h-[26px]">
                       {selectedPeopleObjects.slice(0, 3).map((p, idx) => {
                         const initials = p.initials || p.name.slice(0, 2).toUpperCase();
                         return p.avatar ? (
@@ -400,12 +432,12 @@ export function AddBudgetExpenseSheet({
                             key={p.id}
                             src={p.avatar}
                             alt={p.name}
-                            className="w-[26px] h-[26px] rounded-full object-cover ring-2 ring-background border border-white"
+                            className="w-[26px] h-[26px] rounded-full object-cover border-[1px] border-white"
                           />
                         ) : (
                           <div
                             key={p.id}
-                            className="w-[26px] h-[26px] rounded-full flex items-center justify-center text-white text-[10px] font-bold ring-2 ring-background border border-white shadow-xs"
+                            className="w-[26px] h-[26px] rounded-full flex items-center justify-center text-white text-[10px] font-bold border-[1px] border-white"
                             style={{ backgroundColor: p.color || defaultColors[idx % defaultColors.length] }}
                           >
                             {initials}
@@ -413,21 +445,24 @@ export function AddBudgetExpenseSheet({
                         );
                       })}
                       {selectedPeopleObjects.length > 3 && (
-                        <div className="w-[26px] h-[26px] rounded-full bg-[#E5E7EB] text-[#4B5563] ring-2 ring-background border border-white flex items-center justify-center text-[10px] font-bold">
+                        <div className="w-[26px] h-[26px] rounded-full bg-[#E5E7EB] text-[#4B5563] border-[1px] border-white flex items-center justify-center text-[10px] font-bold">
                           +{selectedPeopleObjects.length - 3}
                         </div>
                       )}
                     </div>
-                    <ChevronRight size={18} className="text-[#141530] group-hover:translate-x-0.5 transition-transform" />
+                    <div className="w-4 h-4 flex items-center justify-center bg-[#141530] text-white rounded-full">
+                      <ChevronRight size={12} strokeWidth={2} />
+                    </div>
                   </div>
                 </div>
               ) : (
-                /* Initial state (Image 1) */
                 <div className="flex items-center justify-between w-full">
-                  <span className="font-['Urbanist'] font-semibold text-[14px] leading-[17px] text-[#141530]">
+                  <span className="font-['Urbanist'] font-semibold text-[14px] leading-[17px] text-[#1A1C40]">
                     Dividir gasto com outros viajantes
                   </span>
-                  <ChevronRight size={18} className="text-[#141530] group-hover:translate-x-0.5 transition-transform" />
+                  <div className="w-4 h-4 flex items-center justify-center bg-[#141530] text-white rounded-full">
+                    <ChevronRight size={12} strokeWidth={2} />
+                  </div>
                 </div>
               )}
             </button>
@@ -435,30 +470,40 @@ export function AddBudgetExpenseSheet({
 
           {/* Delete Option (if editing) */}
           {editingExpense && onDelete && (
-            <button
-              type="button"
-              onClick={() => {
-                onDelete(editingExpense.id);
-                onClose();
-              }}
-              className="w-full py-2.5 flex items-center justify-center gap-2 mb-4 text-[#EF4444] hover:bg-[#FEF2F2] rounded-xl transition-colors font-medium text-[14px]"
-            >
-              <Trash2 size={16} />
-              <span>Remover gasto</span>
-            </button>
+            <>
+              {/* Divider */}
+              <div className="w-full border-t border-[#F2F2F2]" />
+              
+              <button
+                type="button"
+                onClick={() => {
+                  onDelete(editingExpense.id);
+                  onClose();
+                }}
+                className="w-full flex items-center justify-start gap-3 text-[#D00004] hover:bg-[#FEF2F2] transition-colors group h-[20px]"
+              >
+                <div className="w-5 h-5 flex items-center justify-center border-[1.25px] border-[#D00004] rounded-[4px]">
+                  <Trash2 size={12} strokeWidth={2} />
+                </div>
+                <span className="font-['Urbanist'] font-medium text-[16px] leading-[19px]">
+                  Excluir
+                </span>
+              </button>
+            </>
           )}
 
-          {/* Main Action Button: 48px, #9DCC36, border-radius 16px, 16px font-bold #141530 */}
+          {/* Main Action Button */}
           <button
             type="button"
             onClick={handleSave}
-            disabled={!name.trim() || currentNumericAmount <= 0}
-            className="w-full h-[48px] px-6 rounded-[16px] bg-[#9DCC36] text-[#141530] font-['Urbanist'] font-bold text-[16px] leading-[19px] shadow-xs active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+            disabled={!name.trim() || currentNumericAmount <= 0 || !category}
+            className="w-full h-[48px] px-[24px] py-[12px] rounded-[16px] bg-[#9DCC36] text-[#141530] font-['Urbanist'] font-bold text-[16px] leading-[19px] shadow-xs active:scale-[0.99] transition-all disabled:opacity-100 disabled:bg-[#E5E5E5] disabled:text-[#949494] disabled:cursor-not-allowed flex items-center justify-center"
           >
             {editingExpense ? 'Salvar alterações' : 'Adicionar'}
           </button>
         </div>
       </div>
+    </div>
 
       {/* Sub-Bottom Sheet: Dividir Gasto (Preserves all form state) */}
       <SplitBudgetExpenseSheet
@@ -471,6 +516,16 @@ export function AddBudgetExpenseSheet({
         initialSplitType={splitType}
         initialAssignedTo={assignedTo}
         initialCustomSplits={customSplits}
+      />
+
+      {/* Sub-Bottom Sheet: Sole Traveler Info */}
+      <SoleTravelerInfoSheet
+        open={showSoleInfo}
+        onClose={() => setShowSoleInfo(false)}
+        onInvite={() => {
+          setShowSoleInfo(false);
+          if (onSoleTravelerInvite) onSoleTravelerInvite();
+        }}
       />
     </>
   );

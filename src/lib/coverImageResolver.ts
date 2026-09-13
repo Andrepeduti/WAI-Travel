@@ -138,6 +138,7 @@ function parseDestination(dest: string): { city: string; country: string } {
 export interface CoverImageResult {
   url: string;
   isAutoSelected: boolean;
+  isLoading?: boolean;
 }
 
 /**

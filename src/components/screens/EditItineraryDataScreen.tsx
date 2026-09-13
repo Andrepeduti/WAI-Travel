@@ -95,7 +95,7 @@ export function EditItineraryDataScreen({
   const selectedCurrency = CURRENCIES.find(c => c.code === currency) || CURRENCIES[0];
 
   return (
-    <div className="min-h-screen pb-28 bg-background" style={{ fontFamily: 'var(--font-family-primary)' }}>
+    <div className="min-h-[100dvh] pb-28 bg-background" style={{ fontFamily: 'var(--font-family-primary)' }}>
       {/* Header */}
       <div className="px-4 pb-4 flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
         <BackButton onClick={onBack} />

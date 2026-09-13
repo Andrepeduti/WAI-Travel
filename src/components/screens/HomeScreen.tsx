@@ -421,7 +421,7 @@ export function HomeScreen({
     return n.toString();
   };
 
-  return <div className="min-h-screen pb-24 bg-[#f2f2f2] w-full max-w-full overflow-x-hidden box-border" style={{ paddingLeft: 'max(16px, env(safe-area-inset-left))', paddingRight: 'max(16px, env(safe-area-inset-right))' }}>
+  return <div className="min-h-[100dvh] pb-24 bg-[#f2f2f2] w-full max-w-full overflow-x-hidden box-border" style={{ paddingLeft: 'max(16px, env(safe-area-inset-left))', paddingRight: 'max(16px, env(safe-area-inset-right))' }}>
     {/* Header */}
     <header className="pt-4 bg-[#f2f2f2] pb-[24px] -mx-4" style={{ paddingLeft: 'max(16px, env(safe-area-inset-left))', paddingTop: 'max(16px, env(safe-area-inset-top))' }}>
       <div className="flex items-center justify-between mb-4 pb-[16px] pr-4">
@@ -453,13 +453,13 @@ export function HomeScreen({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={onChatClick} className="w-11 h-11 rounded-full bg-white flex items-center justify-center shadow-sm active:scale-95 active:opacity-80 transition-all" aria-label="Mensagens">
+          <button onClick={onChatClick} className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm active:scale-95 active:opacity-80 transition-all" aria-label="Mensagens">
             <span className="relative inline-flex">
               <Icon name="chat_bubble_outline" size={22} className="text-foreground" />
               {unreadChatCount > 0 && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-destructive rounded-full border-[1.5px] border-white" />}
             </span>
           </button>
-          <button onClick={onNotificationsClick} className="w-11 h-11 rounded-full bg-white flex items-center justify-center shadow-sm active:scale-95 active:opacity-80 transition-all" aria-label="Notificações">
+          <button onClick={onNotificationsClick} className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm active:scale-95 active:opacity-80 transition-all" aria-label="Notificações">
             <span className="relative inline-flex">
               <Icon name="notifications" size={22} className="text-foreground" />
               {unreadCount > 0 && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-destructive rounded-full border-[1.5px] border-white" />}

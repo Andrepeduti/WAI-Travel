@@ -59,7 +59,7 @@ export function CreateFolderSheet({ isOpen, onClose, onSubmit }: CreateFolderShe
           <div className="flex items-center justify-end px-5 pt-1 pb-1">
             <button
               onClick={handleClose}
-              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors -mr-1"
+              className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors -mr-1"
               aria-label="Fechar"
             >
               <Icon name="close" size={20} className="text-muted-foreground" />

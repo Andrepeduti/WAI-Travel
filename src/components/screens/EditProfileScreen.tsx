@@ -102,7 +102,7 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
   useEffect(() => {
     const query = locationInput.trim();
     if (!showLocationSuggestions) return;
-    if (query.length < 2 || query === (formData.location ?? '').trim()) {
+    if (query.length < 3 || query === (formData.location ?? '').trim()) {
       setLocationResults([]);
       setIsSearchingLocation(false);
       return;
@@ -125,7 +125,7 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
       } finally {
         if (active) setIsSearchingLocation(false);
       }
-    }, 1000);
+    }, 500);
     return () => {
       active = false;
       clearTimeout(timeout);
@@ -283,7 +283,7 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-32">
+    <div className="min-h-[100dvh] bg-background pb-32">
       {/* Header — padrão sub-page (sticky branco com BackButton) */}
       <div className="sticky top-0 z-20 bg-background pt-[env(safe-area-inset-top)]">
         <div className="flex items-center gap-3 px-4 py-4">

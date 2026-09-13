@@ -85,7 +85,7 @@ export function UserProfileScreen({
   const continents = getUniqueCountinents(countries);
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-[100dvh] bg-background pb-24">
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-safe-top pb-2">
         <div className="flex items-center gap-3">

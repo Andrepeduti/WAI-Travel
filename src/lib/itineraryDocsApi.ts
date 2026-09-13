@@ -72,6 +72,7 @@ function reservaFromRow(row: any): Reserva {
 }
 
 function transporteFromRow(row: any): Transporte {
+  const meta = row.metadata || {};
   const t: Transporte = {
     id: row.client_id ?? row.id,
     tipo: (row.tipo as Transporte['tipo']) ?? 'voo',
@@ -86,6 +87,14 @@ function transporteFromRow(row: any): Transporte {
     chegadaMinuto: row.chegada_minuto ?? undefined,
     codigo: row.codigo ?? undefined,
     valor: row.valor ?? undefined,
+    terminalOrigem: meta.terminalOrigem ?? undefined,
+    portaoOrigem: meta.portaoOrigem ?? undefined,
+    terminalDestino: meta.terminalDestino ?? undefined,
+    portaoDestino: meta.portaoDestino ?? undefined,
+    baggageClaim: meta.baggageClaim ?? undefined,
+    statusVoo: meta.statusVoo ?? undefined,
+    ciaAerea: meta.ciaAerea ?? undefined,
+    aeronave: meta.aeronave ?? undefined,
   };
   (t as any).attachmentPath = row.attachment_path ?? undefined;
   (t as any).attachmentName = row.attachment_name ?? undefined;
@@ -205,6 +214,16 @@ export async function saveItineraryDocs(
     attachment_path: (t as any).attachmentPath ?? null,
     attachment_name: (t as any).attachmentName ?? null,
     position,
+    metadata: {
+      terminalOrigem: t.terminalOrigem ?? null,
+      portaoOrigem: t.portaoOrigem ?? null,
+      terminalDestino: t.terminalDestino ?? null,
+      portaoDestino: t.portaoDestino ?? null,
+      baggageClaim: t.baggageClaim ?? null,
+      statusVoo: t.statusVoo ?? null,
+      ciaAerea: t.ciaAerea ?? null,
+      aeronave: t.aeronave ?? null,
+    },
   }));
 
   // 3) Delete + insert

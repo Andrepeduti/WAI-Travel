@@ -1,14 +1,19 @@
 import React, { useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
-import { EditTransportSheet, TransportData } from './EditTransportSheet';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Navigation, ArrowRightLeft, Trash2, Pencil, Footprints, MessageSquare } from 'lucide-react';
+import { EditTransportSheet } from './EditTransportSheet';
+import { MoveActivityToDaySheet } from './MoveActivityToDaySheet';
+import { MoreHorizontal, Trash2, Pencil, Footprints, MessageSquare } from 'lucide-react';
 import { motion } from 'framer-motion';
+
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 export interface Activity {
   id: number;
@@ -31,8 +36,10 @@ export interface Activity {
   personalNote?: string;
 }
 
+export type TransportType = 'none' | 'train' | 'metro' | 'walk' | 'bus' | 'car' | 'bike' | 'other';
+
 export interface TransportBetween {
-  type: 'walk' | 'bus' | 'metro' | 'car';
+  type: TransportType;
   duration: string;
   cost?: string;
   distance?: string;
@@ -50,219 +57,7 @@ export interface DragState {
   cardWidth: number;
 }
 
-const CITY_TO_COUNTRY: Record<string, string> = {
-  // Europa
-  paris: 'França',
-  frança: 'França',
-  franca: 'França',
-  nice: 'França',
-  lyon: 'França',
-  marseille: 'França',
-  bordeaux: 'França',
-  roma: 'Itália',
-  rome: 'Itália',
-  itália: 'Itália',
-  italia: 'Itália',
-  veneza: 'Itália',
-  venice: 'Itália',
-  florença: 'Itália',
-  florence: 'Itália',
-  milao: 'Itália',
-  milão: 'Itália',
-  milan: 'Itália',
-  napoles: 'Itália',
-  nápoles: 'Itália',
-  pisa: 'Itália',
-  londres: 'Reino Unido',
-  london: 'Reino Unido',
-  inglaterra: 'Reino Unido',
-  edimburgo: 'Reino Unido',
-  edinburgh: 'Reino Unido',
-  manchester: 'Reino Unido',
-  amsterdam: 'Países Baixos',
-  holanda: 'Países Baixos',
-  roterdam: 'Países Baixos',
-  lisboa: 'Portugal',
-  lisbon: 'Portugal',
-  porto: 'Portugal',
-  portugal: 'Portugal',
-  sintra: 'Portugal',
-  algarve: 'Portugal',
-  madri: 'Espanha',
-  madrid: 'Espanha',
-  barcelona: 'Espanha',
-  espanha: 'Espanha',
-  sevilha: 'Espanha',
-  sevilla: 'Espanha',
-  valencia: 'Espanha',
-  valência: 'Espanha',
-  berlim: 'Alemanha',
-  berlin: 'Alemanha',
-  alemanha: 'Alemanha',
-  munique: 'Alemanha',
-  munich: 'Alemanha',
-  frankfurt: 'Alemanha',
-  hamburgo: 'Alemanha',
-  viena: 'Áustria',
-  vienna: 'Áustria',
-  austria: 'Áustria',
-  áustria: 'Áustria',
-  salzburgo: 'Áustria',
-  praga: 'República Tcheca',
-  prague: 'República Tcheca',
-  atenas: 'Grécia',
-  athens: 'Grécia',
-  grecia: 'Grécia',
-  grécia: 'Grécia',
-  santorini: 'Grécia',
-  mykonos: 'Grécia',
-  bruxelas: 'Bélgica',
-  brussels: 'Bélgica',
-  bruges: 'Bélgica',
-  dublin: 'Irlanda',
-  irlanda: 'Irlanda',
-  zurique: 'Suíça',
-  zurich: 'Suíça',
-  genebra: 'Suíça',
-  geneva: 'Suíça',
-  suíça: 'Suíça',
-  suica: 'Suíça',
-  budapeste: 'Hungria',
-  budapest: 'Hungria',
-  varsovia: 'Polônia',
-  varsóvia: 'Polônia',
-  cracovia: 'Polônia',
-  cracóvia: 'Polônia',
-  estocolmo: 'Suécia',
-  oslo: 'Noruega',
-  copenhague: 'Dinamarca',
-  copenhagen: 'Dinamarca',
-  helsinki: 'Finlândia',
-  istambul: 'Turquia',
-  turquia: 'Turquia',
-
-  // Américas
-  'nova york': 'Estados Unidos',
-  'new york': 'Estados Unidos',
-  eua: 'Estados Unidos',
-  usa: 'Estados Unidos',
-  orlando: 'Estados Unidos',
-  miami: 'Estados Unidos',
-  'los angeles': 'Estados Unidos',
-  'san francisco': 'Estados Unidos',
-  'las vegas': 'Estados Unidos',
-  chicago: 'Estados Unidos',
-  toronto: 'Canadá',
-  vancouver: 'Canadá',
-  montreal: 'Canadá',
-  canada: 'Canadá',
-  canadá: 'Canadá',
-  mexico: 'México',
-  méxico: 'México',
-  cancun: 'México',
-  cancún: 'México',
-  'cidade do méxico': 'México',
-  'buenos aires': 'Argentina',
-  argentina: 'Argentina',
-  bariloche: 'Argentina',
-  mendoza: 'Argentina',
-  santiago: 'Chile',
-  chile: 'Chile',
-  atacama: 'Chile',
-  rio: 'Brasil',
-  'rio de janeiro': 'Brasil',
-  'são paulo': 'Brasil',
-  'sao paulo': 'Brasil',
-  salvador: 'Brasil',
-  brasil: 'Brasil',
-  cusco: 'Peru',
-  cuzco: 'Peru',
-  lima: 'Peru',
-  machu_picchu: 'Peru',
-  'machu picchu': 'Peru',
-  peru: 'Peru',
-  bogota: 'Colômbia',
-  bogotá: 'Colômbia',
-  medellin: 'Colômbia',
-  medellín: 'Colômbia',
-  cartagena: 'Colômbia',
-  colombia: 'Colômbia',
-  colômbia: 'Colômbia',
-  montevideu: 'Uruguai',
-  montevideo: 'Uruguai',
-  uruguai: 'Uruguai',
-
-  // Ásia & Oceania
-  toquio: 'Japão',
-  tóquio: 'Japão',
-  tokyo: 'Japão',
-  japao: 'Japão',
-  japão: 'Japão',
-  kyoto: 'Japão',
-  quioto: 'Japão',
-  osaka: 'Japão',
-  seul: 'Coreia do Sul',
-  seoul: 'Coreia do Sul',
-  pequim: 'China',
-  beijing: 'China',
-  xangai: 'China',
-  shanghai: 'China',
-  bangkok: 'Tailândia',
-  tailandia: 'Tailândia',
-  tailândia: 'Tailândia',
-  phuket: 'Tailândia',
-  singapura: 'Singapura',
-  singapore: 'Singapura',
-  dubai: 'Emirados Árabes',
-  'abu dhabi': 'Emirados Árabes',
-  doha: 'Catar',
-  bali: 'Indonésia',
-  indonesia: 'Indonésia',
-  indonésia: 'Indonésia',
-  sydney: 'Austrália',
-  australia: 'Austrália',
-  austrália: 'Austrália',
-  melbourne: 'Austrália',
-  auckland: 'Nova Zelândia',
-  cairo: 'Egito',
-  egito: 'Egito',
-  marrakech: 'Marrocos',
-  marrocos: 'Marrocos',
-  'cidade do cabo': 'África do Sul',
-  'cape town': 'África do Sul',
-};
-
-function resolveActivityCountry(activity: Activity, destinations?: string[]): string | undefined {
-  if (activity.country && activity.country.trim()) {
-    return activity.country.trim();
-  }
-
-  if (activity.city) {
-    const parts = activity.city.split(',').map((s) => s.trim());
-    if (parts.length > 1 && parts[1]) {
-      return parts[1];
-    }
-    const cleanCity = parts[0].toLowerCase();
-    if (CITY_TO_COUNTRY[cleanCity]) {
-      return CITY_TO_COUNTRY[cleanCity];
-    }
-  }
-
-  if (destinations && destinations.length > 0) {
-    for (const dest of destinations) {
-      const parts = dest.split(',').map((s) => s.trim());
-      if (parts.length > 1 && parts[1]) {
-        return parts[1];
-      }
-      const clean = parts[0].toLowerCase();
-      if (CITY_TO_COUNTRY[clean]) {
-        return CITY_TO_COUNTRY[clean];
-      }
-    }
-  }
-
-  return undefined;
-}
+import { resolveActivityCountry, resolveActivityLocationLabel } from '@/lib/countryResolver';
 
 interface DraggableActivityListProps {
   activities: Activity[];
@@ -273,6 +68,8 @@ interface DraggableActivityListProps {
   selectedDay: number;
   compactView?: boolean;
   itineraryCurrency?: string;
+  isFlexibleDates?: boolean;
+  getActivityCount?: (day: number) => number;
   dragState?: DragState;
   onStartDrag?: (activity: Activity, day: number, index: number, event: React.PointerEvent) => void;
   onReorder: (activities: Activity[]) => void;
@@ -281,7 +78,7 @@ interface DraggableActivityListProps {
   onActivityClick: (activity: Activity) => void;
   onEditNote?: (activity: Activity) => void;
   getTransportIcon?: (type: TransportBetween['type']) => string;
-  onUpdateTransport?: (index: number, data: TransportData) => void;
+  onUpdateTransport?: (index: number, data: TransportBetween) => void;
   onDeleteTransport?: (index: number) => void;
 }
 
@@ -291,6 +88,10 @@ export function DraggableActivityList({
   destinations,
   daysData,
   selectedDay,
+  compactView,
+  itineraryCurrency,
+  isFlexibleDates,
+  getActivityCount,
   dragState,
   onStartDrag,
   onReorder,
@@ -302,6 +103,7 @@ export function DraggableActivityList({
   onDeleteTransport,
 }: DraggableActivityListProps) {
   const [movingActivity, setMovingActivity] = useState<Activity | null>(null);
+  const [optionsActivity, setOptionsActivity] = useState<Activity | null>(null);
   const [editingTransportIndex, setEditingTransportIndex] = useState<number | null>(null);
 
   const handleOpenGoogleMaps = (activity: Activity) => {
@@ -342,8 +144,8 @@ export function DraggableActivityList({
             <div className="w-12 h-1 rounded-full bg-[#1D4ED8]/50" />
           </motion.div>
         ) : (
-          <div className="py-8 text-center bg-white rounded-2xl border border-dashed border-[#E5E5E7] p-6">
-            <p className="text-[14px] font-medium text-[#8E8E93] font-['Urbanist',sans-serif]">Este dia ainda está vazio.</p>
+          <div className="py-1 px-1">
+            <p className="text-[15px] font-medium text-[#7F7F7F] font-['Urbanist',sans-serif]">Este dia ainda está vazio.</p>
           </div>
         )}
       </div>
@@ -366,8 +168,10 @@ export function DraggableActivityList({
           dragState.targetDay === selectedDay &&
           dragState.targetIndex === index;
 
+        const activityKey = activity.id ? `${activity.id}-${index}` : `${activity.name}-${activity.startTime}-${index}`;
+
         return (
-          <React.Fragment key={activity.id}>
+          <React.Fragment key={activityKey}>
             {/* Subtle Insertion Spacing (espaçamento sutil entre os cards) */}
             {shouldShowPlaceholderBefore && renderDropPlaceholder(index)}
 
@@ -433,51 +237,17 @@ export function DraggableActivityList({
                           onPointerDown={(e) => e.stopPropagation()}
                           onClick={(e) => e.stopPropagation()}
                         >
-                          {/* 3-dots Menu */}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button
-                                className="p-1 -mr-1 rounded-full text-[#141530] hover:bg-black/5 transition-colors"
-                                aria-label="Opções"
-                              >
-                                <MoreHorizontal className="w-5 h-5 text-[#141530]" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-52 bg-white rounded-xl shadow-lg border border-[#E5E5E7] p-1 z-30 font-['Urbanist',sans-serif]">
-                              {onEditNote && (
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onEditNote(activity);
-                                  }}
-                                  className="text-[13px] py-2 px-3 flex items-center gap-2.5 cursor-pointer text-[#141530] font-semibold"
-                                >
-                                  <Pencil className="w-4 h-4 text-[#233ACF]" />
-                                  <span>Editar</span>
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setMovingActivity(activity);
-                                }}
-                                className="text-[13px] py-2 px-3 flex items-center gap-2.5 cursor-pointer text-[#141530]"
-                              >
-                                <ArrowRightLeft className="w-4 h-4 text-[#141530]" />
-                                <span>Mover para outro dia</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onDelete(activity);
-                                }}
-                                className="text-[13px] py-2 px-3 flex items-center gap-2.5 cursor-pointer text-[#DC2626] focus:text-[#DC2626]"
-                              >
-                                <Trash2 className="w-4 h-4 text-[#DC2626]" />
-                                <span>Excluir</span>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOptionsActivity(activity);
+                            }}
+                            className="p-1 -mr-1 rounded-full text-[#141530] hover:bg-black/5 transition-colors"
+                            aria-label="Opções"
+                          >
+                            <MoreHorizontal className="w-5 h-5 text-[#141530]" />
+                          </button>
                         </div>
                       </div>
 
@@ -495,7 +265,10 @@ export function DraggableActivityList({
                 <div className="bg-white py-1.5 pl-3 pr-1 relative">
                   <div className="flex flex-col items-start gap-3 w-full isolate">
                     {/* Top Row: Image (with Map Pin Marker) + Content Info */}
-                    <div className="flex gap-3.5 items-start w-full">
+                    <div
+                      onClick={() => onActivityClick(activity)}
+                      className="flex gap-3.5 items-start w-full cursor-pointer hover:opacity-95 transition-opacity"
+                    >
                       {/* Thumbnail with Blue Pin Number Badge */}
                       <div className="relative w-[85px] h-[75px] rounded-[8px] bg-muted shrink-0 pointer-events-none">
                         <img
@@ -545,68 +318,23 @@ export function DraggableActivityList({
                             onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => e.stopPropagation()}
                           >
-                            {/* 3-dots Menu */}
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <button
-                                  className="p-1 -mr-1 rounded-full text-[#141530] hover:bg-black/5 transition-colors"
-                                  aria-label="Opções"
-                                >
-                                  <MoreHorizontal className="w-5 h-5 text-[#141530]" />
-                                </button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-52 bg-white rounded-xl shadow-lg border border-[#E5E5E7] p-1 z-30 font-['Urbanist',sans-serif]">
-                                {onEditNote && (
-                                  <DropdownMenuItem
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onEditNote(activity);
-                                    }}
-                                    className="text-[13px] py-2 px-3 flex items-center gap-2.5 cursor-pointer text-[#141530] font-semibold"
-                                  >
-                                    <Pencil className="w-4 h-4 text-[#233ACF]" />
-                                    <span>{activity.personalNote || activity.noteText ? 'Editar anotação' : 'Adicionar anotação'}</span>
-                                  </DropdownMenuItem>
-                                )}
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleOpenGoogleMaps(activity);
-                                  }}
-                                  className="text-[13px] py-2 px-3 flex items-center gap-2.5 cursor-pointer text-[#141530]"
-                                >
-                                  <Navigation className="w-4 h-4 text-[#233ACF]" />
-                                  <span>Abrir com Google Maps</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setMovingActivity(activity);
-                                  }}
-                                  className="text-[13px] py-2 px-3 flex items-center gap-2.5 cursor-pointer text-[#141530]"
-                                >
-                                  <ArrowRightLeft className="w-4 h-4 text-[#141530]" />
-                                  <span>Mover para outro dia</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onDelete(activity);
-                                  }}
-                                  className="text-[13px] py-2 px-3 flex items-center gap-2.5 cursor-pointer text-[#DC2626] focus:text-[#DC2626]"
-                                >
-                                  <Trash2 className="w-4 h-4 text-[#DC2626]" />
-                                  <span>Excluir</span>
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOptionsActivity(activity);
+                              }}
+                              className="p-1 -mr-1 rounded-full text-[#141530] hover:bg-black/5 transition-colors"
+                              aria-label="Opções"
+                            >
+                              <MoreHorizontal className="w-5 h-5 text-[#141530]" />
+                            </button>
                           </div>
                         </div>
 
-                        {/* Category | Country */}
+                        {/* Category | Country / Location */}
                         {(() => {
-                          const country = resolveActivityCountry(activity, destinations);
-                          const locationLabel = country || activity.city;
+                          const locationLabel = resolveActivityLocationLabel(activity, destinations);
                           return (
                             <p className="text-[12px] font-semibold text-[#080B43] font-['Urbanist',sans-serif] truncate mb-1">
                               {activity.category}{locationLabel ? ` | ${locationLabel}` : ''}
@@ -616,7 +344,7 @@ export function DraggableActivityList({
 
                         {/* Description */}
                         <p className="text-[12px] font-medium text-[#7F7F7F] font-['Urbanist',sans-serif] line-clamp-2 leading-[14px]">
-                          {activity.observation || 'Ícone de Paris e um dos lugares mais famosos do mundo.'}
+                          {activity.observation || 'Ícone do destino e um dos lugares mais famosos da região.'}
                         </p>
                       </div>
                     </div>
@@ -670,11 +398,12 @@ export function DraggableActivityList({
                 if (hasCalculatedTransport) {
                   return (
                     <div
+                      onPointerDown={(e) => e.stopPropagation()}
                       onClick={(e) => {
                         e.stopPropagation();
                         setEditingTransportIndex(index);
                       }}
-                      className="py-2 pl-3 flex items-center gap-2 text-[#7F7F7F] cursor-pointer group hover:opacity-80 transition-opacity"
+                      className="pt-6 pb-2 pl-3 flex items-center gap-2 text-[#7F7F7F] cursor-pointer group hover:opacity-80 transition-opacity"
                     >
                       <div className="flex items-center gap-1.5 text-[12px] font-medium text-[#141530] font-['Urbanist',sans-serif] flex-shrink-0">
                         <Footprints className="w-3.5 h-3.5 text-[#141530]" />
@@ -690,11 +419,12 @@ export function DraggableActivityList({
 
                 return (
                   <div
+                    onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => {
                       e.stopPropagation();
                       setEditingTransportIndex(index);
                     }}
-                    className="py-2.5 pl-3 flex items-center gap-2 text-[#141530] cursor-pointer group hover:opacity-80 transition-opacity"
+                    className="pt-6 pb-2.5 pl-3 flex items-center gap-2 text-[#141530] cursor-pointer group hover:opacity-80 transition-opacity"
                   >
                     <div className="flex items-center gap-1.5 text-[13px] font-medium text-[#141530] font-['Urbanist',sans-serif] flex-shrink-0">
                       <span>Adicionar locomoção</span>
@@ -716,40 +446,148 @@ export function DraggableActivityList({
         dragState.targetIndex >= activities.length &&
         renderDropPlaceholder()}
 
-      {/* Move to another day modal */}
+      {/* Move to another day bottom sheet */}
       {movingActivity && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl">
-            <h3 className="text-[16px] font-bold text-[#1A1C40] mb-1">Mover atividade</h3>
-            <p className="text-[13px] text-[#8E8E93] mb-4">
-              Escolha o dia de destino para "{movingActivity.name}":
-            </p>
+        <MoveActivityToDaySheet
+          open={!!movingActivity}
+          onClose={() => setMovingActivity(null)}
+          onBack={() => {
+            const act = movingActivity;
+            setMovingActivity(null);
+            setOptionsActivity(act);
+          }}
+          activityName={movingActivity.name}
+          currentDay={selectedDay}
+          daysData={daysData}
+          isFlexibleDates={isFlexibleDates}
+          getActivityCount={getActivityCount}
+          onConfirm={(targetDay) => {
+            onMoveToDay(movingActivity, targetDay);
+            setMovingActivity(null);
+          }}
+        />
+      )}
 
-            <div className="space-y-2 max-h-56 overflow-y-auto mb-5">
-              {daysData.map((d) => (
-                <button
-                  key={d.day}
-                  onClick={() => {
-                    onMoveToDay(movingActivity, d.day);
-                    setMovingActivity(null);
-                  }}
-                  disabled={d.day === selectedDay}
-                  className={`w-full py-2.5 px-4 rounded-xl text-[13px] font-semibold text-left transition-all ${d.day === selectedDay
-                      ? 'bg-[#F4F4F5] text-[#8E8E93] cursor-not-allowed'
-                      : 'bg-[#F9F9FB] text-[#1A1C40] hover:bg-[#EFF6FF] hover:text-[#2563EB]'
-                    }`}
-                >
-                  Dia {d.day}
-                </button>
-              ))}
+      {/* Activity Options Bottom Sheet (Matching user Image 2) */}
+      {optionsActivity && (
+        <div
+          className="fixed inset-0 z-[120] flex items-end justify-center"
+          onClick={() => setOptionsActivity(null)}
+        >
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/40"
+            style={{ animation: 'fadeIn 0.2s ease-out' }}
+          />
+
+          {/* Sheet Container */}
+          <div
+            className="relative w-full bg-white rounded-t-3xl max-h-[85vh] overflow-y-auto"
+            style={{ animation: 'slideUpSheet 0.32s cubic-bezier(0.32, 0.72, 0, 1)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top Drag Handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 rounded-full bg-muted" />
             </div>
 
-            <button
-              onClick={() => setMovingActivity(null)}
-              className="w-full py-3 rounded-2xl bg-[#F4F4F5] text-[#1A1C40] text-[13px] font-bold"
-            >
-              Cancelar
-            </button>
+            {/* Header with Title and Close X */}
+            <div className="px-5 pb-3 pt-2 flex items-center justify-between">
+              <h3 className="text-[18px] font-bold text-foreground truncate pr-2 font-['Urbanist',sans-serif]">
+                {optionsActivity.name || (optionsActivity.type === 'note' ? 'Anotação' : 'Opções')}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setOptionsActivity(null)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors -mr-1 shrink-0"
+                aria-label="Fechar"
+              >
+                <Icon name="close" size={20} className="text-foreground" />
+              </button>
+            </div>
+
+            {/* Options List strictly matching Image 2 */}
+            <div className="px-5 pb-6 divide-y divide-border/40 font-['Urbanist',sans-serif]">
+              {/* 1. Abrir no Google Maps */}
+              {optionsActivity.type !== 'note' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const act = optionsActivity;
+                    setOptionsActivity(null);
+                    handleOpenGoogleMaps(act);
+                  }}
+                  className="w-full flex items-center gap-3.5 py-4 px-1 text-foreground hover:bg-muted/30 transition-colors"
+                >
+                  <div className="w-6 h-6 flex items-center justify-center text-foreground">
+                    <Icon name="map" size={20} className="text-foreground" />
+                  </div>
+                  <span className="text-[15px] font-medium text-foreground flex-1 text-left">
+                    Abrir no Google Maps
+                  </span>
+                  <Icon name="chevron_right" size={20} className="text-muted-foreground/80" />
+                </button>
+              )}
+
+              {/* For notes: Editar anotação */}
+              {optionsActivity.type === 'note' && onEditNote && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const act = optionsActivity;
+                    setOptionsActivity(null);
+                    onEditNote(act);
+                  }}
+                  className="w-full flex items-center gap-3.5 py-4 px-1 text-foreground hover:bg-muted/30 transition-colors"
+                >
+                  <div className="w-6 h-6 flex items-center justify-center text-foreground">
+                    <Pencil size={18} className="text-foreground" />
+                  </div>
+                  <span className="text-[15px] font-medium text-foreground flex-1 text-left">
+                    Editar
+                  </span>
+                  <Icon name="chevron_right" size={20} className="text-muted-foreground/80" />
+                </button>
+              )}
+
+              {/* 2. Mover para outro dia */}
+              <button
+                type="button"
+                onClick={() => {
+                  const act = optionsActivity;
+                  setOptionsActivity(null);
+                  setMovingActivity(act);
+                }}
+                className="w-full flex items-center gap-3.5 py-4 px-1 text-foreground hover:bg-muted/30 transition-colors"
+              >
+                <div className="w-6 h-6 flex items-center justify-center text-foreground">
+                  <Icon name="swap_horiz" size={20} className="text-foreground" />
+                </div>
+                <span className="text-[15px] font-medium text-foreground flex-1 text-left">
+                  Mover para outro dia
+                </span>
+                <Icon name="chevron_right" size={20} className="text-muted-foreground/80" />
+              </button>
+
+              {/* 3. Excluir */}
+              <button
+                type="button"
+                onClick={() => {
+                  const act = optionsActivity;
+                  setOptionsActivity(null);
+                  onDelete(act);
+                }}
+                className="w-full flex items-center gap-3.5 py-4 px-1 text-[#DC2626] hover:bg-destructive/10 transition-colors"
+              >
+                <div className="w-6 h-6 flex items-center justify-center text-[#DC2626]">
+                  <Trash2 size={20} className="text-[#DC2626]" />
+                </div>
+                <span className="text-[15px] font-medium text-[#DC2626] flex-1 text-left">
+                  Excluir
+                </span>
+                <Icon name="chevron_right" size={20} className="text-[#DC2626]" />
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -760,8 +598,18 @@ export function DraggableActivityList({
           open={true}
           onClose={() => setEditingTransportIndex(null)}
           transport={transports[editingTransportIndex] || { type: 'walk', duration: '15 min' }}
+          currency={itineraryCurrency || 'BRL'}
           fromName={activities[editingTransportIndex]?.name}
           toName={activities[editingTransportIndex + 1]?.name}
+          distanceKm={
+            activities[editingTransportIndex]?.lat && activities[editingTransportIndex]?.lng && 
+            activities[editingTransportIndex + 1]?.lat && activities[editingTransportIndex + 1]?.lng 
+              ? haversineKm(
+                  activities[editingTransportIndex].lat!, activities[editingTransportIndex].lng!,
+                  activities[editingTransportIndex + 1].lat!, activities[editingTransportIndex + 1].lng!
+                )
+              : undefined
+          }
           onSave={(data) => {
             onUpdateTransport?.(editingTransportIndex, data);
             setEditingTransportIndex(null);

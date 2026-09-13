@@ -3,10 +3,13 @@ import { Icon } from '@/components/ui/Icon';
 import { DaySelector } from './DaySelector';
 import { TimePickerSheet } from './TimePickerSheet';
 import { toast } from 'sonner';
+import { getCurrencySymbol } from '@/lib/currencyUtils';
 
 export interface ManualActivityData {
   name: string;
   location: string;
+  category?: string;
+  categoryColor?: string;
   startTime: string;
   endTime: string;
   price: string;
@@ -20,6 +23,7 @@ interface AddManualActivitySheetProps {
   dayNumber: number;
   totalDays: number;
   startDate?: Date;
+  currency?: string;
 }
 
 function timeToMinutes(t: string): number {
@@ -46,7 +50,7 @@ const categoryOptions = [
   { label: 'Outro', color: '#64748B', icon: 'place' },
 ];
 
-export function AddManualActivitySheet({ open, onClose, onSave, dayNumber, totalDays, startDate }: AddManualActivitySheetProps) {
+export function AddManualActivitySheet({ open, onClose, onSave, dayNumber, totalDays, startDate, currency = 'BRL' }: AddManualActivitySheetProps) {
   const [name, setName] = useState('');
   const [location, setLocation] = useState('');
   const [price, setPrice] = useState('');
@@ -80,6 +84,8 @@ export function AddManualActivitySheet({ open, onClose, onSave, dayNumber, total
     }
   };
 
+  const cat = categoryOptions[selectedCategory];
+
   const handleSave = () => {
     if (!isValid) return;
     if (timeToMinutes(startTime) >= timeToMinutes(endTime)) {
@@ -89,6 +95,8 @@ export function AddManualActivitySheet({ open, onClose, onSave, dayNumber, total
     onSave({
       name: name.trim(),
       location: location.trim(),
+      category: cat?.label || 'Atividade',
+      categoryColor: cat?.color || '#10B981',
       startTime,
       endTime,
       price: price.trim(),
@@ -103,8 +111,6 @@ export function AddManualActivitySheet({ open, onClose, onSave, dayNumber, total
     setEndTime('10:00');
     onClose();
   };
-
-  const cat = categoryOptions[selectedCategory];
 
   return (
     <>
@@ -123,7 +129,7 @@ export function AddManualActivitySheet({ open, onClose, onSave, dayNumber, total
           <div className="px-6 pt-1 pb-2 flex items-center justify-end">
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-full bg-muted flex items-center justify-center -mr-1"
+              className="w-10 h-10 rounded-full bg-muted flex items-center justify-center -mr-1"
               aria-label="Fechar"
             >
               <Icon name="close" size={18} className="text-muted-foreground" />
@@ -237,7 +243,7 @@ export function AddManualActivitySheet({ open, onClose, onSave, dayNumber, total
                   type="text"
                   value={price}
                   onChange={e => setPrice(e.target.value)}
-                  placeholder="Ex: €17, Grátis, R$ 50"
+                  placeholder={`Ex: ${getCurrencySymbol(currency)} 50, Grátis`}
                   maxLength={50}
                   className="w-full rounded-xl pl-10 pr-4 py-3 text-[14px] text-foreground placeholder:text-muted-foreground outline-none"
                   style={{ background: '#F2F2F2' }}

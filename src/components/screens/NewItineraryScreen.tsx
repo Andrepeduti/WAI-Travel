@@ -113,7 +113,7 @@ export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales, 
   const [showManageItinerary, setShowManageItinerary] = useState(false);
   const [itineraryData, setItineraryData] = useState(data);
   const [manualCover, setManualCover] = useState<string | null>(null);
-  const [duplicateToast, setDuplicateToast] = useState(false);
+
   const [isOpeningDuplicate, setIsOpeningDuplicate] = useState(false);
   const tabsRef = useRef<HTMLDivElement>(null);
 
@@ -194,29 +194,28 @@ export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales, 
   }
 
   return (
-    <div className="min-h-screen pb-8 relative" style={{ fontFamily: 'var(--font-family-primary)', background: '#F2F2F2' }}>
+    <div className="min-h-[100dvh] pb-8 relative" style={{ fontFamily: 'var(--font-family-primary)', background: '#F2F2F2' }}>
       {/* Floating FABs */}
       <div className="fixed inset-x-0 bottom-24 z-50 pointer-events-none">
         <div className="w-full mx-auto relative">
           <div className="absolute right-4 bottom-0 flex flex-col gap-3 pointer-events-auto">
-            <button className="w-12 h-12 rounded-full shadow-lg flex items-center justify-center" style={{ background: '#1A1C40' }}>
+            <button className="w-10 h-10 rounded-full shadow-lg flex items-center justify-center" style={{ background: '#1A1C40' }}>
               <Icon name="map" size={22} className="text-primary" />
             </button>
-            <button className="w-12 h-12 rounded-full bg-primary shadow-lg flex items-center justify-center">
+            <button className="w-10 h-10 rounded-full bg-primary shadow-lg flex items-center justify-center">
               <Icon name="add" size={24} className="text-primary-foreground" />
             </button>
           </div>
         </div>
       </div>
 
-      {/* Hero Header */}
       <div
-        className="relative bg-cover bg-center"
+        className={`relative bg-cover bg-center ${isAutoCover && autoCover.isLoading ? 'animate-pulse bg-gray-300' : ''}`}
         style={{
           height: '22vh',
           minHeight: '160px',
           maxHeight: '220px',
-          backgroundImage: `url(${coverImage})`,
+          backgroundImage: (isAutoCover && autoCover.isLoading) ? 'none' : `url(${coverImage})`,
         }}
       >
         <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/10 to-black/50" />
@@ -428,7 +427,7 @@ export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales, 
         {currentTitle && (
           <div className="flex items-center gap-3 mb-5">
             <h2 className="text-[18px] font-bold text-foreground">{currentTitle}</h2>
-            <button className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#F3F3F3' }}>
+            <button className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: '#F3F3F3' }}>
               <Icon name="edit" size={16} className="text-foreground" />
             </button>
           </div>
@@ -528,9 +527,31 @@ export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales, 
       </div>
 
       {isOpeningDuplicate && (
-        <div className="fixed inset-0 z-[210] bg-background/90 backdrop-blur-sm flex flex-col items-center justify-center gap-3">
-          <div className="w-10 h-10 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
-          <p className="text-[14px] font-semibold text-foreground">Abrindo cópia do roteiro...</p>
+        <div className="fixed inset-0 z-[210] flex flex-col items-center justify-center gap-6" style={{ backgroundColor: '#1A1C40' }}>
+          <div className="relative w-[80px] h-[80px] animate-spin">
+            <div 
+              className="absolute inset-0 rounded-full"
+              style={{ 
+                background: 'conic-gradient(from 180deg at 50% 50%, rgba(134, 182, 31, 0) 0deg, #86B61F 360deg)',
+                WebkitMaskImage: 'radial-gradient(circle at center, transparent 34px, black 35px)',
+                maskImage: 'radial-gradient(circle at center, transparent 34px, black 35px)'
+              }} 
+            />
+            <div 
+              className="absolute"
+              style={{ 
+                width: '12px',
+                height: '12px',
+                borderRadius: '50%',
+                background: '#9DCC36',
+                top: '67.57px',
+                left: '34.18px'
+              }}
+            />
+          </div>
+          <p className="text-[24px] font-semibold text-[#FEFEFE]" style={{ fontFamily: 'Urbanist, sans-serif' }}>
+            Duplicando roteiro...
+          </p>
         </div>
       )}
 
@@ -542,8 +563,6 @@ export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales, 
         onDuplicate={() => {
           if (ownCreatedCount >= FREE_PLAN_ITINERARY_LIMIT) {
             setShowPlanLimitSheet(true);
-          } else {
-            setDuplicateToast(true);
           }
         }}
         onDelete={onDelete ?? onBack}
@@ -585,37 +604,6 @@ export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales, 
           setPublishedMainTag(patch.mainTag);
         }}
         onUnpublish={() => setIsItineraryPublic(false)}
-      />
-      <SuccessToast
-        isVisible={duplicateToast}
-        onClose={() => setDuplicateToast(false)}
-        title="Roteiro duplicado!"
-        description="Uma cópia do roteiro foi criada com sucesso"
-        actionLabel="Abrir roteiro"
-        onAction={() => {
-          setDuplicateToast(false);
-          setIsOpeningDuplicate(true);
-
-          setTimeout(() => {
-            setSelectedDay(1);
-            setReservas([]);
-            setExpenses([]);
-            setTransportes([]);
-            setDayTitles({});
-            setSelectedActivity(null);
-            setItineraryData(prev => {
-              const firstDestination = prev.destinations[0] ?? 'Paris, França';
-              const [city] = firstDestination.split(',');
-              const newTitle = prev.tripName ? `Cópia de ${prev.tripName}` : `Cópia de ${city.trim()}`;
-
-              return {
-                ...prev,
-                tripName: newTitle,
-              };
-            });
-            setIsOpeningDuplicate(false);
-          }, 700);
-        }}
       />
 
       <PlanLimitReachedSheet

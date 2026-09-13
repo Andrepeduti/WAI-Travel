@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { TimePickerSheet } from '@/components/travel/TimePickerSheet';
 import { cn } from '@/lib/utils';
 import { searchGooglePlacesAutocomplete } from '@/lib/googlePlacesApi';
+import { getCurrencySymbol } from '@/lib/currencyUtils';
 
 type ReservaTipo = 'hospedagem' | 'atividade';
 
@@ -42,11 +43,12 @@ interface AddReservaSheetProps {
   onAdd: (reserva: Reserva) => void;
   editingReserva?: Reserva | null;
   initialTipo?: ReservaTipo;
+  currency?: string;
 }
 
 type TimePickerTarget = 'checkIn' | 'checkOut' | 'atividade' | null;
 
-export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva, initialTipo }: AddReservaSheetProps) {
+export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva, initialTipo, currency = 'BRL' }: AddReservaSheetProps) {
   const [tipo, setTipo] = useState<ReservaTipo>(editingReserva?.tipo || initialTipo || 'hospedagem');
   const [isLoading, setIsLoading] = useState(false);
   const [nome, setNome] = useState(editingReserva?.nome || '');
@@ -283,7 +285,7 @@ export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva, initia
           <div className="flex justify-end items-center px-6 pt-1 pb-2">
             <button
               onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center -mr-1"
+              className="w-10 h-10 flex items-center justify-center -mr-1"
               aria-label="Fechar"
             >
               <Icon name="close" size={20} className="text-muted-foreground" />

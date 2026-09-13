@@ -321,7 +321,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
   const handleOpenChat = useCallback(async () => {
     if (!itineraryData) return;
     if (!onOpenChat) {
-      toast(`Abrindo conversa com ${itineraryData.author}…`);
+      toast.success(`Abrindo conversa com ${itineraryData.author}…`);
       return;
     }
     const destination = itineraryData?.destinations?.[0];
@@ -541,7 +541,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
   }
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] pb-32">
+    <div className="min-h-[100dvh] bg-[#F2F2F2] pb-32">
       {/* Hero image */}
       <div className="relative h-[230px]">
         <img

@@ -84,11 +84,24 @@ function getOsmCategory(tags: Record<string, string>) {
   return defaultCategory;
 }
 
-// ─── Cache ───────────────────────────────────────────────────────────────────
+function getCityCache(key: string): CityPlace[] | null {
+  try {
+    const cached = localStorage.getItem(`wai-city-cache-${key}`);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) {
+        return parsed.places;
+      }
+    }
+  } catch (e) {}
+  return null;
+}
 
-const cityCache = new Map<string, { places: CityPlace[]; timestamp: number }>();
-const CACHE_DURATION = 30 * 60 * 1000; // 30 min
-
+function setCityCache(key: string, places: CityPlace[]) {
+  try {
+    localStorage.setItem(`wai-city-cache-${key}`, JSON.stringify({ places, timestamp: Date.now() }));
+  } catch (e) {}
+}
 // ─── Priority for sorting ────────────────────────────────────────────────────
 
 const priorityOrder: Record<string, number> = {
@@ -519,26 +532,46 @@ async function fetchWikipediaNearby(
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
-export async function fetchPlacesForCity(cityName: string): Promise<CityPlace[]> {
+export async function fetchPlacesForCity(cityName: string, interests?: string[]): Promise<CityPlace[]> {
   const cacheKey = cityName.toLowerCase().trim().split(',')[0].trim();
-  const cached = cityCache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    return cached.places;
+  const cached = getCityCache(cacheKey);
+  if (cached) {
+    return cached;
   }
 
   try {
     // Run Wikipedia (monuments/attractions) and AI curation
     // (restaurants/experiences/nightlife/events) in parallel.
-    const aiPromise = fetchAiPlacesForCity(cityName).catch(() => [] as CityPlace[]);
+    const aiPromise = fetchAiPlacesForCity(cityName, interests).catch(() => [] as CityPlace[]);
 
     // Geocode city for Wikipedia geosearch using Google Places API
-    const googlePredictions = await searchGooglePlacesAutocomplete(cityName, ['(cities)']);
     let cityLat, cityLng;
+    const { getPlaceByGoogleId, upsertPlace } = await import('@/lib/placesCache');
+    
+    const googlePredictions = await searchGooglePlacesAutocomplete(cityName, ['(cities)']);
     if (googlePredictions.length > 0) {
-      const details = await getGooglePlaceDetails(googlePredictions[0].placeId);
-      if (details) {
-        cityLat = details.lat;
-        cityLng = details.lng;
+      const placeId = googlePredictions[0].placeId;
+      const cachedCityPlace = await getPlaceByGoogleId(placeId);
+      
+      if (cachedCityPlace?.latitude && cachedCityPlace?.longitude) {
+        cityLat = cachedCityPlace.latitude;
+        cityLng = cachedCityPlace.longitude;
+      } else {
+        const details = await getGooglePlaceDetails(placeId);
+        if (details) {
+          cityLat = details.lat;
+          cityLng = details.lng;
+          try {
+            await upsertPlace({
+              name: cityName.toLowerCase().trim().split(',')[0].trim(),
+              google_place_id: placeId,
+              latitude: details.lat,
+              longitude: details.lng,
+              formatted_address: details.formattedAddress,
+              enrichment_level: 'basic'
+            });
+          } catch {}
+        }
       }
     }
 
@@ -555,14 +588,14 @@ export async function fetchPlacesForCity(cityName: string): Promise<CityPlace[]>
     const interleaved = interleaveByCategory(merged);
 
     if (interleaved.length > 0) {
-      cityCache.set(cacheKey, { places: interleaved, timestamp: Date.now() });
+      setCityCache(cacheKey, interleaved);
     }
     return interleaved;
   } catch (error) {
     console.error('Error fetching places:', error);
     // Fallback: try AI alone (it may be cached locally even without geocoding).
     try {
-      return await fetchAiPlacesForCity(cityName);
+      return await fetchAiPlacesForCity(cityName, interests);
     } catch {
       return [];
     }

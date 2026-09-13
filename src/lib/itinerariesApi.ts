@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { setCachedOwnerProfile, setCachedItineraryMembers, type ItineraryMember } from './itineraryMembersApi';
+import { parseLocalDate } from './localDate';
 
 /**
  * Evento global disparado após qualquer mutação confirmada em `itineraries`.
@@ -37,7 +38,11 @@ export interface UserItinerary {
   isPublic: boolean;
   priceCents?: number | null;
   description?: string;
-  tags?: string[];
+  description?: string;
+  status?: 'draft' | 'published' | 'suspended';
+  isFlexible?: boolean;
+  durationDays?: number;
+  travelMonth?: string;
   userId: string;
   isPaused?: boolean;
   extraPeople?: any[];
@@ -59,7 +64,11 @@ export interface CreateItineraryInput {
   isPublic?: boolean;
   priceCents?: number | null;
   description?: string;
-  tags?: string[];
+  description?: string;
+  status?: 'draft' | 'published' | 'suspended';
+  isFlexible?: boolean;
+  durationDays?: number;
+  travelMonth?: string;
 }
 
 export interface UpdateItineraryInput {
@@ -74,7 +83,11 @@ export interface UpdateItineraryInput {
   isPublic?: boolean;
   priceCents?: number | null;
   description?: string;
-  tags?: string[];
+  description?: string;
+  status?: 'draft' | 'published' | 'suspended';
+  isFlexible?: boolean;
+  durationDays?: number;
+  travelMonth?: string;
   isPaused?: boolean;
   extraPeople?: any[];
   deletedAt?: string | null;
@@ -95,7 +108,10 @@ function rowToItinerary(row: any): UserItinerary {
     isPublic: row.is_public ?? false,
     priceCents: row.price_cents,
     description: row.description,
-    tags: row.tags || [],
+    status: row.status ?? 'draft',
+    isFlexible: row.is_flexible ?? false,
+    durationDays: row.duration_days ?? undefined,
+    travelMonth: row.travel_month ?? undefined,
     userId: row.user_id,
     isPaused: row.is_paused ?? false,
     extraPeople: row.extra_people ?? [],
@@ -153,13 +169,73 @@ export async function listMyItineraries(): Promise<UserItinerary[]> {
     seen.add(it.id);
     merged.push(it);
   }
-  // Ordena por data de última alteração (updatedAt ou createdAt) decrescente
-  merged.sort((a, b) => {
-    const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
-    const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
-    return timeB - timeA;
+  // Ordena por regras de data:
+  // 1. Em andamento sempre em primeiro
+  // 2. Data mais próxima em cima das de data mais distante
+  // 3. Concluídos sempre por último
+  return sortUserItinerariesByDate(merged);
+}
+
+export function sortUserItinerariesByDate(list: UserItinerary[]): UserItinerary[] {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return [...list].sort((a, b) => {
+    const isFlexibleA = a.isFlexible || false;
+    const isCancelledA = a.status === 'suspended' || false;
+    const parsedStartA = parseLocalDate(a.startDate);
+    const parsedEndA = parseLocalDate(a.endDate);
+    const startA = parsedStartA ? new Date(parsedStartA) : (parsedEndA ? new Date(parsedEndA) : null);
+    const endA = parsedEndA ? new Date(parsedEndA) : (parsedStartA ? new Date(parsedStartA) : null);
+    if (startA) startA.setHours(0, 0, 0, 0);
+    if (endA) endA.setHours(0, 0, 0, 0);
+
+    const isPastA = !isCancelledA && !isFlexibleA && !!endA && endA < today;
+    const isInProgressA = !isCancelledA && !isFlexibleA && !isPastA && !!startA && !!endA && today >= startA && today <= endA;
+
+    const isFlexibleB = b.isFlexible || false;
+    const isCancelledB = b.status === 'suspended' || false;
+    const parsedStartB = parseLocalDate(b.startDate);
+    const parsedEndB = parseLocalDate(b.endDate);
+    const startB = parsedStartB ? new Date(parsedStartB) : (parsedEndB ? new Date(parsedEndB) : null);
+    const endB = parsedEndB ? new Date(parsedEndB) : (parsedStartB ? new Date(parsedStartB) : null);
+    if (startB) startB.setHours(0, 0, 0, 0);
+    if (endB) endB.setHours(0, 0, 0, 0);
+
+    const isPastB = !isCancelledB && !isFlexibleB && !!endB && endB < today;
+    const isInProgressB = !isCancelledB && !isFlexibleB && !isPastB && !!startB && !!endB && today >= startB && today <= endB;
+
+    // 1. Em andamento em primeiro
+    if (isInProgressA && !isInProgressB) return -1;
+    if (!isInProgressA && isInProgressB) return 1;
+
+    // 2. Concluídos por último
+    if (isPastA && !isPastB) return 1;
+    if (!isPastA && isPastB) return -1;
+
+    if (isPastA && isPastB) {
+      const endMsA = endA ? endA.getTime() : 0;
+      const endMsB = endB ? endB.getTime() : 0;
+      if (endMsA !== endMsB) return endMsB - endMsA;
+      return 0;
+    }
+
+    if (isInProgressA && isInProgressB) {
+      const startMsA = startA ? startA.getTime() : 0;
+      const startMsB = startB ? startB.getTime() : 0;
+      if (startMsA !== startMsB) return startMsA - startMsB;
+      return 0;
+    }
+
+    // 3. Futuros / Próximos: data mais próxima em cima
+    const timeA = !isFlexibleA && startA ? startA.getTime() : Infinity;
+    const timeB = !isFlexibleB && startB ? startB.getTime() : Infinity;
+    if (timeA !== timeB) return timeA - timeB;
+
+    const createdA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const createdB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return createdB - createdA;
   });
-  return merged;
 }
 
 export async function getUserItineraryById(id: string): Promise<UserItinerary | null> {
@@ -177,8 +253,8 @@ export async function getUserItineraryById(id: string): Promise<UserItinerary | 
 }
 
 export async function createItinerary(input: CreateItineraryInput): Promise<UserItinerary | null> {
-  const { data: userData } = await supabase.auth.getUser();
-  const userId = userData.user?.id;
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user?.id;
   if (!userId) {
     console.error('[itinerariesApi] createItinerary called without an auth session');
     return null;
@@ -200,7 +276,10 @@ export async function createItinerary(input: CreateItineraryInput): Promise<User
       is_public: input.isPublic ?? false,
       price_cents: input.priceCents ?? null,
       description: input.description ?? '',
-      tags: input.tags ?? [],
+      status: input.status ?? 'draft',
+      is_flexible: input.isFlexible ?? false,
+      duration_days: input.durationDays ?? null,
+      travel_month: input.travelMonth ?? null,
       is_paused: input.isPaused ?? false,
       extra_people: input.extraPeople ?? []
     })
@@ -211,7 +290,15 @@ export async function createItinerary(input: CreateItineraryInput): Promise<User
     return null;
   }
   const created = rowToItinerary(data);
-  if (created) emitItinerariesChanged('create', created.id);
+  if (created) {
+    try {
+      const { initItineraryChecklist } = await import('./checklistApi');
+      await initItineraryChecklist(created.id);
+    } catch (err) {
+      console.error('[itinerariesApi] Failed to init default checklist', err);
+    }
+    emitItinerariesChanged('create', created.id);
+  }
   return created;
 }
 
@@ -229,7 +316,10 @@ export async function updateItinerary(id: string, patch: UpdateItineraryInput): 
   if (patch.isPublic !== undefined) updates.is_public = patch.isPublic;
   if (patch.priceCents !== undefined) updates.price_cents = patch.priceCents;
   if (patch.description !== undefined) updates.description = patch.description;
-  if (patch.tags !== undefined) updates.tags = patch.tags;
+  if (patch.status !== undefined) updates.status = patch.status;
+  if (patch.isFlexible !== undefined) updates.is_flexible = patch.isFlexible;
+  if (patch.durationDays !== undefined) updates.duration_days = patch.durationDays;
+  if (patch.travelMonth !== undefined) updates.travel_month = patch.travelMonth;
   if (patch.isPaused !== undefined) updates.is_paused = patch.isPaused;
   if (patch.extraPeople !== undefined) updates.extra_people = patch.extraPeople;
   if (patch.deletedAt !== undefined) updates.deleted_at = patch.deletedAt;
@@ -282,18 +372,20 @@ export interface ItineraryCardParticipant {
 export async function fetchItineraryMemberAvatars(
   itineraryIds: string[],
 ): Promise<Record<string, ItineraryCardParticipant[]>> {
-  if (itineraryIds.length === 0) return {};
+  const validIds = itineraryIds.filter(id => !id.startsWith('pending-itinerary-'));
+  if (validIds.length === 0) return {};
+  
   const result: Record<string, ItineraryCardParticipant[]> = {};
   // 1) Donos dos roteiros
   const { data: itins } = await supabase
     .from('itineraries')
     .select('id, user_id')
-    .in('id', itineraryIds);
+    .in('id', validIds);
   // 2) Membros aceitos
   const { data: members } = await supabase
     .from('itinerary_members')
     .select('itinerary_id, user_id')
-    .in('itinerary_id', itineraryIds);
+    .in('itinerary_id', validIds);
 
   const ownerByItin = new Map<string, string>();
   (itins ?? []).forEach((i: any) => ownerByItin.set(i.id, i.user_id));
@@ -445,6 +537,7 @@ export async function listPublicItineraries(limit = 200): Promise<PublicItinerar
     .from('itineraries')
     .select('*')
     .eq('is_public', true)
+    .eq('status', 'published')
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .limit(limit);
@@ -502,7 +595,7 @@ export async function listPublicItineraries(limit = 200): Promise<PublicItinerar
  */
 export async function publishItineraryAsCopy(
   source: UserItinerary,
-  publishData: { priceCents: number | null; description: string; tags: string[]; },
+  publishData: { priceCents: number | null; description: string; },
   snapshot?: {
     activities?: Record<number, unknown[]>;
     transports?: Record<number, unknown[]>;
@@ -521,7 +614,7 @@ export async function publishItineraryAsCopy(
     isPublic: true,
     priceCents: publishData.priceCents,
     description: publishData.description,
-    tags: publishData.tags
+    status: 'published'
   });
   if (!created) return null;
 

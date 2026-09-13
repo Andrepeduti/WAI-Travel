@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Icon } from '@/components/ui/Icon';
-import { X, MapPin, ChevronDown, Check } from 'lucide-react';
+import { X, MapPin, ChevronDown, Check, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -13,6 +12,7 @@ interface AddNoteSheetProps {
     day: number;
     activityId?: number;
   }) => void;
+  onDelete?: () => void;
   dayNumber: number;
   totalDays: number;
   daysData?: Array<{ day: number; date: Date }>;
@@ -25,6 +25,7 @@ export function AddNoteSheet({
   open,
   onClose,
   onSave,
+  onDelete,
   dayNumber,
   totalDays,
   daysData = [],
@@ -62,6 +63,8 @@ export function AddNoteSheet({
     onClose();
   };
 
+  const isEditing = Boolean(initialText || activityId);
+
   return (
     <>
       {/* Backdrop */}
@@ -71,97 +74,106 @@ export function AddNoteSheet({
       />
 
       {/* Modal / Bottom Sheet */}
-      <div className="fixed inset-x-0 bottom-0 z-50 flex justify-center pointer-events-none">
-        <div className="bg-white rounded-t-[32px] w-full shadow-2xl p-6 pointer-events-auto animate-in slide-in-from-bottom duration-300 max-w-lg mx-auto">
+      <div className="fixed inset-x-0 bottom-0 z-50 flex flex-col justify-end pointer-events-none">
+        <div className="bg-white rounded-t-[24px] w-full shadow-2xl pointer-events-auto animate-in slide-in-from-bottom duration-300 overflow-hidden font-['Urbanist',sans-serif]">
           
-          {/* Top Bar with Close Button */}
-          <div className="flex items-center justify-end pb-2">
+          {/* Header Top Bar with Close Button */}
+          <div className="flex items-center justify-end px-6 pt-6 pb-3">
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-full flex items-center justify-center bg-[#F4F4F5] text-[#1A1C40] hover:bg-[#ECECED] transition-colors -mr-1"
+              className="w-[18px] h-[18px] flex items-center justify-center text-[#000000] hover:opacity-70 transition-opacity"
               aria-label="Fechar"
             >
-              <X className="w-4 h-4" />
+              <X className="w-[18px] h-[18px]" strokeWidth={2} />
             </button>
           </div>
 
-          {/* Title */}
-          <div className="pb-3 border-b border-[#F4F4F5]">
-            <h2 className="text-[20px] font-bold text-[#1A1C40]">
-              {activityName ? `Anotação para ${activityName}` : 'Adicionar anotação pessoal'}
-            </h2>
-          </div>
+          {/* Main Body */}
+          <div className="px-6 pb-6 flex flex-col gap-6">
+            
+            {/* Title */}
+            <div>
+              <h2 className="text-[22px] font-semibold leading-[26px] text-[#171F2C]">
+                {activityName ? `Anotação para ${activityName}` : 'Anotação pessoal'}
+              </h2>
+            </div>
 
-          <div className="space-y-4 pt-4">
             {/* Day Selector - only displayed for standalone notes not bound to an existing activity */}
             {!activityName && !activityId && (
-              <div>
-                <label className="text-[12px] font-medium text-[#8E8E93] block mb-1.5">
-                  Escolha o dia
-                </label>
-
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setIsDayDropdownOpen(!isDayDropdownOpen)}
-                    className="w-full flex items-center justify-between px-4 py-3 bg-[#F4F4F5] rounded-2xl text-[14px] font-semibold text-[#1A1C40] text-left"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <MapPin className="w-4 h-4 text-[#8E8E93]" />
-                      <span>{formattedDayStr}</span>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsDayDropdownOpen(!isDayDropdownOpen)}
+                  className={`w-full min-h-[54px] px-3 py-2 bg-[#EDEDED] rounded-[12px] flex items-center justify-between gap-3 text-left transition-all hover:bg-[#E5E5E5] ${
+                    isDayDropdownOpen ? 'ring-2 ring-[#9DCC36]' : ''
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <MapPin className="w-4 h-4 text-[#7F7F7F] shrink-0" />
+                    <div className="flex flex-col justify-center gap-[2px] min-w-0">
+                      <span className="text-[12px] font-medium leading-[16px] text-[#949494]">
+                        Escolha o dia
+                      </span>
+                      <span className="text-[14px] font-medium leading-[16px] text-[#141530] truncate">
+                        {formattedDayStr}
+                      </span>
                     </div>
-                    <ChevronDown className="w-4 h-4 text-[#8E8E93]" />
-                  </button>
+                  </div>
+                  <ChevronDown
+                    className={`w-4 h-4 text-[#7F7F7F] shrink-0 transition-transform ${
+                      isDayDropdownOpen ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
 
-                  {isDayDropdownOpen && (
-                    <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-[#E5E5E7] rounded-2xl shadow-xl z-20 max-h-48 overflow-y-auto divide-y divide-[#F4F4F5]">
-                      {daysData.length > 0
-                        ? daysData.map((d) => {
-                            const str = `Dia ${d.day} (${format(d.date, 'dd/MM - EEEE', { locale: ptBR })})`;
-                            return (
-                              <button
-                                key={d.day}
-                                type="button"
-                                onClick={() => {
-                                  setSelectedDay(d.day);
-                                  setIsDayDropdownOpen(false);
-                                }}
-                                className={`w-full px-4 py-2.5 text-left text-[13px] flex items-center justify-between ${
-                                  selectedDay === d.day
-                                    ? 'bg-[#F5F3FF] text-[#7C3AED] font-bold'
-                                    : 'text-[#1A1C40] hover:bg-[#F4F4F5]'
-                                }`}
-                              >
-                                <span>{str}</span>
-                                {selectedDay === d.day && <Check className="w-4 h-4" />}
-                              </button>
-                            );
-                          })
-                        : Array.from({ length: totalDays || 1 }).map((_, i) => (
+                {isDayDropdownOpen && (
+                  <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-[#E5E5E7] rounded-[16px] shadow-xl z-20 max-h-48 overflow-y-auto divide-y divide-[#F4F4F5]">
+                    {daysData.length > 0
+                      ? daysData.map((d) => {
+                          const str = `Dia ${d.day} (${format(d.date, 'dd/MM - EEEE', { locale: ptBR })})`;
+                          return (
                             <button
-                              key={i + 1}
+                              key={d.day}
                               type="button"
                               onClick={() => {
-                                setSelectedDay(i + 1);
+                                setSelectedDay(d.day);
                                 setIsDayDropdownOpen(false);
                               }}
-                              className={`w-full px-4 py-2.5 text-left text-[13px] ${
-                                selectedDay === i + 1
-                                  ? 'bg-[#F5F3FF] text-[#7C3AED] font-bold'
-                                  : 'text-[#1A1C40] hover:bg-[#F4F4F5]'
+                              className={`w-full px-4 py-3 text-left text-[14px] flex items-center justify-between transition-colors ${
+                                selectedDay === d.day
+                                  ? 'bg-[#9DCC36]/20 text-[#141530] font-bold'
+                                  : 'text-[#141530] hover:bg-[#F4F4F5] font-medium'
                               }`}
                             >
-                              Dia {i + 1}
+                              <span>{str}</span>
+                              {selectedDay === d.day && <Check className="w-4 h-4 text-[#4E7B06]" />}
                             </button>
-                          ))}
-                    </div>
-                  )}
-                </div>
+                          );
+                        })
+                      : Array.from({ length: totalDays || 1 }).map((_, i) => (
+                          <button
+                            key={i + 1}
+                            type="button"
+                            onClick={() => {
+                              setSelectedDay(i + 1);
+                              setIsDayDropdownOpen(false);
+                            }}
+                            className={`w-full px-4 py-3 text-left text-[14px] transition-colors ${
+                              selectedDay === i + 1
+                                ? 'bg-[#9DCC36]/20 text-[#141530] font-bold'
+                                : 'text-[#141530] hover:bg-[#F4F4F5] font-medium'
+                            }`}
+                          >
+                            Dia {i + 1}
+                          </button>
+                        ))}
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Note Textarea */}
-            <div className="bg-[#F4F4F5] rounded-2xl p-3.5 relative">
+            {/* Note Textarea Container */}
+            <div className="bg-[#EDEDED] rounded-[16px] p-6 flex flex-col justify-between min-h-[181px] gap-4">
               <textarea
                 value={text}
                 onChange={(e) => {
@@ -170,32 +182,51 @@ export function AddNoteSheet({
                   }
                 }}
                 rows={5}
-                placeholder="Escreva sua anotação pessoal..."
-                className="w-full bg-transparent text-[14px] text-[#1A1C40] placeholder:text-[#8E8E93] focus:outline-none resize-none"
+                placeholder="Adicione uma anotação para este dia..."
+                className="w-full bg-transparent text-[14px] font-medium leading-[20px] text-[#171F2C] placeholder:text-[#7F7F7F] focus:outline-none resize-none flex-1"
               />
-              <div className="text-right text-[11px] font-medium text-[#8E8E93] mt-1">
-                {text.length}/500
+              <div className="flex justify-end items-center">
+                <span className="text-[12px] font-medium leading-[16px] text-[#676767]">
+                  {text.length}/500
+                </span>
               </div>
             </div>
 
-            {/* Save Button */}
-            <div className="pt-2">
+            {/* Actions (Delete & Save) */}
+            <div className="flex flex-col gap-4">
+              {/* Delete Note Option */}
+              {onDelete && isEditing && (
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  className="flex items-center gap-3 text-[#D00004] hover:opacity-80 transition-opacity py-1 w-fit group"
+                >
+                  <Trash2 className="w-5 h-5 text-[#D00004]" strokeWidth={1.8} />
+                  <span className="text-[16px] font-medium leading-[19px] text-[#D00004]">
+                    Excluir anotação
+                  </span>
+                </button>
+              )}
+
+              {/* Save Button */}
               <button
                 type="button"
                 onClick={handleSave}
                 disabled={!text.trim()}
-                className={`w-full py-4 rounded-2xl text-[15px] font-bold transition-all shadow-sm flex items-center justify-center ${
+                className={`w-full h-[48px] rounded-[16px] px-6 py-3 text-[16px] font-bold leading-[19px] flex items-center justify-center transition-all ${
                   text.trim()
-                    ? 'bg-[#9ecc3b] text-[#1A1C40] hover:opacity-95 active:scale-[0.99]'
-                    : 'bg-[#E5E5E7] text-[#8E8E93] cursor-not-allowed'
+                    ? 'bg-[#9DCC36] text-[#141530] hover:brightness-95 active:scale-[0.99] shadow-sm'
+                    : 'bg-[#EDEDED] text-[#949494] cursor-not-allowed'
                 }`}
               >
                 Salvar
               </button>
             </div>
+
           </div>
         </div>
       </div>
     </>
   );
 }
+

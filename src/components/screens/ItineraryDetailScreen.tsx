@@ -131,7 +131,7 @@ export function ItineraryDetailScreen({ itineraryId, onBack, onOpenChat }: Itine
     if (onOpenChat) {
       onOpenChat(itineraryData.author, itineraryData.authorImage);
     } else {
-      toast(`Abrindo conversa com ${itineraryData.author}…`);
+      toast.success(`Abrindo conversa com ${itineraryData.author}…`);
     }
   }, [onOpenChat]);
 
@@ -157,7 +157,7 @@ export function ItineraryDetailScreen({ itineraryId, onBack, onOpenChat }: Itine
   };
 
   return (
-    <div className="min-h-screen bg-background pb-32">
+    <div className="min-h-[100dvh] bg-background pb-32">
       {/* Hero image */}
       <div className="relative h-[280px]">
         <img 

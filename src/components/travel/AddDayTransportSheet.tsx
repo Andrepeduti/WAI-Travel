@@ -60,7 +60,7 @@ export function AddDayTransportSheet({ open, onClose, onSave, dayNumber, totalDa
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-full flex items-center justify-center -mr-1"
+            className="w-10 h-10 rounded-full flex items-center justify-center -mr-1"
             style={{ background: '#F2F2F2' }}
             aria-label="Fechar"
           >
@@ -106,7 +106,7 @@ export function AddDayTransportSheet({ open, onClose, onSave, dayNumber, totalDa
             <label className="text-[13px] font-medium text-muted-foreground mb-1.5 block">
               Custo (opcional)
             </label>
-            <div className="flex items-center gap-2 rounded-xl px-4 py-3" style={{ background: '#F2F2F2' }}>
+            <div className="flex items-center gap-2 rounded-[10px] px-4 py-3" style={{ background: '#F2F2F2' }}>
               <Icon name="attach_money" size={18} className="text-muted-foreground" />
               <input
                 type="text"

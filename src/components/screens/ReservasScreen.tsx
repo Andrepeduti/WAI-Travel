@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { BackButton } from '@/components/ui/BackButton';
+import { ChevronLeft } from 'lucide-react';
 import { SuccessToast } from '@/components/travel/SuccessToast';
 import { LuggageIllustration } from '@/components/travel/reservas/LuggageIllustration';
 import {
@@ -197,16 +197,23 @@ export function ReservasScreen({
 
   return (
     <div
-      className="min-h-screen bg-[#F3F3F3] flex flex-col relative"
+      className="min-h-[100dvh] bg-[#F3F3F3] flex flex-col relative"
       style={{ fontFamily: 'var(--font-family-primary, "Urbanist", sans-serif)' }}
     >
       {/* Header (Figma specs: bg #F3F3F3, gap 16px, title 20px bold #171F2C) */}
       <header className="sticky top-0 z-20 bg-[#F3F3F3] px-6 pt-5 pb-3">
         <div
-          className="flex items-center gap-4"
+          className="flex items-center gap-3"
           style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 8px)' }}
         >
-          <BackButton onClick={onBack} />
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Voltar"
+            className="p-1 -ml-1 text-[#171F2C] hover:opacity-70 active:scale-95 transition-all flex items-center justify-center"
+          >
+            <ChevronLeft size={22} strokeWidth={2.5} className="text-[#171F2C]" />
+          </button>
           <h1 className="font-['Urbanist'] font-bold text-[20px] leading-[24px] text-[#171F2C] my-0">
             Reservas
           </h1>

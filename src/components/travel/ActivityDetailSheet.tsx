@@ -434,7 +434,7 @@ export function ActivityDetailSheet({ activity, videoLink, onClose }: ActivityDe
         <div className="flex items-center justify-end px-5 pt-2 pb-1">
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-[#F2F2F2] flex items-center justify-center flex-shrink-0 -mr-1"
+            className="w-10 h-10 rounded-full bg-[#F2F2F2] flex items-center justify-center flex-shrink-0 -mr-1"
             aria-label="Fechar"
           >
             <Icon name="close" size={18} className="text-foreground" />

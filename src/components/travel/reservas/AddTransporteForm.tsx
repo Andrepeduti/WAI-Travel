@@ -8,6 +8,14 @@ import { searchGooglePlacesAutocomplete } from '@/lib/googlePlacesApi';
 import { SplitExpenseSheet, SplitConfig, SplitPerson } from './SplitExpenseSheet';
 import type { Transporte } from '@/components/travel/AddTransporteSheet';
 
+/*
+// =========================================================================
+// [FEATURE FLIGHT AEROAPI - DESATIVADA TEMPORARIAMENTE]
+// Para reativar a busca automática por número de voo no futuro, descomente
+// o import de 'searchFlightByNumber' de '@/lib/aeroApi' e o bloco da feature.
+// =========================================================================
+*/
+
 interface AddTransporteFormProps {
   isOpen: boolean;
   onClose: () => void;

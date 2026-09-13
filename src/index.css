@@ -627,3 +627,8 @@ input, select, textarea {
   opacity: 0.85;
   text-shadow: 0 1px 1px rgba(255,255,255,0.5);
 }
+
+/* Hide close button on success toasts when there is an action button */
+li[data-type="success"]:has([data-button="true"]) [data-close-button] {
+  display: none !important;
+}

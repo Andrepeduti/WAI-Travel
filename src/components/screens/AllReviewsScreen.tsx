@@ -77,7 +77,7 @@ export function AllReviewsScreen({ creatorName, reviews, averageRating, onBack }
   }, [reviews, averageRating, creatorName]);
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] pb-24">
+    <div className="min-h-[100dvh] bg-[#F2F2F2] pb-24">
       {/* Sticky header */}
       <div className="sticky top-0 z-20 bg-[#F2F2F2]">
         <div className="flex items-center gap-3 px-4 pb-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>

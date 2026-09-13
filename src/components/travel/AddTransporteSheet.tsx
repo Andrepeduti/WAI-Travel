@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { TimePickerSheet } from '@/components/travel/TimePickerSheet';
 import { cn } from '@/lib/utils';
 import { searchGooglePlacesAutocomplete } from '@/lib/googlePlacesApi';
+import { getCurrencySymbol } from '@/lib/currencyUtils';
 
 export type TransporteTipo = 'voo' | 'trem' | 'onibus' | 'carro';
 
@@ -26,6 +27,14 @@ export interface Transporte {
   chegadaMinuto?: string;
   codigo?: string;
   valor?: string;
+  terminalOrigem?: string;
+  portaoOrigem?: string;
+  terminalDestino?: string;
+  portaoDestino?: string;
+  baggageClaim?: string;
+  statusVoo?: string;
+  ciaAerea?: string;
+  aeronave?: string;
   /** Caminho no bucket `itinerary-documents` (após upload). */
   attachmentPath?: string;
   /** Nome original do arquivo, exibido na lista. */
@@ -39,6 +48,7 @@ interface AddTransporteSheetProps {
   onClose: () => void;
   onAdd: (transporte: Transporte) => void;
   editingTransporte?: Transporte | null;
+  currency?: string;
 }
 
 type TimePickerTarget = 'partida' | 'chegada' | null;
@@ -50,7 +60,7 @@ const tipoConfig: Record<TransporteTipo, { label: string; icon: typeof Plane; pl
   carro: { label: 'Carro', icon: Car, placeholder: 'Ex: Aluguel Hertz' },
 };
 
-export function AddTransporteSheet({ isOpen, onClose, onAdd, editingTransporte }: AddTransporteSheetProps) {
+export function AddTransporteSheet({ isOpen, onClose, onAdd, editingTransporte, currency = 'BRL' }: AddTransporteSheetProps) {
   const [tipo, setTipo] = useState<TransporteTipo>(editingTransporte?.tipo || 'voo');
   const [isLoading, setIsLoading] = useState(false);
   const [nome, setNome] = useState(editingTransporte?.nome || '');
@@ -272,7 +282,7 @@ export function AddTransporteSheet({ isOpen, onClose, onAdd, editingTransporte }
           <div className="flex justify-end items-center px-6 pt-1 pb-2">
             <button
               onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center -mr-1"
+              className="w-10 h-10 flex items-center justify-center -mr-1"
               aria-label="Fechar"
             >
               <Icon name="close" size={20} className="text-muted-foreground" />
@@ -426,8 +436,8 @@ export function AddTransporteSheet({ isOpen, onClose, onAdd, editingTransporte }
               Valor <span className="text-muted-foreground font-normal">(opcional)</span>
             </label>
             <div className="relative mb-4">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">R$</span>
-              <input type="text" inputMode="numeric" placeholder="0,00" value={valor} onChange={handleValorChange} className={cn(inputClass, 'pl-10')} />
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">{getCurrencySymbol(currency)}</span>
+              <input type="text" inputMode="numeric" placeholder="0,00" value={valor} onChange={handleValorChange} className={cn(inputClass, 'pl-[50px]')} />
             </div>
 
 

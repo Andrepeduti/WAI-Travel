@@ -101,7 +101,7 @@ export function CardPaymentScreen({ onBack, onSave, onDelete, initialData }: Car
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-[100dvh] bg-background flex flex-col">
       {/* Header */}
  <header className="sticky top-0 z-20 bg-background px-5 pb-3 border-b border-border">
         <div className="flex items-center justify-between">

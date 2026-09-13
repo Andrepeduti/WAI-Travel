@@ -139,7 +139,7 @@ export function CheckoutScreen({ itinerary, onBack, onConfirm, onSaveForLater }:
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-[100dvh] bg-background flex flex-col">
       {/* Header */}
  <header className="sticky top-0 z-20 bg-background px-5 pb-3">
         <div className="flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>

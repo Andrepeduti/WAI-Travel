@@ -7,7 +7,9 @@ import { TravelerBudgetCard, BudgetPerson } from '@/components/travel/budget/Tra
 import { ExpenseCard, ExpenseItem } from '@/components/travel/budget/ExpenseCard';
 import { AddBudgetExpenseSheet, ActivityOption } from '@/components/travel/budget/AddBudgetExpenseSheet';
 import { ManageBudgetTravelersSheet } from '@/components/travel/budget/ManageBudgetTravelersSheet';
+import { SoleTravelerInfoSheet } from '@/components/travel/budget/SoleTravelerInfoSheet';
 import { BudgetFilterSheet } from '@/components/travel/budget/BudgetFilterSheet';
+import { formatCurrency, getCurrencySymbol } from '@/lib/currencyUtils';
 
 export type Expense = ExpenseItem & {
   description: string;
@@ -37,6 +39,9 @@ interface BudgetScreenProps {
   onExtraPeopleChange?: (people: BudgetExtraPerson[]) => void;
   activities?: ActivityOption[];
   isLoading?: boolean;
+  currency?: string;
+  onInvite?: () => void;
+  isShareSheetOpen?: boolean;
 }
 
 const personColors = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444', '#EC4899', '#14B8A6', '#F97316'];
@@ -74,6 +79,9 @@ export function BudgetScreen({
   onExtraPeopleChange,
   activities = [],
   isLoading = false,
+  currency = 'BRL',
+  onInvite,
+  isShareSheetOpen = false,
 }: BudgetScreenProps) {
   const setExpenses = onExpensesChange;
 
@@ -97,28 +105,39 @@ export function BudgetScreen({
     }
   }, [JSON.stringify(participants), JSON.stringify(extraPeople)]);
 
+  // Lock body scroll when overlay is active
+  useEffect(() => {
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalStyle;
+    };
+  }, []);
+
   // Modals & UI States
   const [showAddExpense, setShowAddExpense] = useState(autoOpenAdd);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [showManageTravelers, setShowManageTravelers] = useState(false);
+  const [showSoleTravelerInfo, setShowSoleTravelerInfo] = useState(false);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('todos');
-  const [selectedTravelerFilter, setSelectedTravelerFilter] = useState<string | null>(null);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedTravelers, setSelectedTravelers] = useState<string[]>([]);
+  const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
+  const [valueRange, setValueRange] = useState<{ min: string; max: string }>({ min: '', max: '' });
 
   // Toast State
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState<{
     title: string;
-    description: string;
     actionLabel?: string;
     onAction?: () => void;
-  }>({ title: '', description: '' });
+  }>({ title: '' });
 
-  const showToast = (title: string, description: string, actionLabel?: string, onAction?: () => void) => {
-    setToastMessage({ title, description, actionLabel, onAction });
+  const showToast = (title: string, actionLabel?: string, onAction?: () => void) => {
+    setToastMessage({ title, actionLabel, onAction });
     setToastVisible(true);
   };
 
@@ -141,7 +160,7 @@ export function BudgetScreen({
     const next = [...people, newPerson];
     setPeople(next);
     syncExtras(next);
-    showToast('Viajante adicionado', `${name.trim()} foi adicionado ao orçamento.`);
+    showToast('Viajante adicionado');
   };
 
   const handleEditPerson = (id: string, name: string) => {
@@ -150,29 +169,29 @@ export function BudgetScreen({
     );
     setPeople(next);
     syncExtras(next);
-    showToast('Viajante atualizado', `${name.trim()} foi atualizado com sucesso.`);
+    showToast('Viajante atualizado');
   };
 
   const handleDeletePerson = (id: string) => {
     if (participantIds.has(id)) {
-      showToast('Ação não permitida', 'Membros do roteiro não podem ser removidos.');
+      showToast('Ação não permitida');
       return;
     }
     const person = people.find(p => p.id === id);
     const next = people.filter(p => p.id !== id);
     setPeople(next);
     syncExtras(next);
-    showToast('Viajante removido', `${person?.name || 'Viajante'} foi removido.`);
+    showToast('Viajante removido');
   };
 
   // Expense management callbacks
   const handleSaveExpense = (savedExpense: any) => {
     if (editingExpense) {
       setExpenses(prev => (Array.isArray(prev) ? prev : expenses).map(e => e.id === savedExpense.id ? savedExpense : e));
-      showToast('Gasto atualizado', `"${savedExpense.name}" foi salvo.`);
+      showToast('Gasto atualizado');
     } else {
       setExpenses(prev => [...(Array.isArray(prev) ? prev : expenses), savedExpense]);
-      showToast('Gasto adicionado', `"${savedExpense.name}" foi adicionado com sucesso.`);
+      showToast('Gasto adicionado');
     }
     setEditingExpense(null);
   };
@@ -187,7 +206,6 @@ export function BudgetScreen({
 
     showToast(
       'Gasto removido',
-      `"${expenseToDelete.name}" foi removido do orçamento.`,
       'Desfazer',
       () => {
         setExpenses(prev => {
@@ -242,38 +260,56 @@ export function BudgetScreen({
         const q = searchQuery.toLowerCase().trim();
         const matchesName = e.name?.toLowerCase().includes(q);
         const matchesCategory = e.category?.toLowerCase().includes(q);
-        const matchesActivity = e.activityName?.toLowerCase().includes(q);
+        const matchesActivity = (e as any).activityName?.toLowerCase().includes(q);
         if (!matchesName && !matchesCategory && !matchesActivity) return false;
       }
 
-      // Category filter
-      if (selectedCategoryFilter !== 'todos') {
-        if (e.category !== selectedCategoryFilter) return false;
+      // Categories filter (multi-select)
+      if (selectedCategories.length > 0) {
+        if (!selectedCategories.includes(e.category)) return false;
       }
 
-      // Traveler filter
-      if (selectedTravelerFilter !== null) {
-        if (people.length > 1 && e.assignedTo?.length > 0 && !e.assignedTo.includes(selectedTravelerFilter)) {
-          return false;
+      // Travelers filter (multi-select)
+      if (selectedTravelers.length > 0) {
+        if (!e.assignedTo || !e.assignedTo.some(tId => selectedTravelers.includes(tId))) {
+          // If no one is explicitly assigned, it's shared by everyone, so it should match
+          // unless assignedTo is explicitly empty (which might mean everyone or no one).
+          // Assuming empty assignedTo = all people, so it matches any traveler filter.
+          if (e.assignedTo && e.assignedTo.length > 0) {
+             return false;
+          }
         }
       }
+      
+      // Value Range filter
+      if (valueRange.min) {
+        if (e.amountBRL < parseFloat(valueRange.min)) return false;
+      }
+      if (valueRange.max) {
+        if (e.amountBRL > parseFloat(valueRange.max)) return false;
+      }
+
+      // Date Range filter
+      // (Requires e.date to exist in future implementations)
 
       return true;
     });
-  }, [expenses, searchQuery, selectedCategoryFilter, selectedTravelerFilter, people.length]);
+  }, [expenses, searchQuery, selectedCategories, selectedTravelers, valueRange, people.length]);
 
   const filteredTotalBRL = useMemo(() => {
     return filteredExpenses.reduce((sum, e) => sum + (e.amountBRL || 0), 0);
   }, [filteredExpenses]);
 
-  const formatBRL = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  // Use dynamic currency formatting
+  const formattedTotal = formatCurrency(totalBRL, currency);
+  const formattedFilteredTotal = formatCurrency(filteredTotalBRL, currency);
 
-  const hasFilterActive = selectedCategoryFilter !== 'todos' || selectedTravelerFilter !== null;
+  const hasFilterActive = selectedCategories.length > 0 || selectedTravelers.length > 0 || dateRange.start || dateRange.end || valueRange.min || valueRange.max;
   const isEmpty = expenses.length === 0;
 
   return (
     <div
-      className={`min-h-screen flex flex-col justify-between ${isEmpty ? 'bg-[#F3F3F3]' : 'bg-background'}`}
+      className={`min-h-[100dvh] flex flex-col justify-between ${isEmpty ? 'bg-[#F3F3F3]' : 'bg-background'}`}
       style={{ fontFamily: 'var(--font-family-primary, "Urbanist", sans-serif)' }}
     >
       {/* ─── Topbar Header ─── */}
@@ -283,7 +319,7 @@ export function BudgetScreen({
           style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 8px)' }}
         >
           <div className="flex items-center gap-4">
-            <BackButton onClick={onBack} />
+            <BackButton onClick={onBack} className="bg-transparent shadow-none" />
             <h1 className="font-['Urbanist'] font-bold text-[20px] leading-[24px] text-[#171F2C] my-0">
               Orçamento
             </h1>
@@ -293,7 +329,13 @@ export function BudgetScreen({
           {!isEmpty && (
             <button
               type="button"
-              onClick={() => setShowManageTravelers(true)}
+              onClick={() => {
+                if (people.length === 1) {
+                  setShowSoleTravelerInfo(true);
+                } else {
+                  setShowManageTravelers(true);
+                }
+              }}
               className="w-10 h-10 rounded-full flex items-center justify-center text-[#171F2C] hover:bg-muted/50 transition-colors active:scale-95"
               aria-label="Adicionar viajante"
             >
@@ -347,7 +389,7 @@ export function BudgetScreen({
             <button
               type="button"
               onClick={() => { setEditingExpense(null); setShowAddExpense(true); }}
-              className="h-[48px] px-6 rounded-[16px] bg-[#9DCC36] text-[#141530] font-['Urbanist'] font-bold text-[16px] leading-[19px] shadow-xs active:scale-[0.98] transition-all flex items-center justify-center"
+              className="box-border flex flex-row justify-center items-center py-[12px] pr-[16px] pl-[24px] gap-2 w-[154px] h-[48px] border border-[#141530] rounded-2xl flex-none grow-0 bg-transparent text-[#141530] font-['Urbanist'] font-bold text-[16px] leading-[19px] active:scale-[0.98] transition-all"
             >
               Adicionar gasto
             </button>
@@ -357,12 +399,12 @@ export function BudgetScreen({
         /* ─── 2. Filled State (Estado Preenchido) ─── */
         <main className="flex-1 overflow-y-auto px-5 pt-4 pb-32">
           {/* Top Summary: Orçamento Total */}
-          <div className="mb-5">
-            <span className="text-[14px] font-medium text-[#7F7F7F] block mb-1">
+          <div className="mb-5 flex flex-col gap-2">
+            <span className="font-['Urbanist'] font-medium text-[14px] leading-[17px] text-[#676767]">
               Orçamento total
             </span>
-            <div className="text-[30px] md:text-[34px] font-extrabold text-[#171F2C] tracking-tight">
-              {formatBRL(totalBRL)}
+            <div className="font-['Urbanist'] font-bold text-[24px] leading-[29px] text-[#171F2C]">
+              {formattedTotal}
             </div>
           </div>
 
@@ -373,22 +415,29 @@ export function BudgetScreen({
                 key={person.id}
                 person={person}
                 amount={calculatePersonTotal(person.id)}
-                onClick={() => setShowManageTravelers(true)}
+                currency={currency}
+                onClick={() => {
+                  if (people.length === 1) {
+                    setShowSoleTravelerInfo(true);
+                  } else {
+                    setShowManageTravelers(true);
+                  }
+                }}
               />
             ))}
           </div>
 
           {/* Section: Gastos */}
           <section className="mt-2">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-[18px] font-bold text-[#171F2C] my-0">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-['Urbanist'] font-semibold text-[18px] leading-[22px] text-[#171F2C] my-0">
                 Gastos
               </h2>
             </div>
 
             {/* Search Bar + Filter Options Button */}
-            <div className="flex items-center gap-2 mb-3">
-              <div className="flex-1 bg-[#F3F4F6] rounded-2xl flex items-center px-3.5 py-2.5 gap-2.5 focus-within:ring-2 focus-within:ring-border transition-all">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="flex-1 bg-[#F3F4F6] rounded-[10px] flex items-center px-3.5 py-2.5 gap-2.5 focus-within:ring-2 focus-within:ring-border transition-all">
                 <Search size={18} className="text-[#9CA3AF] flex-shrink-0" />
                 <input
                   type="text"
@@ -397,7 +446,7 @@ export function BudgetScreen({
                   placeholder="Busque por um gasto..."
                   className="w-full bg-transparent text-[14px] font-medium text-[#171F2C] outline-none placeholder:text-[#9CA3AF]"
                 />
-                {searchQuery ? (
+                {searchQuery && (
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
@@ -405,8 +454,6 @@ export function BudgetScreen({
                   >
                     <X size={16} />
                   </button>
-                ) : (
-                  <Mic size={18} className="text-[#9CA3AF] flex-shrink-0" />
                 )}
               </div>
 
@@ -414,11 +461,10 @@ export function BudgetScreen({
               <button
                 type="button"
                 onClick={() => setShowFilterSheet(true)}
-                className={`w-11 h-11 rounded-2xl border flex items-center justify-center transition-all relative flex-shrink-0 ${
-                  hasFilterActive
-                    ? 'bg-[#1A1C40] text-white border-[#1A1C40]'
-                    : 'bg-card text-[#171F2C] border-border/70 hover:bg-muted/40'
-                }`}
+                className={`w-11 h-11 rounded-2xl border flex items-center justify-center transition-all relative flex-shrink-0 ${hasFilterActive
+                  ? 'bg-[#1A1C40] text-white border-[#1A1C40]'
+                  : 'bg-card text-[#171F2C] border-border/70 hover:bg-muted/40'
+                  }`}
                 aria-label="Filtrar gastos"
               >
                 <SlidersHorizontal size={18} />
@@ -429,16 +475,21 @@ export function BudgetScreen({
             </div>
 
             {/* Subtotal Label */}
-            <div className="flex items-center justify-between mb-3 px-1">
-              <span className="text-[13px] font-medium text-[#7F7F7F]">
-                Total: <strong className="text-[#171F2C] font-bold">{formatBRL(filteredTotalBRL)}</strong>
+            <div className="flex items-center justify-between mb-4 px-1">
+              <span className="font-['Urbanist'] font-medium text-[14px] leading-[17px] text-[#676767]">
+                Total: {formattedFilteredTotal}
               </span>
 
               {hasFilterActive && (
                 <button
                   type="button"
-                  onClick={() => { setSelectedCategoryFilter('todos'); setSelectedTravelerFilter(null); }}
-                  className="text-[12px] font-bold text-[#1A1C40] underline hover:opacity-80"
+                  onClick={() => {
+                    setSelectedCategories([]);
+                    setSelectedTravelers([]);
+                    setDateRange({ start: '', end: '' });
+                    setValueRange({ min: '', max: '' });
+                  }}
+                  className="font-['Urbanist'] font-bold text-[12px] text-[#1A1C40] underline hover:opacity-80"
                 >
                   Limpar filtros
                 </button>
@@ -446,12 +497,13 @@ export function BudgetScreen({
             </div>
 
             {/* Expense Cards List */}
-            <div className="space-y-1 divide-y divide-border/20">
+            <div className="flex flex-col items-start gap-4 w-full">
               {filteredExpenses.map(expense => (
                 <ExpenseCard
                   key={expense.id}
                   expense={expense}
                   people={people}
+                  currency={currency}
                   onClick={() => {
                     setEditingExpense(expense);
                     setShowAddExpense(true);
@@ -472,13 +524,13 @@ export function BudgetScreen({
       {/* ─── Fixed Bottom Button (Filled State) ─── */}
       {!isEmpty && (
         <div
-          className="fixed bottom-0 left-0 right-0 z-30 bg-background/95 backdrop-blur-md px-5 pt-3 border-t border-border/20"
-          style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 20px)' }}
+          className="fixed bottom-0 left-0 right-0 z-30 bg-background/95 backdrop-blur-md px-4 py-6 border-t border-[#B6B6B6] flex flex-row items-center gap-6"
+          style={{ paddingBottom: 'calc(24px + max(env(safe-area-inset-bottom), 0px))' }}
         >
           <button
             type="button"
             onClick={() => { setEditingExpense(null); setShowAddExpense(true); }}
-            className="w-full h-14 rounded-2xl bg-[#9DCC36] text-[#141530] font-bold text-[16px] shadow-xs active:scale-[0.99] transition-all flex items-center justify-center"
+            className="flex-1 h-12 rounded-2xl bg-[#9DCC36] text-[#141530] font-['Urbanist'] font-bold text-[16px] leading-[19px] shadow-xs active:scale-[0.99] transition-all flex flex-row items-center justify-center py-3 pr-4 pl-6 gap-2"
           >
             Adicionar gasto
           </button>
@@ -494,6 +546,8 @@ export function BudgetScreen({
         editingExpense={editingExpense}
         people={people}
         activities={activities}
+        onSoleTravelerInvite={onInvite}
+        isHidden={isShareSheetOpen}
       />
 
       {/* ─── Manage Travelers Sheet ─── */}
@@ -508,14 +562,27 @@ export function BudgetScreen({
         participantIds={participantIds}
       />
 
+      {/* ─── Sole Traveler Sheet ─── */}
+      <SoleTravelerInfoSheet
+        open={showSoleTravelerInfo}
+        onClose={() => setShowSoleTravelerInfo(false)}
+        onInvite={onInvite || (() => { })}
+      />
+
       {/* ─── Filter Sheet ─── */}
       <BudgetFilterSheet
         open={showFilterSheet}
         onClose={() => setShowFilterSheet(false)}
-        selectedCategory={selectedCategoryFilter}
-        onSelectCategory={setSelectedCategoryFilter}
-        selectedTravelerId={selectedTravelerFilter}
-        onSelectTravelerId={setSelectedTravelerFilter}
+        selectedCategories={selectedCategories}
+        selectedTravelers={selectedTravelers}
+        dateRange={dateRange}
+        valueRange={valueRange}
+        onApplyFilters={(cats, travs, dRange, vRange) => {
+          setSelectedCategories(cats);
+          setSelectedTravelers(travs);
+          setDateRange(dRange);
+          setValueRange(vRange);
+        }}
         people={people}
       />
 
@@ -524,10 +591,11 @@ export function BudgetScreen({
         isVisible={toastVisible}
         onClose={() => setToastVisible(false)}
         title={toastMessage.title}
-        description={toastMessage.description}
+        description=""
         actionLabel={toastMessage.actionLabel}
         onAction={toastMessage.onAction}
         duration={5000}
+        position="bottom"
       />
     </div>
   );

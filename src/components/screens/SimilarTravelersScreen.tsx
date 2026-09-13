@@ -77,7 +77,7 @@ export function SimilarTravelersScreen({ onBack, onViewProfile }: SimilarTravele
   };
 
   return (
-    <div className="min-h-screen flex flex-col pb-8" style={{ backgroundColor: '#F2F2F2' }}>
+    <div className="min-h-[100dvh] flex flex-col pb-8" style={{ backgroundColor: '#F2F2F2' }}>
       {/* Header */}
  <header className="sticky top-0 z-20 px-4 pb-3" style={{ backgroundColor: '#F2F2F2' }}>
         <div className="flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>

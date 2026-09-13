@@ -47,7 +47,7 @@ export function DocTypePickerSheet({ isOpen, onClose, onSelect }: DocTypePickerS
           <div className="flex items-center justify-end px-5 pt-1 pb-2">
             <button
               onClick={onClose}
-              className="w-9 h-9 rounded-full flex items-center justify-center -mr-1"
+              className="w-10 h-10 rounded-full flex items-center justify-center -mr-1"
               style={{ background: '#F2F2F2' }}
               aria-label="Fechar"
             >

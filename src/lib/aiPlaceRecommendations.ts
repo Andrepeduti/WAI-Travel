@@ -6,7 +6,7 @@
 
 import type { CityPlace } from '@/data/cityRecommendations';
 import { FALLBACK_IMAGE } from '@/lib/imageFallback';
-import { searchGooglePlacesText } from '@/lib/googlePlacesApi';
+import { searchGooglePlacesAutocomplete, getGooglePlaceDetails } from '@/lib/googlePlacesApi';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
@@ -112,14 +112,16 @@ function toCityPlaces(payload: AiResponse, cityKeyStr: string): CityPlace[] {
 // Use only sources that can be tied back to the place name. Generic photo
 // fallbacks are intentionally avoided because they produce visually wrong cards.
 
+import { getPlaceByGoogleId, upsertPlace } from '@/lib/placesCache';
+
 async function enrichWithGooglePlaces(places: CityPlace[], city: string): Promise<CityPlace[]> {
   const out: CityPlace[] = new Array(places.length);
   const queue = places.map((p, i) => ({ p, i }));
   
   const startTime = Date.now();
   
-  // Concurrency up to 10 to speed up API calls. 
-  const workers = Array.from({ length: 10 }, async () => {
+  // Concurrency up to 3 to speed up API calls but avoid rate limits/high costs. 
+  const workers = Array.from({ length: 3 }, async () => {
     while (queue.length) {
       // Abort enrichment if it's taking more than 12 seconds to prevent locking the UI
       if (Date.now() - startTime > 12000) {
@@ -132,10 +134,28 @@ async function enrichWithGooglePlaces(places: CityPlace[], city: string): Promis
       out[job.i] = { ...p };
       
       try {
-        const results = await searchGooglePlacesText(p.name, city);
-        if (results && results.length > 0) {
-          const best = results[0];
-          
+        // NÍVEL 1 DE CACHE (Deduplicação Perfeita com Google Place ID)
+        // 1. Pega o ID oficial do Google via Autocomplete (muito barato)
+        const predictions = await searchGooglePlacesAutocomplete(`${p.name} ${city}`);
+        if (!predictions || predictions.length === 0) continue;
+        
+        const googlePlaceId = predictions[0].placeId;
+
+        // 2. Busca no nosso banco pelo ID exato
+        const existingPlace = await getPlaceByGoogleId(googlePlaceId);
+        if (existingPlace && existingPlace.cover_photo_url) {
+          out[job.i].image = existingPlace.cover_photo_url;
+          out[job.i].lat = existingPlace.latitude ?? undefined;
+          out[job.i].lng = existingPlace.longitude ?? undefined;
+          if (existingPlace.formatted_address) {
+            out[job.i].address = existingPlace.formatted_address;
+          }
+          continue; // Já pegamos do nosso cache, pula o Place Details!
+        }
+
+        // 3. Se não achou no nosso banco, bate no Place Details (mais barato que o Text Search)
+        const best = await getGooglePlaceDetails(googlePlaceId);
+        if (best) {
           // Override with accurate Google Places data
           out[job.i].lat = best.lat;
           out[job.i].lng = best.lng;
@@ -145,6 +165,19 @@ async function enrichWithGooglePlaces(places: CityPlace[], city: string): Promis
           if (best.photoUrl) {
             out[job.i].image = best.photoUrl;
           }
+
+          // Salva no nosso cache global (Level 2) para que os próximos usuários não precisem pagar por essa foto
+          await upsertPlace({
+            google_place_id: googlePlaceId,
+            name: p.name,
+            city: city,
+            category: p.category,
+            cover_photo_url: best.photoUrl,
+            formatted_address: best.address,
+            latitude: best.lat,
+            longitude: best.lng,
+            enrichment_level: 'photos'
+          });
         }
       } catch (e) {
         console.warn('Failed to enrich place with Google Places API:', p.name, e);
@@ -166,14 +199,22 @@ async function enrichWithGooglePlaces(places: CityPlace[], city: string): Promis
  * Fetch AI-curated places for a city. Cached in memory.
  * Returns [] on any failure so callers can fall back gracefully.
  */
-export async function fetchAiPlacesForCity(cityName: string): Promise<CityPlace[]> {
+import { getUserAiRecommendations, saveUserAiRecommendations } from '@/lib/userAiRecommendationsApi';
+
+export async function fetchAiPlacesForCity(cityName: string, interests?: string[]): Promise<CityPlace[]> {
   const key = cityKey(cityName);
   if (!key) return [];
 
+  // 1. MemCache (mais rápido, mesma sessão de navegador)
   const cachedMem = memCache.get(key);
   if (cachedMem) return cachedMem;
 
-
+  // 2. NÍVEL 1 DE CACHE: Tenta carregar as dicas que este usuário gerou antes para esta cidade (Supabase user_ai_recommendations)
+  const userCached = await getUserAiRecommendations(key);
+  if (userCached && userCached.length > 0) {
+    memCache.set(key, userCached);
+    return userCached;
+  }
 
   const inflight = pending.get(key);
   if (inflight) return inflight;
@@ -187,14 +228,19 @@ export async function fetchAiPlacesForCity(cityName: string): Promise<CityPlace[
           apikey: SUPABASE_PUBLISHABLE_KEY,
           Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ city: cityName }),
+        body: JSON.stringify({ city: cityName, interests: interests || [] }),
       });
       if (!res.ok) return [];
       const data = (await res.json()) as AiResponse;
       const rawPlaces = toCityPlaces(data, key);
+      
+      // Enriquecimento com fotos recheado de Cache Level 2
       const places = rawPlaces.length > 0 ? await enrichWithGooglePlaces(rawPlaces, key) : rawPlaces;
+      
       if (places.length > 0) {
         memCache.set(key, places);
+        // Salva no banco Level 1 (O roteiro do usuário)
+        await saveUserAiRecommendations(key, places);
       }
       return places;
     } catch (e) {

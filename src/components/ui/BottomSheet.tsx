@@ -65,11 +65,20 @@ export function BottomSheet({
 
   useEffect(() => {
     if (!isVisible) return;
+
+    // Prevent body scroll when the bottom sheet is open
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = 'hidden';
+
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = originalStyle;
+    };
   }, [isVisible, onClose]);
 
   if (!isVisible) return null;
@@ -113,7 +122,7 @@ export function BottomSheet({
                   <button
                     type="button"
                     onClick={onBack}
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-foreground hover:bg-muted/60 transition-colors -ml-1.5"
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-foreground hover:bg-muted/60 transition-colors -ml-1.5"
                     aria-label="Voltar"
                   >
                     <Icon name="chevron_left" size={22} className="text-foreground" />
@@ -126,7 +135,7 @@ export function BottomSheet({
                   <button
                     type="button"
                     onClick={onClose}
-                    className="w-8 h-8 rounded-full bg-muted/60 hover:bg-muted flex items-center justify-center transition-colors -mr-1.5"
+                    className="w-10 h-10 rounded-full flex items-center justify-center transition-colors -mr-1.5"
                     aria-label="Fechar"
                   >
                     <Icon name="close" size={18} className="text-foreground" />

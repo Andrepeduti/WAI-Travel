@@ -1,588 +1,862 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
-import { Icon } from '@/components/ui/Icon';
-import { Plus, Trash2, X, Pencil, Check, MoreHorizontal, CheckCheck, Square, ArrowUpDown, ChevronDown } from 'lucide-react';
-import { ReorderCategoriesScreen } from './ReorderCategoriesScreen';
-import { BackButton } from '@/components/ui/BackButton';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import {
+  Plus,
+  Trash2,
+  X,
+  Pencil,
+  Check,
+  MoreHorizontal,
+  CheckCheck,
+  CircleDot,
+  ArrowUpDown,
+  ChevronDown,
+  ChevronLeft,
+  Tag,
+} from 'lucide-react';
+import { LuggageIllustration } from '@/components/ui/LuggageIllustration';
+import {
+  ChecklistCategory,
+  ChecklistItem,
+  getLocalChecklist,
+  loadChecklist,
+  saveChecklist,
+  generateDefaultChecklist,
+  generateUUID,
+} from '@/lib/checklistApi';
+import { SuccessToast } from '@/components/travel/SuccessToast';
+import { Reorder, useDragControls, motion, AnimatePresence } from 'framer-motion';
+import { GripVertical } from 'lucide-react';
 
 interface TripChecklistScreenProps {
   onBack: () => void;
   destination?: string;
+  itineraryId?: string;
+  isPurchased?: boolean;
   onChecklistChange?: (checked: number, total: number) => void;
 }
 
-interface CheckItem {
-  id: number;
-  label: string;
-  checked: boolean;
-}
+  // ─── Componente de Item da Categoria (Arrastável) ─────────────────────────
+  const CategoryItem = ({
+    cat,
+    isCollapsed,
+    toggleCollapse,
+    handleOpenEditCategory,
+    toggleItem,
+    deleteItem,
+    addingItemToCatId,
+    setAddingItemToCatId,
+    newItemText,
+    setNewItemText,
+    addItem,
+  }: {
+    cat: ChecklistCategory;
+    isCollapsed: boolean;
+    toggleCollapse: (id: string) => void;
+    handleOpenEditCategory: (cat: ChecklistCategory) => void;
+    toggleItem: (catId: string, itemId: string) => void;
+    deleteItem: (catId: string, itemId: string) => void;
+    addingItemToCatId: string | null;
+    setAddingItemToCatId: (id: string | null) => void;
+    newItemText: string;
+    setNewItemText: (text: string) => void;
+    addItem: (catId: string) => void;
+  }) => {
+    const dragControls = useDragControls();
+    const itemCount = cat.items.length;
 
-interface ChecklistCategory {
-  id: string;
-  title: string;
-  icon: string;
-  iconBg: string;
-  iconColor: string;
-  items: CheckItem[];
-}
+    return (
+      <Reorder.Item
+        value={cat}
+        dragListener={false}
+        dragControls={dragControls}
+        transition={{ duration: 0.2, ease: 'easeInOut' }}
+        className="bg-[#FFFFFF] rounded-[16px] p-6 shadow-sm flex flex-col gap-6"
+        whileDrag={{ scale: 1.02, boxShadow: '0 10px 30px rgba(0,0,0,0.12)', zIndex: 10 }}
+      >
+        {/* Header do Accordion */}
+        <div
+          className="flex items-center justify-between cursor-grab active:cursor-grabbing"
+          onPointerDown={(e) => dragControls.start(e)}
+          style={{ touchAction: 'none' }}
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="text-[#7F7F7F] p-1 -ml-1">
+              <GripVertical size={20} />
+            </div>
+            <div
+              onClick={() => toggleCollapse(cat.id)}
+              className="flex items-center gap-2 select-none min-w-0"
+            >
+              <motion.h3 layout="position" className="font-['Urbanist'] font-semibold text-[18px] leading-[22px] text-[#171F2C] truncate">
+                {cat.title}
+              </motion.h3>
+              <motion.span layout="position" className="font-['Urbanist'] font-medium text-[14px] leading-[20px] text-[#7F7F7F] whitespace-nowrap">
+                {itemCount} {itemCount === 1 ? 'item' : 'itens'}
+              </motion.span>
+            </div>
+          </div>
 
-const initialCategories: ChecklistCategory[] = [
-{
-  id: 'docs',
-  title: 'Documentos',
-  icon: 'description',
-  iconBg: 'hsl(210 100% 52% / 0.12)',
-  iconColor: 'text-blue-500',
-  items: [
-  { id: 1, label: 'Passaporte válido', checked: false },
-  { id: 2, label: 'Visto (se necessário)', checked: false },
-  { id: 3, label: 'Seguro viagem', checked: false },
-  { id: 4, label: 'Reserva de hotel', checked: false },
-  { id: 5, label: 'Passagem aérea', checked: false },
-  { id: 6, label: 'Cartão de vacinação', checked: false }]
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Botão de Editar Categoria */}
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenEditCategory(cat);
+              }}
+              className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-black/5 active:scale-95 transition-all text-[#516D12]"
+              aria-label={`Editar categoria ${cat.title}`}
+            >
+              <Pencil size={16} strokeWidth={2.2} />
+            </button>
 
-},
-{
-  id: 'clothes',
-  title: 'Roupas',
-  icon: 'shopping_bag',
-  iconBg: 'hsl(262 83% 58% / 0.12)',
-  iconColor: 'text-violet-500',
-  items: [
-  { id: 7, label: 'Casaco impermeável', checked: false },
-  { id: 8, label: 'Roupas em camadas', checked: false },
-  { id: 9, label: 'Sapato confortável para caminhada', checked: false },
-  { id: 10, label: 'Cachecol e luvas', checked: false }]
+            {/* Chevron de expansão/colapso */}
+            <div
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleCollapse(cat.id);
+              }}
+              className={`w-6 h-6 flex items-center justify-center text-[#171F2C] transition-transform duration-200 cursor-pointer ${
+                isCollapsed ? 'rotate-180' : 'rotate-0'
+              }`}
+            >
+              <ChevronDown size={20} strokeWidth={2} />
+            </div>
+          </div>
+        </div>
 
-},
-{
-  id: 'electronics',
-  title: 'Eletrônicos',
-  icon: 'lightbulb',
-  iconBg: 'hsl(142 71% 45% / 0.12)',
-  iconColor: 'text-emerald-500',
-  items: [
-  { id: 11, label: 'Adaptador de tomada (tipo C/F)', checked: false },
-  { id: 12, label: 'Carregador portátil', checked: false }]
+        {/* Corpo do Accordion (Lista de Itens) */}
+        <AnimatePresence initial={false}>
+          {!isCollapsed && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2, ease: 'easeInOut' }}
+              className="overflow-hidden"
+            >
+              <div className="flex flex-col gap-4 pt-2">
+                <div className="flex flex-col">
+                  {cat.items.map((item: ChecklistItem, idx: number) => (
+                    <div key={item.id} className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between gap-2 py-1">
+                        {/* Checkbox clicável e label */}
+                        <button
+                          onClick={() => toggleItem(cat.id, item.id)}
+                          className="flex items-center gap-2 flex-1 min-w-0 text-left cursor-pointer"
+                        >
+                          <div
+                            className={`w-[22px] h-[22px] rounded-[5px] flex items-center justify-center flex-shrink-0 transition-all ${
+                              item.checked
+                                ? 'bg-[#9DCC36] border-[1.5px] border-[#9DCC36] text-[#141530]'
+                                : 'border-[1.5px] border-[#7F7F7F] bg-transparent'
+                            }`}
+                          >
+                            {item.checked && (
+                              <Check
+                                size={14}
+                                strokeWidth={3.5}
+                                className="text-[#141530]"
+                              />
+                            )}
+                          </div>
 
-}];
+                          <motion.span
+                            layout="position"
+                            className={`font-['Urbanist'] font-semibold text-[14px] leading-[17px] break-words flex-1 ${
+                              item.checked
+                                ? 'line-through text-[#7F7F7F]'
+                                : 'text-[#171F2C]'
+                            }`}
+                          >
+                            {item.label}
+                          </motion.span>
+                        </button>
+
+                        {/* Botão Excluir Item */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteItem(cat.id, item.id);
+                          }}
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-[#141530] hover:bg-black/5 active:scale-95 transition-all flex-shrink-0"
+                          aria-label="Excluir item"
+                        >
+                          <X size={14} strokeWidth={2.2} />
+                        </button>
+                      </div>
+
+                      {/* Divider Line */}
+                      {idx < cat.items.length - 1 && (
+                        <div className="w-full h-0 border-b border-[#D5D5D5] my-1" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Rodapé do Accordion: + Adicionar item */}
+                <div className="pt-2">
+                  {addingItemToCatId === cat.id ? (
+                    <div className="flex items-center gap-2 pt-1 pb-1">
+                      <input
+                        autoFocus
+                        type="text"
+                        value={newItemText}
+                        onChange={(e) => setNewItemText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') addItem(cat.id);
+                          if (e.key === 'Escape') {
+                            setAddingItemToCatId(null);
+                            setNewItemText('');
+                          }
+                        }}
+                        placeholder="Nome do item..."
+                        className="flex-1 px-3 py-2 text-[14px] font-['Urbanist'] font-medium bg-[#EDEDED] rounded-[8px] outline-none text-[#141530] placeholder:text-[#7F7F7F] border border-transparent focus:border-border"
+                      />
+                      <button
+                        onClick={() => addItem(cat.id)}
+                        className="px-3.5 py-2 rounded-[8px] text-xs font-bold font-['Urbanist'] bg-[#9DCC36] text-[#141530] active:scale-95 transition-transform"
+                      >
+                        OK
+                      </button>
+                      <button
+                        onClick={() => {
+                          setAddingItemToCatId(null);
+                          setNewItemText('');
+                        }}
+                        className="p-1 text-[#7F7F7F] hover:text-[#141530]"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setAddingItemToCatId(cat.id);
+                        setNewItemText('');
+                      }}
+                      className="flex items-center gap-2 font-['Urbanist'] font-bold text-[14px] leading-[17px] text-[#141530] active:opacity-70 transition-opacity"
+                    >
+                      <Plus size={16} strokeWidth={2.5} className="text-[#141530]" />
+                      <motion.span layout="position">Adicionar item</motion.span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </Reorder.Item>
+    );
+  };
 
 
-const sectionColors = [
-{ bg: 'hsl(210 100% 52% / 0.12)', color: 'text-blue-500' },
-{ bg: 'hsl(262 83% 58% / 0.12)', color: 'text-violet-500' },
-{ bg: 'hsl(142 71% 45% / 0.12)', color: 'text-emerald-500' },
-{ bg: 'hsl(25 95% 53% / 0.12)', color: 'text-orange-500' },
-{ bg: 'hsl(340 82% 52% / 0.12)', color: 'text-pink-500' },
-{ bg: 'hsl(45 93% 47% / 0.12)', color: 'text-amber-500' }];
+export function TripChecklistScreen({
+  onBack,
+  destination = 'Amsterdam',
+  itineraryId,
+  isPurchased = false,
+  onChecklistChange,
+}: TripChecklistScreenProps) {
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [categories, setCategories] = useState<ChecklistCategory[]>(() => {
+    if (itineraryId) {
+      const local = getLocalChecklist(itineraryId);
+      if (local !== null && local.length > 0) return local;
+    }
+    return generateDefaultChecklist();
+  });
 
-
-type SwipeDirection = 'left' | 'right' | null;
-
-export function TripChecklistScreen({ onBack, destination = 'Amsterdam', onChecklistChange }: TripChecklistScreenProps) {
-  const [categories, setCategories] = useState<ChecklistCategory[]>(initialCategories);
-  const [newItemText, setNewItemText] = useState('');
-
-  // Report checklist counts to parent
+  // Carregar dados salvos (localStorage + Supabase)
   useEffect(() => {
-    const allItems = categories.flatMap(c => c.items);
-    const checked = allItems.filter(i => i.checked).length;
+    let isMounted = true;
+    async function fetchData() {
+      if (itineraryId) {
+        const saved = await loadChecklist(itineraryId);
+        if (isMounted && saved !== null && saved.length > 0) {
+          setCategories(saved);
+        }
+      }
+    }
+    fetchData();
+    return () => {
+      isMounted = false;
+    };
+  }, [itineraryId]);
+
+  // Reportar contagem de itens para o componente pai
+  useEffect(() => {
+    const allItems = categories.flatMap((c) => c.items);
+    const checked = allItems.filter((i) => i.checked).length;
     onChecklistChange?.(checked, allItems.length);
   }, [categories, onChecklistChange]);
-  const [addingTo, setAddingTo] = useState<string | null>(null);
-  const [showEditSectionSheet, setShowEditSectionSheet] = useState<string | null>(null);
-  const [editSectionName, setEditSectionName] = useState('');
-  const [showAddSection, setShowAddSection] = useState(false);
-  const [newSectionTitle, setNewSectionTitle] = useState('');
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  // Backward-compatible aliases to avoid stale runtime references during HMR
-  const deletingSectionId = showEditSectionSheet;
-  const setDeletingSectionId = setShowEditSectionSheet;
-  const [editingItemId, setEditingItemId] = useState<{catId: string;itemId: number;} | null>(null);
-  const [editingItemLabel, setEditingItemLabel] = useState('');
+
+  // Persistir categorias com debounce
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const persistCategories = useCallback(
+    (newCategories: ChecklistCategory[]) => {
+      setCategories(newCategories);
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      debounceTimerRef.current = setTimeout(() => {
+        saveChecklist(itineraryId, newCategories);
+      }, 300);
+    },
+    [itineraryId],
+  );
+
+  // Estados de controle de colapso do accordion
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
 
   const toggleCollapse = (catId: string) => {
     setCollapsedCategories((prev) => {
       const next = new Set(prev);
-      if (next.has(catId)) next.delete(catId);else
-      next.add(catId);
+      if (next.has(catId)) next.delete(catId);
+      else next.add(catId);
       return next;
     });
   };
 
+  // Estados de Bottom Sheets e Modais
+  const [showHeaderMenu, setShowHeaderMenu] = useState(false);
+  const [showAddCategorySheet, setShowAddCategorySheet] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
 
-  const [swipedItem, setSwipedItem] = useState<string | null>(null); // "catId-itemId"
-  const [swipeDirection, setSwipeDirection] = useState<SwipeDirection>(null);
-  const touchStart = useRef<{x: number;y: number;} | null>(null);
-  const swipeRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [editingCategory, setEditingCategory] = useState<ChecklistCategory | null>(null);
+  const [editCategoryName, setEditCategoryName] = useState('');
 
-  const getSwipeKey = (catId: string, itemId: number) => `${catId}-${itemId}`;
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<ChecklistCategory | null>(null);
 
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    touchStart.current = { x: e.clientX, y: e.clientY };
-  }, []);
+  // Estado para adição inline de item
+  const [addingItemToCatId, setAddingItemToCatId] = useState<string | null>(null);
+  const [newItemText, setNewItemText] = useState('');
 
-  const handlePointerUp = useCallback((catId: string, itemId: number, e: React.PointerEvent) => {
-    if (!touchStart.current) return;
-    const deltaX = e.clientX - touchStart.current.x;
-    const deltaY = Math.abs(e.clientY - touchStart.current.y);
-    const key = getSwipeKey(catId, itemId);
+  // ─── Manipulação de Itens ──────────────────────────────────────────────────
 
-    touchStart.current = null;
-
-    if (deltaY > 30) return;
-
-    if (deltaX < -50) {
-      // Swipe left → delete
-      if (swipedItem === key && swipeDirection === 'left') {
-        setSwipedItem(null);
-        setSwipeDirection(null);
-      } else {
-        setSwipedItem(key);
-        setSwipeDirection('left');
-      }
-    } else if (deltaX > 50) {
-      // Swipe right → edit
-      if (swipedItem === key && swipeDirection === 'right') {
-        setSwipedItem(null);
-        setSwipeDirection(null);
-      } else {
-        setSwipedItem(key);
-        setSwipeDirection('right');
-      }
-    }
-  }, [swipedItem, swipeDirection]);
-
-  const toggleItem = (categoryId: string, itemId: number) => {
-    setCategories((prev) =>
-    prev.map((cat) =>
-    cat.id === categoryId ?
-    { ...cat, items: cat.items.map((item) => item.id === itemId ? { ...item, checked: !item.checked } : item) } :
-    cat
-    )
+  const toggleItem = (categoryId: string, itemId: string | number) => {
+    const updated = categories.map((cat) =>
+      cat.id === categoryId
+        ? {
+            ...cat,
+            items: cat.items.map((item) =>
+              item.id === itemId ? { ...item, checked: !item.checked } : item,
+            ),
+          }
+        : cat,
     );
+    persistCategories(updated);
   };
 
   const addItem = (categoryId: string) => {
-    if (!newItemText.trim()) return;
-    const newId = Date.now();
-    setCategories((prev) =>
-    prev.map((cat) =>
-    cat.id === categoryId ?
-    { ...cat, items: [...cat.items, { id: newId, label: newItemText.trim(), checked: false }] } :
-    cat
-    )
-    );
-    setNewItemText('');
-    setAddingTo(null);
-  };
+    const trimmed = newItemText.trim();
+    if (!trimmed) {
+      setAddingItemToCatId(null);
+      setNewItemText('');
+      return;
+    }
 
-  const deleteItem = (categoryId: string, itemId: number) => {
-    setCategories((prev) =>
-    prev.map((cat) =>
-    cat.id === categoryId ?
-    { ...cat, items: cat.items.filter((item) => item.id !== itemId) } :
-    cat
-    )
-    );
-    setSwipedItem(null);
-    setSwipeDirection(null);
-  };
-
-  const startEditItem = (catId: string, item: CheckItem) => {
-    setEditingItemId({ catId, itemId: item.id });
-    setEditingItemLabel(item.label);
-    setSwipedItem(null);
-    setSwipeDirection(null);
-  };
-
-  const saveEditItem = () => {
-    if (!editingItemId || !editingItemLabel.trim()) return;
-    setCategories((prev) =>
-    prev.map((cat) =>
-    cat.id === editingItemId.catId ?
-    { ...cat, items: cat.items.map((item) => item.id === editingItemId.itemId ? { ...item, label: editingItemLabel.trim() } : item) } :
-    cat
-    )
-    );
-    setEditingItemId(null);
-    setEditingItemLabel('');
-  };
-
-  const deleteSection = (categoryId: string) => {
-    setCategories((prev) => prev.filter((cat) => cat.id !== categoryId));
-    setShowEditSectionSheet(null);
-    setShowDeleteConfirm(false);
-  };
-
-  const renameSection = (categoryId: string) => {
-    if (!editSectionName.trim()) return;
-    setCategories((prev) =>
-    prev.map((cat) =>
-    cat.id === categoryId ? { ...cat, title: editSectionName.trim() } : cat
-    )
-    );
-    setShowEditSectionSheet(null);
-    setEditSectionName('');
-  };
-
-  const addSection = () => {
-    if (!newSectionTitle.trim()) return;
-    const colorIndex = categories.length % sectionColors.length;
-    const color = sectionColors[colorIndex];
-    const newCat: ChecklistCategory = {
-      id: `section-${Date.now()}`,
-      title: newSectionTitle.trim(),
-      icon: 'category',
-      iconBg: color.bg,
-      iconColor: color.color,
-      items: []
+    const newItem: ChecklistItem = {
+      id: generateUUID(),
+      label: trimmed,
+      checked: false,
     };
-    setCategories((prev) => [...prev, newCat]);
-    setNewSectionTitle('');
-    setShowAddSection(false);
+
+    const updated = categories.map((cat) =>
+      cat.id === categoryId ? { ...cat, items: [...cat.items, newItem] } : cat,
+    );
+
+    persistCategories(updated);
+    setNewItemText('');
+    setAddingItemToCatId(null);
   };
 
-  const [showHeaderMenu, setShowHeaderMenu] = useState(false);
+  const deleteItem = (categoryId: string, itemId: string | number) => {
+    const updated = categories.map((cat) =>
+      cat.id === categoryId
+        ? { ...cat, items: cat.items.filter((item) => item.id !== itemId) }
+        : cat,
+    );
+    persistCategories(updated);
+  };
+
+  // ─── Manipulação de Categorias ─────────────────────────────────────────────
+
+  const handleAddCategory = () => {
+    const trimmed = newCategoryName.trim();
+    if (!trimmed) return;
+
+    const newCat: ChecklistCategory = {
+      id: generateUUID(),
+      title: trimmed,
+      icon: 'category',
+      iconBg: 'hsl(210 100% 52% / 0.12)',
+      iconColor: 'text-blue-500',
+      items: [],
+    };
+
+    const updated = [...categories, newCat];
+    persistCategories(updated);
+    setNewCategoryName('');
+    setShowAddCategorySheet(false);
+    setShowSuccessToast(true);
+  };
+
+  const handleOpenEditCategory = (cat: ChecklistCategory) => {
+    setEditingCategory(cat);
+    setEditCategoryName(cat.title);
+  };
+
+  const handleSaveEditCategory = () => {
+    if (!editingCategory || !editCategoryName.trim()) return;
+
+    const updated = categories.map((cat) =>
+      cat.id === editingCategory.id ? { ...cat, title: editCategoryName.trim() } : cat,
+    );
+
+    persistCategories(updated);
+    setEditingCategory(null);
+    setEditCategoryName('');
+  };
+
+  const handleRequestDeleteCategory = () => {
+    if (!editingCategory) return;
+    setCategoryToDelete(editingCategory);
+    setEditingCategory(null);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDeleteCategory = () => {
+    if (!categoryToDelete) return;
+    const updated = categories.filter((cat) => cat.id !== categoryToDelete.id);
+    persistCategories(updated);
+    setShowDeleteConfirm(false);
+    setCategoryToDelete(null);
+  };
+
+  // ─── Ações Gerais (3 Pontinhos) ────────────────────────────────────────────
 
   const handleCheckAll = () => {
-    setCategories((prev) => prev.map((cat) => ({
+    const updated = categories.map((cat) => ({
       ...cat,
-      items: cat.items.map((item) => ({ ...item, checked: true }))
-    })));
+      items: cat.items.map((item) => ({ ...item, checked: true })),
+    }));
+    persistCategories(updated);
     setShowHeaderMenu(false);
   };
 
   const handleUncheckAll = () => {
-    setCategories((prev) => prev.map((cat) => ({
+    const updated = categories.map((cat) => ({
       ...cat,
-      items: cat.items.map((item) => ({ ...item, checked: false }))
-    })));
+      items: cat.items.map((item) => ({ ...item, checked: false })),
+    }));
+    persistCategories(updated);
     setShowHeaderMenu(false);
   };
 
-  const [showReorderScreen, setShowReorderScreen] = useState(false);
-
-  const handleToggleReorder = () => {
-    setShowReorderScreen(true);
-    setShowHeaderMenu(false);
-  };
-
-  const handleSaveReorder = (orderedIds: string[]) => {
-    setCategories((prev) => {
-      const map = new Map(prev.map((c) => [c.id, c]));
-      return orderedIds.map((id) => map.get(id)!).filter(Boolean);
-    });
-    setShowReorderScreen(false);
-  };
+  const isEmpty = categories.length === 0;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <header className="sticky top-0 z-20 bg-background px-4 pb-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
-        <div className="flex items-center gap-3">
-          <BackButton onClick={onBack} />
-          <h1 className="text-xl font-bold text-foreground my-0 flex-1">Checklist</h1>
-          <div className="relative">
+    <div className="h-[100dvh] overflow-y-auto bg-[#F3F3F3] flex flex-col font-['Urbanist',sans-serif]">
+      <SuccessToast 
+        isVisible={showSuccessToast} 
+        onClose={() => setShowSuccessToast(false)} 
+        title="Categoria adicionada com sucesso!"
+        description=""
+      />
+
+      {/* ─── Topbar Header (Figma specs: flat chevron sem background circular branco) ─── */}
+      <header
+        className="sticky top-0 z-20 bg-[#F3F3F3] px-6 pb-3"
+        style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}
+      >
+        <div className="flex items-center justify-between gap-4 h-[38px]">
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => setShowHeaderMenu((prev) => !prev)}
-              className="w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition-all"
-              style={{ background: '#F2F2F2' }}>
-              
-              <MoreHorizontal size={20} style={{ color: '#1A1C40' }} />
+              type="button"
+              onClick={onBack}
+              aria-label="Voltar"
+              className="p-1 -ml-1 text-[#171F2C] hover:opacity-70 active:scale-95 transition-all flex items-center justify-center"
+            >
+              <ChevronLeft size={22} strokeWidth={2.5} className="text-[#171F2C]" />
             </button>
-            {showHeaderMenu &&
-            <>
-                <div className="fixed inset-0 z-30" onClick={() => setShowHeaderMenu(false)} />
-                <div className="absolute right-0 top-12 z-40 w-52 bg-card rounded-xl border border-border shadow-lg py-1.5 overflow-hidden">
-                  <button
-                  onClick={handleCheckAll}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-muted/50 active:bg-muted transition-colors">
-                  
-                    <CheckCheck size={18} className="text-muted-foreground" />
-                    Marcar todos
-                  </button>
-                  <button
-                  onClick={handleUncheckAll}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-muted/50 active:bg-muted transition-colors">
-                  
-                    <Square size={18} className="text-muted-foreground" />
-                    Desmarcar todos
-                  </button>
-                  <div className="h-px bg-border mx-3" />
-                  <button
-                  onClick={handleToggleReorder}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-muted/50 active:bg-muted transition-colors">
-                  
-                    <ArrowUpDown size={18} className="text-muted-foreground" />
-                    Reordenar categorias
-                  </button>
-                </div>
-              </>
-            }
+            <h1 className="font-['Urbanist'] font-bold text-[20px] leading-[24px] text-[#171F2C] my-0">
+              Checklist
+            </h1>
           </div>
+
+          {/* Botão 3 pontinhos (Menu de Ações) */}
+          {!isEmpty && (
+            <button
+              onClick={() => setShowHeaderMenu(true)}
+              className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-black/5 active:scale-95 transition-all flex-shrink-0"
+              aria-label="Opções do checklist"
+            >
+              <MoreHorizontal size={22} className="text-[#141530]" />
+            </button>
+          )}
         </div>
       </header>
 
-      {/* Reorder screen */}
-      {showReorderScreen &&
-      <div className="fixed inset-0 z-50 bg-background">
-          <ReorderCategoriesScreen
-          categories={categories.map((c) => ({ id: c.id, title: c.title, icon: c.icon, iconBg: c.iconBg, iconColor: c.iconColor, itemCount: c.items.length }))}
-          onSave={handleSaveReorder}
-          onBack={() => setShowReorderScreen(false)} />
-        
+      {/* ─── Estado Vazio (Empty State) [Figma CSS: Frame 1321316331] ─── */}
+      {isEmpty ? (
+        <div className="flex-1 flex flex-col items-center justify-center px-6 pb-20 text-center animate-in fade-in duration-300">
+          <div className="flex flex-col items-center gap-6 max-w-[345px]">
+            {/* Frame 1321316334: gap 16px */}
+            <div className="flex flex-col items-center gap-4">
+              {/* Group 481513: width 119px, height 113.32px */}
+              <LuggageIllustration width={119} height={114} />
+
+              {/* Frame 1321316333: gap 8px */}
+              <div className="flex flex-col items-center gap-2 max-w-[293px]">
+                {/* Title: 600, 18px, line-height 22px, #171F2C */}
+                <h2 className="font-['Urbanist'] font-semibold text-[18px] leading-[22px] text-[#171F2C] my-0">
+                  Nenhum checklist criado
+                </h2>
+                {/* Subtitle: 500, 14px, line-height 16px, #7F7F7F */}
+                <p className="font-['Urbanist'] font-medium text-[14px] leading-[16px] text-[#7F7F7F] text-center my-0 max-w-[293px]">
+                  Crie um checklist para não esquecer nada antes ou durante a viagem.
+                </p>
+              </div>
+            </div>
+
+            {/* Main button: border 1px solid #141530, border-radius 16px, h 48px, font 16px bold #141530 */}
+            <button
+              onClick={() => {
+                setNewCategoryName('');
+                setShowAddCategorySheet(true);
+              }}
+              className="h-[48px] px-6 rounded-[16px] border border-[#141530] bg-[#F3F3F3] text-[#141530] font-['Urbanist'] font-bold text-[16px] leading-[19px] hover:bg-black/5 active:scale-95 transition-all flex items-center justify-center shadow-none"
+            >
+              Criar checklist
+            </button>
+          </div>
         </div>
-      }
+      ) : (
+        /* ─── Estado Preenchido (Listagem) [image_e1afee.png - Esquerda] ─── */
+        <div className="flex-1 px-6 pb-12 pt-6 flex flex-col gap-6">
+          {/* Botão + Adicionar categoria (Figma: gap 8px, font 14px bold, text #141530) */}
+          <div>
+            <button
+              onClick={() => {
+                setNewCategoryName('');
+                setShowAddCategorySheet(true);
+              }}
+              className="flex items-center gap-2 font-['Urbanist'] font-bold text-[14px] leading-[17px] text-[#141530] active:opacity-70 transition-opacity"
+            >
+              <Plus size={16} strokeWidth={2.5} className="text-[#141530]" />
+              <span>Adicionar categoria</span>
+            </button>
+          </div>
 
+          {/* Lista de Categorias (Accordion Cards: bg #FFFFFF, border-radius 16px, padding 24px, gap 24px) */}
+          <Reorder.Group axis="y" values={categories} onReorder={persistCategories} className="flex flex-col gap-6">
+            {categories.map((cat) => (
+              <CategoryItem
+                key={cat.id}
+                cat={cat}
+                isCollapsed={collapsedCategories.has(cat.id)}
+                toggleCollapse={toggleCollapse}
+                handleOpenEditCategory={handleOpenEditCategory}
+                toggleItem={toggleItem}
+                deleteItem={deleteItem}
+                addingItemToCatId={addingItemToCatId}
+                setAddingItemToCatId={setAddingItemToCatId}
+                newItemText={newItemText}
+                setNewItemText={setNewItemText}
+                addItem={addItem}
+              />
+            ))}
+          </Reorder.Group>
+        </div>
+      )}
 
-      {/* Categories */}
-      <div className="flex-1 px-4 pb-8 pt-10 space-y-6">
+      {/* ─── Bottom Sheet: Ações Gerais (Menu 3 Pontinhos) [Figma CSS] ─── */}
+      {showHeaderMenu && (
+        <div className="fixed inset-0 z-50 flex justify-center font-['Urbanist',sans-serif]">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity"
+            onClick={() => setShowHeaderMenu(false)}
+          />
 
-        {categories.map((cat, catIdx) => {
-          const catChecked = cat.items.filter((i) => i.checked).length;
-          return (
-            <section key={cat.id}>
-              {/* Section header */}
+          <div
+            className="relative w-full mt-auto rounded-t-[24px] bg-[#FFFFFF] shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-300 z-10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close button bar */}
+            <div className="flex items-center justify-end px-6 pt-6 pb-3">
               <button
-                onClick={() => toggleCollapse(cat.id)}
-                className="flex items-center gap-2.5 mb-3 w-full text-left">
-                
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: cat.iconBg }}>
-                  
-                  <Icon name={cat.icon} size={16} className={cat.iconColor} />
-                </div>
-                <h2 className="text-[15px] font-semibold text-foreground">{cat.title}</h2>
-                <span className="text-[12px] text-muted-foreground flex-1">{catChecked}/{cat.items.length}</span>
-                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    onClick={() => {setShowEditSectionSheet(cat.id);setEditSectionName(cat.title);}}
-                    className="flex items-center gap-1 active:scale-95 transition-transform"
-                    style={{ color: '#1A1C40' }}>
-                    
-                    <Pencil size={13} />
-                    <span className="text-[13px] font-medium">Editar</span>
-                  </button>
-                </div>
-                <ChevronDown
-                  size={18}
-                  className={`text-muted-foreground transition-transform duration-200 flex-shrink-0 ${
-                  collapsedCategories.has(cat.id) ? 'rotate-180' : 'rotate-0'}`
-                  } />
-                
+                type="button"
+                onClick={() => setShowHeaderMenu(false)}
+                className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-black/5 active:scale-95 transition-all text-[#000000]"
+                aria-label="Fechar"
+              >
+                <X size={18} strokeWidth={2.2} />
               </button>
+            </div>
 
-              {/* Collapsible content */}
-              <div
-                className={`overflow-hidden transition-all duration-200 ${
-                collapsedCategories.has(cat.id) ? 'max-h-0 opacity-0' : 'max-h-[2000px] opacity-100'}`
-                }>
-                
-                {/* Items list */}
-                <div className="space-y-0">
-                  {cat.items.map((item) => {
-                    const key = getSwipeKey(cat.id, item.id);
-                    const isSwipedLeft = swipedItem === key && swipeDirection === 'left';
-                    const isSwipedRight = swipedItem === key && swipeDirection === 'right';
-                    const isEditing = editingItemId?.catId === cat.id && editingItemId?.itemId === item.id;
+            {/* Content */}
+            <div className="px-6 pb-8 flex flex-col gap-6">
+              <h3 className="font-['Urbanist'] font-semibold text-[22px] leading-[26px] text-[#171F2C] my-0">
+                Checklist
+              </h3>
 
-                    return (
-                      <div key={item.id} className="relative overflow-hidden">
-                        <div className="absolute inset-y-0 left-0 flex items-stretch" style={{ width: 80 }}>
-                          <button
-                            onClick={() => startEditItem(cat.id, item)}
-                            className="w-full flex flex-col items-center justify-center gap-0.5"
-                            style={{ backgroundColor: '#3587F2' }}>
-                            
-                            <Pencil size={16} className="text-white" />
-                            <span className="text-[11px] font-medium text-white">Editar</span>
-                          </button>
-                        </div>
-                        <div className="absolute inset-y-0 right-0 flex items-stretch" style={{ width: 80 }}>
-                          <button
-                            onClick={() => deleteItem(cat.id, item.id)}
-                            className="w-full flex flex-col items-center justify-center gap-0.5 bg-destructive">
-                            
-                            <Trash2 size={16} className="text-white" />
-                            <span className="text-[11px] font-medium text-white">Excluir</span>
-                          </button>
-                        </div>
-                        <div
-                          ref={(el) => {swipeRefs.current[key] = el;}}
-                          className="relative z-10 bg-background flex items-center gap-3 px-1 py-3.5 border-b border-border/40 transition-transform duration-200 ease-out"
-                          style={{
-                            transform: isSwipedLeft ? 'translateX(-80px)' : isSwipedRight ? 'translateX(80px)' : 'translateX(0)'
-                          }}
-                          onPointerDown={handlePointerDown}
-                          onPointerUp={(e) => handlePointerUp(cat.id, item.id, e)}
-                          onClick={() => {
-                            if (isSwipedLeft || isSwipedRight) {
-                              setSwipedItem(null);
-                              setSwipeDirection(null);
-                            }
-                          }}>
-                          
-                          {isEditing ?
-                          <div className="flex items-center gap-2 flex-1">
-                              <input
-                              autoFocus
-                              value={editingItemLabel}
-                              onChange={(e) => setEditingItemLabel(e.target.value)}
-                              onKeyDown={(e) => e.key === 'Enter' && saveEditItem()}
-                              className="flex-1 text-sm bg-transparent outline-none text-foreground border-b border-border" />
-                            
-                              <button onClick={saveEditItem} className="text-xs font-medium px-2 py-1 rounded-lg" style={{ color: '#1A1C40' }}>
-                                OK
-                              </button>
-                              <button onClick={() => {setEditingItemId(null);setEditingItemLabel('');}}>
-                                <X size={14} className="text-muted-foreground" />
-                              </button>
-                            </div> :
+              <div className="flex flex-col gap-5">
+                <button
+                  onClick={handleCheckAll}
+                  className="w-full flex items-center justify-between text-left group active:opacity-70 transition-opacity"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+                      <CheckCheck size={16} className="text-[#141530]" strokeWidth={2.5} />
+                    </div>
+                    <span className="font-['Urbanist'] font-medium text-[16px] leading-[19px] text-[#141530]">
+                      Marcar todos
+                    </span>
+                  </div>
+                </button>
 
-                          <button
-                            onClick={() => {
-                              if (!isSwipedLeft && !isSwipedRight) toggleItem(cat.id, item.id);
-                            }}
-                            className="flex items-center gap-3 flex-1 text-left">
-                            
-                              <div className={`w-[22px] h-[22px] rounded-md flex items-center justify-center flex-shrink-0 transition-all ${
-                            item.checked ? 'bg-primary' : 'border-2 border-muted-foreground/25'}`
-                            }>
-                                {item.checked && <Check size={14} strokeWidth={3} className="text-primary-foreground" />}
-                              </div>
-                              <span className={`text-[14px] flex-1 ${item.checked ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
-                                {item.label}
-                              </span>
-                            </button>
-                          }
-                          {!isEditing && !isSwipedLeft && !isSwipedRight && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); deleteItem(cat.id, item.id); }}
-                              className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center active:scale-95 transition-all"
-                              aria-label="Excluir item">
-                              <X size={18} style={{ color: '#1A1C40' }} strokeWidth={2.25} />
-                            </button>
-                          )}
-                        </div>
-                      </div>);
-
-                  })}
-                </div>
-
-                {/* Add item */}
-                {addingTo === cat.id ?
-                <div className="px-1 py-3 mt-1">
-                    <input
-                    autoFocus
-                    value={newItemText}
-                    onChange={(e) => setNewItemText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') addItem(cat.id);
-                      if (e.key === 'Escape') {setAddingTo(null);setNewItemText('');}
-                    }}
-                    onBlur={() => {if (!newItemText.trim()) {setAddingTo(null);setNewItemText('');}}}
-                    placeholder="Novo item..."
-                    className="w-full text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground border-b border-border pb-1" />
-                  
-                  </div> :
+                <div className="w-full h-0 border-b border-[#F2F2F2]" />
 
                 <button
-                  onClick={() => setAddingTo(cat.id)}
-                  className="flex items-center gap-2 px-1 py-3 mt-1 active:opacity-70 transition-opacity"
-                  style={{ color: '#1A1C40' }}>
-                  
-                    <Plus size={16} />
-                    <span className="text-sm font-medium">Adicionar item</span>
-                  </button>
-                }
-              </div>
-            </section>);
-
-        })}
-      </div>
-
-      {/* Edit section bottom sheet */}
-      {showEditSectionSheet && !showDeleteConfirm &&
-      <>
-          <div className="fixed inset-0 bg-black/40 z-50" onClick={() => {setShowEditSectionSheet(null);setEditSectionName('');}} />
-          <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center">
-            <div className="bg-background rounded-t-3xl w-full w-full p-6 pb-8 animate-in slide-in-from-bottom duration-300">
-              <div className="flex justify-center mb-3">
-                <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
-              </div>
-              <div className="flex items-center justify-between mb-5">
-                <h3 className="text-[18px] font-bold text-foreground">Editar seção</h3>
-                <button
-                onClick={() => {setShowEditSectionSheet(null);setEditSectionName('');}}
-                className="w-8 h-8 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: '#F2F2F2' }}>
-                
-                  <X size={18} className="text-foreground" />
+                  onClick={handleUncheckAll}
+                  className="w-full flex items-center justify-between text-left group active:opacity-70 transition-opacity"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+                      <CircleDot size={16} className="text-[#141530]" strokeWidth={2.5} />
+                    </div>
+                    <span className="font-['Urbanist'] font-medium text-[16px] leading-[19px] text-[#141530]">
+                      Desmarcar todos
+                    </span>
+                  </div>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
 
-              <label className="text-[13px] font-medium text-foreground block mb-1.5">Nome da seção</label>
-              <input
-              autoFocus
-              value={editSectionName}
-              onChange={(e) => setEditSectionName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && renameSection(showEditSectionSheet)}
-              className="w-full px-4 py-3 rounded-xl border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground outline-none mb-6" />
-            
+      {/* ─── Bottom Sheet: Adicionar Categoria [Figma CSS] ─── */}
+      {showAddCategorySheet && (
+        <div className="fixed inset-0 z-50 flex justify-center font-['Urbanist',sans-serif]">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity"
+            onClick={() => setShowAddCategorySheet(false)}
+          />
 
+          <div
+            className="relative w-full mt-auto rounded-t-[24px] bg-[#FFFFFF] shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-300 z-10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top close button bar */}
+            <div className="flex items-center justify-end px-6 pt-6 pb-3">
               <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="flex items-center gap-2 py-3 text-destructive active:opacity-70 transition-opacity mb-4">
-              
-                <Trash2 size={16} />
-                <span className="text-sm font-medium">Excluir seção</span>
+                type="button"
+                onClick={() => setShowAddCategorySheet(false)}
+                className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-black/5 active:scale-95 transition-all text-[#000000]"
+                aria-label="Fechar"
+              >
+                <X size={18} strokeWidth={2.2} />
+              </button>
+            </div>
+
+            {/* Content (Figma: padding 0 24px 24px, gap 32px) */}
+            <div className="px-6 pb-8 flex flex-col gap-6">
+              <h3 className="font-['Urbanist'] font-semibold text-[22px] leading-[26px] text-[#171F2C] my-0">
+                Adicionar categoria
+              </h3>
+
+              {/* Input container Search (Figma: bg #EDEDED, border-radius 12px, padding 8px 12px, height 54px) */}
+              <div className="bg-[#EDEDED] rounded-[12px] px-3 py-2 flex items-center gap-3 h-[54px]">
+                <Tag size={16} className="text-[#7F7F7F] flex-shrink-0" />
+                <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
+                  <label className="font-['Urbanist'] font-medium text-[12px] leading-[16px] text-[#949494] block">
+                    Nome da categoria
+                  </label>
+                  <input
+                    autoFocus
+                    type="text"
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
+                    placeholder="Ex: Documentos, Roupas..."
+                    className="w-full font-['Urbanist'] font-medium text-[14px] leading-[16px] text-[#141530] bg-transparent outline-none placeholder:text-[#949494]/60"
+                  />
+                </div>
+              </div>
+
+              {/* Main button (Figma: bg #9DCC36, border-radius 16px, height 48px, font 16px bold) */}
+              <button
+                onClick={handleAddCategory}
+                disabled={!newCategoryName.trim()}
+                className="w-full h-[48px] rounded-[16px] bg-[#9DCC36] text-[#141530] font-['Urbanist'] font-bold text-[16px] leading-[19px] flex items-center justify-center transition-all disabled:opacity-50 active:scale-[0.99]"
+              >
+                Adicionar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Bottom Sheet: Editar Categoria [Figma CSS: Frame 1321316155] ─── */}
+      {editingCategory !== null && (
+        <div className="fixed inset-0 z-50 flex justify-center font-['Urbanist',sans-serif]">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity"
+            onClick={() => setEditingCategory(null)}
+          />
+
+          <div
+            className="relative w-full mt-auto rounded-t-[24px] bg-[#FFFFFF] shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-300 z-10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top close button bar (Figma: padding 24px 24px 12px, justify-end) */}
+            <div className="flex items-center justify-end px-6 pt-6 pb-3">
+              <button
+                type="button"
+                onClick={() => setEditingCategory(null)}
+                className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-black/5 active:scale-95 transition-all text-[#000000]"
+                aria-label="Fechar"
+              >
+                <X size={18} strokeWidth={2.2} />
+              </button>
+            </div>
+
+            {/* Content (Figma: padding 0 24px 24px, gap 32px) */}
+            <div className="px-6 pb-8 flex flex-col gap-6">
+              {/* Title: Editar categoria (Figma: 600, 22px, line-height 26px, #171F2C) */}
+              <h3 className="font-['Urbanist'] font-semibold text-[22px] leading-[26px] text-[#171F2C] my-0">
+                Editar categoria
+              </h3>
+
+              {/* Input container Search (Figma: bg #EDEDED, border-radius 12px, padding 8px 12px, height 54px) */}
+              <div className="bg-[#EDEDED] rounded-[12px] px-3 py-2 flex items-center gap-3 h-[54px]">
+                <Tag size={16} className="text-[#7F7F7F] flex-shrink-0" />
+                <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
+                  <label className="font-['Urbanist'] font-medium text-[12px] leading-[16px] text-[#949494] block">
+                    Nome da categoria
+                  </label>
+                  <input
+                    autoFocus
+                    type="text"
+                    value={editCategoryName}
+                    onChange={(e) => setEditCategoryName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSaveEditCategory()}
+                    className="w-full font-['Urbanist'] font-medium text-[14px] leading-[16px] text-[#141530] bg-transparent outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Excluir categoria button (Figma: gap 12px, font 16px 500, color #D00004) */}
+              <button
+                onClick={handleRequestDeleteCategory}
+                className="flex items-center gap-3 text-[#D00004] hover:opacity-80 active:opacity-60 transition-opacity py-1"
+              >
+                <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                  <Trash2 size={18} strokeWidth={1.75} className="text-[#D00004]" />
+                </div>
+                <span className="font-['Urbanist'] font-medium text-[16px] leading-[19px] text-[#D00004]">
+                  Excluir categoria
+                </span>
               </button>
 
+              {/* Main button Salvar (Figma: bg #9DCC36, border-radius 16px, height 48px, font 16px bold) */}
               <button
-              onClick={() => renameSection(showEditSectionSheet)}
-              className="w-full py-3.5 rounded-2xl text-[15px] font-semibold"
-              style={{ background: '#9DCC36', color: '#1A1C40' }}>
-              
+                onClick={handleSaveEditCategory}
+                disabled={!editCategoryName.trim()}
+                className="w-full h-[48px] rounded-[16px] bg-[#9DCC36] text-[#141530] font-['Urbanist'] font-bold text-[16px] leading-[19px] flex items-center justify-center transition-all disabled:opacity-50 active:scale-[0.99]"
+              >
                 Salvar
               </button>
             </div>
           </div>
-        </>
-      }
+        </div>
+      )}
 
-      {/* Delete section confirmation */}
-      {showEditSectionSheet && showDeleteConfirm &&
-      <>
-          <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setShowDeleteConfirm(false)} />
-          <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center">
-            <div className="bg-background rounded-t-3xl w-full w-full p-6 pb-8 animate-in slide-in-from-bottom duration-300">
-              <div className="flex justify-center mb-3">
-                <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
+      {/* ─── Bottom Sheet: Confirmação de Exclusão [Figma CSS: Frame 1321316155 / height 256px] ─── */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex justify-center font-['Urbanist',sans-serif]">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity"
+            onClick={() => {
+              setShowDeleteConfirm(false);
+              setCategoryToDelete(null);
+            }}
+          />
+
+          <div
+            className="relative w-full mt-auto rounded-t-[24px] bg-[#FFFFFF] shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-300 z-10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top action bar: back button < on left, close X on right (Figma: padding 24px 24px 12px, h 60px, justify-between) */}
+            <div className="flex items-center justify-between px-6 pt-6 pb-3 h-[60px]">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  if (categoryToDelete) {
+                    setEditingCategory(categoryToDelete);
+                  }
+                }}
+                className="w-6 h-6 flex items-center justify-center text-[#000000] hover:opacity-70 active:scale-95 transition-all -ml-1"
+                aria-label="Voltar"
+              >
+                <ChevronLeft size={22} strokeWidth={2.5} className="text-[#000000]" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setCategoryToDelete(null);
+                }}
+                className="w-6 h-6 flex items-center justify-center hover:opacity-70 active:scale-95 transition-all text-[#000000] -mr-1"
+                aria-label="Fechar"
+              >
+                <X size={18} strokeWidth={2.2} />
+              </button>
+            </div>
+
+            {/* Content (Figma: padding 16px 24px 32px, gap 32px) */}
+            <div className="px-6 pb-8 pt-2 flex flex-col gap-8">
+              {/* Frame 1321316436: gap 8px */}
+              <div className="flex flex-col gap-2">
+                {/* Title: 600, 22px, line-height 26px, #171F2C */}
+                <h3 className="font-['Urbanist'] font-semibold text-[22px] leading-[26px] text-[#171F2C] my-0">
+                  Tem certeza que deseja excluir esta categoria?
+                </h3>
+                {/* Subtitle / Category name: 500, 14px, line-height 20px, #7F7F7F */}
+                <p className="font-['Urbanist'] font-medium text-[14px] leading-[20px] text-[#7F7F7F] my-0">
+                  {categoryToDelete?.title || 'Categoria'}
+                </p>
               </div>
-              <h3 className="text-[16px] font-bold text-foreground mb-2">Excluir seção?</h3>
-              <p className="text-sm text-muted-foreground mb-5">A seção e todos os seus itens serão removidos permanentemente.</p>
-              <div className="flex gap-3">
+
+              {/* Action buttons (Figma: Frame 1321316525: gap 16px, h 48px) */}
+              <div className="flex items-center gap-4">
+                {/* Cancelar (Figma: border 1px solid #141530, border-radius 16px, h 48px, font 16px bold #141530) */}
                 <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 py-3 rounded-xl border font-medium text-sm"
-                style={{ borderColor: '#1A1C40', color: '#1A1C40' }}>
-                
+                  onClick={() => {
+                    setShowDeleteConfirm(false);
+                    setCategoryToDelete(null);
+                  }}
+                  className="flex-1 h-[48px] rounded-[16px] border border-[#141530] bg-[#FFFFFF] text-[#141530] font-['Urbanist'] font-bold text-[16px] leading-[19px] hover:bg-black/5 active:scale-95 transition-all flex items-center justify-center"
+                >
                   Cancelar
                 </button>
+                {/* Confirmar (Figma: bg #9DCC36, border-radius 16px, h 48px, font 16px bold #141530) */}
                 <button
-                onClick={() => deleteSection(showEditSectionSheet)}
-                className="flex-1 py-3 rounded-xl font-semibold text-sm"
-                style={{ background: '#9DCC36', color: '#1A1C40' }}>
-                
+                  onClick={handleConfirmDeleteCategory}
+                  className="flex-1 h-[48px] rounded-[16px] bg-[#9DCC36] text-[#141530] font-['Urbanist'] font-bold text-[16px] leading-[19px] hover:brightness-105 active:scale-95 transition-all flex items-center justify-center"
+                >
                   Excluir
                 </button>
               </div>
             </div>
           </div>
-        </>
-      }
-    </div>);
-
+        </div>
+      )}
+    </div>
+  );
 }

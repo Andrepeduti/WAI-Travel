@@ -134,7 +134,7 @@ export function SubscriptionScreen({ onBack }: SubscriptionScreenProps) {
     : '';
 
   return (
-    <div className="min-h-screen pb-8 bg-background">
+    <div className="min-h-[100dvh] pb-8 bg-background">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 pb-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
         <BackButton onClick={onBack} />

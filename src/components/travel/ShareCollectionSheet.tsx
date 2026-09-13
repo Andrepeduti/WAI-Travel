@@ -196,7 +196,7 @@ export function ShareCollectionSheet({
         </div>
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-[#F2F2F2] flex items-center justify-center"
+          className="absolute top-3 right-3 w-10 h-10 rounded-full bg-[#F2F2F2] flex items-center justify-center"
           aria-label="Fechar"
         >
           <X size={16} />

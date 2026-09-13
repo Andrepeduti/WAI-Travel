@@ -117,7 +117,7 @@ export function ChatScreen({ onBack, initialContact, onViewItinerary }: ChatScre
 
   if (!userId) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center px-6 text-center">
+      <div className="min-h-[100dvh] bg-background flex items-center justify-center px-6 text-center">
         <p className="text-sm text-muted-foreground">Entre na sua conta para usar o chat.</p>
       </div>
     );
@@ -275,7 +275,7 @@ function InboxView({
   }, [currentUserId]);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-[100dvh] bg-background flex flex-col">
       <header className="sticky top-0 z-20 bg-background px-5 pb-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -408,7 +408,7 @@ function NewConversationView({
     : results;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-[100dvh] bg-background flex flex-col">
       <header className="sticky top-0 z-20 bg-background px-4 pb-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
         <div className="flex items-center gap-3 mb-3">
           <BackButton onClick={onBack} />
@@ -517,7 +517,7 @@ function CreateGroupView({
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-[100dvh] bg-background flex flex-col">
  <header className="sticky top-0 z-20 bg-background px-4 pb-3">
         <div className="flex items-center gap-3 mb-3">
           <BackButton onClick={onBack} />
@@ -761,7 +761,7 @@ function ConversationView({
     : [];
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-[100dvh] bg-background flex flex-col">
       <header className="sticky top-0 z-20 bg-background border-b border-[hsl(var(--divider))] px-4 py-3">
         <div className="flex items-center gap-3">
           <BackButton onClick={onBack} />
@@ -929,7 +929,7 @@ function ConversationView({
         )}
 
         <div className="flex items-end gap-2">
-          <div className="flex-1 bg-card border border-[hsl(var(--divider))] rounded-2xl px-3 py-2">
+          <div className="flex-1 bg-card border border-[hsl(var(--divider))] rounded-[10px] px-3 py-2">
             <textarea
               ref={textareaRef}
               value={text}

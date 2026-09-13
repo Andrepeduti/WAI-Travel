@@ -242,7 +242,7 @@ function LoginCard({
           type="button"
           onClick={onBack}
           aria-label="Voltar"
-          className="w-9 h-9 rounded-full bg-[#F4F5F7] flex items-center justify-center text-[#0A0A0A]/70 hover:bg-[#0A0A0A]/10 active:scale-95 transition-all"
+          className="w-10 h-10 rounded-full bg-[#F4F5F7] flex items-center justify-center text-[#0A0A0A]/70 hover:bg-[#0A0A0A]/10 active:scale-95 transition-all"
         >
           <ArrowLeft size={18} />
         </button>
@@ -414,7 +414,7 @@ function SignupCard({
           type="button"
           onClick={onBack}
           aria-label="Voltar"
-          className="w-9 h-9 rounded-full bg-[#F4F5F7] flex items-center justify-center text-[#0A0A0A]/70 hover:bg-[#0A0A0A]/10 active:scale-95 transition-all"
+          className="w-10 h-10 rounded-full bg-[#F4F5F7] flex items-center justify-center text-[#0A0A0A]/70 hover:bg-[#0A0A0A]/10 active:scale-95 transition-all"
         >
           <ArrowLeft size={18} />
         </button>
@@ -557,7 +557,7 @@ function ForgotPasswordCard({ onBack }: { onBack: () => void }) {
           type="button"
           onClick={onBack}
           aria-label="Voltar"
-          className="w-9 h-9 rounded-full bg-[#F4F5F7] flex items-center justify-center text-[#0A0A0A]/70 hover:bg-[#0A0A0A]/10 active:scale-95 transition-all"
+          className="w-10 h-10 rounded-full bg-[#F4F5F7] flex items-center justify-center text-[#0A0A0A]/70 hover:bg-[#0A0A0A]/10 active:scale-95 transition-all"
         >
           <ArrowLeft size={18} />
         </button>

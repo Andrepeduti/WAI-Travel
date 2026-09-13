@@ -32,7 +32,7 @@ export function PlaceCard({ place, onClick, className }: PlaceCardProps) {
     >
       <div className="relative h-32">
         <img src={place.image} alt={place.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-        <button onClick={handleSave} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center transition-transform active:scale-90">
+        <button onClick={handleSave} className="absolute top-2 right-2 w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center transition-transform active:scale-90">
           <Icon name="bookmark" size={16} filled={isSaved} className={isSaved ? 'text-florida-normal' : ''} />
         </button>
       </div>

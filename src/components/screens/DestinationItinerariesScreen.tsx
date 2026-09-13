@@ -183,7 +183,7 @@ export function DestinationItinerariesScreen({
   };
 
   return (
-    <div className="min-h-screen pb-8" style={{ backgroundColor: '#F2F2F2' }}>
+    <div className="min-h-[100dvh] pb-8" style={{ backgroundColor: '#F2F2F2' }}>
       {/* Hero */}
       <div className="relative h-[200px] w-full overflow-hidden">
         {coverImage && (

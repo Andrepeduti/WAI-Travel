@@ -58,7 +58,7 @@ export function AddExpenseSheet({ open, onClose, onSave, dayNumber }: AddExpense
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-full flex items-center justify-center -mr-1"
+            className="w-10 h-10 rounded-full flex items-center justify-center -mr-1"
             style={{ background: '#F2F2F2' }}
             aria-label="Fechar"
           >
@@ -79,7 +79,7 @@ export function AddExpenseSheet({ open, onClose, onSave, dayNumber }: AddExpense
             <label className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
               Descrição do gasto
             </label>
-            <div className="flex items-center gap-2 rounded-xl px-4 py-3" style={{ background: '#F2F2F2' }}>
+            <div className="flex items-center gap-2 rounded-[10px] px-4 py-3" style={{ background: '#F2F2F2' }}>
               <input
                 type="text"
                 placeholder="Ex: Jantar no restaurante"
@@ -97,7 +97,7 @@ export function AddExpenseSheet({ open, onClose, onSave, dayNumber }: AddExpense
               <label className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
                 Valor
               </label>
-              <div className="flex items-center gap-2 rounded-xl px-4 py-3" style={{ background: '#F2F2F2' }}>
+              <div className="flex items-center gap-2 rounded-[10px] px-4 py-3" style={{ background: '#F2F2F2' }}>
                 <input
                   type="text"
                   placeholder="0,00"

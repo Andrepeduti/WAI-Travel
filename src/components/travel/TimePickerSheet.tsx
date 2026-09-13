@@ -50,7 +50,7 @@ export function TimePickerSheet({
           <div className="flex items-center justify-end px-6 pt-1 pb-1">
             <button
               onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center -mr-1"
+              className="w-10 h-10 flex items-center justify-center -mr-1"
               aria-label="Fechar"
             >
               <Icon name="close" size={20} className="text-muted-foreground" />

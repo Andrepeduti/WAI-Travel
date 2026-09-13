@@ -33,6 +33,8 @@ export interface PlannerActivity {
   observation?: string;
   lat?: number;
   lng?: number;
+  city?: string;
+  country?: string;
 }
 
 export interface PlannerTransport {
@@ -70,6 +72,8 @@ function activityRowToObject(row: any): PlannerActivity {
     observation: row.observation ?? undefined,
     lat: row.lat ?? undefined,
     lng: row.lng ?? undefined,
+    city: row.metadata?.city ?? undefined,
+    country: row.metadata?.country ?? undefined,
   };
 }
 
@@ -115,7 +119,16 @@ export async function loadPlannerData(itineraryId: string): Promise<PlannerData 
   for (const row of activitiesRes.data ?? []) {
     const day = (row as any).day as number;
     if (!activities[day]) activities[day] = [];
-    activities[day].push(activityRowToObject(row));
+    const act = activityRowToObject(row);
+    const isDuplicate = activities[day].some((existing) =>
+      existing.id === act.id ||
+      (existing.name.trim().toLowerCase() === act.name.trim().toLowerCase() &&
+       existing.startTime === act.startTime &&
+       existing.type === act.type)
+    );
+    if (!isDuplicate) {
+      activities[day].push(act);
+    }
   }
 
   const transports: Record<number, PlannerTransport[]> = {};
@@ -145,8 +158,17 @@ export async function savePlannerData(
   const activityRows: any[] = [];
   for (const [dayStr, list] of Object.entries(data.activities)) {
     const day = Number(dayStr);
+    const seenIds = new Set<number>();
+    const seenSignatures = new Set<string>();
+
     list.forEach((a, position) => {
+      if (!a) return;
       const noteContent = a.noteText ?? a.personalNote ?? null;
+      const sig = `${a.type ?? 'activity'}_${(a.name ?? '').trim().toLowerCase()}_${a.startTime ?? ''}`;
+      if (seenIds.has(a.id) || seenSignatures.has(sig)) return;
+      seenIds.add(a.id);
+      seenSignatures.add(sig);
+
       activityRows.push({
         itinerary_id: itineraryId,
         user_id: userId,
@@ -166,7 +188,7 @@ export async function savePlannerData(
         lng: a.lng ?? null,
         note_text: noteContent,
         observation: a.observation ?? null,
-        metadata: { legacyId: a.id, personalNote: noteContent },
+        metadata: { legacyId: a.id, personalNote: noteContent, city: a.city ?? null, country: a.country ?? null },
       });
     });
   }

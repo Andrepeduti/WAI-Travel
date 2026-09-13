@@ -56,7 +56,7 @@ export function CreatorItinerariesScreen({
   };
 
   return (
-    <div className="min-h-screen bg-background pb-8">
+    <div className="min-h-[100dvh] bg-background pb-8">
       {/* Sticky header */}
       <div className="sticky top-0 z-20 bg-background">
         <div className="flex items-center gap-3 px-4 pb-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
@@ -68,7 +68,7 @@ export function CreatorItinerariesScreen({
 
         {/* Search + filter */}
         <div className="px-4 pb-3 flex items-center gap-2">
-          <div className="flex-1 flex items-center gap-2 px-3 h-11 rounded-2xl" style={{ background: '#F2F2F2' }}>
+          <div className="flex-1 flex items-center gap-2 px-3 h-11 rounded-[10px]" style={{ background: '#F2F2F2' }}>
             <Icon name="search" size={18} style={{ color: '#8E8E93' }} />
             <input
               type="text"
