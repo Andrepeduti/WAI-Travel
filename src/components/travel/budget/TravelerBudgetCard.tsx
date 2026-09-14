@@ -13,13 +13,12 @@ interface TravelerBudgetCardProps {
   person: BudgetPerson;
   amount: number;
   currency?: string;
-  onClick?: () => void;
   className?: string;
 }
 
 const defaultColors = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444', '#EC4899', '#14B8A6', '#F97316'];
 
-export function TravelerBudgetCard({ person, amount, currency = 'BRL', onClick, className = '' }: TravelerBudgetCardProps) {
+export function TravelerBudgetCard({ person, amount, currency = 'BRL', className = '' }: TravelerBudgetCardProps) {
   const initials = person.initials || (
     person.name
       .trim()
@@ -32,10 +31,7 @@ export function TravelerBudgetCard({ person, amount, currency = 'BRL', onClick, 
 
   return (
     <div
-      onClick={onClick}
-      role="button"
-      tabIndex={0}
-      className={`box-border flex flex-col items-start p-4 gap-4 w-[181px] h-[84px] bg-[#FFFFFF] border border-[#EBEBEB] rounded-[16px] cursor-pointer active:scale-[0.98] hover:border-[#D1D1D1] transition-all select-none flex-shrink-0 ${className}`}
+      className={`box-border flex flex-col items-start p-4 gap-4 w-[181px] bg-[#FFFFFF] border border-[#EBEBEB] rounded-[16px] select-none flex-shrink-0 ${className}`}
       style={{ fontFamily: 'var(--font-family-primary, "Urbanist", sans-serif)' }}
     >
       <div className="flex flex-row items-center gap-2 w-full h-[25px]">

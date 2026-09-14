@@ -56,7 +56,7 @@ export function CountryActionSheet({
 
   return (
     <Sheet open={open} onOpenChange={handleClose}>
-      <SheetContent side="bottom" className="rounded-t-2xl px-5 pb-8 pt-3 max-h-[85vh] overflow-y-auto">
+      <SheetContent side="bottom" className="rounded-t-2xl px-5 pb-[34px] pt-3 max-h-[85vh] overflow-y-auto">
         <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: 'hsl(var(--muted))' }} />
 
         <SheetHeader className="text-left mb-5">

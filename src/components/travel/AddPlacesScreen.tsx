@@ -47,7 +47,7 @@ interface AddPlacesScreenProps {
   totalDays: number;
   startDate?: Date;
   destinations?: string[];
-  existingActivityNames?: string[];
+  existingActivities?: { name: string, day: number }[];
 }
 
 export function AddPlacesScreen({
@@ -58,7 +58,7 @@ export function AddPlacesScreen({
   totalDays,
   startDate,
   destinations = [],
-  existingActivityNames = [],
+  existingActivities = [],
 }: AddPlacesScreenProps) {
   const [search, setSearch] = useState('');
   const [selectedDay, setSelectedDay] = useState(dayNumber);
@@ -315,7 +315,9 @@ export function AddPlacesScreen({
             
             {displayResults.map((place, index) => {
               const isSelected = selectedIds.has(place.id);
-              const isAlreadyAdded = existingActivityNames.includes(place.name.toLowerCase());
+              const addedActivity = existingActivities.find(a => a.name === place.name.toLowerCase());
+              const isAlreadyAdded = !!addedActivity;
+              const addedDay = addedActivity?.day;
               
               return (
                 <div key={place.id} className="flex flex-col gap-4">
@@ -337,9 +339,9 @@ export function AddPlacesScreen({
                         </p>
                         
                         {isAlreadyAdded && (
-                          <div className="inline-flex items-center justify-center px-3 h-[24px] bg-[#F2B90C] rounded-[9px] border border-[#F2B90C] w-fit mt-1">
+                          <div className="box-border flex flex-row justify-center items-center px-[12px] py-[4px] gap-[4px] h-[24px] bg-[#F2B90C] border border-[#F2B90C] rounded-[9px] w-fit mt-1 shrink-0">
                             <span className="text-[12px] font-medium text-[#141530] font-urbanist text-center leading-none">
-                              Adicionado
+                              {addedDay ? `Adicionado no dia ${addedDay}` : 'Adicionado'}
                             </span>
                           </div>
                         )}

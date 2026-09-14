@@ -126,9 +126,12 @@ function toIsoDate(value?: string | null): string | null {
   return value.slice(0, 10);
 }
 
-export async function listMyItineraries(): Promise<UserItinerary[]> {
-  const { data: userData } = await supabase.auth.getUser();
-  const userId = userData.user?.id;
+export async function listMyItineraries(providedUserId?: string): Promise<UserItinerary[]> {
+  let userId = providedUserId;
+  if (!userId) {
+    const { data: sessionData } = await supabase.auth.getSession();
+    userId = sessionData.session?.user?.id;
+  }
   if (!userId) return [];
   const [ownedRes, memberRes] = await Promise.all([
     supabase

@@ -105,7 +105,7 @@ export function EditTransportSheet({
   };
 
   const footer = (
-    <div className="w-full px-6 pb-6 pt-2">
+    <div className="w-full px-6 pb-6 pt-0">
       <button
         onClick={handleSave}
         className="w-full h-[48px] rounded-[16px] flex items-center justify-center transition-colors active:scale-[0.98]"
@@ -129,7 +129,7 @@ export function EditTransportSheet({
       }
       zIndex={210}
       footer={footer}
-      bodyClassName="px-6 pb-2"
+      bodyClassName="px-6 pb-[32px]"
     >
       <div className="w-full flex flex-col items-start gap-[24px]">
               

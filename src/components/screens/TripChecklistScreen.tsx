@@ -12,6 +12,7 @@ import {
   ChevronDown,
   ChevronLeft,
   Tag,
+  RotateCcw,
 } from 'lucide-react';
 import { LuggageIllustration } from '@/components/ui/LuggageIllustration';
 import {
@@ -69,30 +70,31 @@ interface TripChecklistScreenProps {
         value={cat}
         dragListener={false}
         dragControls={dragControls}
-        transition={{ duration: 0.2, ease: 'easeInOut' }}
+        transition={{ duration: 0.15, ease: 'easeOut' }}
         className="bg-[#FFFFFF] rounded-[16px] p-6 shadow-sm flex flex-col gap-6"
         whileDrag={{ scale: 1.02, boxShadow: '0 10px 30px rgba(0,0,0,0.12)', zIndex: 10 }}
       >
         {/* Header do Accordion */}
-        <div
-          className="flex items-center justify-between cursor-grab active:cursor-grabbing"
-          onPointerDown={(e) => dragControls.start(e)}
-          style={{ touchAction: 'none' }}
-        >
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="text-[#7F7F7F] p-1 -ml-1">
+            {/* O arrasto agora é acionado APENAS pelo ícone */}
+            <div
+              className="text-[#7F7F7F] p-1 -ml-1 cursor-grab active:cursor-grabbing"
+              onPointerDown={(e) => dragControls.start(e)}
+              style={{ touchAction: 'none' }}
+            >
               <GripVertical size={20} />
             </div>
             <div
               onClick={() => toggleCollapse(cat.id)}
-              className="flex items-center gap-2 select-none min-w-0"
+              className="flex flex-col select-none min-w-0"
             >
-              <motion.h3 layout="position" className="font-['Urbanist'] font-semibold text-[18px] leading-[22px] text-[#171F2C] truncate">
+              <h3 className="font-['Urbanist'] font-semibold text-[18px] leading-[22px] text-[#171F2C] truncate">
                 {cat.title}
-              </motion.h3>
-              <motion.span layout="position" className="font-['Urbanist'] font-medium text-[14px] leading-[20px] text-[#7F7F7F] whitespace-nowrap">
+              </h3>
+              <span className="font-['Urbanist'] font-medium text-[14px] leading-[20px] text-[#7F7F7F] whitespace-nowrap">
                 {itemCount} {itemCount === 1 ? 'item' : 'itens'}
-              </motion.span>
+              </span>
             </div>
           </div>
 
@@ -133,66 +135,69 @@ interface TripChecklistScreenProps {
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2, ease: 'easeInOut' }}
+              transition={{ duration: 0.15, ease: 'easeOut' }}
               className="overflow-hidden"
             >
               <div className="flex flex-col gap-4 pt-2">
                 <div className="flex flex-col">
-                  {cat.items.map((item: ChecklistItem, idx: number) => (
-                    <div key={item.id} className="flex flex-col gap-3">
-                      <div className="flex items-center justify-between gap-2 py-1">
-                        {/* Checkbox clicável e label */}
-                        <button
-                          onClick={() => toggleItem(cat.id, item.id)}
-                          className="flex items-center gap-2 flex-1 min-w-0 text-left cursor-pointer"
-                        >
-                          <div
-                            className={`w-[22px] h-[22px] rounded-[5px] flex items-center justify-center flex-shrink-0 transition-all ${
-                              item.checked
-                                ? 'bg-[#9DCC36] border-[1.5px] border-[#9DCC36] text-[#141530]'
-                                : 'border-[1.5px] border-[#7F7F7F] bg-transparent'
-                            }`}
+                  <AnimatePresence initial={false}>
+                    {cat.items.map((item: ChecklistItem) => (
+                      <motion.div
+                        key={item.id}
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.15, ease: 'easeOut' }}
+                        className="overflow-hidden border-b border-transparent [&:not(:last-child)]:border-[#D5D5D5]"
+                      >
+                        <div className="flex items-center justify-between gap-2 py-3">
+                          {/* Checkbox clicável e label */}
+                          <button
+                            onClick={() => toggleItem(cat.id, item.id)}
+                            className="flex items-center gap-2 flex-1 min-w-0 text-left cursor-pointer"
                           >
-                            {item.checked && (
-                              <Check
-                                size={14}
-                                strokeWidth={3.5}
-                                className="text-[#141530]"
-                              />
-                            )}
-                          </div>
+                            <div
+                              className={`w-[22px] h-[22px] rounded-[5px] flex items-center justify-center flex-shrink-0 transition-all ${
+                                item.checked
+                                  ? 'bg-[#9DCC36] border-[1.5px] border-[#9DCC36] text-[#141530]'
+                                  : 'border-[1.5px] border-[#7F7F7F] bg-transparent'
+                              }`}
+                            >
+                              {item.checked && (
+                                <Check
+                                  size={14}
+                                  strokeWidth={3.5}
+                                  className="text-[#141530]"
+                                />
+                              )}
+                            </div>
 
-                          <motion.span
-                            layout="position"
-                            className={`font-['Urbanist'] font-semibold text-[14px] leading-[17px] break-words flex-1 ${
-                              item.checked
-                                ? 'line-through text-[#7F7F7F]'
-                                : 'text-[#171F2C]'
-                            }`}
+                            <span
+                              className={`font-['Urbanist'] font-semibold text-[14px] leading-[17px] break-words flex-1 ${
+                                item.checked
+                                  ? 'line-through text-[#7F7F7F]'
+                                  : 'text-[#171F2C]'
+                              }`}
+                            >
+                              {item.label}
+                            </span>
+                          </button>
+
+                          {/* Botão Excluir Item */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteItem(cat.id, item.id);
+                            }}
+                            className="w-6 h-6 rounded-full flex items-center justify-center text-[#141530] hover:bg-black/5 active:scale-95 transition-all flex-shrink-0"
+                            aria-label="Excluir item"
                           >
-                            {item.label}
-                          </motion.span>
-                        </button>
-
-                        {/* Botão Excluir Item */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteItem(cat.id, item.id);
-                          }}
-                          className="w-6 h-6 rounded-full flex items-center justify-center text-[#141530] hover:bg-black/5 active:scale-95 transition-all flex-shrink-0"
-                          aria-label="Excluir item"
-                        >
-                          <X size={14} strokeWidth={2.2} />
-                        </button>
-                      </div>
-
-                      {/* Divider Line */}
-                      {idx < cat.items.length - 1 && (
-                        <div className="w-full h-0 border-b border-[#D5D5D5] my-1" />
-                      )}
-                    </div>
-                  ))}
+                            <X size={14} strokeWidth={2.2} />
+                          </button>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
                 </div>
 
                 {/* Rodapé do Accordion: + Adicionar item */}
@@ -239,7 +244,7 @@ interface TripChecklistScreenProps {
                       className="flex items-center gap-2 font-['Urbanist'] font-bold text-[14px] leading-[17px] text-[#141530] active:opacity-70 transition-opacity"
                     >
                       <Plus size={16} strokeWidth={2.5} className="text-[#141530]" />
-                      <motion.span layout="position">Adicionar item</motion.span>
+                      <span>Adicionar item</span>
                     </button>
                   )}
                 </div>
@@ -292,6 +297,15 @@ export function TripChecklistScreen({
     onChecklistChange?.(checked, allItems.length);
   }, [categories, onChecklistChange]);
 
+  // Travar o scroll da tela de trás (body)
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
+
   // Persistir categorias com debounce
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const persistCategories = useCallback(
@@ -334,6 +348,13 @@ export function TripChecklistScreen({
   const [addingItemToCatId, setAddingItemToCatId] = useState<string | null>(null);
   const [newItemText, setNewItemText] = useState('');
 
+  const [deletedItemInfo, setDeletedItemInfo] = useState<{
+    categoryId: string;
+    item: ChecklistItem;
+    index: number;
+  } | null>(null);
+  const [showUndoDeleteToast, setShowUndoDeleteToast] = useState(false);
+
   // ─── Manipulação de Itens ──────────────────────────────────────────────────
 
   const toggleItem = (categoryId: string, itemId: string | number) => {
@@ -374,12 +395,38 @@ export function TripChecklistScreen({
   };
 
   const deleteItem = (categoryId: string, itemId: string | number) => {
+    const cat = categories.find((c) => c.id === categoryId);
+    if (cat) {
+      const index = cat.items.findIndex((i) => i.id === itemId);
+      if (index !== -1) {
+        setDeletedItemInfo({ categoryId, item: cat.items[index], index });
+        setShowUndoDeleteToast(true);
+      }
+    }
+
     const updated = categories.map((cat) =>
       cat.id === categoryId
         ? { ...cat, items: cat.items.filter((item) => item.id !== itemId) }
         : cat,
     );
     persistCategories(updated);
+  };
+
+  const handleUndoDelete = () => {
+    if (!deletedItemInfo) return;
+    
+    const updated = categories.map((cat) => {
+      if (cat.id === deletedItemInfo.categoryId) {
+        const newItems = [...cat.items];
+        newItems.splice(deletedItemInfo.index, 0, deletedItemInfo.item);
+        return { ...cat, items: newItems };
+      }
+      return cat;
+    });
+    
+    persistCategories(updated);
+    setDeletedItemInfo(null);
+    setShowUndoDeleteToast(false);
   };
 
   // ─── Manipulação de Categorias ─────────────────────────────────────────────
@@ -456,6 +503,12 @@ export function TripChecklistScreen({
     setShowHeaderMenu(false);
   };
 
+  const handleResetChecklist = () => {
+    const defaultChecklist = generateDefaultChecklist();
+    persistCategories(defaultChecklist);
+    setShowHeaderMenu(false);
+  };
+
   const isEmpty = categories.length === 0;
 
   return (
@@ -464,7 +517,15 @@ export function TripChecklistScreen({
         isVisible={showSuccessToast} 
         onClose={() => setShowSuccessToast(false)} 
         title="Categoria adicionada com sucesso!"
-        description=""
+      />
+
+      <SuccessToast 
+        isVisible={showUndoDeleteToast} 
+        onClose={() => setShowUndoDeleteToast(false)} 
+        title="Item excluído"
+        actionLabel="Desfazer"
+        onAction={handleUndoDelete}
+        position="bottom"
       />
 
       {/* ─── Topbar Header (Figma specs: flat chevron sem background circular branco) ─── */}
@@ -633,6 +694,22 @@ export function TripChecklistScreen({
                     </span>
                   </div>
                 </button>
+
+                <div className="w-full h-0 border-b border-[#F2F2F2]" />
+
+                <button
+                  onClick={handleResetChecklist}
+                  className="w-full flex items-center justify-between text-left group active:opacity-70 transition-opacity"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+                      <RotateCcw size={16} className="text-[#141530]" strokeWidth={2.5} />
+                    </div>
+                    <span className="font-['Urbanist'] font-medium text-[16px] leading-[19px] text-[#141530]">
+                      Resetar aos padrões
+                    </span>
+                  </div>
+                </button>
               </div>
             </div>
           </div>
@@ -692,7 +769,7 @@ export function TripChecklistScreen({
               <button
                 onClick={handleAddCategory}
                 disabled={!newCategoryName.trim()}
-                className="w-full h-[48px] rounded-[16px] bg-[#9DCC36] text-[#141530] font-['Urbanist'] font-bold text-[16px] leading-[19px] flex items-center justify-center transition-all disabled:opacity-50 active:scale-[0.99]"
+                className="w-full h-[48px] rounded-[16px] bg-[#9DCC36] text-[#141530] disabled:bg-[#EDEDED] disabled:text-[#949494] font-['Urbanist'] font-bold text-[16px] leading-[19px] flex items-center justify-center transition-all active:scale-[0.99]"
               >
                 Adicionar
               </button>
@@ -767,7 +844,7 @@ export function TripChecklistScreen({
               <button
                 onClick={handleSaveEditCategory}
                 disabled={!editCategoryName.trim()}
-                className="w-full h-[48px] rounded-[16px] bg-[#9DCC36] text-[#141530] font-['Urbanist'] font-bold text-[16px] leading-[19px] flex items-center justify-center transition-all disabled:opacity-50 active:scale-[0.99]"
+                className="w-full h-[48px] rounded-[16px] bg-[#9DCC36] text-[#141530] disabled:bg-[#EDEDED] disabled:text-[#949494] font-['Urbanist'] font-bold text-[16px] leading-[19px] flex items-center justify-center transition-all active:scale-[0.99]"
               >
                 Salvar
               </button>

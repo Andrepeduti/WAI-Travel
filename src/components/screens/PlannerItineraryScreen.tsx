@@ -986,7 +986,6 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     }
   }, [isUuidId, itineraryId]);
 
-  // Plug realtime: refaz cada loader quando outro participante muda algo
   useItineraryRealtime(typeof itineraryId === 'string' ? itineraryId : null, {
     onItineraryChange: () => { void reloadItineraryMeta(); },
     onActivitiesChange: () => { void reloadPlanner(); },
@@ -998,9 +997,30 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     onMembersChange: () => { void reloadMembers(); },
   });
 
-
-
-
+  // Refetch on window focus to catch any realtime events missed while tab was in background
+  useEffect(() => {
+    if (typeof itineraryId !== 'string' || !isUuidId) return;
+    
+    const handleFocus = () => {
+      if (!document.hidden) {
+        void reloadItineraryMeta();
+        void reloadPlanner();
+        void reloadDocs();
+        void reloadBudget();
+        void reloadNotes();
+        void reloadMembers();
+      }
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('visibilitychange', handleFocus);
+    
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('visibilitychange', handleFocus);
+    };
+  }, [itineraryId, isUuidId, reloadItineraryMeta, reloadPlanner, reloadDocs, reloadBudget, reloadNotes, reloadMembers]);
+  
   const checkScrollArrows = useCallback(() => {
     if (tabsRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = tabsRef.current;
@@ -1892,6 +1912,17 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
 
       if (event.button !== 0) return;
 
+      const isTouch = event.pointerType === 'touch' || event.pointerType === 'pen';
+      let dragTimer: NodeJS.Timeout | null = null;
+      let isDragReady = !isTouch;
+
+      if (isTouch) {
+        dragTimer = setTimeout(() => {
+          isDragReady = true;
+          if (navigator.vibrate) navigator.vibrate(50);
+        }, 500);
+      }
+
       const startX = event.clientX;
       const startY = event.clientY;
       const cardElement = (event.currentTarget as HTMLElement).closest('[data-activity-card]') as HTMLElement;
@@ -2036,6 +2067,17 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         const dist = Math.hypot(dx, dy);
 
         if (!isDragActive) {
+          if (!isDragReady) {
+            // Se o usuário mover a tela antes do tempo, cancela a intenção de drag (é scroll)
+            if (Math.abs(dy) > 10 || Math.abs(dx) > 10) {
+              if (dragTimer) clearTimeout(dragTimer);
+              window.removeEventListener('pointermove', onPointerMove);
+              window.removeEventListener('pointerup', onPointerUp);
+              window.removeEventListener('pointercancel', onPointerUp);
+            }
+            return;
+          }
+
           if (dist > 5) {
             isDragActive = true;
             const initialDrag: DragState = {
@@ -2077,6 +2119,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       };
 
       const onPointerUp = async () => {
+        if (dragTimer) clearTimeout(dragTimer);
         window.removeEventListener('pointermove', onPointerMove);
         window.removeEventListener('pointerup', onPointerUp);
         window.removeEventListener('pointercancel', onPointerUp);
@@ -2943,7 +2986,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
 
         {/* Hero Header (Figma: Botões_Img height 244px) */}
         <div
-          className="relative bg-cover bg-center flex flex-col justify-between rounded-b-[24px] overflow-hidden"
+          className="relative bg-cover bg-center flex flex-col justify-between gap-6 rounded-b-[24px] overflow-hidden"
           style={{
             minHeight: '244px',
             paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)',
@@ -3113,7 +3156,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
           <div className="px-5 -mt-5 relative z-20 mb-4">
             <div
               onClick={() => { if (!isViewer) setShowEditTripInfo(true); }}
-              className="bg-white rounded-[16px] px-4 py-3 flex items-center justify-center cursor-pointer active:scale-[0.98] transition-transform"
+              className="bg-white rounded-[16px] px-4 py-3 flex items-center justify-start cursor-pointer active:scale-[0.98] transition-transform"
               style={{ boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.1)' }}
             >
               <div className="flex items-center gap-2 min-w-0">
@@ -3227,8 +3270,11 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
 
           <div
             ref={stickyTabsRef}
-            className="-mx-4 px-4 sticky top-0 z-30 pt-3 pb-2"
-            style={{ backgroundColor: '#EFEFEF' }}
+            className="-mx-4 px-4 sticky top-0 z-30 pb-2"
+            style={{ 
+              backgroundColor: '#EFEFEF', 
+              paddingTop: 'calc(max(12px, env(safe-area-inset-top)))' 
+            }}
           >
             {/* Day Carousel without side arrows (Figma: 50x62px, border-radius 32px) */}
             <div
@@ -3275,7 +3321,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
             {/* View toggle [ Roteiro | Mapa ] (Figma: Frame 1321316359 / Frame 1321316461) */}
             <div className="flex items-center justify-between pt-2 pb-1">
               <h3 className="text-[16px] font-semibold text-[#141530] font-['Urbanist',sans-serif]">Itinerário</h3>
-              <div className="bg-[#FFFFFF] rounded-full p-[3.4px] flex items-center h-[44px]">
+              <div className="bg-[#FFFFFF] rounded-full p-[4px] flex items-center h-[44px]">
                 <button
                   type="button"
                   className="px-[27px] py-[10px] rounded-[20px] text-[14px] font-semibold bg-[#1A1C40] text-[#FEFEFE] leading-none font-['Urbanist',sans-serif]"
@@ -3846,7 +3892,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
           totalDays={tripDays}
           startDate={itineraryData.startDate}
           destinations={itineraryData.destinations}
-          existingActivityNames={Object.values(dayActivities).flat().map(a => a.name.toLowerCase())} />
+          existingActivities={Object.entries(dayActivities).flatMap(([dayStr, activities]) => activities.map(a => ({ name: a.name.toLowerCase(), day: Number(dayStr) })))} />
 
         <AddNoteSheet
           open={showAddNote}
@@ -3999,6 +4045,8 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       {showBudget && (
         <div className="fixed inset-0 z-50 bg-background overflow-y-auto">
           <BudgetScreen
+            itineraryId={typeof itineraryId === 'string' ? itineraryId : ''}
+            ownerId={session?.user?.id || ''}
             onBack={() => { setShowBudget(false); setBudgetAutoAdd(false); }}
             expenses={expenses}
             onExpensesChange={setExpenses}

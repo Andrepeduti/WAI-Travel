@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, X, GripVertical, CheckCircle2 } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { LuggageIllustration } from '@/components/ui/LuggageIllustration';
@@ -55,7 +55,7 @@ const NoteItemComponent = ({ note, currentUser, onClick }: { note: TripNote, cur
               {note.title}
             </h3>
             {note.summary ? (
-              <p className="font-['Urbanist'] font-medium text-[14px] leading-[17px] text-[#676767] line-clamp-2 my-0">
+              <p className="font-['Urbanist'] font-medium text-[14px] leading-[17px] text-[#676767] break-words whitespace-pre-wrap my-0">
                 {note.summary}
               </p>
             ) : null}
@@ -101,6 +101,15 @@ export function TripNotesScreen({ onBack, notes: externalNotes, onNotesChange }:
 
   const isEmpty = notes.length === 0;
 
+  // Travar o scroll da tela de trás (body)
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
+
   return (
     <div
       className="min-h-[100dvh] bg-[#F3F3F3] flex flex-col relative"
@@ -109,7 +118,7 @@ export function TripNotesScreen({ onBack, notes: externalNotes, onNotesChange }:
 
 
       {/* Header */}
-      <header className="sticky top-0 z-20 bg-[#F3F3F3] px-6 pt-5 pb-3">
+      <header className="sticky top-0 z-20 bg-[#F3F3F3] px-6 pt-5 pb-6">
         <div
           className="flex items-center gap-3"
           style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 8px)' }}

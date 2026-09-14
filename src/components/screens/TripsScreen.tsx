@@ -559,7 +559,10 @@ export function TripsScreen({
   return (
     <div className="min-h-[100dvh] pb-28 bg-[#FFFFFF] font-sans">
       {/* Top Header */}
-      <header className="px-6 pt-6 pb-8 flex items-center justify-between">
+      <header 
+        className="px-6 pb-8 flex items-center justify-between"
+        style={{ paddingTop: 'calc(max(24px, env(safe-area-inset-top) + 16px))' }}
+      >
         <h1 className="text-[26px] font-bold text-[#1A1C40] tracking-tight">Roteiros</h1>
         <button
           onClick={() => onOpenCreateSheet ? onOpenCreateSheet() : onCreateItinerary?.()}
@@ -578,7 +581,7 @@ export function TripsScreen({
               setActiveTab('private');
               setSearchQuery('');
             }}
-            className={`flex-1 pb-3 text-center text-[15px] font-bold transition-all relative whitespace-nowrap ${activeTab === 'private' ? 'text-[#1A1C40]' : 'text-[#8E8E93] hover:text-[#1A1C40]'
+            className={`flex-1 pb-3 text-center text-[15px] transition-all relative whitespace-nowrap ${activeTab === 'private' ? 'font-semibold text-[#1A1C40]' : 'font-medium text-[#8E8E93] hover:text-[#1A1C40]'
               }`}
           >
             Minhas viagens
@@ -595,7 +598,7 @@ export function TripsScreen({
               setActiveTab('public');
               setSearchQuery('');
             }}
-            className={`flex-1 pb-3 text-center text-[15px] font-bold transition-all relative whitespace-nowrap ${activeTab === 'public' ? 'text-[#1A1C40]' : 'text-[#8E8E93] hover:text-[#1A1C40]'
+            className={`flex-1 pb-3 text-center text-[15px] transition-all relative whitespace-nowrap ${activeTab === 'public' ? 'font-semibold text-[#1A1C40]' : 'font-medium text-[#8E8E93] hover:text-[#1A1C40]'
               }`}
           >
             Minha loja

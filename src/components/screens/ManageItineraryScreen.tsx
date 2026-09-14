@@ -25,6 +25,7 @@ import {
 import { leaveItinerary } from '@/lib/itinerariesApi';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useItineraryRealtime } from '@/hooks/use-itinerary-realtime';
 
 interface InvitedFriend {
   id: string;
@@ -144,13 +145,27 @@ export function ManageItineraryScreen({
   const currentUserRole = currentUserMember?.role || 'viewer';
   const canEdit = isOwner || currentUserRole === 'editor';
 
+  useItineraryRealtime(itineraryId !== 'default' ? itineraryId : null, {
+    onMembersChange: () => {
+      if (itineraryId && itineraryId !== 'default') {
+        listItineraryMembers(itineraryId).then(setMembers).catch(console.error);
+      }
+    },
+    onInvitesChange: () => {
+      if (itineraryId && itineraryId !== 'default') {
+        listPendingInvitesForItinerary(itineraryId).then(setPendingInvites).catch(console.error);
+      }
+    }
+  });
+
   useEffect(() => {
     if (!itineraryId || itineraryId === 'default') {
       setLoadingMembers(false);
       return;
     }
     let cancelled = false;
-    (async () => {
+    
+    const fetchData = async () => {
       try {
         const [o, m, p] = await Promise.all([
           getItineraryOwnerProfile(itineraryId),
@@ -161,11 +176,30 @@ export function ManageItineraryScreen({
         setOwner(o);
         setMembers(m);
         setPendingInvites(p);
+      } catch (err) {
+        console.error('Error fetching members/invites:', err);
       } finally {
         if (!cancelled) setLoadingMembers(false);
       }
-    })();
-    return () => { cancelled = true; };
+    };
+
+    fetchData();
+
+    // Refetch on window focus to catch any realtime events missed while tab was in background
+    const handleFocus = () => {
+      if (!document.hidden) {
+        fetchData();
+      }
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('visibilitychange', handleFocus);
+
+    return () => { 
+      cancelled = true; 
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('visibilitychange', handleFocus);
+    };
   }, [itineraryId, currentUserId, initialOwner, initialMembers]);
 
   useEffect(() => {

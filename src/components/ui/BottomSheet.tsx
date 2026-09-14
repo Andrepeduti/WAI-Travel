@@ -173,7 +173,7 @@ export function BottomSheet({
         {footer && (
           <div
             className={cn('flex-shrink-0 border-t border-border/40 px-5 pt-3', bg)}
-            style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
+            style={{ paddingBottom: 'max(34px, env(safe-area-inset-bottom))' }}
           >
             {footer}
           </div>
@@ -183,7 +183,7 @@ export function BottomSheet({
         {!footer && (
           <div
             className="flex-shrink-0"
-            style={{ height: 'env(safe-area-inset-bottom)' }}
+            style={{ height: 'max(34px, env(safe-area-inset-bottom))' }}
           />
         )}
       </div>

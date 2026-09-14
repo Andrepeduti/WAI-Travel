@@ -8,6 +8,7 @@ interface Handlers {
   onReservationsChange?: (payload: any) => void;
   onDocTransportsChange?: (payload: any) => void;
   onMembersChange?: (payload: any) => void;
+  onInvitesChange?: (payload: any) => void;
   onExpensesChange?: (payload: any) => void;
   onNotesChange?: (payload: any) => void;
 }
@@ -64,6 +65,11 @@ export function useItineraryRealtime(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'itinerary_members', filter },
         (p) => handlersRef.current.onMembersChange?.(p),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'itinerary_invites', filter },
+        (p) => handlersRef.current.onInvitesChange?.(p),
       )
       .on(
         'postgres_changes',

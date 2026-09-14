@@ -317,7 +317,7 @@ export function AddVisitedCountriesSheet({
 
         {/* Footer */}
         <div
-          className="px-5 pt-3 pb-6 shrink-0"
+          className="px-5 pt-3 pb-[34px] shrink-0"
           style={{ borderTop: '1px solid hsl(var(--divider))', background: '#FFFFFF' }}
         >
           <button

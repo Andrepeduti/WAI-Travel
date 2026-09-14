@@ -491,19 +491,26 @@ export function DraggableActivityList({
               <div className="w-10 h-1 rounded-full bg-muted" />
             </div>
 
-            {/* Header with Title and Close X */}
-            <div className="px-5 pb-3 pt-2 flex items-center justify-between">
-              <h3 className="text-[18px] font-bold text-foreground truncate pr-2 font-['Urbanist',sans-serif]">
-                {optionsActivity.name || (optionsActivity.type === 'note' ? 'Anotação' : 'Opções')}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setOptionsActivity(null)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors -mr-1 shrink-0"
-                aria-label="Fechar"
-              >
-                <Icon name="close" size={20} className="text-foreground" />
-              </button>
+            {/* Header with Close X and Title */}
+            <div className="px-5 pb-3 pt-2">
+              <div className="flex justify-end -mt-2 -mr-1 mb-2">
+                <button
+                  type="button"
+                  onClick={() => setOptionsActivity(null)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0"
+                  aria-label="Fechar"
+                >
+                  <Icon name="close" size={20} className="text-foreground" />
+                </button>
+              </div>
+              <div className="pr-2">
+                <h3 className="text-[18px] font-bold text-foreground font-['Urbanist',sans-serif]">
+                  Mais opções
+                </h3>
+                <p className="text-[14px] text-muted-foreground font-medium mt-0.5 font-['Urbanist',sans-serif]">
+                  {optionsActivity.name || (optionsActivity.type === 'note' ? 'Anotação' : 'Opções')}
+                </p>
+              </div>
             </div>
 
             {/* Options List strictly matching Image 2 */}

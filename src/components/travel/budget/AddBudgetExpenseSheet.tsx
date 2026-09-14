@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { X, MapPin, ChevronRight, Trash2, Check, ChevronDown, CircleDot } from 'lucide-react';
 import { BudgetPerson } from './TravelerBudgetCard';
 import { SplitBudgetExpenseSheet, SplitResult } from './SplitBudgetExpenseSheet';
-import { SoleTravelerInfoSheet } from './SoleTravelerInfoSheet';
 
 export interface BudgetExpense {
   id: string;
@@ -75,7 +74,6 @@ export function AddBudgetExpenseSheet({
 
   // Sub-modal state
   const [showSplitSubSheet, setShowSplitSubSheet] = useState(false);
-  const [showSoleInfo, setShowSoleInfo] = useState(false);
 
   // Category dropdown open state
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
@@ -126,7 +124,6 @@ export function AddBudgetExpenseSheet({
         setIsSplitExplicitlyConfigured(false);
       }
       setShowSplitSubSheet(false);
-      setShowSoleInfo(false);
       setShowCategoryPicker(false);
       setShowActivityPicker(false);
     }
@@ -208,6 +205,19 @@ export function AddBudgetExpenseSheet({
   // Only show the split state (label change + avatars) once the user has configured the split or for existing split expenses
   const isSplitActive = isSplitExplicitlyConfigured && selectedPeopleObjects.length > 0;
 
+  const hasChanges = editingExpense ? (
+    name.trim() !== (editingExpense.name || '') ||
+    activityId !== editingExpense.activityId ||
+    category !== (editingExpense.category || '') ||
+    currentNumericAmount !== (editingExpense.amountBRL || 0) ||
+    splitType !== (editingExpense.splitType || (editingExpense.assignedTo?.length ? 'equal' : 'none')) ||
+    JSON.stringify(assignedTo) !== JSON.stringify(editingExpense.assignedTo?.length ? editingExpense.assignedTo : people.map(p => p.id)) ||
+    JSON.stringify(customSplits) !== JSON.stringify(editingExpense.customSplits || {})
+  ) : true;
+
+  const isFormValid = Boolean(name.trim() && currentNumericAmount > 0 && category);
+  const isSaveDisabled = !isFormValid || !hasChanges;
+
   return (
     <>
       <div className="fixed inset-0 z-[100] flex items-end justify-center" style={{ display: isHidden ? 'none' : undefined }}>
@@ -220,7 +230,7 @@ export function AddBudgetExpenseSheet({
         {/* Main Sheet */}
         <div
           className="relative w-full bg-[#FFFFFF] rounded-t-[24px] overflow-hidden animate-in slide-in-from-bottom duration-300 shadow-2xl flex flex-col"
-          style={{ fontFamily: 'var(--font-family-primary, "Urbanist", sans-serif)', display: (showSplitSubSheet || showSoleInfo) ? 'none' : 'flex' }}
+          style={{ fontFamily: 'var(--font-family-primary, "Urbanist", sans-serif)', display: showSplitSubSheet ? 'none' : 'flex' }}
         >
           {/* Top Bar with Close Button */}
           <div className="flex flex-row justify-end items-center px-6 pt-6 pb-3 w-full h-[54px] bg-[#FFFFFF]">
@@ -235,9 +245,9 @@ export function AddBudgetExpenseSheet({
           </div>
 
           {/* Main Content Block */}
-          <div className="flex flex-col items-start px-6 py-4 gap-10 w-full bg-[#FFFFFF] overflow-y-auto max-h-[85vh]">
-            
-            <div className="flex flex-col items-start gap-6 w-full">
+          <div className="flex flex-col items-start px-6 pt-4 pb-0 w-full bg-[#FFFFFF] overflow-y-auto max-h-[85vh]">
+
+            <div className="flex flex-col items-start gap-6 w-full mb-6">
               {/* Title & Subtitle */}
               <div className="flex flex-col items-start gap-2 w-full">
                 <h2 className="font-['Urbanist'] font-semibold text-[22px] leading-[26px] text-[#171F2C]">
@@ -248,262 +258,270 @@ export function AddBudgetExpenseSheet({
                 </p>
               </div>
 
-          {/* Form Fields Stack */}
-          <div className="flex flex-col gap-6 w-full mb-6">
-            {/* Field 1: Nome */}
-            <div className="bg-[#EEEEEE] rounded-[12px] h-[60px] p-3 flex flex-row items-center gap-3 border border-transparent focus-within:border-[#949494] transition-all w-full">
-              <div className="w-4 h-4 flex items-center justify-center text-[#141530] flex-shrink-0">
-                <CircleDot size={16} strokeWidth={2} />
-              </div>
-              <div className="flex-1 min-w-0 flex flex-col justify-center items-start gap-1">
-                <label className="font-['Urbanist'] font-medium text-[12px] leading-[16px] text-[#949494] block">
-                  Descrição
-                </label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Dê um nome para este gasto..."
-                  className="w-full bg-transparent font-['Urbanist'] font-medium text-[14px] leading-[16px] text-[#141530] outline-none placeholder:text-[#949494]"
-                />
-              </div>
-            </div>
-
-            {/* Field 2: Vincule à uma atividade (opcional) */}
-            <div className="relative w-full">
-              <div
-                onClick={() => activities.length > 0 && setShowActivityPicker(prev => !prev)}
-                className={`bg-[#EEEEEE] rounded-[12px] h-[60px] p-3 flex flex-row items-center gap-3 border border-transparent transition-all w-full ${activities.length > 0 ? 'cursor-pointer active:bg-[#E5E5E5]' : ''
-                  }`}
-              >
-                <div className="w-4 h-4 flex items-center justify-center text-[#141530] flex-shrink-0">
-                  <MapPin size={16} strokeWidth={2} />
-                </div>
-                <div className="flex-1 min-w-0 flex flex-col justify-center items-start gap-1">
-                  <label className="font-['Urbanist'] font-medium text-[12px] leading-[16px] text-[#949494] block">
-                    Vincular à atividade (opcional)
-                  </label>
-                  {activities.length > 0 ? (
-                    <div className="flex items-center justify-between w-full">
-                      <span className={`font-['Urbanist'] font-medium text-[14px] leading-[16px] truncate block ${activityName ? 'text-[#141530]' : 'text-[#949494]'}`}>
-                        {activityName || 'Selecione uma atividade do roteiro'}
-                      </span>
-                      <ChevronRight size={16} className={`text-[#141530] transition-transform ${showActivityPicker ? 'rotate-90' : ''}`} />
-                    </div>
-                  ) : (
+              {/* Form Fields Stack */}
+              <div className="flex flex-col gap-4 w-full">
+                {/* Field 1: Nome */}
+                <div className="bg-[#EEEEEE] rounded-[12px] h-[60px] p-3 flex flex-row items-center gap-3 border border-transparent focus-within:border-[#949494] transition-all w-full">
+                  <div className="w-4 h-4 flex items-center justify-center text-[#141530] flex-shrink-0">
+                    <CircleDot size={16} strokeWidth={2} />
+                  </div>
+                  <div className="flex-1 min-w-0 flex flex-col justify-center items-start gap-1">
+                    <label className="font-['Urbanist'] font-medium text-[12px] leading-[16px] text-[#949494] block">
+                      Descrição
+                    </label>
                     <input
                       type="text"
-                      value={activityName}
-                      onChange={(e) => setActivityName(e.target.value)}
-                      placeholder="Selecione uma atividade do roteiro"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Dê um nome para este gasto..."
                       className="w-full bg-transparent font-['Urbanist'] font-medium text-[14px] leading-[16px] text-[#141530] outline-none placeholder:text-[#949494]"
                     />
-                  )}
-                </div>
-              </div>
-
-              {/* Activity dropdown picker if activities exist */}
-              {showActivityPicker && activities.length > 0 && (
-                <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl border border-border shadow-xl p-2 z-30 max-h-56 overflow-y-auto animate-in fade-in zoom-in-95 space-y-1">
-                  <button
-                    type="button"
-                    onClick={() => { setActivityName(''); setActivityId(undefined); setShowActivityPicker(false); }}
-                    className="w-full text-left px-3 py-2 rounded-xl text-[13px] font-medium text-[#7F7F7F] hover:bg-muted/50 transition-colors"
-                  >
-                    Nenhuma atividade (gasto avulso)
-                  </button>
-                  {activities.map((act) => (
-                    <button
-                      key={act.id}
-                      type="button"
-                      onClick={() => handleSelectActivity(act)}
-                      className={`w-full text-left px-3 py-2.5 rounded-xl text-[13px] transition-colors flex items-center justify-between gap-2 ${activityId === act.id ? 'bg-[#141530]/5 text-[#141530] font-bold' : 'hover:bg-muted/50 text-[#141530] font-medium'
-                        }`}
-                    >
-                      <div className="flex flex-col min-w-0 flex-1">
-                        <span className="truncate">{act.name}</span>
-                        <span className="text-[11px] text-[#7F7F7F] capitalize">
-                          {act.category ? act.category : 'Atividade'}
-                          {act.day ? ` • Dia ${act.day}` : ''}
-                        </span>
-                      </div>
-                      {activityId === act.id && <Check size={16} className="text-[#10B981] flex-shrink-0" />}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Field 3: Categoria */}
-            <div className="relative w-full">
-              <div
-                onClick={() => setShowCategoryPicker(prev => !prev)}
-                className="bg-[#EEEEEE] rounded-[12px] h-[60px] p-3 flex flex-row items-center gap-3 border border-transparent active:bg-[#E5E5E5] cursor-pointer transition-all w-full"
-              >
-                <div className="w-4 h-4 flex items-center justify-center text-[#141530] flex-shrink-0">
-                  <CircleDot size={16} strokeWidth={2} />
-                </div>
-                <div className="flex-1 min-w-0 flex flex-col justify-center items-start gap-1">
-                  <label className="font-['Urbanist'] font-medium text-[12px] leading-[16px] text-[#949494] block">
-                    Categoria
-                  </label>
-                  <div className="flex items-center justify-between w-full">
-                    <span className={`font-['Urbanist'] font-medium text-[14px] leading-[16px] capitalize block truncate ${category ? 'text-[#141530]' : 'text-[#949494]'}`}>
-                      {category ? categoryOptions.find(c => c.key === category)?.label : 'Selecione uma categoria'}
-                    </span>
-                    <ChevronRight size={16} className={`text-[#141530] transition-transform ${showCategoryPicker ? 'rotate-90' : ''}`} />
                   </div>
                 </div>
-              </div>
 
-              {/* Category Dropdown Picker */}
-              {showCategoryPicker && (
-                <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl border border-border shadow-xl p-2 z-30 max-h-56 overflow-y-auto animate-in fade-in zoom-in-95 space-y-1">
-                  {categoryOptions.map((opt) => (
-                    <button
-                      key={opt.key}
-                      type="button"
-                      onClick={() => {
-                        setCategory(opt.key);
-                        setShowCategoryPicker(false);
-                      }}
-                      className={`w-full text-left px-3 py-2.5 rounded-xl text-[13px] transition-colors flex items-center justify-between gap-2 ${category === opt.key ? 'bg-[#9DCC36]/20 text-[#141530] font-bold' : 'hover:bg-muted/50 text-[#141530] font-medium'
-                        }`}
-                    >
-                      <span>{opt.label}</span>
-                      {category === opt.key && <Check size={16} className="text-[#86B32D] flex-shrink-0" />}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Field 4: Valor */}
-            <div className="bg-[#EEEEEE] rounded-[12px] h-[60px] p-3 flex flex-row items-center gap-3 border border-transparent focus-within:border-[#949494] transition-all w-full">
-              <div className="w-4 h-4 flex items-center justify-center text-[#141530] flex-shrink-0">
-                <CircleDot size={16} strokeWidth={2} />
-              </div>
-              <div className="flex-1 min-w-0 flex flex-col justify-center items-start gap-1">
-                <label className="font-['Urbanist'] font-medium text-[12px] leading-[16px] text-[#949494] block">
-                  Valor
-                </label>
-                <div className="flex flex-row items-center w-full gap-1">
-                  <span className="font-['Urbanist'] font-medium text-[14px] leading-[16px] text-[#141530]">R$</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={amountInput}
-                    onChange={(e) => setAmountInput(formatCurrency(e.target.value))}
-                    placeholder="Digite um valor"
-                    className="w-full bg-transparent font-['Urbanist'] font-medium text-[14px] leading-[16px] text-[#141530] outline-none placeholder:text-[#949494]"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-          </div>
-
-          {/* Dynamic Cost Splitting Row */}
-          <div className="w-full">
-            <button
-              type="button"
-              disabled={currentNumericAmount <= 0}
-              onClick={() => {
-                if (people.length === 1) {
-                  setShowSoleInfo(true);
-                } else {
-                  setShowSplitSubSheet(true);
-                }
-              }}
-              className="w-full flex items-center justify-between text-left rounded-xl hover:bg-muted/30 transition-colors group h-[26px] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSplitActive && selectedPeopleObjects.length > 0 ? (
-                <div className="flex items-center justify-between w-full">
-                  <span className="font-['Urbanist'] font-semibold text-[14px] leading-[17px] text-[#1A1C40]">
-                    Gasto dividido entre:
-                  </span>
-
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <div className="flex items-center -space-x-1.5 h-[26px]">
-                      {selectedPeopleObjects.slice(0, 3).map((p, idx) => {
-                        const initials = p.initials || p.name.slice(0, 2).toUpperCase();
-                        return p.avatar ? (
-                          <img
-                            key={p.id}
-                            src={p.avatar}
-                            alt={p.name}
-                            className="w-[26px] h-[26px] rounded-full object-cover border-[1px] border-white"
-                          />
-                        ) : (
-                          <div
-                            key={p.id}
-                            className="w-[26px] h-[26px] rounded-full flex items-center justify-center text-white text-[10px] font-bold border-[1px] border-white"
-                            style={{ backgroundColor: p.color || defaultColors[idx % defaultColors.length] }}
-                          >
-                            {initials}
-                          </div>
-                        );
-                      })}
-                      {selectedPeopleObjects.length > 3 && (
-                        <div className="w-[26px] h-[26px] rounded-full bg-[#E5E7EB] text-[#4B5563] border-[1px] border-white flex items-center justify-center text-[10px] font-bold">
-                          +{selectedPeopleObjects.length - 3}
+                {/* Field 2: Vincule à uma atividade (opcional) */}
+                <div className="relative w-full">
+                  <div
+                    onClick={() => activities.length > 0 && setShowActivityPicker(prev => !prev)}
+                    className={`bg-[#EEEEEE] rounded-[12px] h-[60px] p-3 flex flex-row items-center gap-3 border border-transparent transition-all w-full ${activities.length > 0 ? 'cursor-pointer active:bg-[#E5E5E5]' : ''
+                      }`}
+                  >
+                    <div className="w-4 h-4 flex items-center justify-center text-[#141530] flex-shrink-0">
+                      <MapPin size={16} strokeWidth={2} />
+                    </div>
+                    <div className="flex-1 min-w-0 flex flex-col justify-center items-start gap-1">
+                      <label className="font-['Urbanist'] font-medium text-[12px] leading-[16px] text-[#949494] block">
+                        Vincular à atividade (opcional)
+                      </label>
+                      {activities.length > 0 ? (
+                        <div className="flex items-center justify-between w-full">
+                          <span className={`font-['Urbanist'] font-medium text-[14px] leading-[16px] truncate block ${activityName ? 'text-[#141530]' : 'text-[#949494]'}`}>
+                            {activityName || 'Selecione uma atividade do roteiro'}
+                          </span>
+                          <ChevronDown size={16} className={`text-[#141530] transition-transform ${showActivityPicker ? 'rotate-180' : ''}`} />
                         </div>
+                      ) : (
+                        <input
+                          type="text"
+                          value={activityName}
+                          onChange={(e) => setActivityName(e.target.value)}
+                          placeholder="Selecione uma atividade do roteiro"
+                          className="w-full bg-transparent font-['Urbanist'] font-medium text-[14px] leading-[16px] text-[#141530] outline-none placeholder:text-[#949494]"
+                        />
                       )}
                     </div>
-                    <div className="w-4 h-4 flex items-center justify-center bg-[#141530] text-white rounded-full">
-                      <ChevronRight size={12} strokeWidth={2} />
+                  </div>
+
+                  {/* Activity dropdown picker if activities exist */}
+                  {showActivityPicker && activities.length > 0 && (
+                    <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl border border-border shadow-xl p-2 z-30 max-h-56 overflow-y-auto animate-in fade-in zoom-in-95 space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => { setActivityName(''); setActivityId(undefined); setShowActivityPicker(false); }}
+                        className="w-full text-left px-3 py-2 rounded-xl text-[13px] font-medium text-[#7F7F7F] hover:bg-muted/50 transition-colors"
+                      >
+                        Nenhuma atividade (gasto avulso)
+                      </button>
+                      {activities.map((act) => (
+                        <button
+                          key={act.id}
+                          type="button"
+                          onClick={() => handleSelectActivity(act)}
+                          className={`w-full text-left px-3 py-2.5 rounded-xl text-[13px] transition-colors flex items-center justify-between gap-2 ${activityId === act.id ? 'bg-[#141530]/5 text-[#141530] font-bold' : 'hover:bg-muted/50 text-[#141530] font-medium'
+                            }`}
+                        >
+                          <div className="flex flex-col min-w-0 flex-1">
+                            <span className="truncate">{act.name}</span>
+                            <span className="text-[11px] text-[#7F7F7F] capitalize">
+                              {act.category ? act.category : 'Atividade'}
+                              {act.day ? ` • Dia ${act.day}` : ''}
+                            </span>
+                          </div>
+                          {activityId === act.id && <Check size={16} className="text-[#10B981] flex-shrink-0" />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Field 3: Categoria */}
+                <div className="relative w-full">
+                  <div
+                    onClick={() => setShowCategoryPicker(prev => !prev)}
+                    className="bg-[#EEEEEE] rounded-[12px] h-[60px] p-3 flex flex-row items-center gap-3 border border-transparent active:bg-[#E5E5E5] cursor-pointer transition-all w-full"
+                  >
+                    <div className="w-4 h-4 flex items-center justify-center text-[#141530] flex-shrink-0">
+                      <CircleDot size={16} strokeWidth={2} />
+                    </div>
+                    <div className="flex-1 min-w-0 flex flex-col justify-center items-start gap-1">
+                      <label className="font-['Urbanist'] font-medium text-[12px] leading-[16px] text-[#949494] block">
+                        Categoria
+                      </label>
+                      <div className="flex items-center justify-between w-full">
+                        <span className={`font-['Urbanist'] font-medium text-[14px] leading-[16px] block truncate ${category ? 'text-[#141530]' : 'text-[#949494]'}`}>
+                          {category 
+                            ? (() => {
+                                const label = categoryOptions.find(c => c.key === category)?.label || '';
+                                return label.charAt(0).toUpperCase() + label.slice(1);
+                              })()
+                            : 'Selecione uma categoria'}
+                        </span>
+                        <ChevronDown size={16} className={`text-[#141530] transition-transform ${showCategoryPicker ? 'rotate-180' : ''}`} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Category Dropdown Picker */}
+                  {showCategoryPicker && (
+                    <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl border border-border shadow-xl p-2 z-30 max-h-56 overflow-y-auto animate-in fade-in zoom-in-95 space-y-1">
+                      {categoryOptions.map((opt) => (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onClick={() => {
+                            setCategory(opt.key);
+                            setShowCategoryPicker(false);
+                          }}
+                          className={`w-full text-left px-3 py-2.5 rounded-xl text-[13px] transition-colors flex items-center justify-between gap-2 ${category === opt.key ? 'bg-[#9DCC36]/20 text-[#141530] font-bold' : 'hover:bg-muted/50 text-[#141530] font-medium'
+                            }`}
+                        >
+                          <span>{opt.label}</span>
+                          {category === opt.key && <Check size={16} className="text-[#86B32D] flex-shrink-0" />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Field 4: Valor */}
+                <div className="bg-[#EEEEEE] rounded-[12px] h-[60px] p-3 flex flex-row items-center gap-3 border border-transparent focus-within:border-[#949494] transition-all w-full">
+                  <div className="w-4 h-4 flex items-center justify-center text-[#141530] flex-shrink-0">
+                    <CircleDot size={16} strokeWidth={2} />
+                  </div>
+                  <div className="flex-1 min-w-0 flex flex-col justify-center items-start gap-1">
+                    <label className="font-['Urbanist'] font-medium text-[12px] leading-[16px] text-[#949494] block">
+                      Valor
+                    </label>
+                    <div className="flex flex-row items-center w-full gap-1">
+                      <span className="font-['Urbanist'] font-medium text-[14px] leading-[16px] text-[#141530]">R$</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={amountInput}
+                        onChange={(e) => setAmountInput(formatCurrency(e.target.value))}
+                        placeholder="Digite um valor"
+                        className="w-full bg-transparent font-['Urbanist'] font-medium text-[14px] leading-[16px] text-[#141530] outline-none placeholder:text-[#949494]"
+                      />
                     </div>
                   </div>
                 </div>
-              ) : (
-                <div className="flex items-center justify-between w-full">
-                  <span className="font-['Urbanist'] font-semibold text-[14px] leading-[17px] text-[#1A1C40]">
-                    Dividir gasto com outros viajantes
-                  </span>
-                  <div className="w-4 h-4 flex items-center justify-center bg-[#141530] text-white rounded-full">
-                    <ChevronRight size={12} strokeWidth={2} />
-                  </div>
-                </div>
-              )}
-            </button>
-          </div>
+              </div>
+            </div>
 
-          {/* Delete Option (if editing) */}
-          {editingExpense && onDelete && (
-            <>
-              {/* Divider */}
-              <div className="w-full border-t border-[#F2F2F2]" />
-              
+            {/* Dynamic Cost Splitting Row */}
+            <div className={`w-full ${editingExpense && onDelete ? 'mb-6' : 'mb-8'}`}>
               <button
                 type="button"
+                disabled={currentNumericAmount <= 0}
                 onClick={() => {
-                  onDelete(editingExpense.id);
-                  onClose();
+                  if (people.length === 1) {
+                    if (onSoleTravelerInvite) onSoleTravelerInvite();
+                  } else {
+                    setShowSplitSubSheet(true);
+                  }
                 }}
-                className="w-full flex items-center justify-start gap-3 text-[#D00004] hover:bg-[#FEF2F2] transition-colors group h-[20px]"
+                className="w-full flex items-center justify-between text-left rounded-xl hover:bg-muted/30 transition-colors group h-[26px] disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <div className="w-5 h-5 flex items-center justify-center border-[1.25px] border-[#D00004] rounded-[4px]">
-                  <Trash2 size={12} strokeWidth={2} />
-                </div>
-                <span className="font-['Urbanist'] font-medium text-[16px] leading-[19px]">
-                  Excluir
-                </span>
-              </button>
-            </>
-          )}
+                {isSplitActive && selectedPeopleObjects.length > 0 ? (
+                  <div className="flex items-center justify-between w-full">
+                    <span className="font-['Urbanist'] font-semibold text-[14px] leading-[17px] text-[#1A1C40]">
+                      Gasto dividido entre:
+                    </span>
 
-          {/* Main Action Button */}
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={!name.trim() || currentNumericAmount <= 0 || !category}
-            className="w-full h-[48px] px-[24px] py-[12px] rounded-[16px] bg-[#9DCC36] text-[#141530] font-['Urbanist'] font-bold text-[16px] leading-[19px] shadow-xs active:scale-[0.99] transition-all disabled:opacity-100 disabled:bg-[#E5E5E5] disabled:text-[#949494] disabled:cursor-not-allowed flex items-center justify-center"
-          >
-            {editingExpense ? 'Salvar alterações' : 'Adicionar'}
-          </button>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <div className="flex items-center -space-x-1.5 h-[26px]">
+                        {selectedPeopleObjects.slice(0, 3).map((p, idx) => {
+                          const initials = p.initials || p.name.slice(0, 2).toUpperCase();
+                          return p.avatar ? (
+                            <img
+                              key={p.id}
+                              src={p.avatar}
+                              alt={p.name}
+                              className="w-[26px] h-[26px] rounded-full object-cover border-[1px] border-white"
+                            />
+                          ) : (
+                            <div
+                              key={p.id}
+                              className="w-[26px] h-[26px] rounded-full flex items-center justify-center text-white text-[10px] font-bold border-[1px] border-white"
+                              style={{ backgroundColor: p.color || defaultColors[idx % defaultColors.length] }}
+                            >
+                              {initials}
+                            </div>
+                          );
+                        })}
+                        {selectedPeopleObjects.length > 3 && (
+                          <div className="w-[26px] h-[26px] rounded-full bg-[#E5E7EB] text-[#4B5563] border-[1px] border-white flex items-center justify-center text-[10px] font-bold">
+                            +{selectedPeopleObjects.length - 3}
+                          </div>
+                        )}
+                      </div>
+                      <ChevronRight size={16} strokeWidth={2} className="text-[#141530]" />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between w-full">
+                    <span className="font-['Urbanist'] font-semibold text-[14px] leading-[17px] text-[#1A1C40]">
+                      Dividir gasto com outros viajantes
+                    </span>
+                    <ChevronRight size={16} strokeWidth={2} className="text-[#141530]" />
+                  </div>
+                )}
+              </button>
+            </div>
+
+            {/* Delete Option (if editing) */}
+            {editingExpense && onDelete && (
+              <>
+                {/* Divider */}
+                <div className="w-full border-t border-[#F2F2F2] mb-6" />
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    onDelete(editingExpense.id);
+                    onClose();
+                  }}
+                  className="w-full flex items-center justify-between text-[#D00004] hover:bg-[#FEF2F2] transition-colors group h-[20px] mb-8"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-5 h-5 flex items-center justify-center border-[1.25px] border-[#D00004] rounded-[4px]">
+                      <Trash2 size={12} strokeWidth={2} />
+                    </div>
+                    <span className="font-['Urbanist'] font-medium text-[16px] leading-[19px]">
+                      Excluir
+                    </span>
+                  </div>
+                  <ChevronRight size={16} strokeWidth={2} className="text-[#D00004]" />
+                </button>
+              </>
+            )}
+
+            {/* Fim do conteúdo rolável */}
+          </div>
+
+          {/* Action Button Fixed Footer */}
+          <div className="bg-white border-t border-[#B6B6B6] px-4 py-6 w-full">
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={isSaveDisabled}
+              className="w-full h-[48px] px-[24px] py-[12px] rounded-[16px] bg-[#9DCC36] text-[#141530] font-['Urbanist'] font-bold text-[16px] leading-[19px] shadow-xs active:scale-[0.99] transition-all disabled:opacity-100 disabled:bg-[#E5E5E5] disabled:text-[#949494] disabled:cursor-not-allowed flex items-center justify-center"
+            >
+              {editingExpense ? 'Salvar' : 'Adicionar'}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
 
       {/* Sub-Bottom Sheet: Dividir Gasto (Preserves all form state) */}
       <SplitBudgetExpenseSheet
@@ -518,15 +536,6 @@ export function AddBudgetExpenseSheet({
         initialCustomSplits={customSplits}
       />
 
-      {/* Sub-Bottom Sheet: Sole Traveler Info */}
-      <SoleTravelerInfoSheet
-        open={showSoleInfo}
-        onClose={() => setShowSoleInfo(false)}
-        onInvite={() => {
-          setShowSoleInfo(false);
-          if (onSoleTravelerInvite) onSoleTravelerInvite();
-        }}
-      />
     </>
   );
 }

@@ -22,6 +22,7 @@ interface ExpenseCardProps {
   currency?: string;
   onClick?: () => void;
   className?: string;
+  hideDivider?: boolean;
 }
 
 const categoryLabels: Record<string, string> = {
@@ -41,7 +42,7 @@ const categoryIcons: Record<string, typeof Building2> = {
 
 const defaultColors = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444', '#EC4899', '#14B8A6', '#F97316'];
 
-export function ExpenseCard({ expense, people, currency = 'BRL', onClick, className = '' }: ExpenseCardProps) {
+export function ExpenseCard({ expense, people, currency = 'BRL', onClick, className = '', hideDivider = false }: ExpenseCardProps) {
   const categoryLabel = categoryLabels[expense.category] || expense.category || 'Gasto';
   
   // Find assigned people objects
@@ -54,10 +55,10 @@ export function ExpenseCard({ expense, people, currency = 'BRL', onClick, classN
       onClick={onClick}
       role="button"
       tabIndex={0}
-      className={`group flex flex-col items-start w-[345px] gap-[25px] pb-5 pt-3 mx-auto cursor-pointer select-none active:scale-[0.99] transition-all ${className}`}
+      className={`group flex flex-col items-start w-full gap-[25px] pb-5 pt-3 cursor-pointer select-none active:scale-[0.99] transition-all ${className}`}
       style={{ fontFamily: 'var(--font-family-primary, "Urbanist", sans-serif)' }}
     >
-      <div className="flex flex-row items-start gap-4 w-[345px]">
+      <div className="flex flex-row items-start gap-4 w-full">
         {/* Left section: Icon */}
         <div className="flex flex-row items-center gap-2 flex-1">
           <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 text-[#141530]">
@@ -105,10 +106,15 @@ export function ExpenseCard({ expense, people, currency = 'BRL', onClick, classN
             </div>
           )}
         </div>
+
+        {/* Chevron Arrow */}
+        <div className="flex items-center justify-center h-[24px] text-[#9CA3AF]">
+          <ChevronRight size={24} strokeWidth={1.5} />
+        </div>
       </div>
       
       {/* Divider */}
-      <div className="w-[345px] border-t border-[#F2F2F2]" />
+      {!hideDivider && <div className="w-full border-t border-[#F2F2F2]" />}
     </div>
   );
 }

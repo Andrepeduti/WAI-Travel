@@ -128,7 +128,7 @@ export function LoginSecurityScreen({ onBack }: LoginSecurityScreenProps) {
 
       {/* Delete / Deactivate Account Bottom Sheet */}
       <Sheet open={showDeleteSheet} onOpenChange={(open) => { if (!open) closeDeleteSheet(); else setShowDeleteSheet(true); }}>
-        <SheetContent side="bottom" className="rounded-t-[20px] px-5 pb-8 pt-3 w-full mx-auto">
+        <SheetContent side="bottom" className="rounded-t-[20px] px-5 pb-[34px] pt-3 w-full mx-auto">
           <div className="flex justify-center mb-4">
             <div className="w-10 h-1 rounded-full" style={{ background: 'hsl(var(--divider))' }} />
           </div>

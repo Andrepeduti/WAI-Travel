@@ -456,9 +456,8 @@ export function ItineraryMapScreen({
 
       {/* Loading Overlay com transição suave (fade out) */}
       <div
-        className={`absolute inset-0 z-[1100] flex flex-col items-center justify-center bg-white transition-opacity duration-300 pointer-events-none ${
-          isMapReady ? 'opacity-0' : 'opacity-100'
-        }`}
+        className={`absolute inset-0 z-[1100] flex flex-col items-center justify-center bg-white transition-opacity duration-300 pointer-events-none ${isMapReady ? 'opacity-0' : 'opacity-100'
+          }`}
       >
         <Loader2 className="w-8 h-8 animate-spin text-[#1D4ED8]" />
         <p className="text-[13px] font-semibold text-[#1A1C40] mt-3 font-['Urbanist',sans-serif]">
@@ -530,9 +529,8 @@ export function ItineraryMapScreen({
                       setSelectedDay(null);
                       setIsDayDropdownOpen(false);
                     }}
-                    className={`w-full px-4 py-2.5 text-left text-[13px] flex items-center justify-between transition-colors ${
-                      selectedDay === null ? 'bg-[#F5F3FF] text-[#1D4ED8] font-bold' : 'text-[#1A1C40] hover:bg-[#F4F4F5]'
-                    }`}
+                    className={`w-full px-4 py-2.5 text-left text-[13px] flex items-center justify-between transition-colors ${selectedDay === null ? 'bg-[#F5F3FF] text-[#1D4ED8] font-bold' : 'text-[#1A1C40] hover:bg-[#F4F4F5]'
+                      }`}
                   >
                     <span>Todos os dias</span>
                     {selectedDay === null && <Check className="w-4 h-4 text-[#1D4ED8]" />}
@@ -546,9 +544,8 @@ export function ItineraryMapScreen({
                         setSelectedDay(d.day);
                         setIsDayDropdownOpen(false);
                       }}
-                      className={`w-full px-4 py-2.5 text-left text-[13px] flex items-center justify-between transition-colors ${
-                        selectedDay === d.day ? 'bg-[#F5F3FF] text-[#1D4ED8] font-bold' : 'text-[#1A1C40] hover:bg-[#F4F4F5]'
-                      }`}
+                      className={`w-full px-4 py-2.5 text-left text-[13px] flex items-center justify-between transition-colors ${selectedDay === d.day ? 'bg-[#F5F3FF] text-[#1D4ED8] font-bold' : 'text-[#1A1C40] hover:bg-[#F4F4F5]'
+                        }`}
                     >
                       <div className="flex items-center gap-2">
                         <div
@@ -621,8 +618,8 @@ export function ItineraryMapScreen({
       ) : (
         /* MODO GERAL: Carrossel com Cards de Lugares */
         <div
-          className="absolute bottom-6 inset-x-0 pointer-events-none"
-          style={{ zIndex: 1200 }}
+          className="absolute inset-x-0 pointer-events-none"
+          style={{ zIndex: 1200, bottom: 'calc(max(24px, env(safe-area-inset-bottom, 0px) + 12px))' }}
         >
           {filteredPlaces.length === 0 ? (
             <div className="px-4 w-full max-w-md mx-auto pointer-events-auto">
@@ -640,15 +637,6 @@ export function ItineraryMapScreen({
                     </p>
                   </div>
                 </div>
-                {selectedDay !== null && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedDay(null)}
-                    className="px-3 py-1.5 rounded-xl text-[12px] font-bold bg-[#1A1C40] text-white shrink-0 active:scale-95"
-                  >
-                    Ver todos
-                  </button>
-                )}
               </div>
             </div>
           ) : (
@@ -678,11 +666,10 @@ export function ItineraryMapScreen({
                         onSelectPlaceDetails(place);
                       }
                     }}
-                    className={`w-[calc(100vw-72px)] min-w-[calc(100vw-72px)] max-w-[320px] sm:min-w-[320px] bg-white rounded-[22px] overflow-hidden border border-[#E5E5E7] transition-all duration-300 cursor-pointer snap-center flex-shrink-0 active:scale-[0.98] ${
-                      isSelected
+                    className={`w-[calc(100vw-72px)] min-w-[calc(100vw-72px)] max-w-[320px] sm:min-w-[320px] bg-white rounded-[22px] overflow-hidden border border-[#E5E5E7] transition-all duration-300 cursor-pointer snap-center flex-shrink-0 active:scale-[0.98] ${isSelected
                         ? 'scale-100 opacity-100 z-10'
                         : 'scale-[0.95] opacity-80 hover:opacity-100'
-                    }`}
+                      }`}
                   >
                     {/* Photo with Day Color Number Badge */}
                     <div className="relative h-[120px] w-full bg-muted overflow-hidden">

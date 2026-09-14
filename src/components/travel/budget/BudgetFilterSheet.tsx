@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, CircleDot, Calendar, CircleDollarSign, ChevronDown } from 'lucide-react';
+import { ChevronLeft, CircleDot, ChevronDown } from 'lucide-react';
 import { BudgetPerson } from './TravelerBudgetCard';
 
 interface BudgetFilterSheetProps {
@@ -195,53 +195,12 @@ export function BudgetFilterSheet({
 
         <div className="w-full border-t-2 border-[#F2F2F2] my-6" />
 
-        {/* Data */}
-        <div className="flex flex-col gap-4 w-full">
-          <h3 className="text-[16px] font-semibold text-[#171F2C]">Data</h3>
-          <div className="flex flex-row gap-4 w-full">
-            {/* A partir de */}
-            <div className="flex-1 flex flex-row items-center px-3 py-3 gap-3 bg-[#EEEEEE] rounded-xl h-[60px] relative">
-              <Calendar size={16} className="text-[#141530]" />
-              <div className="flex flex-col">
-                <span className="font-medium text-[12px] text-[#949494]">A partir de</span>
-                <input 
-                  type="text" 
-                  value={localStartDate}
-                  onChange={(e) => setLocalStartDate(e.target.value)}
-                  placeholder="DD/MM/AA"
-                  className="bg-transparent border-none outline-none font-medium text-[14px] text-[#141530] w-full p-0 h-4"
-                />
-              </div>
-              <ChevronDown size={16} className="text-[#141530] absolute right-3" />
-            </div>
-
-            {/* Até */}
-            <div className="flex-1 flex flex-row items-center px-3 py-3 gap-3 bg-[#EEEEEE] rounded-xl h-[60px] relative">
-              <Calendar size={16} className="text-[#141530]" />
-              <div className="flex flex-col">
-                <span className="font-medium text-[12px] text-[#949494]">Até</span>
-                <input 
-                  type="text" 
-                  value={localEndDate}
-                  onChange={(e) => setLocalEndDate(e.target.value)}
-                  placeholder="DD/MM/AA"
-                  className="bg-transparent border-none outline-none font-medium text-[14px] text-[#141530] w-full p-0 h-4"
-                />
-              </div>
-              <ChevronDown size={16} className="text-[#141530] absolute right-3" />
-            </div>
-          </div>
-        </div>
-
-        <div className="w-full border-t-2 border-[#F2F2F2] my-6" />
-
         {/* Valor do gasto */}
         <div className="flex flex-col gap-4 w-full">
           <h3 className="text-[16px] font-semibold text-[#171F2C]">Valor do gasto</h3>
           <div className="flex flex-row gap-4 w-full">
             {/* A partir de */}
             <div className="flex-1 flex flex-row items-center px-2 py-3 gap-2 bg-[#EEEEEE] rounded-xl h-[60px]">
-              <CircleDollarSign size={16} className="text-[#141530]" />
               <div className="flex flex-col flex-1">
                 <span className="font-medium text-[12px] text-[#949494]">A partir de</span>
                 <div className="flex items-center">
@@ -259,7 +218,6 @@ export function BudgetFilterSheet({
 
             {/* Até */}
             <div className="flex-1 flex flex-row items-center px-2 py-3 gap-2 bg-[#EEEEEE] rounded-xl h-[60px]">
-              <CircleDollarSign size={16} className="text-[#141530]" />
               <div className="flex flex-col flex-1">
                 <span className="font-medium text-[12px] text-[#949494]">Até</span>
                 <div className="flex items-center">

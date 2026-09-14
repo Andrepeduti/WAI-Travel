@@ -106,7 +106,7 @@ export function useMyItineraries() {
       return;
     }
     if (!cachedMyItineraries) setLoading(true);
-    const data = await listMyItineraries();
+    const data = await listMyItineraries(userId);
     const merged = mergeWithOptimistic(userId, data);
     cachedMyItineraries = merged;
     setItineraries(merged);

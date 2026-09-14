@@ -209,7 +209,7 @@ export function EditInterestsSheet({
         </div>
 
         <div
-          className="px-5 pt-3 pb-5 flex-shrink-0 border-t"
+          className="px-5 pt-3 pb-[34px] flex-shrink-0 border-t"
           style={{ borderColor: '#F2F2F7' }}
         >
           <button
