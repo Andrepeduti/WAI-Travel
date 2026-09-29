@@ -248,18 +248,13 @@ export function CreateItinerarySheet({
       const isFlex = dateMode === 'flexible';
       const daysCount = isFlex && typeof durationDays === 'number' ? durationDays : (startDate && endDate ? differenceInDays(endDate, startDate) + 1 : 7);
 
-      const effectiveStartDate = startDate ?? new Date();
+      const effectiveStartDate = isFlex ? undefined : (startDate ?? new Date());
       const effectiveEndDate = isFlex
-        ? new Date(effectiveStartDate.getTime() + (daysCount - 1) * 86400000)
+        ? undefined
         : (endDate ?? new Date());
 
+      // Datas flexíveis e mês de viagem vão em isFlexible/travelMonth, não em tags.
       const tags: string[] = [];
-      if (isFlex) {
-        tags.push('_FLEXIBLE_DATES_');
-        if (travelMonth) {
-          tags.push(`_TRAVEL_MONTH_${travelMonth}_`);
-        }
-      }
 
       await onSubmit({
         tripName: tripName.trim() || `${destinations[0]} trip`,
@@ -416,7 +411,7 @@ export function CreateItinerarySheet({
                 {/* Form Elements Container (gap: 16px) */}
                 <div className="space-y-4">
                   {/* Input 1: Nome do roteiro (height: 60px, bg: #EEEEEE, radius: 12px) */}
-                  <div className="bg-[#EEEEEE] rounded-[12px] p-3 min-h-[60px] flex items-center gap-3">
+                  <div className="bg-field border border-transparent focus-within:border-primary transition-colors rounded-[12px] p-3 min-h-[60px] flex items-center gap-3">
                     <Pencil className="w-4 h-4 text-[#141530] flex-shrink-0" />
                     <div className="flex-1 flex flex-col justify-center gap-1">
                       <label className="text-[12px] font-medium text-[#949494] leading-4 block">
@@ -563,7 +558,7 @@ export function CreateItinerarySheet({
                     {dateMode === 'flexible' ? (
                       <div className="space-y-4">
                         {/* 1. Duração da viagem (height: 60px, bg: #EDEDED, radius: 12px) */}
-                        <div className="bg-[#EDEDED] rounded-[12px] p-3 min-h-[60px] flex items-center gap-3">
+                        <div className="bg-field border border-transparent focus-within:border-primary transition-colors rounded-[12px] p-3 min-h-[60px] flex items-center gap-3">
                           <Clock className="w-4 h-4 text-[#555555] flex-shrink-0" />
                           <div className="flex-1 flex flex-col justify-center gap-1">
                             <label className="text-[12px] font-medium text-[#949494] leading-4 block">
@@ -590,7 +585,7 @@ export function CreateItinerarySheet({
                         </div>
 
                         {/* 2. Mês da viagem (Opcional) (Select, height: 60px, bg: #EEEEEE, radius: 12px) */}
-                        <div className="bg-[#EEEEEE] rounded-[12px] p-3 min-h-[60px] flex items-center gap-3 relative">
+                        <div className="bg-field rounded-[12px] p-3 min-h-[60px] flex items-center gap-3 relative">
                           <CalendarIcon className="w-4 h-4 text-[#141530] flex-shrink-0" />
                           <div className="flex-1 flex flex-col justify-center gap-1 relative">
                             <label className="text-[12px] font-medium text-[#949494] leading-4 block">
@@ -614,7 +609,7 @@ export function CreateItinerarySheet({
                       </div>
                     ) : (
                       /* Modo: Data específica (Select/Popover) */
-                      <div className="bg-[#EEEEEE] rounded-[12px] p-3 min-h-[60px] flex items-center gap-3">
+                      <div className="bg-field rounded-[12px] p-3 min-h-[60px] flex items-center gap-3">
                         <CalendarIcon className="w-4 h-4 text-[#141530] flex-shrink-0" />
                         <div className="flex-1 flex flex-col justify-center gap-1">
                           <label className="text-[12px] font-medium text-[#949494] leading-4 block">

@@ -346,7 +346,7 @@ export async function getPlaceFullDetails(params: {
   // 4. Salva na tabela centralizada `places` de forma assíncrona
   void (async () => {
     try {
-      await incrementApiCounter('google_places', 1);
+      incrementApiCounter('google_places', 1).catch(() => {});
       await upsertPlace({
         name: result.name,
         city: result.city || undefined,

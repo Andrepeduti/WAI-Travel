@@ -36,13 +36,8 @@ const ChatScreen = lazy(() => import('@/components/screens/ChatScreen').then(m =
 const NotificationsScreen = lazy(() => import('@/components/screens/NotificationsScreen').then(m => ({ default: m.NotificationsScreen })));
 const CreateItinerarySheet = lazy(() => import('@/components/travel/CreateItinerarySheet').then(m => ({ default: m.CreateItinerarySheet })));
 const PlanLimitReachedSheet = lazy(() => import('@/components/travel/PlanLimitReachedSheet').then(m => ({ default: m.PlanLimitReachedSheet })));
-const CreateCollectionSheet = lazy(() => import('@/components/travel/CreateCollectionSheet').then(m => ({ default: m.CreateCollectionSheet })));
 const CreateGuideSheet = lazy(() => import('@/components/travel/CreateGuideSheet').then(m => ({ default: m.CreateGuideSheet })));
-const AddVideoSheet = lazy(() => import('@/components/travel/AddVideoSheet').then(m => ({ default: m.AddVideoSheet })));
-const AddVideoByLinkSheet = lazy(() => import('@/components/travel/AddVideoByLinkSheet').then(m => ({ default: m.AddVideoByLinkSheet })));
 const PlannerItineraryScreen = lazy(() => import('@/components/screens/PlannerItineraryScreen').then(m => ({ default: m.PlannerItineraryScreen })));
-const AddVideoFromGallerySheet = lazy(() => import('@/components/travel/AddVideoFromGallerySheet').then(m => ({ default: m.AddVideoFromGallerySheet })));
-const CollectionDetailScreen = lazy(() => import('@/components/screens/CollectionDetailScreen').then(m => ({ default: m.CollectionDetailScreen })));
 const ExperienceDetailScreen = lazy(() => import('@/components/screens/ExperienceDetailScreen').then(m => ({ default: m.ExperienceDetailScreen })));
 const TripRemindersScreen = lazy(() => import('@/components/screens/TripRemindersScreen').then(m => ({ default: m.TripRemindersScreen })));
 const PromoDetailScreen = lazy(() => import('@/components/screens/PromoDetailScreen').then(m => ({ default: m.PromoDetailScreen })));
@@ -63,13 +58,9 @@ const SubscriptionScreen = lazy(() => import('@/components/screens/SubscriptionS
 const GoalsSettingsScreen = lazy(() => import('@/components/screens/GoalsSettingsScreen').then(m => ({ default: m.GoalsSettingsScreen })));
 
 import { addOptimisticItinerary, buildOptimisticItinerary, removeOptimisticItinerary, replaceOptimisticItinerary, useMyItineraries } from '@/hooks/use-my-itineraries';
-// `saveUserCollection`/`deleteUserCollection`/`UserItinerary` continuam vindos do módulo de TripsScreen,
-// mas como TripsScreen agora é lazy, importamos somente o que precisamos de forma estática (os helpers
-// são leves; o componente em si só é avaliado quando referenciado).
-import { saveUserCollection, deleteUserCollection, type UserItinerary } from '@/components/screens/TripsScreen';
+import { type UserItinerary } from '@/components/screens/TripsScreen';
 import { createItinerary, updateItinerary, deleteItinerary, getUserItineraryById } from '@/lib/itinerariesApi';
 import { loadPlannerActivities, loadPlannerTransports } from '@/lib/plannerActivitiesStore';
-import { mockPeople } from '@/components/travel/ShareCollectionSheet';
 import { getItineraryById, getItinerariesByAuthor, setItineraryAuthorOverride, ItineraryDataset } from '@/data/itineraries';
 import waiLogo from '@/assets/wai-logo.png.asset.json';
 import { buildSyntheticMarketplaceDataset } from '@/lib/syntheticMarketplaceDataset';
@@ -237,16 +228,12 @@ const Index = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state]);
-  const [showCollectionSheet, setShowCollectionSheet] = useState(false);
   const [showGuideSheet, setShowGuideSheet] = useState(false);
-  const [showAddVideoSheet, setShowAddVideoSheet] = useState(false);
-  const [showAddVideoByLinkSheet, setShowAddVideoByLinkSheet] = useState(false);
-  const [showAddVideoFromGallery, setShowAddVideoFromGallery] = useState(false);
-  const [pendingVideoPlaces, setPendingVideoPlaces] = useState<any[] | null>(null);
   const [newItineraryData, setNewItineraryData] = useState<ItineraryFormData | null>(null);
   const [activeUserItineraryId, setActiveUserItineraryId] = useState<string | null>(null);
   const [activeUserItineraryDataset, setActiveUserItineraryDataset] = useState<ItineraryDataset | null>(null);
   const [activeUserItineraryRole, setActiveUserItineraryRole] = useState<'owner' | 'editor' | 'viewer' | null>(null);
+  const [activeUserItineraryReadOnlyMode, setActiveUserItineraryReadOnlyMode] = useState(false);
   const [activeUserItineraryIsPurchased, setActiveUserItineraryIsPurchased] = useState(false);
   const [autoOpenPublishFlow, setAutoOpenPublishFlow] = useState(false);
   const [selectedItinerary, setSelectedItinerary] = useState<ItineraryDataset | null>(null);
@@ -261,9 +248,6 @@ const Index = () => {
   const [creatorEditingItinerary, setCreatorEditingItinerary] = useState<UserItinerary | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [destinationList, setDestinationList] = useState<{ country: string; continent: string; image: string } | null>(null);
-  const [selectedCollectionId, setSelectedCollectionId] = useState<number | null>(null);
-  const [newCollectionName, setNewCollectionName] = useState<string | null>(null);
-  const [newCollectionSharedWith, setNewCollectionSharedWith] = useState<string[]>([]);
   const [selectedExperienceId, setSelectedExperienceId] = useState<number | null>(null);
   const [profileSubScreen, setProfileSubScreen] = useState<ProfileSubScreen>('main');
   // Origem da tela "Programa de Criadores" — controla para onde o botão Voltar retorna.
@@ -311,8 +295,6 @@ const Index = () => {
   const [showDeleteSuccessToast, setShowDeleteSuccessToast] = useState(false);
   const [showLeaveSuccessToast, setShowLeaveSuccessToast] = useState(false);
   const [showDuplicateSuccessToast, setShowDuplicateSuccessToast] = useState(false);
-  const [showDeleteCollectionToast, setShowDeleteCollectionToast] = useState(false);
-  const [returnToCollections, setReturnToCollections] = useState(false);
   const [returnToPublic, setReturnToPublic] = useState(false);
   const [purchasedItineraryId, setPurchasedItineraryId] = useState<number | null>(null);
   const [selectedCreator, setSelectedCreator] = useState<CreatorProfileData | null>(null);
@@ -336,7 +318,6 @@ const Index = () => {
       activeUserItineraryId ? `userIt:${activeUserItineraryId}` : '',
       activeUserItineraryRole ? `role:${activeUserItineraryRole}` : '',
       creatorDashboardItinerary ? `dash:${creatorDashboardItinerary.id}` : '',
-      selectedCollectionId != null ? `col:${selectedCollectionId}` : '',
       selectedExperienceId != null ? `exp:${selectedExperienceId}` : '',
       destinationList ? `dest:${destinationList.country}` : '',
       showSearch ? 'search' : '',
@@ -352,7 +333,7 @@ const Index = () => {
     ].filter(Boolean).join('|');
   }, [
     activeTab, profileSubScreen, selectedCreator, selectedFriend, selectedItinerary,
-    activeUserItineraryId, activeUserItineraryRole, creatorDashboardItinerary, selectedCollectionId,
+    activeUserItineraryId, activeUserItineraryRole, creatorDashboardItinerary,
     selectedExperienceId, destinationList, showSearch, showChat, showNotifications,
     showAIAssistant, showAIHistory, showCart, showTripReminders, showPromoDetail,
     showSimilarTravelers, newItineraryData,
@@ -371,7 +352,6 @@ const Index = () => {
       activeUserItineraryDataset,
       activeUserItineraryRole,
       creatorDashboardItinerary,
-      selectedCollectionId,
       selectedExperienceId,
       destinationList,
       showSearch,
@@ -390,7 +370,6 @@ const Index = () => {
       navigatedFromNotifications,
       navigatedFromFriendProfile,
       navigatedFromPurchases,
-      returnToCollections,
       returnToPublic,
       chatInitialContact,
     };
@@ -404,7 +383,6 @@ const Index = () => {
       setActiveUserItineraryDataset(snap.activeUserItineraryDataset);
       setActiveUserItineraryRole(snap.activeUserItineraryRole);
       setCreatorDashboardItinerary(snap.creatorDashboardItinerary);
-      setSelectedCollectionId(snap.selectedCollectionId);
       setSelectedExperienceId(snap.selectedExperienceId);
       setDestinationList(snap.destinationList);
       setShowSearch(snap.showSearch);
@@ -423,18 +401,17 @@ const Index = () => {
       setNavigatedFromNotifications(snap.navigatedFromNotifications);
       setNavigatedFromFriendProfile(snap.navigatedFromFriendProfile);
       setNavigatedFromPurchases(snap.navigatedFromPurchases);
-      setReturnToCollections(snap.returnToCollections);
       setReturnToPublic(snap.returnToPublic);
       setChatInitialContact(snap.chatInitialContact);
     };
   }, [
     activeTab, profileSubScreen, selectedCreator, selectedFriend, selectedItinerary,
     activeUserItineraryId, activeUserItineraryDataset, activeUserItineraryRole, creatorDashboardItinerary,
-    selectedCollectionId, selectedExperienceId, destinationList, showSearch, showChat,
+    selectedExperienceId, destinationList, showSearch, showChat,
     showNotifications, showAIAssistant, showAIHistory, showCart, showTripReminders,
     showPromoDetail, showSimilarTravelers, newItineraryData, injectedMarketplaceDataset,
     ownedPublicUserItinerary, purchasedItineraryId, navigatedFromNotifications,
-    navigatedFromFriendProfile, navigatedFromPurchases, returnToCollections, returnToPublic, chatInitialContact,
+    navigatedFromFriendProfile, navigatedFromPurchases, returnToPublic, chatInitialContact,
   ]);
 
   const { wrapBack, resetStack } = useNavStack(navSignature, captureRestore());
@@ -443,9 +420,8 @@ const Index = () => {
   useEffect(() => {
     if (activeTab !== 'trips') {
       if (returnToPublic) setReturnToPublic(false);
-      if (returnToCollections) setReturnToCollections(false);
     }
-  }, [activeTab, returnToPublic, returnToCollections]);
+  }, [activeTab, returnToPublic]);
 
   const handleTabChange = (tab: TabType) => {
     if (tab === 'create') {
@@ -481,49 +457,9 @@ const Index = () => {
       tryOpenItinerarySheet('personal');
     } else if (optionId === 'seller') {
       tryOpenItinerarySheet('seller');
-    } else if (optionId === 'video') {
-      setShowAddVideoSheet(true);
-    } else if (optionId === 'collection') {
-      setShowCollectionSheet(true);
     } else if (optionId === 'guide') {
       setShowGuideSheet(true);
     }
-  };
-
-  const handleAddVideoOptionSelect = (optionId: string) => {
-    setShowAddVideoSheet(false);
-    if (optionId === 'link') {
-      setShowAddVideoByLinkSheet(true);
-    } else if (optionId === 'gallery') {
-      setShowAddVideoFromGallery(true);
-    }
-  };
-
-  const handleBackToAddVideoSheet = () => {
-    setShowAddVideoByLinkSheet(false);
-    setShowAddVideoFromGallery(false);
-    setShowAddVideoSheet(true);
-  };
-
-  const handleVideoLinkSubmit = (link: string, places?: any[], destination?: 'itinerary' | 'collection') => {
-    console.log('Video link submitted:', link, 'destination:', destination, 'places:', places?.length);
-    setShowAddVideoByLinkSheet(false);
-  };
-
-  const handleVideoGallerySubmit = (file: File | null, places?: any[], destination?: 'itinerary' | 'collection') => {
-    console.log('Video file submitted:', file?.name, 'destination:', destination, 'places:', places?.length);
-    setShowAddVideoFromGallery(false);
-  };
-
-  const handleCreateNewItineraryFromVideo = (places: any[]) => {
-    setPendingVideoPlaces(places);
-    setShowAddVideoByLinkSheet(false);
-    setShowAddVideoFromGallery(false);
-    if (ownCreatedCount >= FREE_PLAN_ITINERARY_LIMIT) {
-      setShowPlanLimitSheet(true);
-      return;
-    }
-    setShowItinerarySheet(true);
   };
 
   const getDestinationImages = (destinations: string[]): string[] => {
@@ -583,15 +519,14 @@ const Index = () => {
 
   const handleItinerarySubmit = async (data: ItineraryFormData) => {
     const title = data.tripName?.trim() || (data.destinations.length > 0 ? `${data.destinations[0].split(',')[0]} trip` : 'Novo roteiro');
-    const placesFromVideo = pendingVideoPlaces;
     const input = {
       title,
       destinations: data.destinations,
-      startDate: formatLocalDate(data.startDate) || formatLocalDate(new Date()),
-      endDate: formatLocalDate(data.endDate) || formatLocalDate(new Date()),
+      startDate: data.isFlexible ? null : (formatLocalDate(data.startDate) || formatLocalDate(new Date())),
+      endDate: data.isFlexible ? null : (formatLocalDate(data.endDate) || formatLocalDate(new Date())),
       images: getDestinationImages(data.destinations),
       participants: [],
-      places: placesFromVideo ? placesFromVideo.length : 0,
+      places: 0,
       isPersonal: data.isPersonal !== undefined ? data.isPersonal : !data.isPublic,
       isPublic: !!data.isPublic,
       priceCents: data.priceCents ?? null,
@@ -601,7 +536,6 @@ const Index = () => {
       travelMonth: data.travelMonth,
     };
     const tempId = `pending-itinerary-${Date.now()}`;
-    // Removed addOptimisticItinerary here to prevent showing it behind the sheet while loading.
     
     const created = await createItinerary(input);
     if (!created) {
@@ -614,10 +548,6 @@ const Index = () => {
     setShowSuccessToast(true);
 
     replaceOptimisticItinerary(tempId, created);
-    if (placesFromVideo) {
-      console.log('Adding', placesFromVideo.length, 'places from video to new itinerary:', created.id);
-      setPendingVideoPlaces(null);
-    }
 
     if (data.isPublic) {
       setReturnToPublic(true);
@@ -633,7 +563,7 @@ const Index = () => {
     setActiveUserItineraryId(created.id);
   };
 
-  const handleUserItineraryClick = (userItinerary: UserItinerary) => {
+  const handleUserItineraryClick = (userItinerary: UserItinerary, readOnlyMode: boolean = false) => {
     const formData: ItineraryFormData = {
       destinations: userItinerary.destinations,
       startDate: parseLocalDate(userItinerary.startDate),
@@ -654,6 +584,7 @@ const Index = () => {
     };
     setActiveUserItineraryId(userItinerary.id);
     setActiveUserItineraryRole(userItinerary.myRole ?? null);
+    setActiveUserItineraryReadOnlyMode(readOnlyMode);
     // Try to load the original dataset for purchased itineraries (linked via sourceDatasetId)
     const datasetId = userItinerary.sourceDatasetId ?? null;
     const dataset = datasetId ? getItineraryById(datasetId) : null;
@@ -689,31 +620,17 @@ const Index = () => {
       void updateItinerary(activeUserItineraryId, {
         title,
         destinations: updatedData.destinations,
-        startDate: formatLocalDate(updatedData.startDate) || formatLocalDate(new Date()),
-        endDate: formatLocalDate(updatedData.endDate) || formatLocalDate(new Date()),
+        startDate: updatedData.isFlexible ? null : (formatLocalDate(updatedData.startDate) || null),
+        endDate: updatedData.isFlexible ? null : (formatLocalDate(updatedData.endDate) || null),
+        isFlexible: updatedData.isFlexible,
+        durationDays: updatedData.durationDays,
         ...(updatedData.coverImage ? { images: [updatedData.coverImage] } : {}),
       });
     }
   };
 
-  const handleCollectionSubmit = (name: string, sharedWithIds: string[] = []) => {
-    const newId = -(Date.now());
-    saveUserCollection({
-      id: newId,
-      title: name,
-      itemCount: 0,
-      isFavorites: false,
-      isPrivate: false,
-      images: [],
-      participants: sharedWithIds.map(id => {
-        const person = mockPeople.find(p => p.id === id);
-        return person?.photo || '';
-      }).filter(Boolean),
-    });
-    setNewCollectionName(name);
-    setNewCollectionSharedWith(sharedWithIds);
-    setSelectedCollectionId(newId);
-  };
+
+
 
   const handleGuideSubmit = (data: { title: string; destination: string }) => {
     console.log('Guide created:', data);
@@ -761,7 +678,9 @@ const Index = () => {
 
     const startDate = parseLocalDate(userItinerary.startDate) ?? new Date();
     const endDate = parseLocalDate(userItinerary.endDate) ?? new Date();
-    const totalDays = Math.max(1, differenceInDays(endDate, startDate) + 1);
+    const totalDays = userItinerary.isFlexible && userItinerary.durationDays
+      ? userItinerary.durationDays
+      : Math.max(1, differenceInDays(endDate, startDate) + 1);
     const validUserCover = userItinerary.images?.find((image) => image && !image.startsWith('blob:'));
     const coverImage = validUserCover
       ?? baseDataset?.coverImage
@@ -909,7 +828,6 @@ const Index = () => {
     setSelectedItinerary(null);
     setInjectedMarketplaceDataset(null);
     setOwnedPublicUserItinerary(null);
-    setReturnToCollections(false);
   };
 
   const handleSearchOpen = () => {
@@ -1039,6 +957,12 @@ const Index = () => {
             onPreview={() => {
               const it = creatorDashboardItinerary;
               setCreatorDashboardItinerary(null);
+              setOwnedPublicUserItinerary(it);
+              handleUserItineraryClick(it, true);
+            }}
+            onViewAd={() => {
+              const it = creatorDashboardItinerary;
+              setCreatorDashboardItinerary(null);
               handleUserPublicItineraryClick(it);
             }}
             onEdit={(it) => {
@@ -1095,7 +1019,6 @@ const Index = () => {
       } else if (fallbackToTrips) {
         setSelectedItinerary(null);
         setActiveTab('trips');
-        setReturnToCollections(false);
       } else {
         handleBackFromDetail();
       }
@@ -1223,7 +1146,6 @@ const Index = () => {
               setSelectedItinerary(null);
               setPurchasedItineraryId(null);
               setActiveTab('trips');
-              setReturnToCollections(false);
               setShowDeleteSuccessToast(true);
             }}
             onUpdate={(updatedData) => {
@@ -1235,8 +1157,10 @@ const Index = () => {
                 void updateItinerary(selectedItinerary.id, {
                   title,
                   destinations: updatedData.destinations,
-                  startDate: formatLocalDate(updatedData.startDate) || formatLocalDate(new Date()),
-                  endDate: formatLocalDate(updatedData.endDate) || formatLocalDate(new Date()),
+                  startDate: updatedData.isFlexible ? null : (formatLocalDate(updatedData.startDate) || null),
+                  endDate: updatedData.isFlexible ? null : (formatLocalDate(updatedData.endDate) || null),
+                  isFlexible: updatedData.isFlexible,
+                  durationDays: updatedData.durationDays,
                   ...(updatedData.coverImage ? { images: [updatedData.coverImage] } : {}),
                 });
               }
@@ -1246,6 +1170,12 @@ const Index = () => {
             onNavigateToSales={() => { setSelectedItinerary(null); setPurchasedItineraryId(null); setReturnToPublic(true); setActiveTab('trips'); }}
             onOpenItinerary={(dataset) => {
               setSelectedItinerary(dataset);
+            }}
+            onDuplicateSuccess={() => {
+              setSelectedItinerary(null);
+              setPurchasedItineraryId(null);
+              setActiveTab('trips');
+              setShowDuplicateSuccessToast(true);
             }}
             onNavigateToFAQ={() => setProfileSubScreen('help-center')}
           />
@@ -1265,22 +1195,29 @@ const Index = () => {
             itineraryId={activeUserItineraryId ?? undefined}
             initialRole={activeUserItineraryRole ?? undefined}
             isPurchased={activeUserItineraryIsPurchased}
+            readOnlyMode={activeUserItineraryReadOnlyMode}
             creatorEditMode={!!creatorEditingItinerary}
             autoOpenPublishFlow={autoOpenPublishFlow}
             onBack={wrapBack(() => {
               setAutoOpenPublishFlow(false);
               if (creatorEditingItinerary) {
                 const it = creatorEditingItinerary;
-                setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryRole(null); setActiveUserItineraryIsPurchased(false);
+                setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryRole(null); setActiveUserItineraryIsPurchased(false); setActiveUserItineraryReadOnlyMode(false);
                 setCreatorEditingItinerary(null);
                 setCreatorDashboardItinerary(it);
                 return;
               }
-              setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryRole(null); setActiveUserItineraryIsPurchased(false); setActiveTab('trips'); setReturnToCollections(false);
+              if (activeUserItineraryReadOnlyMode && ownedPublicUserItinerary) {
+                const it = ownedPublicUserItinerary;
+                setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryRole(null); setActiveUserItineraryIsPurchased(false); setActiveUserItineraryReadOnlyMode(false);
+                setCreatorDashboardItinerary(it);
+                return;
+              }
+              setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryRole(null); setActiveUserItineraryIsPurchased(false); setActiveUserItineraryReadOnlyMode(false); setActiveTab('trips');
             })}
             onSaveCreatorEdit={() => {
               const it = creatorEditingItinerary;
-              setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryRole(null); setActiveUserItineraryIsPurchased(false);
+              setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryRole(null); setActiveUserItineraryIsPurchased(false); setActiveUserItineraryReadOnlyMode(false);
               setCreatorEditingItinerary(null);
               if (it) setCreatorDashboardItinerary(it);
             }}
@@ -1293,24 +1230,25 @@ const Index = () => {
               setActiveUserItineraryDataset(null);
               setActiveUserItineraryRole(null);
               setActiveUserItineraryIsPurchased(false);
+              setActiveUserItineraryReadOnlyMode(false);
               setCreatorEditingItinerary(null);
               setActiveTab('trips');
-              setReturnToCollections(false);
               setShowDeleteSuccessToast(true);
             }}
             onUpdate={handleItineraryUpdate}
             onDuplicateSuccess={() => {
-              setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryRole(null); setActiveUserItineraryIsPurchased(false); setActiveTab('trips'); setReturnToCollections(false);
+              setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryRole(null); setActiveUserItineraryIsPurchased(false); setActiveUserItineraryReadOnlyMode(false); setActiveTab('trips');
               setShowDuplicateSuccessToast(true);
             }}
-            onNavigateToAI={() => { setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryRole(null); setActiveUserItineraryIsPurchased(false); setShowAIAssistant(true); }}
-            onNavigateToSales={() => { setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryRole(null); setActiveUserItineraryIsPurchased(false); setCreatorEditingItinerary(null); setReturnToPublic(true); setActiveTab('trips'); }}
+            onNavigateToAI={() => { setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryRole(null); setActiveUserItineraryIsPurchased(false); setActiveUserItineraryReadOnlyMode(false); setShowAIAssistant(true); }}
+            onNavigateToSales={() => { setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryRole(null); setActiveUserItineraryIsPurchased(false); setActiveUserItineraryReadOnlyMode(false); setCreatorEditingItinerary(null); setReturnToPublic(true); setActiveTab('trips'); }}
             onUpgrade={() => {
               setNewItineraryData(null);
               setActiveUserItineraryId(null);
               setActiveUserItineraryDataset(null);
               setActiveUserItineraryRole(null);
               setActiveUserItineraryIsPurchased(false);
+              setActiveUserItineraryReadOnlyMode(false);
               setCreatorEditingItinerary(null);
               setSubscriptionOrigin('trips');
               setActiveTab('home');
@@ -1322,25 +1260,9 @@ const Index = () => {
         <SuccessToast
           isVisible={showSuccessToast}
           onClose={() => setShowSuccessToast(false)}
+          position="bottom"
         />
 
-      </div>
-    );
-  }
-
-  // Show collection detail screen
-  if (selectedCollectionId !== null) {
-    return (
-      <div className="min-h-screen bg-background w-full">
-        <div className="w-full bg-background min-h-screen overflow-x-clip">
-          <CollectionDetailScreen
-            collectionId={selectedCollectionId}
-            collectionName={newCollectionName}
-            sharedWithIds={newCollectionSharedWith}
-            onBack={wrapBack(() => { setSelectedCollectionId(null); setNewCollectionName(null); setNewCollectionSharedWith([]); setActiveTab('trips'); setReturnToCollections(true); })}
-            onDelete={() => { deleteUserCollection(selectedCollectionId); setSelectedCollectionId(null); setNewCollectionName(null); setNewCollectionSharedWith([]); setActiveTab('trips'); setReturnToCollections(true); setShowDeleteCollectionToast(true); }}
-          />
-        </div>
       </div>
     );
   }
@@ -1815,12 +1737,11 @@ const Index = () => {
       {activeTab === 'trips' && (
         <Suspense fallback={<ScreenFallback />}>
           <TripsScreen
-            key={returnToPublic ? 'public' : returnToCollections ? 'collections' : 'default'}
+            key={returnToPublic ? 'public' : 'default'}
             onItineraryClick={handleItineraryClick}
             onPrivateItineraryClick={handleItineraryClick}
             onUserItineraryClick={handleUserItineraryClick}
             onUserPublicItineraryClick={(it) => setCreatorDashboardItinerary(it)}
-            onCollectionClick={(id) => { setSelectedCollectionId(id); setReturnToCollections(false); }}
             onCreateItinerary={(type) => tryOpenItinerarySheet(type)}
             onOpenCreateSheet={() => tryOpenItinerarySheet()}
             onBecomeCreator={() => { setCreatorProgramOrigin('trips'); setActiveTab('home'); setProfileSubScreen('creator-program'); }}
@@ -1828,7 +1749,7 @@ const Index = () => {
             onUpgrade={() => { setSubscriptionOrigin('trips'); setActiveTab('home'); setProfileSubScreen('subscription'); }}
             itineraryUsedCount={ownCreatedCount}
             itineraryLimit={FREE_PLAN_ITINERARY_LIMIT}
-            defaultTab={returnToPublic ? 'public' : returnToCollections ? 'collections' : 'private'}
+            defaultTab={returnToPublic ? 'public' : 'private'}
             onDeleteSuccess={() => setShowDeleteSuccessToast(true)}
             onLeaveSuccess={() => setShowLeaveSuccessToast(true)}
           />
@@ -1852,9 +1773,8 @@ const Index = () => {
         {showItinerarySheet && (
           <CreateItinerarySheet
             isOpen={showItinerarySheet}
-            onClose={() => { setShowItinerarySheet(false); setPendingVideoPlaces(null); setCreateItineraryInitialType(undefined); }}
+            onClose={() => { setShowItinerarySheet(false); setCreateItineraryInitialType(undefined); }}
             onSubmit={handleItinerarySubmit}
-            initialDestinations={pendingVideoPlaces ? [...new Set(pendingVideoPlaces.map((p: any) => p.location as string))] : undefined}
             initialCreationType={createItineraryInitialType}
           />
         )}
@@ -1874,44 +1794,6 @@ const Index = () => {
           />
         )}
 
-        {showAddVideoSheet && (
-          <AddVideoSheet
-            isOpen={showAddVideoSheet}
-            onClose={() => setShowAddVideoSheet(false)}
-            onOptionSelect={handleAddVideoOptionSelect}
-          />
-        )}
-
-        {showAddVideoByLinkSheet && (
-          <AddVideoByLinkSheet
-            isOpen={showAddVideoByLinkSheet}
-            onClose={() => setShowAddVideoByLinkSheet(false)}
-            onBack={wrapBack(handleBackToAddVideoSheet)}
-            onSubmit={handleVideoLinkSubmit}
-            onCreateNewItinerary={handleCreateNewItineraryFromVideo}
-            onCollectionCreated={(id) => { setSelectedCollectionId(id); setReturnToCollections(false); }}
-          />
-        )}
-
-        {showAddVideoFromGallery && (
-          <AddVideoFromGallerySheet
-            isOpen={showAddVideoFromGallery}
-            onClose={() => setShowAddVideoFromGallery(false)}
-            onBack={wrapBack(handleBackToAddVideoSheet)}
-            onSubmit={handleVideoGallerySubmit}
-            onCreateNewItinerary={handleCreateNewItineraryFromVideo}
-            onCollectionCreated={(id) => { setSelectedCollectionId(id); setReturnToCollections(false); }}
-          />
-        )}
-
-        {showCollectionSheet && (
-          <CreateCollectionSheet
-            isOpen={showCollectionSheet}
-            onClose={() => setShowCollectionSheet(false)}
-            onSubmit={handleCollectionSubmit}
-          />
-        )}
-
         {showGuideSheet && (
           <CreateGuideSheet
             isOpen={showGuideSheet}
@@ -1924,12 +1806,14 @@ const Index = () => {
       <SuccessToast
         isVisible={showSuccessToast}
         onClose={() => setShowSuccessToast(false)}
+        position="bottom"
       />
       <SuccessToast
         isVisible={showDeleteSuccessToast}
         onClose={() => setShowDeleteSuccessToast(false)}
         title="Roteiro excluído!"
         description=""
+        position="above-nav"
       />
       <SuccessToast
         isVisible={showLeaveSuccessToast}
@@ -1937,17 +1821,12 @@ const Index = () => {
         title="Você saiu do roteiro!"
         description=""
       />
-      <SuccessToast
-        isVisible={showDeleteCollectionToast}
-        onClose={() => setShowDeleteCollectionToast(false)}
-        title="Coleção excluída!"
-        description=""
-      />
+
       <SuccessToast
         isVisible={showDuplicateSuccessToast}
         onClose={() => setShowDuplicateSuccessToast(false)}
         title="Roteiro duplicado!"
-        description=""
+        position="above-nav"
       />
     </div>
   );

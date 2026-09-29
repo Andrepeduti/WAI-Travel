@@ -1,11 +1,75 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Globe, Map, ChevronRight, ChevronLeft, ImagePlus, Trash2 } from 'lucide-react';
+import { Globe, Map, ChevronRight, ChevronLeft, ImagePlus, Trash2, Camera, FileText, DollarSign, Type, Tags, Power, X, Target } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { TRIP_TYPES } from '@/components/screens/FiltersScreen';
 import { toast } from 'sonner';
 import { loadPlannerData } from '@/lib/plannerApi';
+import { DeleteConfirmSheet } from '@/components/travel/DeleteConfirmSheet';
+import { UnpublishConfirmSheet } from '@/components/travel/UnpublishConfirmSheet';
+
+const TAG_CATEGORIES = [
+  {
+    title: 'Ambiente',
+    tags: [
+      { id: 'praia', label: 'Praia', emoji: '🏖️' },
+      { id: 'montanha', label: 'Montanha', emoji: '⛰️' },
+      { id: 'urbano', label: 'Urbano', emoji: '🏙️' },
+      { id: 'natureza', label: 'Natureza', emoji: '🌿' },
+      { id: 'neve', label: 'Neve', emoji: '❄️' },
+    ]
+  },
+  {
+    title: 'Estilo da viagem',
+    tags: [
+      { id: 'cultural', label: 'Cultural', emoji: '🏛️' },
+      { id: 'gastronomia', label: 'Gastronomia', emoji: '🍽️' },
+      { id: 'aventura', label: 'Aventura', emoji: '🧗' },
+      { id: 'vida-noturna', label: 'Vida noturna', emoji: '🌃' },
+      { id: 'relax', label: 'Relax', emoji: '🧘' },
+      { id: 'romance', label: 'Romance', emoji: '💕' },
+      { id: 'roadtrip', label: 'Roadtrip', emoji: '🚗' },
+      { id: 'compras', label: 'Compras', emoji: '🛍️' },
+      { id: 'bem-estar', label: 'Bem-estar', emoji: '💆' },
+      { id: 'vinhos', label: 'Vinhos', emoji: '🍷' },
+      { id: 'cafes', label: 'Cafés', emoji: '☕' },
+      { id: 'festivais', label: 'Festivais', emoji: '🎪' },
+    ]
+  },
+  {
+    title: 'Perfil do viajante',
+    tags: [
+      { id: 'familia', label: 'Família', emoji: '👨‍👩‍👧‍👦' },
+      { id: 'amigos', label: 'Amigos', emoji: '🍻' },
+      { id: 'solo', label: 'Solo', emoji: '🚶' },
+      { id: 'mochilao', label: 'Mochilão', emoji: '🎒' },
+      { id: 'economico', label: 'Econômico', emoji: '💸' },
+      { id: 'luxo', label: 'Luxo', emoji: '💎' },
+      { id: 'criancas', label: 'Crianças', emoji: '🧒' },
+      { id: 'pet-friendly', label: 'Pet friendly', emoji: '🐾' },
+      { id: 'acessivel', label: 'Acessível', emoji: '♿' },
+      { id: 'trabalho-remoto', label: 'Trabalho remoto', emoji: '💻' },
+    ]
+  },
+  {
+    title: 'Experiências',
+    tags: [
+      { id: 'fotogenico', label: 'Fotogênico', emoji: '📸' },
+      { id: 'arquitetura', label: 'Arquitetura', emoji: '🏢' },
+      { id: 'arte', label: 'Arte', emoji: '🎨' },
+      { id: 'trilhas', label: 'Trilhas', emoji: '🥾' },
+      { id: 'cachoeiras', label: 'Cachoeiras', emoji: '🌊' },
+      { id: 'parques-nacionais', label: 'Parques nacionais', emoji: '🏞️' },
+      { id: 'ilhas', label: 'Ilhas', emoji: '🏝️' },
+      { id: 'mergulho', label: 'Mergulho', emoji: '🤿' },
+    ]
+  }
+];
+
+const TAG_LABEL_BY_ID: Record<string, string> = Object.fromEntries(
+  TAG_CATEGORIES.flatMap((cat) => cat.tags.map((t) => [t.id, t.label])),
+);
 
 interface EditPublishSheetProps {
   open: boolean;
@@ -31,9 +95,10 @@ interface EditPublishSheetProps {
   isPaused?: boolean;
   onTogglePause?: (next: boolean) => void;
   initialMainTag?: string;
+  onDelete?: () => void;
 }
 
-type View = 'summary' | 'title' | 'price' | 'description' | 'tags';
+
 
 const formatBRLInput = (digits: string) => {
   if (!digits) return '';
@@ -42,6 +107,7 @@ const formatBRLInput = (digits: string) => {
 };
 
 const formatBRLValue = (cents: number | null | undefined) => {
+  if (cents === 0) return 'Grátis';
   if (!cents) return '—';
   return `R$ ${(cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
@@ -71,30 +137,47 @@ export function EditPublishSheet({
   isPaused = false,
   onTogglePause,
   initialMainTag,
+  onDelete,
 }: EditPublishSheetProps) {
-  const [view, setView] = useState<View>('summary');
   const [title, setTitle] = useState(initialTitle);
   const [coverUrl, setCoverUrl] = useState(initialCoverUrl);
   const [priceDigits, setPriceDigits] = useState('');
+  const [isFreeState, setIsFreeState] = useState(initialPriceCents === 0);
   const [description, setDescription] = useState(initialDescription);
   const [tags, setTags] = useState<string[]>(initialTags);
   const [showUnpublishConfirm, setShowUnpublishConfirm] = useState(false);
   const [showStatusSheet, setShowStatusSheet] = useState(false);
+  const [showTagsSheet, setShowTagsSheet] = useState(false);
+  const [showTitleSheet, setShowTitleSheet] = useState(false);
+  const [showPriceSheet, setShowPriceSheet] = useState(false);
+  const [showDescriptionSheet, setShowDescriptionSheet] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [activitiesCount, setActivitiesCount] = useState<number | null>(null);
   const coverInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (open) {
-      setView('summary');
       setTitle(initialTitle);
       setCoverUrl(initialCoverUrl);
       setPriceDigits(initialPriceCents ? String(initialPriceCents) : '');
+      setIsFreeState(initialPriceCents === 0);
       setDescription(initialDescription);
       setTags(initialTags);
       setShowUnpublishConfirm(false);
       setShowStatusSheet(false);
     }
   }, [open, initialTitle, initialCoverUrl, initialPriceCents, initialDescription, initialTags]);
+
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -124,10 +207,17 @@ export function EditPublishSheet({
     return () => { cancelled = true; };
   }, [open, itineraryId]);
 
+  const isAnySheetOpen = showTitleSheet || showPriceSheet || showDescriptionSheet || showTagsSheet || showStatusSheet || showUnpublishConfirm || showDeleteConfirm;
+
   const numericPrice = Number(priceDigits || '0') / 100;
-  const priceValid = numericPrice > 0;
-  const descriptionValid = description.trim().length >= 20;
-  const tagsValid = tags.length >= 1 && tags.length <= 5;
+  const priceChanged = isFreeState ? initialPriceCents !== 0 : Math.round(numericPrice * 100) !== initialPriceCents;
+  const priceValid = (isFreeState ? true : numericPrice > 0) && priceChanged;
+
+  const descriptionChanged = description.trim() !== (initialDescription || '').trim();
+  const descriptionValid = description.trim().length >= 20 && descriptionChanged;
+
+  const tagsChanged = JSON.stringify([...tags].sort()) !== JSON.stringify([...initialTags].sort());
+  const tagsValid = tags.length >= 1 && tags.length <= 5 && tagsChanged;
 
   const platformFee = numericPrice * 0.1;
   const earning = numericPrice - platformFee;
@@ -147,34 +237,35 @@ export function EditPublishSheet({
     });
   };
 
-  const titleValid = title.trim().length >= 3;
+  const titleChanged = title.trim() !== (initialTitle || '').trim();
+  const titleValid = title.trim().length >= 3 && titleChanged;
 
   const confirmTitle = () => {
     if (!titleValid) return;
     onSave({ title: title.trim() });
-    toast.success('Título atualizado!');
+    toast.success('Alteração salva');
     setView('summary');
   };
 
   const confirmPrice = () => {
     if (!priceValid) return;
     onSave({ priceCents: Math.round(numericPrice * 100) });
-    toast.success('Preço atualizado!');
-    setView('summary');
+    toast.success('Alteração salva');
+    setShowPriceSheet(false);
   };
 
   const confirmDescription = () => {
     if (!descriptionValid) return;
     onSave({ description: description.trim() });
-    toast.success('Descrição atualizada!');
-    setView('summary');
+    toast.success('Alteração salva');
+    setShowDescriptionSheet(false);
   };
 
   const confirmTags = () => {
     if (!tagsValid) return;
     onSave({ tags });
-    toast.success('Tags atualizadas!');
-    setView('summary');
+    toast.success('Alteração salva');
+    setShowTagsSheet(false);
   };
 
   const handleCoverPick = (file: File) => {
@@ -184,7 +275,7 @@ export function EditPublishSheet({
       if (!dataUrl) return;
       setCoverUrl(dataUrl);
       onSave({ coverUrl: dataUrl });
-      toast.success('Capa atualizada!');
+      toast.success('Alteração salva');
     };
     reader.readAsDataURL(file);
   };
@@ -192,345 +283,579 @@ export function EditPublishSheet({
   const statusLabel = isPaused ? 'Pausado' : 'Ativo';
   const statusColor = isPaused ? 'text-[#E89A2C]' : 'text-[#3FA46A]';
 
-  const headerTitle =
-    view === 'summary'
-      ? 'Editar publicação'
-      : view === 'title'
-        ? 'Título'
-        : view === 'price'
-          ? 'Preço'
-          : view === 'description'
-            ? 'Descrição'
-            : 'Tags';
-
   return (
-    <div className="fixed inset-0 z-[210] flex justify-center" style={{ background: '#F2F2F2' }}>
+    <div className="fixed inset-0 z-[210] flex justify-center" style={{ background: '#F3F3F3' }}>
       <div
         className="relative w-full w-full flex flex-col"
-        style={{ height: '100dvh', background: '#F2F2F2' }}
+        style={{ height: '100dvh', background: '#F3F3F3' }}
       >
         {/* Header */}
         <div
-          className="sticky top-0 z-10 px-5 pb-3 flex items-center justify-between shrink-0"
-          style={{ paddingTop: 'max(16px, env(safe-area-inset-top))', background: '#F2F2F2' }}
+          className="sticky top-0 z-10 px-4 pb-6 flex items-center gap-[24px] shrink-0"
+          style={{ paddingTop: 'max(16px, env(safe-area-inset-top))', background: '#F3F3F3' }}
         >
           <button
-            onClick={view === 'summary' ? onClose : () => setView('summary')}
-            className="w-9 h-9 rounded-full flex items-center justify-center bg-card shadow-sm"
+            onClick={onClose}
+            className="w-[21.33px] h-[21.33px] flex items-center justify-center"
             aria-label="Voltar"
           >
-            <ChevronLeft size={20} className="text-foreground" strokeWidth={2.4} />
+            <ChevronLeft size={24} className="text-[#000000]" strokeWidth={1.5} />
           </button>
-          <h2 className="text-[17px] font-bold text-foreground">{headerTitle}</h2>
-          <div className="w-9 h-9" />
+          <h2 className="font-['Urbanist'] font-bold text-[20px] leading-[24px] text-[#171F2C] flex-1">Editar publicação</h2>
+          <div className="w-[21.33px] h-[21.33px]" />
         </div>
 
         {/* Body */}
-        {view === 'summary' && (
-          <div className="flex-1 overflow-y-auto px-5 pb-6">
-            {/* Hidden input para capa */}
-            <input
-              ref={coverInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) handleCoverPick(f);
-                e.target.value = '';
-              }}
-            />
+        <div className={cn("flex-1 px-4 pb-6 flex flex-col gap-4", isAnySheetOpen ? "overflow-hidden touch-none" : "overflow-y-auto")}>
+          {/* Hidden input para capa */}
+          <input
+            ref={coverInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleCoverPick(f);
+              e.target.value = '';
+            }}
+          />
 
-            {/* 1) Capa (preview grande) */}
+          {/* 1) Capa */}
+          <div className="flex flex-col items-start p-4 gap-4 w-full bg-[#FFFFFF] rounded-[16px]">
+            <span className="font-['Urbanist'] font-semibold text-[16px] leading-[19px] text-[#171F2C]">
+              Capa
+            </span>
+
             <button
               onClick={() => coverInputRef.current?.click()}
-              className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden shadow-sm bg-card active:scale-[0.995] transition-transform"
+              className="relative w-full h-[141px] rounded-[16px] overflow-hidden active:scale-[0.995] transition-transform flex items-center justify-center bg-[#F2F2F2]"
             >
               {coverUrl ? (
                 <>
                   <img src={coverUrl} alt="Capa" className="absolute inset-0 w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/0 to-black/0" />
+                  <div className="absolute inset-0" style={{ background: 'linear-gradient(357.27deg, rgba(0, 0, 0, 0.6) 34.24%, rgba(102, 102, 102, 0.6) 106.53%)' }} />
                 </>
               ) : (
-                <div className="absolute inset-0 bg-[#F2F2F2] flex items-center justify-center">
-                  <ImagePlus size={32} className="text-muted-foreground" />
-                </div>
+                <div className="absolute inset-0 bg-[#F2F2F2]" />
               )}
-              <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
-                <span className="text-[13px] font-semibold text-white drop-shadow">
-                  {coverUrl ? 'Capa do roteiro' : 'Adicionar capa'}
-                </span>
-                <span className="px-3 h-8 inline-flex items-center rounded-full bg-white text-foreground text-[12px] font-semibold shadow-sm">
-                  {coverUrl ? 'Alterar' : 'Adicionar'}
-                </span>
+
+              <div className="relative w-[40px] h-[40px] bg-[#FEFEFE] shadow-[0px_4px_20px_rgba(0,0,0,0.1)] rounded-[100px] flex items-center justify-center z-10">
+                <Camera size={20} className="text-[#141530]" />
               </div>
             </button>
+          </div>
 
+          {/* 3) Informações da publicação + Status */}
+          <div className="flex flex-col items-start p-4 gap-6 w-full bg-[#FFFFFF] rounded-[16px]">
+            <span className="font-['Urbanist'] font-semibold text-[16px] leading-[19px] text-[#171F2C]">
+              Dados do roteiro
+            </span>
 
-
-
-            {/* 3) Informações da publicação + Status */}
-            <div className="mt-4 rounded-2xl bg-card divide-y divide-border/50 overflow-hidden shadow-sm">
+            <div className="flex flex-col w-full gap-4">
               <SummaryRow
                 label="Título"
                 value={initialTitle || '—'}
-                onClick={() => setView('title')}
+                onClick={() => setShowTitleSheet(true)}
+                icon={<Type size={20} className="text-[#141530]" />}
               />
+              <hr className="w-full border-t border-[#F2F2F2]" />
               <SummaryRow
                 label="Preço"
                 value={formatBRLValue(initialPriceCents)}
-                onClick={() => setView('price')}
+                onClick={() => setShowPriceSheet(true)}
+                icon={<DollarSign size={20} className="text-[#141530]" />}
               />
+              <hr className="w-full border-t border-[#F2F2F2]" />
               <SummaryRow
                 label="Descrição"
                 value={
                   initialDescription
-                    ? initialDescription.length > 60
-                      ? initialDescription.slice(0, 60) + '…'
+                    ? initialDescription.length > 35
+                      ? initialDescription.slice(0, 35) + '…'
                       : initialDescription
                     : '—'
                 }
-                onClick={() => setView('description')}
+                onClick={() => setShowDescriptionSheet(true)}
+                icon={<FileText size={20} className="text-[#141530]" />}
               />
+              <hr className="w-full border-t border-[#F2F2F2]" />
               <SummaryRow
-                label="Tags"
+                icon={<Target size={24} className="text-[#141530]" strokeWidth={1.5} />}
+                label="Perfeito para"
                 value={
-                  initialTags.length > 0
-                    ? `${initialTags.length} ${initialTags.length === 1 ? 'tag' : 'tags'}${initialMainTag ? ` · ${initialMainTag}` : ''}`
-                    : '—'
+                  tags.length > 0
+                    ? tags.map((id) => TAG_LABEL_BY_ID[id] ?? id).join(' | ')
+                    : 'Adicionar opções'
                 }
-                onClick={() => setView('tags')}
+                onClick={() => setShowTagsSheet(true)}
               />
-              <button
+              <hr className="w-full border-t border-[#F2F2F2]" />
+              <SummaryRow
+                label="Status"
+                value={statusLabel}
                 onClick={() => setShowStatusSheet(true)}
-                className="w-full flex items-center gap-3 px-4 py-3.5 text-left active:bg-foreground/5 transition-colors"
+                icon={<Power size={20} className="text-[#141530]" />}
+                tag={isPaused ? { text: 'Pausado', bg: '#E0B400' } : { text: 'Ativo', bg: '#3C8622' }}
+              />
+            </div>
+          </div>
+
+          {/* Excluir roteiro button */}
+          {onDelete && (
+            <div className="mt-8">
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="w-full h-[52px] rounded-2xl flex items-center justify-center font-semibold text-[15px] bg-[#FFEAEA] text-[#FF4B4B] active:scale-[0.99] transition-transform"
               >
-                <span className="flex-1 text-[14px] font-semibold text-foreground">Status</span>
-                <span className={cn('text-[13px] font-semibold', statusColor)}>{statusLabel}</span>
-                <ChevronRight size={18} className="text-muted-foreground shrink-0" />
+                Excluir roteiro
               </button>
             </div>
-          </div>
-        )}
-
-        {view === 'title' && (
-          <div className="flex-1 overflow-y-auto px-5 pb-4">
-            <label className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">
-              Título
-            </label>
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value.slice(0, 80))}
-              placeholder="Nome do roteiro"
-              className="rounded-xl bg-white border-0 text-foreground font-semibold focus-visible:ring-2 focus-visible:ring-[#9DCC36]"
-              style={{ fontSize: '16px', height: '52px' }}
-            />
-            <div className="mt-1.5 flex justify-between text-[11px] text-muted-foreground">
-              <span>Mínimo 3 caracteres</span>
-              <span>{80 - title.length} restantes</span>
-            </div>
-          </div>
-        )}
-
-        {view === 'price' && (
-          <div className="flex-1 overflow-y-auto px-5 pb-4">
-            <label className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">
-              Preço (R$)
-            </label>
-            <div className="relative">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground/40 font-semibold text-[15px] pointer-events-none">
-                R$
-              </div>
-              <Input
-                value={formatBRLInput(priceDigits)}
-                onChange={(e) => setPriceDigits(e.target.value.replace(/\D/g, ''))}
-                placeholder="0,00"
-                inputMode="numeric"
-                className="rounded-xl bg-[#F2F2F2] border-0 pl-11 text-foreground font-semibold focus-visible:ring-2 focus-visible:ring-[#9DCC36]"
-                style={{ fontSize: '16px', height: '52px' }}
-              />
-            </div>
-            {numericPrice > 0 && (
-              <div className="mt-2 flex items-center justify-between text-[12px] text-muted-foreground">
-                <span>Taxa 10%: R$ {platformFee.toFixed(2).replace('.', ',')}</span>
-                <span className="font-semibold text-foreground">Você recebe: R$ {earning.toFixed(2).replace('.', ',')}</span>
-              </div>
-            )}
-            {!priceValid && priceDigits.length > 0 && (
-              <p className="mt-1.5 text-[12px] text-[#E5484D]">O valor deve ser maior que zero.</p>
-            )}
-          </div>
-        )}
-
-        {view === 'description' && (
-          <div className="flex-1 overflow-y-auto px-5 pb-4">
-            <label className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">
-              Descrição
-            </label>
-            <Textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value.slice(0, 500))}
-              placeholder="Conte aos viajantes o que torna esse roteiro especial..."
-              className="rounded-xl bg-white border-0 text-foreground placeholder:text-foreground/30 focus-visible:ring-2 focus-visible:ring-[#9DCC36] resize-none p-4"
-              style={{ fontSize: '16px', minHeight: '160px', lineHeight: '1.5' }}
-            />
-            <div className="mt-1.5 flex justify-between text-[11px] text-muted-foreground">
-              <span>Mínimo 20 caracteres</span>
-              <span>{500 - description.length} restantes</span>
-            </div>
-          </div>
-        )}
-
-        {view === 'tags' && (
-          <div className="flex-1 overflow-y-auto px-5 pb-4 space-y-5">
-            <div>
-              <label className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">
-                Tags ({tags.length}/5)
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {TRIP_TYPES.map((tItem) => {
-                  const t = tItem.label;
-                  const isSelected = tags.includes(t);
-                  const disabled = !isSelected && tags.length >= 5;
-                  return (
-                    <button
-                      key={tItem.id}
-                      onClick={() => toggleTag(t)}
-                      disabled={disabled}
-                      className={cn(
-                        'px-3.5 h-9 rounded-full text-[12.5px] font-semibold transition-all border flex items-center gap-1.5',
-                        isSelected
-                          ? 'bg-[#1A1C40] text-white border-[#1A1C40]'
-                          : disabled
-                            ? 'bg-white text-foreground/30 border-foreground/5 cursor-not-allowed'
-                            : 'bg-white text-foreground border-foreground/10'
-                      )}
-                    >
-                      <span>{tItem.emoji}</span>
-                      <span>{t}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-          </div>
-        )}
-
-        {/* Footer (only in edit views) */}
-        {view !== 'summary' && (
-          <div className="shrink-0 px-5 pb-8 pt-3 border-t border-border/40">
-            {(() => {
-              const isValid =
-                view === 'title'
-                  ? titleValid
-                  : view === 'price'
-                    ? priceValid
-                    : view === 'description'
-                      ? descriptionValid
-                      : tagsValid;
-              const onClick =
-                view === 'title'
-                  ? confirmTitle
-                  : view === 'price'
-                    ? confirmPrice
-                    : view === 'description'
-                      ? confirmDescription
-                      : confirmTags;
-              return (
-                <button
-                  onClick={onClick}
-                  disabled={!isValid}
-                  className={cn(
-                    'w-full h-12 rounded-2xl font-semibold text-[14px] transition-all',
-                    isValid
-                      ? 'bg-[#9DCC36] text-[#141530] active:scale-[0.99]'
-                      : 'bg-[#E7E7EE] text-[#CACAD0] cursor-not-allowed',
-                  )}
-                >
-                  Salvar
-                </button>
-              );
-            })()}
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {/* Unpublish confirm */}
-      {showUnpublishConfirm && (
+      {/* Description Action Sheet */}
+      {showDescriptionSheet && (
         <div
-          className="absolute inset-0 z-10 flex items-end justify-center"
-          onClick={() => setShowUnpublishConfirm(false)}
+          className="absolute inset-0 z-[210] flex items-end justify-center"
+          onClick={() => {
+            setDescription(initialDescription);
+            setShowDescriptionSheet(false);
+          }}
         >
-          <div className="absolute inset-0 bg-black/30" />
+          <div className="absolute inset-0 bg-black/30 touch-none" />
           <div
-            className="relative w-full w-full bg-card rounded-t-2xl"
+            className="relative w-full max-h-[90dvh] bg-white rounded-t-[24px] flex flex-col"
             style={{ animation: 'slideUpSheet 0.3s cubic-bezier(0.32, 0.72, 0, 1)' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="w-10 h-1 rounded-full bg-muted mx-auto mt-3 mb-2" />
-            <div className="px-5 pt-4 pb-8 text-center">
-              <div className="w-14 h-14 rounded-full bg-[#F2F2F2] flex items-center justify-center mx-auto mb-4">
-                <Globe size={26} className="text-foreground" />
-              </div>
-              <h3 className="text-[17px] font-bold text-foreground mb-1">Tirar do marketplace?</h3>
-              <p className="text-[13px] text-muted-foreground mb-6 leading-relaxed">
-                O roteiro voltará a ser privado e não poderá mais ser comprado por outros viajantes.
-              </p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowUnpublishConfirm(false)}
-                  className="flex-1 py-3.5 rounded-xl border border-border text-[14px] font-semibold text-foreground bg-card"
-                >
-                  Cancelar
-                </button>
+            {/* Header Block */}
+            <div className="flex flex-col items-center pt-4 px-6 pb-3 gap-2 w-full h-[56px] bg-white rounded-t-[24px] shrink-0 relative">
+              <div className="w-[44px] h-[4px] bg-[#DEDEDE] rounded-[4px]" />
+              <div className="flex flex-row justify-end items-center w-full relative">
                 <button
                   onClick={() => {
-                    setShowUnpublishConfirm(false);
-                    onUnpublish();
-                    onClose();
+                    setDescription(initialDescription);
+                    setShowDescriptionSheet(false);
                   }}
-                  className="flex-1 py-3.5 rounded-xl bg-[#1A1C40] text-white text-[14px] font-semibold"
+                  className="absolute right-0 flex items-center justify-center w-4 h-4 text-[#141530]"
                 >
-                  Sim, tirar
+                  <X size={16} strokeWidth={2} />
                 </button>
               </div>
+            </div>
+
+            {/* Content Block */}
+            <div className="flex flex-col items-start px-4 pt-4 pb-[34px] gap-6 w-full flex-1 bg-white overflow-y-auto">
+              <div className="flex flex-col items-start gap-6 w-full">
+                <div className="flex flex-col items-start gap-2 w-full">
+                  <h2 className="font-['Urbanist'] font-semibold text-[24px] leading-[29px] text-[#171F2C]">
+                    Alterar descrição
+                  </h2>
+                  <p className="font-['Urbanist'] font-medium text-[14px] leading-[20px] text-[#7F7F7F]">
+                    Dê uma ideia do que está no roteiro e do que eles podem esperar da viagem.
+                  </p>
+                </div>
+
+                <div className="flex flex-col items-start gap-2 w-full">
+                  <div className="flex flex-col items-start p-4 gap-6 w-full h-[181px] bg-field border border-transparent focus-within:border-primary transition-colors rounded-[16px]">
+                    <div className="flex flex-col items-start w-full h-full gap-1">
+                      <span className="font-['Urbanist'] font-medium text-[12px] leading-[16px] text-[#949494]">
+                        Descrição
+                      </span>
+                      <textarea
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value.slice(0, 500))}
+                        className="font-['Urbanist'] font-medium text-[14px] leading-[16px] text-[#141530] bg-transparent border-0 p-0 w-full h-full outline-none focus:ring-0 placeholder:text-[#141530]/30 resize-none"
+                        placeholder="Conte aos viajantes o que torna esse roteiro especial..."
+                      />
+                    </div>
+                  </div>
+                  <span className="font-['Urbanist'] font-medium text-[12px] leading-[16px] text-[#676767]">
+                    {description.length}/500
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Fixed Button Container */}
+            <div className="box-border flex flex-col items-start px-4 py-6 gap-[10px] w-full h-[97px] bg-white shrink-0">
+              <button
+                onClick={() => {
+                  if (!descriptionValid) return;
+                  setShowDescriptionSheet(false);
+                  onSave({ description: description.trim() });
+                  toast.success('Alteração salva');
+                }}
+                disabled={!descriptionValid}
+                className={cn("flex flex-row justify-center items-center py-3 px-4 gap-2 w-full h-12 rounded-[16px] active:scale-[0.99] transition-transform", descriptionValid ? "bg-[#9DCC36] text-[#141530]" : "bg-[#F3F3F3] text-[#A6A6A6] cursor-not-allowed")}
+              >
+                <span className="font-['Urbanist'] font-bold text-[16px] leading-[19px]">
+                  Salvar
+                </span>
+              </button>
             </div>
           </div>
         </div>
       )}
-      {/* Status action sheet */}
-      {showStatusSheet && (
+
+      {/* Unpublish confirm */}
+      <UnpublishConfirmSheet
+        isOpen={showUnpublishConfirm}
+        onClose={() => setShowUnpublishConfirm(false)}
+        onConfirm={() => {
+          setShowUnpublishConfirm(false);
+          onUnpublish();
+          onClose();
+        }}
+      />
+      {/* Tags Action Sheet */}
+      {showTagsSheet && (
         <div
-          className="absolute inset-0 z-10 flex items-end justify-center"
-          onClick={() => setShowStatusSheet(false)}
+          className="absolute inset-0 z-[210] flex items-end justify-center"
+          onClick={() => {
+            setTags(initialTags);
+            setShowTagsSheet(false);
+          }}
         >
-          <div className="absolute inset-0 bg-black/30" />
+          <div className="absolute inset-0 bg-black/30 touch-none" />
           <div
-            className="relative w-full w-full bg-card rounded-t-2xl"
+            className="relative w-full max-h-[90dvh] bg-white rounded-t-[24px] flex flex-col"
             style={{ animation: 'slideUpSheet 0.3s cubic-bezier(0.32, 0.72, 0, 1)' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="w-10 h-1 rounded-full bg-muted mx-auto mt-3 mb-2" />
-            <div className="px-5 pt-3 pb-8">
-              <h3 className="text-[15px] font-bold text-foreground mb-4">Status da publicação</h3>
-              <StatusSheetBody
-                isPaused={!!isPaused}
-                onSave={(nextPaused) => {
-                  setShowStatusSheet(false);
-                  if (onTogglePause && nextPaused !== isPaused) {
-                    onTogglePause(nextPaused);
-                    toast.success(nextPaused ? 'Venda pausada' : 'Venda retomada');
-                  }
+            {/* Header Block */}
+            <div className="flex flex-col items-center pt-4 px-6 pb-3 gap-2 w-full h-[56px] bg-white rounded-t-[24px] shrink-0 relative">
+              <div className="w-[44px] h-[4px] bg-[#DEDEDE] rounded-[4px]" />
+              <div className="flex flex-row justify-end items-center w-full relative">
+                <button
+                  onClick={() => {
+                    setTags(initialTags);
+                    setShowTagsSheet(false);
+                  }}
+                  className="absolute right-0 flex items-center justify-center w-4 h-4 text-[#141530]"
+                >
+                  <X size={16} strokeWidth={2} />
+                </button>
+              </div>
+            </div>
+
+            {/* Content Block */}
+            <div className="flex flex-col items-start px-4 pt-4 pb-[34px] gap-6 w-full flex-1 bg-white overflow-y-auto">
+              <div className="flex flex-col items-start gap-2 w-full">
+                <h2 className="font-['Urbanist'] font-semibold text-[22px] leading-[26px] text-[#171F2C]">
+                  Alterar categorias
+                </h2>
+                <p className="font-['Urbanist'] font-medium text-[14px] leading-[20px] text-[#7F7F7F]">
+                  Escolha até 5 opções que melhor representam a experiência.
+                </p>
+              </div>
+
+              <div className="flex flex-col items-start gap-6 w-full pb-[40px]">
+                {TAG_CATEGORIES.map((cat) => (
+                  <div key={cat.title} className="flex flex-col items-start gap-4 w-full">
+                    <h3 className="font-['Urbanist'] font-semibold text-[16px] leading-[19px] text-[#171F2C]">
+                      {cat.title}
+                    </h3>
+                    <div className="flex flex-row flex-wrap items-start gap-3 w-full">
+                      {cat.tags.map((tag) => {
+                        const isSelected = tags.includes(tag.id);
+                        const disabled = !isSelected && tags.length >= 5;
+                        return (
+                          <button
+                            key={tag.id}
+                            onClick={() => toggleTag(tag.id)}
+                            disabled={disabled}
+                            className={cn(
+                              "box-border flex flex-row items-center px-4 py-2 gap-4 h-10 border rounded-[16px] transition-all shrink-0",
+                              isSelected
+                                ? "bg-[#141530] text-white border-[#141530]"
+                                : "bg-white text-[#141530] border-[#141530]",
+                              disabled && "opacity-40 cursor-not-allowed border-[#141530]/20 text-[#141530]/40"
+                            )}
+                          >
+                            <span className="text-[14px] leading-[17px] text-center w-6">{tag.emoji}</span>
+                            <span className={cn("font-['Urbanist'] font-medium text-[14px] leading-[17px] text-center", isSelected ? "text-white" : "text-[#141530]")}>{tag.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Fixed Button */}
+            <div className="flex flex-col items-start p-4 pt-6 gap-[10px] w-full bg-white shrink-0 pb-safe">
+              <button
+                onClick={() => {
+                  setShowTagsSheet(false);
+                  onSave({ tags });
+                  toast.success('Alteração salva');
                 }}
-                onUnpublishClick={() => {
-                  setShowStatusSheet(false);
-                  setShowUnpublishConfirm(true);
-                }}
-              />
+                disabled={!tagsValid}
+                className={cn("flex flex-row justify-center items-center py-3 px-4 gap-2 w-full h-12 rounded-[16px] active:scale-[0.99] transition-transform", tagsValid ? "bg-[#9DCC36] text-[#141530]" : "bg-[#F3F3F3] text-[#A6A6A6] cursor-not-allowed")}
+              >
+                <span className="font-['Urbanist'] font-bold text-[16px] leading-[19px]">
+                  Salvar ({tags.length}/5)
+                </span>
+              </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Price Action Sheet */}
+      {showPriceSheet && (
+        <div
+          className="absolute inset-0 z-[210] flex items-end justify-center"
+          onClick={() => {
+            setPriceDigits(initialPriceCents ? String(initialPriceCents) : '');
+            setIsFreeState(initialPriceCents === 0);
+            setShowPriceSheet(false);
+          }}
+        >
+          <div className="absolute inset-0 bg-black/30 touch-none" />
+          <div
+            className="relative w-full max-h-[90dvh] bg-white rounded-t-[24px] flex flex-col"
+            style={{ animation: 'slideUpSheet 0.3s cubic-bezier(0.32, 0.72, 0, 1)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Block */}
+            <div className="flex flex-col items-center pt-4 px-6 pb-3 gap-2 w-full h-[56px] bg-white rounded-t-[24px] shrink-0 relative">
+              <div className="w-[44px] h-[4px] bg-[#DEDEDE] rounded-[4px]" />
+              <div className="flex flex-row justify-end items-center w-full relative">
+                <button
+                  onClick={() => {
+                    setPriceDigits(initialPriceCents ? String(initialPriceCents) : '');
+                    setIsFreeState(initialPriceCents === 0);
+                    setShowPriceSheet(false);
+                  }}
+                  className="absolute right-0 flex items-center justify-center w-4 h-4 text-[#141530]"
+                >
+                  <X size={16} strokeWidth={2} />
+                </button>
+              </div>
+            </div>
+
+            {/* Content Block */}
+            <div className="flex flex-col items-start px-4 pt-4 pb-[34px] gap-6 w-full flex-1 bg-white overflow-y-auto">
+              <div className="flex flex-col items-start gap-6 w-full">
+                <h2 className="font-['Urbanist'] font-semibold text-[24px] leading-[28px] text-[#141530]">
+                  Alterar preço
+                </h2>
+
+                <div className="flex flex-col items-start gap-6 w-full">
+                  {/* Chips */}
+                  <div className="flex flex-row items-start gap-3 w-full">
+                    <button
+                      onClick={() => setIsFreeState(false)}
+                      className={cn("flex flex-row items-center justify-center py-2 px-4 gap-4 h-[33px] rounded-[16px] transition-colors", !isFreeState ? "bg-[#141530] text-[#FEFEFE]" : "border border-[#141530] text-[#141530] opacity-50")}
+                    >
+                      <span className="font-['Urbanist'] font-medium text-[14px] leading-[17px] text-center">
+                        Cobrar
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => setIsFreeState(true)}
+                      className={cn("flex flex-row items-center justify-center py-2 px-4 gap-4 h-[33px] rounded-[16px] transition-colors", isFreeState ? "bg-[#141530] text-[#FEFEFE]" : "border border-[#141530] text-[#141530] opacity-50")}
+                    >
+                      <span className="font-['Urbanist'] font-medium text-[14px] leading-[17px] text-center">
+                        Grátis
+                      </span>
+                    </button>
+                  </div>
+
+                  {isFreeState ? (
+                    <div className="flex flex-row items-center p-4 gap-3 w-full h-[66px] border border-[#D5D5D5] rounded-[16px]">
+                      <Target size={20} className="text-[#141530] shrink-0" />
+                      <span className="font-['Urbanist'] font-medium text-[14px] leading-[17px] text-[#646464]">
+                        Seu roteiro ficará disponível gratuitamente na Loja WAI.
+                      </span>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Input Block */}
+                      <div className="flex flex-row items-center px-3 gap-3 w-full h-[60px] bg-field border border-transparent focus-within:border-primary transition-colors rounded-[12px]">
+                        <DollarSign size={16} className="text-[#141530] shrink-0" />
+                        <div className="flex flex-col justify-center items-start flex-1 gap-1">
+                          <span className="font-['Urbanist'] font-medium text-[12px] leading-[16px] text-[#949494]">
+                            Preço do roteiro
+                          </span>
+                          <input
+                            value={formatBRLInput(priceDigits)}
+                            onChange={(e) => setPriceDigits(e.target.value.replace(/\D/g, ''))}
+                            inputMode="numeric"
+                            className="font-['Urbanist'] font-medium text-[14px] leading-[16px] text-[#141530] bg-transparent border-0 p-0 w-full outline-none focus:ring-0 placeholder:text-[#141530]/30"
+                            placeholder="0,00"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Earnings Summary Block */}
+                      {numericPrice > 0 && (
+                        <div className="flex flex-col items-start p-4 gap-3 w-full h-[103px] border border-[#D5D5D5] rounded-[16px]">
+                          <div className="flex flex-row justify-between items-start w-full">
+                            <span className="font-['Urbanist'] font-medium text-[14px] leading-[17px] text-[#141530]">
+                              Você recebe por venda
+                            </span>
+                            <span className="font-['Urbanist'] font-semibold text-[14px] leading-[17px] text-[#141530]">
+                              R$ {earning.toFixed(2).replace('.', ',')}
+                            </span>
+                          </div>
+                          <div className="w-full border-t border-[#F2F2F2]" />
+                          <div className="flex flex-row items-center gap-2 w-full">
+                            <Target size={16} className="text-[#141530] shrink-0" />
+                            <span className="font-['Urbanist'] font-medium text-[12px] leading-[14px] text-[#646464]">
+                              Nós cobramos 10% de taxa. Você recebe 90% de cada venda.
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      {!priceValid && priceDigits.length > 0 && (
+                        <p className="mt-1.5 text-[12px] text-[#E5484D]">O valor deve ser maior que zero.</p>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Fixed Button Container */}
+            <div className="box-border flex flex-col items-start px-4 py-6 gap-[10px] w-full h-[97px] bg-white shrink-0">
+              <button
+                onClick={() => {
+                  if (!priceValid) return;
+                  setShowPriceSheet(false);
+                  onSave({ priceCents: isFreeState ? 0 : Math.round(numericPrice * 100) });
+                  toast.success('Alteração salva');
+                }}
+                disabled={!priceValid}
+                className={cn("flex flex-row justify-center items-center py-3 px-4 gap-2 w-full h-12 rounded-[16px] active:scale-[0.99] transition-transform", priceValid ? "bg-[#9DCC36] text-[#141530]" : "bg-[#F3F3F3] text-[#A6A6A6] cursor-not-allowed")}
+              >
+                <span className="font-['Urbanist'] font-bold text-[16px] leading-[19px]">
+                  Salvar
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Title Action Sheet */}
+      {showTitleSheet && (
+        <div
+          className="absolute inset-0 z-[210] flex items-end justify-center"
+          onClick={() => {
+            setTitle(initialTitle);
+            setShowTitleSheet(false);
+          }}
+        >
+          <div className="absolute inset-0 bg-black/30 touch-none" />
+          <div
+            className="relative w-full max-h-[90dvh] bg-white rounded-t-[24px] flex flex-col"
+            style={{ animation: 'slideUpSheet 0.3s cubic-bezier(0.32, 0.72, 0, 1)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Block */}
+            <div className="flex flex-col items-center pt-4 px-6 pb-3 gap-2 w-full h-[56px] bg-white rounded-t-[24px] shrink-0 relative">
+              <div className="w-[44px] h-[4px] bg-[#DEDEDE] rounded-[4px]" />
+              <div className="flex flex-row justify-end items-center w-full relative">
+                <button
+                  onClick={() => {
+                    setTitle(initialTitle);
+                    setShowTitleSheet(false);
+                  }}
+                  className="absolute right-0 flex items-center justify-center w-4 h-4 text-[#141530]"
+                >
+                  <X size={16} strokeWidth={2} />
+                </button>
+              </div>
+            </div>
+
+            {/* Content Block */}
+            <div className="flex flex-col items-start px-4 pt-4 pb-[34px] gap-6 w-full flex-1 bg-white overflow-y-auto">
+              <div className="flex flex-col items-start gap-6 w-full">
+                <div className="flex flex-col items-start gap-2 w-full">
+                  <h2 className="font-['Urbanist'] font-semibold text-[24px] leading-[29px] text-[#171F2C]">
+                    Alterar Título
+                  </h2>
+                </div>
+
+                <div className="flex flex-col items-start gap-2 w-full">
+                  <div className="flex flex-col items-start p-4 gap-6 w-full h-[81px] bg-field border border-transparent focus-within:border-primary transition-colors rounded-[16px]">
+                    <div className="flex flex-col items-start w-full h-full gap-1">
+                      <span className="font-['Urbanist'] font-medium text-[12px] leading-[16px] text-[#949494]">
+                        Título da publicação
+                      </span>
+                      <input
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value.slice(0, 60))}
+                        className="font-['Urbanist'] font-medium text-[14px] leading-[16px] text-[#141530] bg-transparent border-0 p-0 w-full outline-none focus:ring-0 placeholder:text-[#141530]/30"
+                        placeholder="Nome do seu roteiro maravilhoso..."
+                      />
+                    </div>
+                  </div>
+                  <span className="font-['Urbanist'] font-medium text-[12px] leading-[16px] text-[#676767]">
+                    {title.length}/60
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Fixed Button Container */}
+            <div className="box-border flex flex-col items-start px-4 py-6 gap-[10px] w-full h-[97px] bg-white shrink-0">
+              <button
+                onClick={() => {
+                  if (!titleValid) return;
+                  setShowTitleSheet(false);
+                  onSave({ title: title.trim() });
+                  toast.success('Alteração salva');
+                }}
+                disabled={!titleValid}
+                className={cn("flex flex-row justify-center items-center py-3 px-4 gap-2 w-full h-12 rounded-[16px] active:scale-[0.99] transition-transform", titleValid ? "bg-[#9DCC36] text-[#141530]" : "bg-[#F3F3F3] text-[#A6A6A6] cursor-not-allowed")}
+              >
+                <span className="font-['Urbanist'] font-bold text-[16px] leading-[19px]">
+                  Salvar
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Status Action Sheet */}
+      {showStatusSheet && (
+        <StatusSheet
+          isPaused={!!isPaused}
+          onClose={() => setShowStatusSheet(false)}
+          onSave={(nextPaused) => {
+            setShowStatusSheet(false);
+            if (onTogglePause && nextPaused !== isPaused) {
+              onTogglePause(nextPaused);
+              toast.success('Alteração salva');
+            }
+          }}
+          onUnpublishClick={() => {
+            setShowStatusSheet(false);
+            setShowUnpublishConfirm(true);
+          }}
+        />
+      )}
+
+      {/* Delete Confirmation Sheet */}
+      {onDelete && (
+        <DeleteConfirmSheet
+          isOpen={showDeleteConfirm}
+          onClose={() => setShowDeleteConfirm(false)}
+          title="Excluir roteiro?"
+          description="Tem certeza que deseja excluir este roteiro da sua loja? Esta ação não poderá ser desfeita."
+          onConfirm={() => {
+            setShowDeleteConfirm(false);
+            onDelete();
+            onClose();
+          }}
+        />
       )}
     </div>
   );
@@ -540,82 +865,195 @@ function SummaryRow({
   label,
   value,
   onClick,
+  icon,
+  tag,
 }: {
   label: string;
   value: string;
   onClick: () => void;
+  icon?: React.ReactNode;
+  tag?: { text: string; bg: string };
 }) {
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-3 px-4 py-3.5 text-left active:bg-foreground/5 transition-colors"
+      className="w-full flex items-center justify-between active:opacity-70 transition-opacity"
     >
-      <div className="flex-1 min-w-0">
-        <p className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide">{label}</p>
-        <p className="text-[14px] font-medium text-foreground truncate mt-0.5">{value}</p>
+      <div className="flex items-center gap-3">
+        {icon && (
+          <div className="w-[24px] h-[24px] flex items-center justify-center shrink-0">
+            {icon}
+          </div>
+        )}
+        <div className="flex flex-col items-start justify-center text-left">
+          <span className="font-['Urbanist'] font-semibold text-[16px] leading-[19px] text-[#141530]">
+            {label}
+          </span>
+          {!tag && (
+            <span className="font-['Urbanist'] font-medium text-[14px] leading-[17px] text-[#7F7F7F]">
+              {value}
+            </span>
+          )}
+        </div>
       </div>
-      <ChevronRight size={18} className="text-muted-foreground shrink-0" />
+
+      <div className="flex items-center gap-4">
+        {tag && (
+          <span
+            className="px-3 py-1 rounded-[9px] font-['Urbanist'] font-medium text-[12px] leading-[14px] text-[#FEFEFE]"
+            style={{ backgroundColor: tag.bg, border: `1px solid ${tag.bg}` }}
+          >
+            {tag.text}
+          </span>
+        )}
+        <div className="w-[20px] h-[20px] flex items-center justify-center">
+          <ChevronRight size={20} className="text-[#7F7F7F]" strokeWidth={1.5} />
+        </div>
+      </div>
     </button>
   );
 }
 
-function StatusSheetBody({
+function StatusSheet({
   isPaused,
+  onClose,
   onSave,
   onUnpublishClick,
 }: {
   isPaused: boolean;
+  onClose: () => void;
   onSave: (nextPaused: boolean) => void;
   onUnpublishClick: () => void;
 }) {
-  const [selected, setSelected] = useState<'ativa' | 'pausada'>(isPaused ? 'pausada' : 'ativa');
-  const NAVY = '#1A1C40';
-
-  const Option = ({ value, label }: { value: 'ativa' | 'pausada'; label: string }) => {
-    const checked = selected === value;
-    return (
-      <button
-        type="button"
-        onClick={() => setSelected(value)}
-        className="w-full flex items-center gap-3 py-3.5 active:opacity-70 transition-opacity"
-      >
-        <span
-          className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0"
-          style={{ borderColor: NAVY }}
-        >
-          {checked && <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: NAVY }} />}
-        </span>
-        <span className="text-[14px] font-semibold" style={{ color: NAVY }}>
-          {label}
-        </span>
-      </button>
-    );
-  };
+  const [selected, setSelected] = useState<'ativo' | 'pausado'>(isPaused ? 'pausado' : 'ativo');
 
   return (
-    <div className="flex flex-col">
-      <Option value="ativa" label="Ativa" />
-      <Option value="pausada" label="Pausada" />
-
-      <button
-        type="button"
-        onClick={onUnpublishClick}
-        className="w-full flex items-center gap-3 py-3.5 mt-1 active:opacity-70 transition-opacity"
+    <div
+      className="absolute inset-0 z-[210] flex items-end justify-center"
+      onClick={onClose}
+    >
+      <div className="absolute inset-0 bg-black/30 touch-none" />
+      <div
+        className="relative w-full max-h-[90dvh] bg-white rounded-t-[24px] flex flex-col"
+        style={{ animation: 'slideUpSheet 0.3s cubic-bezier(0.32, 0.72, 0, 1)' }}
+        onClick={(e) => e.stopPropagation()}
       >
-        <Trash2 size={18} style={{ color: NAVY }} className="shrink-0" />
-        <span className="text-[14px] font-semibold" style={{ color: NAVY }}>
-          Excluir publicação
-        </span>
-      </button>
+        {/* Header Block */}
+        <div className="flex flex-col items-center pt-4 px-6 pb-3 gap-2 w-full h-[56px] bg-white rounded-t-[24px] shrink-0 relative">
+          <div className="w-[44px] h-[4px] bg-[#DEDEDE] rounded-[4px]" />
+          <div className="flex flex-row justify-end items-center w-full relative">
+            <button
+              onClick={onClose}
+              className="absolute right-0 flex items-center justify-center w-4 h-4 text-[#141530]"
+            >
+              <X size={16} strokeWidth={2} />
+            </button>
+          </div>
+        </div>
 
-      <button
-        type="button"
-        onClick={() => onSave(selected === 'pausada')}
-        className="w-full h-12 rounded-2xl font-semibold text-[14px] mt-4 active:scale-[0.99] transition-transform"
-        style={{ background: '#9DCC36', color: '#141530' }}
-      >
-        Salvar
-      </button>
+        {/* Content Block */}
+        <div className="flex flex-col items-start px-4 pt-4 pb-[34px] gap-6 w-full bg-white flex-1 overflow-y-auto">
+          <div className="flex flex-col items-start gap-[24px] w-full">
+            <h2 className="font-['Urbanist'] font-semibold text-[24px] leading-[29px] text-[#171F2C]">
+              Alterar status da publicação
+            </h2>
+
+            <div className="flex flex-col items-start gap-[16px] w-full">
+              {/* Option Ativo */}
+              <button
+                onClick={() => setSelected('ativo')}
+                className={cn(
+                  "box-border flex flex-col items-start p-4 gap-6 w-full h-[81px] rounded-[16px] transition-colors",
+                  selected === 'ativo' ? "bg-[#F4FDDF] border border-[#9DCC36]" : "bg-white border border-[#EBEBEB]"
+                )}
+              >
+                <div className="flex flex-row items-center gap-4 w-full h-[49px]">
+                  <div className="flex flex-row items-center gap-[13px] flex-1 h-[49px]">
+                    <div className="relative w-6 h-6 flex items-center justify-center shrink-0 bg-[#141530] rounded-full">
+                      <Target size={14} className="text-white" />
+                    </div>
+                    <div className="flex flex-col items-start gap-1 flex-1">
+                      <span className="font-['Urbanist'] font-semibold text-[16px] leading-[19px] text-[#1A1C40]">
+                        Ativo
+                      </span>
+                      <span className="font-['Urbanist'] font-medium text-[14px] leading-[16px] text-[#676767] text-left">
+                        O roteiro ficará disponível na Loja WAI.
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-row items-center justify-center p-[6.4px] w-8 h-8 shrink-0">
+                    <div className={cn("w-[19.2px] h-[19.2px] rounded-full transition-colors flex items-center justify-center", selected === 'ativo' ? "bg-[#9DCC36]" : "bg-[#9E9E9E]")}>
+                      {selected === 'ativo' && (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M20 6L9 17L4 12" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </button>
+
+              {/* Option Pausado */}
+              <button
+                onClick={() => setSelected('pausado')}
+                className={cn(
+                  "box-border flex flex-col items-start p-4 gap-6 w-full h-[81px] rounded-[16px] transition-colors",
+                  selected === 'pausado' ? "bg-[#F4FDDF] border border-[#9DCC36]" : "bg-white border border-[#EBEBEB]"
+                )}
+              >
+                <div className="flex flex-row items-center gap-4 w-full h-[49px]">
+                  <div className="flex flex-row items-center gap-[13px] flex-1 h-[49px]">
+                    <div className="relative w-6 h-6 flex items-center justify-center shrink-0 bg-[#141530] rounded-full">
+                      <Target size={14} className="text-white" />
+                    </div>
+                    <div className="flex flex-col items-start gap-1 flex-1">
+                      <span className="font-['Urbanist'] font-semibold text-[16px] leading-[19px] text-[#1A1C40]">
+                        Pausado
+                      </span>
+                      <span className="font-['Urbanist'] font-medium text-[14px] leading-[16px] text-[#676767] text-left">
+                        Ninguém poderá ver e comprar o roteiro.
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-row items-center justify-center p-[6.4px] w-8 h-8 shrink-0">
+                    <div className={cn("w-[19.2px] h-[19.2px] rounded-full transition-colors flex items-center justify-center", selected === 'pausado' ? "bg-[#9DCC36]" : "bg-[#9E9E9E]")}>
+                      {selected === 'pausado' && (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M20 6L9 17L4 12" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            {/* Unpublish Action */}
+            <button
+              onClick={onUnpublishClick}
+              className="flex flex-row items-center gap-3 mt-4"
+            >
+              <Trash2 size={20} className="text-[#D00004]" />
+              <span className="font-['Urbanist'] font-medium text-[16px] leading-[19px] text-[#D00004]">
+                Excluir publicação
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Fixed Button Container */}
+        <div className="box-border flex flex-col items-start px-4 py-6 gap-[10px] w-full h-[97px] bg-white shrink-0">
+          <button
+            onClick={() => onSave(selected === 'pausado')}
+            disabled={selected === (isPaused ? 'pausado' : 'ativo')}
+            className={cn("flex flex-row justify-center items-center py-3 px-4 gap-2 w-full h-12 rounded-[16px] active:scale-[0.99] transition-transform", selected !== (isPaused ? 'pausado' : 'ativo') ? "bg-[#9DCC36] text-[#141530]" : "bg-[#F3F3F3] text-[#A6A6A6] cursor-not-allowed")}
+          >
+            <span className="font-['Urbanist'] font-bold text-[16px] leading-[19px]">
+              Salvar
+            </span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -150,7 +150,7 @@ export function EditItineraryDataScreen({
           onChange={e => setDescription(e.target.value)}
           placeholder="Descreva brevemente sua viagem..."
           rows={3}
-          className="w-full px-4 py-3 rounded-xl border border-border bg-background text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
+          className="w-full px-4 py-3 rounded-xl border border-border bg-field text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none"
         />
       </div>
 

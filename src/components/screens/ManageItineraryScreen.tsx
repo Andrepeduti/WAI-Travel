@@ -45,6 +45,8 @@ interface ManageItineraryScreenProps {
   currency?: string;
   description?: string;
   destinations?: string[];
+  isFlexible?: boolean;
+  durationDays?: number;
   onPublish?: () => void;
   onDelete?: () => void;
   onSave?: (data: any) => void;
@@ -62,6 +64,8 @@ export function ManageItineraryScreen({
   endDate: initialEndDate,
   currency: initialCurrency = 'BRL',
   destinations: initialDestinations = [],
+  isFlexible = false,
+  durationDays: initialDurationDays,
   onPublish,
   onDelete,
   onSave,
@@ -80,9 +84,9 @@ export function ManageItineraryScreen({
   const [startDate, setStartDate] = useState<Date | undefined>(initialStartDate);
   const [endDate, setEndDate] = useState<Date | undefined>(initialEndDate);
   const [destinations, setDestinations] = useState<string[]>(initialDestinations);
-  const [dateMode, setDateMode] = useState<'specific' | 'flexible'>(initialStartDate ? 'specific' : 'flexible');
+  const [dateMode, setDateMode] = useState<'specific' | 'flexible'>(isFlexible ? 'flexible' : 'specific');
   const [durationDays, setDurationDays] = useState<number | ''>(
-    initialStartDate && initialEndDate ? differenceInDays(initialEndDate, initialStartDate) + 1 : 7
+    isFlexible && initialDurationDays ? initialDurationDays : (initialStartDate && initialEndDate ? differenceInDays(initialEndDate, initialStartDate) + 1 : 7)
   );
 
   // UI States
@@ -92,7 +96,6 @@ export function ManageItineraryScreen({
   const [showDestinationsPicker, setShowDestinationsPicker] = useState(false);
   const [showShareSheet, setShowShareSheet] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [memberToRemove, setMemberToRemove] = useState<ItineraryMember | null>(null);
   const [memberToLeave, setMemberToLeave] = useState<ItineraryMember | null>(null);
 
@@ -239,11 +242,7 @@ export function ManageItineraryScreen({
 
   // Handlers
   const handleBack = () => {
-    if (hasChanges) {
-      setShowUnsavedDialog(true);
-    } else {
-      onBack();
-    }
+    onBack();
   };
 
   const handleSave = () => {
@@ -252,9 +251,11 @@ export function ManageItineraryScreen({
         tripName,
         coverImage: coverPreview || initialCoverImage,
         currency,
-        startDate,
-        endDate,
+        startDate: dateMode === 'specific' ? startDate : undefined,
+        endDate: dateMode === 'specific' ? endDate : undefined,
         destinations,
+        isFlexible: dateMode === 'flexible',
+        durationDays: dateMode === 'flexible' ? durationDays : undefined,
       });
     }
   };
@@ -335,9 +336,11 @@ export function ManageItineraryScreen({
 
   // Render variables
   const selectedCurrency = CURRENCIES.find(c => c.code === currency) || { symbol: currency, label: currency };
-  const formattedDate = startDate 
-    ? `${format(startDate, "dd 'de' MMM.", { locale: ptBR })} - ${endDate ? format(endDate, "dd 'de' MMM.", { locale: ptBR }) : ''}`
-    : 'Selecione as datas';
+  const formattedDate = dateMode === 'flexible'
+    ? (durationDays ? `${durationDays} ${durationDays === 1 ? 'dia' : 'dias'}` : 'Duração indefinida')
+    : (startDate 
+      ? `${format(startDate, "dd 'de' MMM.", { locale: ptBR })} - ${endDate ? format(endDate, "dd 'de' MMM.", { locale: ptBR }) : ''}`
+      : 'Selecione as datas');
 
   return (
     <div className="min-h-[100dvh] bg-[#F3F3F3]" style={{ fontFamily: 'var(--font-family-primary)' }}>
@@ -728,38 +731,12 @@ export function ManageItineraryScreen({
       </div>
       )}
 
-      {/* Unsaved Changes Dialog */}
-      {showUnsavedDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="bg-white rounded-[24px] p-6 flex flex-col gap-6 w-full max-w-sm">
-            <h3 className="font-bold text-[18px] text-[#171F2C] text-center">Deseja sair sem salvar as alterações?</h3>
-            <div className="flex flex-col gap-3">
-              <button 
-                onClick={() => {
-                  setShowUnsavedDialog(false);
-                  onBack();
-                }}
-                className="w-full py-3.5 rounded-[16px] font-semibold text-[#141530] border border-[#141530]"
-              >
-                Descartar alterações
-              </button>
-              <button 
-                onClick={() => setShowUnsavedDialog(false)}
-                className="w-full py-3.5 rounded-[16px] font-semibold bg-[#9DCC36] text-[#141530]"
-              >
-                Continuar editando
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Title Sheet */}
       <BottomSheet open={showTitlePicker} onClose={() => setShowTitlePicker(false)} bodyClassName="p-0">
         <div className="flex flex-col items-start px-4 pb-[34px] pt-4 gap-[24px] w-full bg-[#FFFFFF]">
           <h3 className="font-semibold text-[24px] leading-[28px] text-[#141530]">Alterar título</h3>
           
-          <div className="flex flex-row items-center p-3 gap-3 w-full h-[60px] bg-[#EEEEEE] rounded-[12px]">
+          <div className="flex flex-row items-center p-3 gap-3 w-full h-[60px] bg-field border border-transparent focus-within:border-primary transition-colors rounded-[12px]">
             <div className="flex flex-col justify-center gap-[2px] w-full">
               <span className="font-medium text-[12px] leading-[16px] text-[#949494]">Titulo da publicação</span>
               <input 
@@ -794,7 +771,7 @@ export function ManageItineraryScreen({
           <h3 className="font-semibold text-[24px] leading-[28px] text-[#141530]">Alterar moeda</h3>
           
           <div className="relative w-full">
-            <div className="flex flex-row justify-center items-center p-3 gap-3 w-full h-[60px] bg-[#EEEEEE] rounded-[12px]">
+            <div className="flex flex-row justify-center items-center p-3 gap-3 w-full h-[60px] bg-field rounded-[12px]">
               <Target size={16} className="text-[#141530] shrink-0" />
               <div className="flex flex-col justify-center items-start gap-[2px] flex-1">
                 <span className="font-medium text-[12px] leading-[16px] text-[#949494]">Moeda</span>
@@ -883,7 +860,7 @@ export function ManageItineraryScreen({
                 )}
                 <button 
                   onClick={() => setShowCalendarInSheet(!showCalendarInSheet)}
-                  className="flex items-center justify-between p-3 w-full h-[60px] bg-[#EEEEEE] rounded-[12px]"
+                  className="flex items-center justify-between p-3 w-full h-[60px] bg-field rounded-[12px]"
                 >
                   <div className="flex items-center gap-3">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#141530]"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
@@ -901,7 +878,7 @@ export function ManageItineraryScreen({
               </div>
             ) : (
               <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between p-3 w-full h-[60px] bg-[#EEEEEE] rounded-[12px]">
+                <div className="flex items-center justify-between p-3 w-full h-[60px] bg-field rounded-[12px]">
                   <div className="flex items-center gap-3">
                     <Clock className="w-4 h-4 text-[#141530]" />
                     <span className="font-medium text-[14px] leading-[16px] text-[#141530]">Duração</span>
@@ -926,7 +903,7 @@ export function ManageItineraryScreen({
                 setDurationDays(tempDuration);
                 setDateMode(tempDateMode);
                 setShowPeriodPicker(false);
-                if (onSave) onSave({ tripName, coverImage: coverPreview || initialCoverImage, currency, startDate: tempStartDate, endDate: tempEndDate, destinations });
+                if (onSave) onSave({ tripName, coverImage: coverPreview || initialCoverImage, currency, startDate: tempStartDate, endDate: tempEndDate, destinations, isFlexible: tempDateMode === 'flexible', durationDays: tempDuration });
               }}
               disabled={
                 tempStartDate?.getTime() === startDate?.getTime() && 
@@ -953,7 +930,7 @@ export function ManageItineraryScreen({
           <h3 className="font-semibold text-[24px] leading-[28px] text-[#141530]">Alterar destinos</h3>
           
           <div className="flex flex-col gap-4 overflow-y-auto w-full flex-1">
-            <div className="flex flex-col p-3 gap-2 w-full bg-[#EEEEEE] rounded-[12px] min-h-[60px]">
+            <div className="flex flex-col p-3 gap-2 w-full bg-field rounded-[12px] min-h-[60px]">
               <div className="flex items-center gap-2">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#949494]"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
                 <span className="font-medium text-[12px] leading-[16px] text-[#949494]">Destinos</span>

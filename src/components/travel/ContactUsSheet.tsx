@@ -112,7 +112,7 @@ export function ContactUsSheet({ isOpen, onClose }: ContactUsSheetProps) {
               value={message} onChange={(e) => setMessage(e.target.value)}
               rows={4}
               placeholder="Descreva sua dúvida ou sugestão..."
-              className="w-full rounded-xl border border-border bg-background px-4 py-3 text-foreground outline-none focus:border-primary transition-colors resize-none"
+              className="w-full rounded-xl border border-border bg-field px-4 py-3 text-foreground outline-none focus:border-primary transition-colors resize-none"
               style={{ fontSize: 'var(--text-base)' }}
             />
           </div>

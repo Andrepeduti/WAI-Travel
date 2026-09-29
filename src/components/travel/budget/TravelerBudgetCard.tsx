@@ -56,7 +56,7 @@ export function TravelerBudgetCard({ person, amount, currency = 'BRL', className
         </div>
       </div>
 
-      <div className="font-['Urbanist'] font-bold text-[18px] leading-[22px] text-[#141530] flex-shrink-0">
+      <div className="font-['Urbanist'] font-medium text-[18px] leading-[22px] text-[#141530] flex-shrink-0">
         {formatCurrency(amount, currency)}
       </div>
     </div>

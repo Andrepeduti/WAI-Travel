@@ -12,6 +12,8 @@ export interface CityRecord {
   country: string | null;
   cover_photo_url: string | null;
   google_place_id: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -75,6 +77,8 @@ export async function upsertCity(updates: Partial<CityRecord> & { name: string }
           cover_photo_url: updates.cover_photo_url ?? existing.cover_photo_url,
           google_place_id: updates.google_place_id ?? existing.google_place_id,
           country: updates.country ?? existing.country,
+          latitude: updates.latitude ?? existing.latitude,
+          longitude: updates.longitude ?? existing.longitude,
         })
         .eq('id', existing.id)
         .select('*')
@@ -92,6 +96,8 @@ export async function upsertCity(updates: Partial<CityRecord> & { name: string }
           cover_photo_url: updates.cover_photo_url,
           google_place_id: updates.google_place_id,
           country: updates.country,
+          latitude: updates.latitude,
+          longitude: updates.longitude,
         })
         .select('*')
         .maybeSingle();

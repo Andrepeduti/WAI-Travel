@@ -38,6 +38,7 @@ export default {
         border: "hsl(var(--border))",
         divider: "hsl(var(--divider))",
         input: "hsl(var(--input))",
+        field: "hsl(var(--field))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",

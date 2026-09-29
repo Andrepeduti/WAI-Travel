@@ -103,7 +103,7 @@ export function CreateScreen({ onClose }: CreateScreenProps) {
             </p>
 
             {/* Search Input */}
-            <div className="flex items-center gap-3 px-4 py-4 bg-secondary rounded-[10px] mb-6">
+            <div className="flex items-center gap-3 px-4 py-4 bg-field border border-transparent focus-within:border-primary transition-colors rounded-[10px] mb-6">
               <Icon name="location_on" size={20} className="text-muted-foreground" />
               <input
                 type="text"

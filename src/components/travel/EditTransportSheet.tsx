@@ -14,6 +14,25 @@ const transportTypes = [
   { id: 'other', label: 'Outros' },
 ] as const;
 
+// O número digitado é o total de minutos (60 → 1h, 90 → 1h 30min).
+function digitsToDuration(digits: string): string {
+  const clean = digits.replace(/\D/g, '').slice(0, 4);
+  if (!clean) return '';
+  const total = parseInt(clean, 10);
+  if (total <= 0) return '';
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h === 0) return `${m} min`;
+  return m === 0 ? `${h}h` : `${h}h ${m}min`;
+}
+
+function durationToDigits(duration: string): string {
+  const h = parseInt(duration.match(/(\d+)\s*h/)?.[1] ?? '0', 10);
+  const m = parseInt(duration.match(/(\d+)\s*min/)?.[1] ?? '0', 10);
+  const total = h * 60 + m;
+  return total > 0 ? String(total) : '';
+}
+
 export interface EditTransportSheetProps {
   open: boolean;
   onClose: () => void;
@@ -172,7 +191,7 @@ export function EditTransportSheet({
               <div className="w-full flex flex-col items-start gap-4">
                 
                 {/* Tempo & Distância */}
-                <div className="flex flex-row items-center px-[12px] py-[12px] gap-[12px] w-full h-[60px] bg-[#EEEEEE] rounded-[12px] relative focus-within:ring-1 focus-within:ring-[#141530]/20">
+                <div className="flex flex-row items-center px-[12px] py-[12px] gap-[12px] w-full h-[60px] bg-field rounded-[12px] relative border border-transparent focus-within:border-primary">
                   <div className="flex items-center justify-center w-[16px] h-[16px] flex-shrink-0 relative">
                     <Icon name="schedule" size={16} className="text-[#141530]" />
                   </div>
@@ -181,14 +200,28 @@ export function EditTransportSheet({
                       <span className="font-medium text-[12px] leading-[16px] text-[#949494]" style={{ fontFamily: 'Urbanist' }}>
                         Tempo (Opcional)
                       </span>
-                      <input
-                        type="text"
-                        placeholder="Ex: 10 min"
-                        value={duration}
-                        onChange={e => setDuration(e.target.value)}
-                        className="w-full bg-transparent border-none outline-none font-medium text-[14px] leading-[16px] text-[#141530] placeholder:text-[#9E9E9E] p-0 h-[16px]"
-                        style={{ fontFamily: 'Urbanist' }}
-                      />
+                      <div
+                        className="w-full flex flex-row items-center gap-[4px] h-[16px] cursor-text"
+                        onClick={e => e.currentTarget.querySelector('input')?.focus()}
+                      >
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="Ex: 10 min"
+                          value={durationToDigits(duration)}
+                          onChange={e => setDuration(digitsToDuration(e.target.value))}
+                          className="bg-transparent border-none outline-none font-medium text-[14px] leading-[16px] text-[#141530] placeholder:text-[#9E9E9E] p-0 h-[16px] min-w-0"
+                          style={{
+                            fontFamily: 'Urbanist',
+                            width: duration ? `${Math.max(durationToDigits(duration).length, 2) + 1}ch` : '100%',
+                          }}
+                        />
+                        {duration && (
+                          <span className="font-medium text-[14px] leading-[16px] text-[#141530] whitespace-nowrap" style={{ fontFamily: 'Urbanist' }}>
+                            min{Number(durationToDigits(duration)) >= 60 ? ` (${duration})` : ''}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="w-[1px] h-[30px] bg-[#D6D6D6] flex-shrink-0" />
                     <div className="flex flex-col justify-center items-start gap-[1px] flex-1">
@@ -208,7 +241,7 @@ export function EditTransportSheet({
                 </div>
 
                 {/* Valor */}
-                <div className="flex flex-row items-center px-[12px] py-[12px] gap-[12px] w-full h-[60px] bg-[#EEEEEE] rounded-[12px] relative focus-within:ring-1 focus-within:ring-[#141530]/20">
+                <div className="flex flex-row items-center px-[12px] py-[12px] gap-[12px] w-full h-[60px] bg-field rounded-[12px] relative border border-transparent focus-within:border-primary">
                   <div className="flex items-center justify-center w-[16px] h-[16px] flex-shrink-0 relative">
                     <Icon name="attach_money" size={16} className="text-[#141530]" />
                   </div>

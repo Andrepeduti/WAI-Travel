@@ -24,6 +24,8 @@ export interface CityPlace {
   address?: string;
   /** Optional Google Place ID for hydration and deduplication */
   googlePlaceId?: string;
+  /** Country of the place */
+  country?: string;
 }
 
 // ─── City Places Database ────────────────────────────────────────────────────

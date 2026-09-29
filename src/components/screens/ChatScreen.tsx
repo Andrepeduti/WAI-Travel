@@ -929,7 +929,7 @@ function ConversationView({
         )}
 
         <div className="flex items-end gap-2">
-          <div className="flex-1 bg-card border border-[hsl(var(--divider))] rounded-[10px] px-3 py-2">
+          <div className="flex-1 bg-field border border-[hsl(var(--divider))] focus-within:border-primary transition-colors rounded-[10px] px-3 py-2">
             <textarea
               ref={textareaRef}
               value={text}

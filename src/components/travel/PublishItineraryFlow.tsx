@@ -1,18 +1,29 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, DollarSign, TrendingUp, Star, ShieldCheck, Sparkles, Users, Check, Copy, Loader2, HelpCircle, Flower, Calendar, Info } from 'lucide-react';
+import { ArrowLeft, DollarSign, TrendingUp, Star, ShieldCheck, Sparkles, Users, Check, Copy, Loader2, HelpCircle, Flower, Calendar, Info, MapPin, CalendarDays, Ticket, Target, Clock, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { HelpCenterScreen } from '../screens/HelpCenterScreen';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarUI } from '@/components/ui/calendar';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 export interface PublishItineraryResult {
+  name?: string;
   price: number;
   description: string;
   tags: string[];
+  seasons: string[];
   mainTag?: string;
+  dateType?: 'FLEXIBLE' | 'SPECIFIC';
+  duration?: number;
+  month?: string;
+  startDate?: Date;
+  endDate?: Date;
 }
 
 interface PublishItineraryFlowProps {
@@ -24,6 +35,7 @@ interface PublishItineraryFlowProps {
   totalCities?: number;
   initialDescription?: string;
   initialTags?: string[];
+  initialSeasons?: string[];
   onClose: () => void;
   onPublished?: (result: PublishItineraryResult) => void | Promise<void>;
   onNavigateToSales?: () => void;
@@ -31,6 +43,9 @@ interface PublishItineraryFlowProps {
   startDate?: Date;
   endDate?: Date;
   initialMainTag?: string;
+  destinations?: string[];
+  isFlexible?: boolean;
+  durationDays?: number;
 }
 
 
@@ -62,6 +77,32 @@ function StepDots({ current, total }: { current: number; total: number }) {
   );
 }
 
+export function PublishBreadcrumb({ step }: { step: number }) {
+  if (step <= 0) return null;
+  return (
+    <div className="flex items-center gap-[12px] mb-[34px]">
+      <span className="font-['Urbanist'] font-medium text-[14px] leading-[20px] text-[#646464]">
+        {step} de 5
+      </span>
+      <div className="flex items-center gap-2">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className={cn(
+              'h-[6px] rounded-full transition-all duration-500',
+              i < step - 1
+                ? 'w-[6px] bg-[#9DCC36]'
+                : i === step - 1
+                  ? 'w-8 bg-[#141530]'
+                  : 'w-[6px] bg-[#B6B6B6]'
+            )}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function PublishItineraryFlow({
   open,
   tripName,
@@ -71,6 +112,7 @@ export function PublishItineraryFlow({
   totalCities,
   initialDescription = '',
   initialTags = [],
+  initialSeasons = [],
   onClose,
   onPublished,
   onNavigateToSales,
@@ -78,23 +120,34 @@ export function PublishItineraryFlow({
   startDate,
   endDate,
   initialMainTag,
+  destinations,
+  isFlexible,
+  durationDays,
 }: PublishItineraryFlowProps) {
-  const [step, setStep] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('wai_hide_publish_onboarding') === 'true' ? 1 : 0;
-    }
-    return 0;
-  });
+  const [step, setStep] = useState(0);
+  const [name, setName] = useState(tripName || '');
   const [price, setPrice] = useState('');
   const [isFree, setIsFree] = useState(false);
   const [touched, setTouched] = useState(false);
   const [description, setDescription] = useState(initialDescription);
-  const [season, setSeason] = useState<string>('');
+  const initialDateType = isFlexible ? 'FLEXIBLE' : (startDate && endDate ? 'SPECIFIC' : 'FLEXIBLE');
+  const initialDuration = isFlexible && durationDays ? durationDays.toString() : (totalDays ? totalDays.toString() : '');
+  const initialMonth = (startDate && !endDate && startDate instanceof Date)
+    ? ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'][startDate.getMonth()]
+    : '';
+
+  const [seasons, setSeasons] = useState<string[]>(initialSeasons);
+  const [dateType, setDateType] = useState<'FLEXIBLE' | 'SPECIFIC'>(initialDateType);
+  const [duration, setDuration] = useState(initialDuration);
+  const [month, setMonth] = useState(initialMonth);
   const [tags, setTags] = useState<string[]>(initialTags);
   const [isReviewingTerms, setIsReviewingTerms] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [showFAQ, setShowFAQ] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  const [startDateState, setStartDateState] = useState<Date | undefined>(isFlexible ? undefined : startDate);
+  const [endDateState, setEndDateState] = useState<Date | undefined>(isFlexible ? undefined : endDate);
 
   useEffect(() => {
     if (!open) {
@@ -179,11 +232,26 @@ export function PublishItineraryFlow({
         ? 'Defina um preço para o seu roteiro.'
         : null;
 
-  const descriptionValid = description.trim().length >= 20;
+  const nameValid = name.trim().length >= 3;
+  const descriptionValid = description.trim().length > 0;
+  const infoValid = nameValid && descriptionValid;
+
   const tagsValid = tags.length >= 1 && tags.length <= 5;
-  const seasonValid = !!season;
+  const seasonValid = seasons.length > 0 &&
+    (dateType === 'SPECIFIC' ? (startDateState !== undefined && endDateState !== undefined) : duration.trim().length > 0);
 
   const LAST_STEP = 5;
+
+  const formatDateRange = () => {
+    if (!startDateState) return '';
+    if (startDateState && endDateState) {
+      if (startDateState.getTime() === endDateState.getTime()) {
+        return format(startDateState, "dd 'de' MMM", { locale: ptBR });
+      }
+      return `${format(startDateState, "dd 'de' MMM", { locale: ptBR })} - ${format(endDateState, "dd 'de' MMM", { locale: ptBR })}`;
+    }
+    return format(startDateState, "dd 'de' MMM", { locale: ptBR });
+  };
 
   const next = async () => {
     if (step === 0 && isReviewingTerms) {
@@ -197,12 +265,16 @@ export function PublishItineraryFlow({
       setIsPublishing(true);
       try {
         await onPublished?.({
+          name: name.trim(),
           price: numericPrice,
           description: description.trim(),
-          tags: Array.from(new Set([season, ...tags.filter(t => t !== ''), ...initialTags.filter(t => t === '_FLEXIBLE_DATES_')])),
-        });
-        toast.success('Roteiro publicado com sucesso!', {
-          description: 'Agora ele está disponível no marketplace.',
+          tags: Array.from(new Set(tags.filter(t => t !== ''))),
+          seasons: seasons,
+          dateType,
+          duration: dateType === 'FLEXIBLE' && duration ? Number(duration) : undefined,
+          month: dateType === 'FLEXIBLE' ? month : undefined,
+          startDate: dateType === 'SPECIFIC' ? startDateState : undefined,
+          endDate: dateType === 'SPECIFIC' ? endDateState : undefined,
         });
         handleClose();
         onNavigateToSales?.();
@@ -215,10 +287,9 @@ export function PublishItineraryFlow({
   const back = () => {
     if (step === 0 && isReviewingTerms) {
       setIsReviewingTerms(false);
-      setStep(5);
       return;
     }
-    if (step <= 1 && !isReviewingTerms) {
+    if (step <= 0) {
       handleClose();
     } else {
       setStep((s) => s - 1);
@@ -226,16 +297,24 @@ export function PublishItineraryFlow({
   };
 
   const handleClose = () => {
-    setStep(localStorage.getItem('wai_hide_publish_onboarding') === 'true' ? 1 : 0);
-    setPrice('');
-    setIsFree(false);
-    setTouched(false);
-    setDescription(initialDescription);
-    setSeason('');
-    setTags(initialTags);
-    setIsReviewingTerms(false);
-    setShowFAQ(false);
     onClose();
+    setTimeout(() => {
+      setStep(0);
+      setName(tripName || '');
+      setPrice('');
+      setIsFree(false);
+      setTouched(false);
+      setDescription(initialDescription);
+      setSeasons([]);
+      setDateType(initialDateType);
+      setDuration(initialDuration);
+      setMonth(initialMonth);
+      setTags(initialTags);
+      setStartDateState(startDate);
+      setEndDateState(endDate);
+      setIsReviewingTerms(false);
+      setShowFAQ(false);
+    }, 300);
   };
 
   const toggleTag = (t: string) => {
@@ -253,124 +332,177 @@ export function PublishItineraryFlow({
   const tagsValidCheck = displayTags.length >= 1 && displayTags.length <= 5;
 
   const canAdvance =
-    step === 1 ? priceValid :
-      step === 2 ? descriptionValid :
+    step === 1 ? infoValid :
+      step === 2 ? tagsValid :
         step === 3 ? seasonValid :
-          step === 4 ? tagsValid :
+          step === 4 ? priceValid :
             true;
 
   return (
-    <div className="fixed inset-0 z-[200] bg-[#F2F2F2]">
+    <div className={cn("fixed inset-0 z-[200]", step <= 4 ? "bg-white" : "bg-[#F3F3F3]")}>
       <div
-        className="absolute inset-x-0 top-0 overflow-hidden font-sans mx-auto transition-all duration-75 ease-out"
+        className="absolute inset-x-0 top-0 flex flex-col overflow-hidden font-sans mx-auto transition-all duration-75 ease-out"
         style={{ bottom: keyboardHeight }}
       >
         {/* Top bar — only back button */}
         <div
-          className="absolute top-0 left-0 right-0 z-30 pb-3 bg-[#F2F2F2]"
+          className={cn("absolute top-0 left-0 right-0 z-30 pb-8", step <= 4 ? "bg-white" : "bg-[#F3F3F3]")}
           style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)))' }}
         >
-          <div className={step <= 0 ? 'px-3' : 'px-7'}>
-            <div className={cn('flex items-center justify-between', step <= 0 && 'w-full max-w-[396px] mx-auto px-7')}>
+          <div className="px-4">
+            <div className="flex items-center justify-between w-full">
               <button
                 onClick={back}
-                className="w-10 h-10 -ml-2 rounded-full flex items-center justify-center transition-all bg-[#0A0A0A]/5 text-[#0A0A0A] hover:bg-[#0A0A0A]/10 shrink-0"
+                className="rounded-full flex items-center justify-center transition-all text-[#0A0A0A] shrink-0 w-10 h-10 -ml-2 bg-transparent active:opacity-70"
                 aria-label="Voltar"
               >
-                <ArrowLeft size={18} />
+                <ArrowLeft size={24} />
               </button>
               <button
                 onClick={() => setShowFAQ(true)}
-                className="w-10 h-10 -mr-2 rounded-full flex items-center justify-center transition-all bg-[#0A0A0A]/5 text-[#0A0A0A] hover:bg-[#0A0A0A]/10 shrink-0"
+                className="rounded-full flex items-center justify-center transition-all text-[#0A0A0A] shrink-0 w-10 h-10 -mr-2 bg-transparent active:opacity-70"
                 aria-label="Ajuda"
               >
-                <HelpCircle size={18} />
+                <HelpCircle size={24} />
               </button>
             </div>
+
+            {/* Global Breadcrumb removed from header */}
           </div>
         </div>
 
-        <AnimatePresence mode="wait">
-          {step === 0 && <HowItWorksScreen key="how" onNext={next} hideCheckbox={isReviewingTerms} />}
-          {step === 1 && (
-            <PriceScreen
-              key="price"
-              value={price}
-              displayValue={formatPriceInput(price)}
-              onChange={(v) => {
-                setPrice(v.replace(/\D/g, ''));
-                if (touched) setTouched(false);
-              }}
-              onBlur={() => setTouched(true)}
-              error={priceError}
-              numericPrice={numericPrice}
-              platformFee={platformFee}
-              earning={earning}
-              formatBRL={formatBRL}
-              isFree={isFree}
-              onToggleFree={(v) => {
-                setIsFree(v);
-                if (v) {
-                  setPrice('');
-                  setTouched(false);
-                }
-              }}
-              onNext={next}
-              canAdvance={canAdvance}
-            />
-          )}
-          {step === 2 && (
-            <DescriptionScreen
-              key="description"
-              value={description}
-              onChange={setDescription}
-              onNext={next}
-              canAdvance={canAdvance}
-            />
-          )}
-          {step === 3 && (
-            <SeasonScreen
-              key="season"
-              value={season}
-              onSelect={setSeason}
-              onNext={next}
-              canAdvance={canAdvance}
-            />
-          )}
-          {step === 4 && (
-            <TagsScreen
-              key="tags"
-              selected={displayTags}
-              onToggle={toggleTag}
-              onNext={next}
-              canAdvance={canAdvance}
-            />
-          )}
-          {step === 5 && (
-            <ReviewScreen
-              key="review"
-              tripName={tripName}
-              coverImage={coverImage}
-              totalDays={totalDays}
-              totalActivities={totalActivities}
-              totalCities={totalCities}
-              numericPrice={numericPrice}
-              earning={earning}
-              description={description}
-              tags={season ? [...tags, season] : tags}
-              formatBRL={formatBRL}
-              onPublish={next}
-              isPublishing={isPublishing}
-              onReviewTerms={() => {
-                setIsReviewingTerms(true);
-                setStep(0);
-              }}
-              season={season}
-              startDate={startDate}
-              endDate={endDate}
-            />
-          )}
-        </AnimatePresence>
+        <div className="flex-1 relative overflow-hidden">
+          <AnimatePresence mode="wait">
+            {step === 0 && <HowItWorksScreen key="how" onNext={next} onBack={back} onFAQ={() => setShowFAQ(true)} />}
+            {step === 1 && (
+              <InfoScreen
+                key="info"
+                name={name}
+                onNameChange={setName}
+                description={description}
+                onDescriptionChange={setDescription}
+                onNext={next}
+                canAdvance={canAdvance}
+              />
+            )}
+            {step === 2 && (
+              <TagsScreen
+                key="tags"
+                selected={displayTags}
+                onToggle={toggleTag}
+                onNext={next}
+                canAdvance={canAdvance}
+              />
+            )}
+            {step === 3 && (
+              <SeasonScreen
+                key="season"
+                seasons={seasons}
+                onToggleSeason={(s) => {
+                  if (s === 'Qualquer época do ano') {
+                    setSeasons(seasons.includes(s) ? [] : [s]);
+                  } else {
+                    setSeasons(prev => {
+                      const withoutAny = prev.filter(x => x !== 'Qualquer época do ano');
+                      if (withoutAny.includes(s)) return withoutAny.filter(x => x !== s);
+                      return [...withoutAny, s];
+                    });
+                  }
+                }}
+                dateType={dateType}
+                setDateType={setDateType}
+                duration={duration}
+                setDuration={setDuration}
+                month={month}
+                setMonth={setMonth}
+                onNext={next}
+                canAdvance={canAdvance}
+                startDateState={startDateState}
+                setStartDateState={setStartDateState}
+                endDateState={endDateState}
+                setEndDateState={setEndDateState}
+                formatDateRange={formatDateRange}
+              />
+            )}
+            {step === 4 && (
+              <PriceScreen
+                key="price"
+                value={price}
+                displayValue={formatPriceInput(price)}
+                onChange={(v) => {
+                  setPrice(v.replace(/\D/g, ''));
+                  if (touched) setTouched(false);
+                }}
+                onBlur={() => setTouched(true)}
+                error={priceError}
+                numericPrice={numericPrice}
+                platformFee={platformFee}
+                earning={earning}
+                formatBRL={formatBRL}
+                isFree={isFree}
+                onToggleFree={(v) => {
+                  setIsFree(v);
+                  if (v) {
+                    setPrice('');
+                    setTouched(false);
+                  }
+                }}
+                onNext={next}
+                canAdvance={canAdvance}
+              />
+            )}
+            {step === 5 && (
+              <ReviewScreen
+                key="review"
+                tripName={name || tripName}
+                coverImage={coverImage}
+                totalDays={totalDays}
+                totalActivities={totalActivities}
+                totalCities={totalCities}
+                numericPrice={numericPrice}
+                earning={earning}
+                description={description}
+                tags={tags}
+                formatBRL={formatBRL}
+                onPublish={next}
+                isPublishing={isPublishing}
+                onReviewTerms={() => {
+                  setIsReviewingTerms(true);
+                  setStep(0);
+                }}
+                seasons={seasons}
+                dateType={dateType}
+                duration={duration}
+                month={month}
+                startDateState={startDateState}
+                endDateState={endDateState}
+                destinations={destinations}
+              />
+            )}
+          </AnimatePresence>
+        </div>
+
+        <div className="w-full px-4 py-6 bg-white flex items-center shrink-0 z-30 relative shadow-[0_-8px_30px_rgba(0,0,0,0.06)]">
+          <button
+            onClick={next}
+            disabled={step === 5 ? isPublishing : !canAdvance}
+            className={cn(
+              'w-full h-14 rounded-[16px] font-["Urbanist"] font-bold text-[16px] transition-all flex items-center justify-center gap-2',
+              (step === 5 ? isPublishing : !canAdvance)
+                ? 'bg-[#E5E7DD] text-[#0A0A0A]/25 cursor-not-allowed opacity-60'
+                : 'bg-[#9DCC36] text-[#141530] hover:brightness-105 active:scale-[0.99]'
+            )}
+          >
+            {step === 5 ? (
+              isPublishing ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Publicando...
+                </>
+              ) : 'Publicar'
+            ) : step === 0 ? 'Começar a publicar' : step === 4 ? 'Revisar' : step === 2 ? `Continuar (${displayTags.length}/5)` : 'Continuar'}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -378,39 +510,26 @@ export function PublishItineraryFlow({
 
 /* ---------------- How it works ---------------- */
 
-function HowItWorksScreen({ onNext, hideCheckbox }: { onNext: () => void; hideCheckbox?: boolean }) {
-  const items: { icon: typeof Users; title: string; desc: string; color: string }[] = [
+function HowItWorksScreen({ onNext, onBack, onFAQ }: { onNext: () => void; onBack: () => void; onFAQ: () => void; hideCheckbox?: boolean }) {
+  const listItems = [
     {
-      icon: Users,
+      title: 'Ganhe dinheiro com seus roteiros',
+      subtitle: 'Defina o preço e receba por cada venda.',
+      divider: true,
+    },
+    {
       title: 'Alcance milhares de viajantes',
-      desc: 'Seu roteiro fica visível no marketplace para toda a comunidade.',
-      color: '#CDE3F3',
+      subtitle: 'Seus roteiros ficam disponíveis para quem está planejando uma viagem.',
+      divider: true,
     },
     {
-      icon: DollarSign,
-      title: 'Receba 90% de cada venda',
-      desc: 'Cobramos apenas 10% de taxa de serviço. O resto é seu.',
-      color: '#E8F1D4',
-    },
-    {
-      icon: Copy,
-      title: 'Cópia independente',
-      desc: 'A versão à venda é independente do seu roteiro privado.',
-      color: '#E0E7FF',
-    },
-    {
-      icon: ShieldCheck,
-      title: 'Pagamentos seguros',
-      desc: 'Saques via Pix com valor mínimo de R$ 30,00.',
-      color: '#FCE7C8',
-    },
-    {
-      icon: Star,
-      title: 'Construa sua reputação',
-      desc: 'Receba avaliações e suba no ranking de Top Criadores.',
-      color: '#F5D8E8',
+      title: 'Alcance milhares de viajantes',
+      subtitle: 'Crie experiências práticas e interativas para os viajantes acompanharem a viagem.',
+      divider: false,
     },
   ];
+
+
 
   return (
     <motion.div
@@ -418,68 +537,47 @@ function HowItWorksScreen({ onNext, hideCheckbox }: { onNext: () => void; hideCh
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.4 }}
-      className="absolute inset-0 flex items-center justify-center bg-[#F2F2F2] px-3 pt-12 pb-3"
+      className="absolute inset-0 flex flex-col bg-white overflow-hidden"
     >
-      <div className="relative w-full h-full max-w-[396px] rounded-[30px] overflow-hidden flex flex-col bg-white">
-        <div className="px-6 pt-24 pb-2">
-          <h1
-            className="text-[#0A0A0A] leading-[1.05] tracking-[-0.025em]"
-            style={{ fontSize: '32px', fontWeight: 800 }}
-          >
-            Como funciona<br />a venda
+      <div
+        className="flex-1 overflow-y-auto px-4 pb-6"
+        style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 66px)' }}
+      >
+        {/* Titulos */}
+        <div className="flex flex-col gap-2 mb-8 mt-2 w-full">
+          <h1 className="font-['Urbanist'] font-semibold text-[24px] leading-[29px] text-[#171F2C]">
+            Publique seus roteiros e inspire o mundo
           </h1>
-
+          <p className="font-['Urbanist'] font-medium text-[14px] leading-[20px] text-[#7F7F7F]">
+            Compartilhe suas viagens, ajude outros viajantes e ainda faça renda com o que você já ama fazer.
+          </p>
         </div>
 
-        <div className="flex-1 px-6 pt-6 pb-36 overflow-y-auto">
-          <div className="space-y-3">
-            {items.map(({ icon: Icon, title, desc, color }, i) => (
-              <motion.div
-                key={title}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.1 + i * 0.08 }}
-                className="flex items-start gap-3.5 p-3.5 rounded-2xl bg-[#FAFAFA] border border-[#0A0A0A]/5"
-              >
-                <div
-                  className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ background: color }}
-                >
-                  <Icon size={20} strokeWidth={2.2} className="text-[#0A0A0A]" />
-                </div>
-                <div className="flex-1 pt-0.5">
-                  <p className="text-[14px] font-bold text-[#0A0A0A] leading-tight">{title}</p>
-                  <p className="text-[12.5px] text-[#6B6B6B] leading-snug mt-1">{desc}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+        {/* Cards */}
+        <div className="relative w-full mb-10 mt-2 flex justify-center">
+          <img src="/cardsnew.png" alt="Exemplos de cards de roteiros publicados" className="w-full h-auto object-contain drop-shadow-[0px_4px_16px_rgba(0,0,0,0.15)]" />
         </div>
 
-        <div className="absolute left-0 right-0 bottom-0 px-6 pb-6 pt-2 bg-white flex flex-col gap-4">
-          <div className="absolute left-0 right-0 h-8 -top-8 bg-gradient-to-t from-white to-transparent pointer-events-none" />
-          {!hideCheckbox && (
-            <label className="flex items-center gap-2 cursor-pointer self-center">
-              <input
-                type="checkbox"
-                className="w-4 h-4 rounded border-[#0A0A0A]/20 text-[#9DCC36] focus:ring-[#9DCC36]"
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    localStorage.setItem('wai_hide_publish_onboarding', 'true');
-                  } else {
-                    localStorage.removeItem('wai_hide_publish_onboarding');
-                  }
-                }}
-              />
-              <span className="text-[13px] font-medium text-[#6B6B6B]">Não mostrar novamente</span>
-            </label>
-          )}
-          <button
-            onClick={onNext}
-            className="w-full h-14 rounded-2xl font-bold text-[15px] tracking-[-0.01em] bg-[#9DCC36] text-[#0A0A0A] hover:brightness-105 active:scale-[0.99] shadow-[0_8px_22px_-8px_rgba(157,204,54,0.5)] transition-all"
-          >
-            Entendi, vamos lá
-          </button>
+        {/* Lista */}
+        <div className="flex flex-col w-full mt-6">
+          {listItems.map((item, i) => (
+            <div key={i} className="flex flex-col w-full">
+              <div className="flex items-center gap-3 py-4">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 relative">
+                  <Target size={24} className="text-[#141530] absolute" strokeWidth={2} />
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-['Urbanist'] font-semibold text-[16px] leading-[19px] text-[#141530]">
+                    {item.title}
+                  </span>
+                  <span className="font-['Urbanist'] font-medium text-[14px] leading-[18px] text-[#7F7F7F]">
+                    {item.subtitle}
+                  </span>
+                </div>
+              </div>
+              {item.divider && <div className="h-px bg-[#F2F2F2] w-full" />}
+            </div>
+          ))}
         </div>
       </div>
     </motion.div>
@@ -522,134 +620,111 @@ function PriceScreen({
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -24 }}
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-      className="absolute inset-0 flex flex-col bg-[#F2F2F2]"
+      className="absolute inset-0 flex flex-col bg-white overflow-hidden"
     >
       <div className="flex-1 overflow-y-auto min-h-0">
         <div
-          className="flex flex-col justify-end min-h-full px-7 pb-32"
-          style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 68px)' }}
+          className="flex flex-col justify-start px-4 pb-6"
+          style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 72px)' }}
         >
-          <StepDots current={0} total={TOTAL_QUESTION_STEPS} />
-          <h1
-            className="text-[#0A0A0A] leading-[1.1] tracking-[-0.02em]"
-            style={{ fontSize: '28px', fontWeight: 800 }}
-          >
-            Quanto deseja<br />cobrar?
+          <PublishBreadcrumb step={4} />
+          <h1 className="font-['Urbanist'] font-semibold text-[22px] leading-[26px] text-[#171F2C]">
+            Por quanto você quer vender seu roteiro?
           </h1>
-          <p className="mt-2 text-[#6B6B6B] text-[13px] leading-snug max-w-[300px]">
-            Defina o preço de venda do seu roteiro no marketplace.
-          </p>
 
-          <div className="mt-6 relative">
-            <div
+          <div className="flex items-center gap-2 mb-6 mt-8">
+            <button
+              onClick={() => onToggleFree(false)}
               className={cn(
-                "flex items-center rounded-2xl bg-white px-5 transition-all shadow-[0_2px_8px_-2px_rgba(10,10,10,0.06)] overflow-hidden",
-                error ? "ring-1 ring-[#E5484D] border border-[#E5484D]" : "border border-transparent focus-within:ring-2 focus-within:ring-[#9DCC36]",
-                isFree && "opacity-50"
+                "px-6 py-2 rounded-full font-['Urbanist'] font-medium text-[14px] transition-all border",
+                !isFree
+                  ? "bg-[#141530] text-white border-[#141530]"
+                  : "bg-white text-[#171F2C] border-[#E5E5E5]"
               )}
-              style={{ height: '64px' }}
             >
-              <span className={cn(
-                "font-semibold text-[20px] mr-2 shrink-0 select-none",
-                isFree ? "text-[#0A0A0A]/20" : "text-[#0A0A0A]/40"
-              )}>
-                R$
-              </span>
-              <input
-                value={isFree ? '' : displayValue}
-                onChange={(e) => onChange(e.target.value)}
-                onBlur={onBlur}
-                placeholder={isFree ? 'Grátis' : '0,00'}
-                inputMode="numeric"
-                disabled={isFree}
-                className="flex-1 w-full h-full bg-transparent text-[#0A0A0A] font-semibold placeholder:text-[#0A0A0A]/25 outline-none"
-                style={{ fontSize: '20px' }}
-              />
-            </div>
-            <AnimatePresence>
-              {error && !isFree && (
-                <motion.p
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.18 }}
-                  className="mt-2 text-[13px] text-[#E5484D] font-medium"
-                  role="alert"
-                >
-                  {error}
-                </motion.p>
+              Cobrar
+            </button>
+            <button
+              onClick={() => onToggleFree(true)}
+              className={cn(
+                "px-6 py-2 rounded-full font-['Urbanist'] font-medium text-[14px] transition-all border",
+                isFree
+                  ? "bg-[#141530] text-white border-[#141530]"
+                  : "bg-white text-[#171F2C] border-[#E5E5E5]"
               )}
-            </AnimatePresence>
+            >
+              Grátis
+            </button>
           </div>
 
-          {/* Free toggle */}
-          <button
-            type="button"
-            onClick={() => onToggleFree(!isFree)}
-            className="mt-3 inline-flex items-center gap-2.5 px-1 py-1.5 active:opacity-70 transition-opacity text-left"
-          >
-            <div
-              className={cn(
-                'w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-colors border-2',
-                isFree ? 'bg-[#9DCC36] border-[#9DCC36]' : 'border-[#0A0A0A]/25 bg-transparent'
-              )}
-            >
-              {isFree && <div className="w-2 h-2 rounded-full bg-[#0A0A0A]" />}
-            </div>
-            <span className="text-[14px] font-semibold text-[#0A0A0A] leading-tight">
-              Quero disponibilizar de graça
-            </span>
-          </button>
-
-          <AnimatePresence>
-            {!isFree && numericPrice > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.2 }}
-                className="mt-4 rounded-2xl bg-white p-4 shadow-[0_2px_8px_-2px_rgba(10,10,10,0.06)]"
-              >
-                <div className="flex items-center justify-between text-[13px]">
-                  <span className="text-[#6B6B6B]">Preço de venda</span>
-                  <span className="font-semibold text-[#0A0A0A]">{formatBRL(numericPrice)}</span>
-                </div>
-                <div className="mt-2 flex items-center justify-between text-[13px]">
-                  <span className="text-[#6B6B6B]">Taxa de serviço (10%)</span>
-                  <span className="font-semibold text-[#E5484D]">− {formatBRL(platformFee)}</span>
-                </div>
-                <div className="mt-3 pt-3 border-t border-[#0A0A0A]/5 flex items-center justify-between">
-                  <div className="flex flex-col">
-                    <span className="text-[13px] font-semibold text-[#0A0A0A] leading-tight">Você recebe</span>
-                    <span className="text-[11px] text-[#6B6B6B] leading-tight mt-0.5">por roteiro vendido</span>
+          {!isFree && (
+            <>
+              {/* Input field */}
+              <div className="flex flex-col gap-2 mb-4">
+                <div
+                  className={cn(
+                    "flex flex-col relative rounded-[16px] bg-[#F4F4F4] transition-all px-4 py-2",
+                    error ? "ring-1 ring-[#E5484D] border border-[#E5484D]" : "border border-transparent focus-within:ring-1 focus-within:ring-[#141530]"
+                  )}
+                  style={{ height: '72px' }}
+                >
+                  <div className="flex items-center h-full">
+                    <Target size={20} className="text-[#171F2C] shrink-0 mr-3" />
+                    <div className="flex flex-col flex-1 h-full justify-center">
+                      <span className="font-['Urbanist'] font-medium text-[12px] text-[#7F7F7F]">
+                        Preço do roteiro
+                      </span>
+                      <div className="flex items-center">
+                        <span className="font-['Urbanist'] font-semibold text-[16px] text-[#171F2C] mr-1">R$</span>
+                        <input
+                          value={displayValue}
+                          onChange={(e) => onChange(e.target.value)}
+                          onBlur={onBlur}
+                          placeholder="0,00"
+                          inputMode="numeric"
+                          className="flex-1 w-full bg-transparent font-['Urbanist'] font-semibold text-[16px] text-[#171F2C] placeholder:text-[#171F2C]/50 outline-none"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <span className="text-[15px] font-bold text-[#0A0A0A]">{formatBRL(earning)}</span>
                 </div>
-                <div className="mt-3 pt-3 border-t border-[#0A0A0A]/5 flex items-center gap-2 text-[12px] text-[#6B6B6B]">
-                  <TrendingUp size={14} className="text-[#9DCC36] shrink-0" />
-                  <span>Cobramos uma taxa de serviço de 10% apenas sobre cada venda realizada.</span>
+                {error && (
+                  <p className="text-[13px] text-[#E5484D] font-medium ml-1" role="alert">
+                    {error}
+                  </p>
+                )}
+              </div>
+
+              {/* Card below input */}
+              <div className="rounded-[16px] bg-white border border-[#E5E5E5] p-4 flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <span className="font-['Urbanist'] font-medium text-[14px] text-[#171F2C]">Você recebe por venda</span>
+                  <span className="font-['Urbanist'] font-semibold text-[14px] text-[#171F2C]">R$ {earning.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                <div className="w-full border-t border-[#F2F2F2]" />
+                <div className="flex gap-2">
+                  <Target size={16} className="text-[#171F2C] shrink-0 mt-0.5" />
+                  <span className="font-['Urbanist'] font-medium text-[12px] leading-[18px] text-[#7F7F7F]">
+                    Nós cobramos 10% de taxa. Você recebe 90% de cada venda.
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
+
+          {isFree && (
+            <div className="rounded-[16px] bg-white border border-[#E5E5E5] p-4 flex items-center gap-3">
+              <Target size={24} className="text-[#141530] shrink-0" />
+              <span className="font-['Urbanist'] font-medium text-[14px] leading-[20px] text-[#7F7F7F]">
+                Seu roteiro ficará disponível gratuitamente na Loja WAI.
+              </span>
+            </div>
+          )}
+
+          {/* error message moved up */}
         </div>
       </div>
-
-      <div className="absolute left-0 right-0 bottom-0 px-6 pb-8 pt-4 bg-gradient-to-t from-[#F2F2F2] via-[#F2F2F2] to-transparent pointer-events-none z-10">
-        <button
-          onClick={onNext}
-          disabled={!canAdvance}
-          className={cn(
-            'w-full h-14 rounded-2xl font-bold text-[15px] tracking-[-0.01em] transition-all pointer-events-auto',
-            !canAdvance
-              ? 'bg-[#E5E7DD] text-[#0A0A0A]/25 cursor-not-allowed opacity-60 pointer-events-none shadow-none'
-              : 'bg-[#9DCC36] text-[#0A0A0A] hover:brightness-105 active:scale-[0.99] shadow-[0_8px_22px_-8px_rgba(157,204,54,0.5)]'
-          )}
-        >
-          Próximo
-        </button>
-      </div>
-    </motion.div >
+    </motion.div>
   );
 }
 
@@ -669,9 +744,13 @@ function ReviewScreen({
   onPublish,
   isPublishing,
   onReviewTerms,
-  season,
-  startDate,
-  endDate,
+  seasons,
+  dateType,
+  duration,
+  month,
+  startDateState,
+  endDateState,
+  destinations,
 }: {
   tripName?: string;
   coverImage?: string;
@@ -686,13 +765,14 @@ function ReviewScreen({
   onPublish: () => void;
   isPublishing?: boolean;
   onReviewTerms: () => void;
-  season?: string;
-  startDate?: Date;
-  endDate?: Date;
+  seasons: string[];
+  dateType?: 'FLEXIBLE' | 'SPECIFIC';
+  duration?: string;
+  month?: string;
+  startDateState?: Date;
+  endDateState?: Date;
+  destinations?: string[];
 }) {
-  const today = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  const platformFee = numericPrice - earning;
-
   // Cover fallback
   const cover =
     coverImage ||
@@ -700,24 +780,15 @@ function ReviewScreen({
 
   const formatTripPeriod = (start?: Date, end?: Date): string => {
     if (!start || !end) return '';
-    const startDay = start.getDate();
-    const endDay = end.getDate();
-    const startMonth = start.toLocaleDateString('pt-BR', { month: 'long' }).toLowerCase();
-    const endMonth = end.toLocaleDateString('pt-BR', { month: 'long' }).toLowerCase();
-    const startYear = start.getFullYear();
-    const endYear = end.getFullYear();
-
-    if (startYear !== endYear) {
-      return `${startDay} de ${startMonth} de ${startYear} a ${endDay} de ${endMonth} de ${endYear}`;
-    }
-    if (startMonth !== endMonth) {
-      return `${startDay} de ${startMonth} a ${endDay} de ${endMonth} de ${endYear}`;
-    }
-    return `${startDay} a ${endDay} de ${endMonth} de ${endYear}`;
+    return `${format(start, "dd MMM", { locale: ptBR })} - ${format(end, "dd MMM", { locale: ptBR })}`;
   };
 
-  const selectedSeasonOption = SEASONS_OPTIONS.find(s => s.id === season);
-  const seasonLabel = selectedSeasonOption ? selectedSeasonOption.label : 'O ano todo';
+  let reviewDays = totalDays ?? 0;
+  if (dateType === 'FLEXIBLE') {
+    reviewDays = duration ? Number(duration) : (totalDays ?? 0);
+  } else if (dateType === 'SPECIFIC' && startDateState && endDateState) {
+    reviewDays = Math.round((endDateState.getTime() - startDateState.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  }
 
   return (
     <motion.div
@@ -725,158 +796,169 @@ function ReviewScreen({
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -24 }}
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-      className="absolute inset-0 overflow-y-auto bg-[#F2F2F2]"
+      className="absolute inset-0 flex flex-col bg-[#F3F3F3] overflow-hidden"
     >
       <div
-        className="px-7 pb-8"
-        style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 68px)' }}
+        className="flex-1 overflow-y-auto min-h-0 px-4 pb-12"
+        style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 72px)' }}
       >
-        <StepDots current={4} total={TOTAL_QUESTION_STEPS} />
-        <h1
-          className="text-[#0A0A0A] leading-[1.15] tracking-[-0.02em]"
-          style={{ fontSize: '28px', fontWeight: 800 }}
-        >
-          Revise as<br />informações<br />do seu roteiro
-        </h1>
-        <p className="mt-2 text-[#6B6B6B] text-[13px] leading-snug max-w-[300px]">
-          Confira os detalhes antes de publicar no marketplace.
-        </p>
+        <PublishBreadcrumb step={5} />
+        <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-4">
+            <h1 className="font-['Urbanist'] font-semibold text-[22px] leading-[26px] text-[#171F2C]">
+              Revise seu roteiro
+            </h1>
 
-        {/* Trip summary card */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-          className="mt-6 rounded-3xl bg-white shadow-[0_8px_24px_-12px_rgba(10,10,10,0.15)] overflow-hidden"
-        >
-          {/* Cover image with title */}
-          <div className="relative">
-            <img
-              src={cover}
-              alt={tripName || 'Roteiro'}
-              className="w-full h-[160px] object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
-            <div className="absolute inset-x-0 bottom-0 p-4">
-              <h3 className="text-white font-extrabold text-[18px] leading-tight tracking-tight line-clamp-2">
-                {tripName || 'Meu roteiro'}
-              </h3>
+            <div
+              className="rounded-[16px] bg-transparent border border-[#B6B6B6] p-4 flex flex-row items-center gap-2"
+              style={{ height: '62px' }}
+            >
+              <div className="w-4 h-4 bg-[#141530] flex items-center justify-center shrink-0">
+                <Target size={12} className="text-white" />
+              </div>
+              <span className="font-['Urbanist'] font-medium text-[12px] leading-[14px] text-[rgba(26,28,64,0.66)]">
+                Depois de publicar, o itinerário não poderá ser editado. Confira todos os detalhes antes de publicar.
+              </span>
             </div>
           </div>
 
-          {/* Stats */}
-          <div className="px-5 pt-4">
-            <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-xl bg-[#F2F2F2] py-3 px-2 text-center">
-                <p className="text-[16px] font-extrabold text-[#1A1C40] leading-none">{totalDays ?? 0}</p>
-                <p className="mt-1 text-[10.5px] text-[#6B6B6B] font-medium">
-                  {(totalDays ?? 0) === 1 ? 'Dia' : 'Dias'}
-                </p>
-              </div>
-              <div className="rounded-xl bg-[#F2F2F2] py-3 px-2 text-center">
-                <p className="text-[16px] font-extrabold text-[#1A1C40] leading-none">{totalActivities ?? 0}</p>
-                <p className="mt-1 text-[10.5px] text-[#6B6B6B] font-medium">
-                  {(totalActivities ?? 0) === 1 ? 'Atividade' : 'Atividades'}
-                </p>
-              </div>
-              <div className="rounded-xl bg-[#F2F2F2] py-3 px-2 text-center">
-                <p className="text-[16px] font-extrabold text-[#1A1C40] leading-none">{totalCities ?? 1}</p>
-                <p className="mt-1 text-[10.5px] text-[#6B6B6B] font-medium">
-                  {(totalCities ?? 1) === 1 ? 'Cidade' : 'Cidades'}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Melhor época & Período da viagem metadata list */}
-          <div className="mx-5 mt-4 pt-4 border-t border-[#0A0A0A]/5 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-[#FDF2F8] text-[#DB2777]">
-                <Flower className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-[13px] font-bold text-[#0A0A0A] leading-tight">Melhor época</p>
-                <p className="text-[12px] text-[#6B6B6B] mt-0.5 leading-none">{seasonLabel}</p>
+          {/* Trip summary card */}
+          <div className="rounded-[16px] bg-white overflow-hidden flex flex-col items-center pb-6">
+            {/* Cover image with price pill */}
+            <div className="relative w-full h-[135px]">
+              <img
+                src={cover}
+                alt={tripName || 'Roteiro'}
+                className="w-full h-full object-cover rounded-t-[8px]"
+              />
+              <div className="absolute top-[15px] left-[16px] bg-[#141530] rounded-[16px] px-4 py-2 flex items-center gap-4">
+                <span className="font-['Urbanist'] font-bold text-[14px] leading-[17px] text-[#FEFEFE] text-center">
+                  {numericPrice > 0 ? formatBRL(numericPrice) : 'Grátis'}
+                </span>
               </div>
             </div>
 
-            {!tags.includes('_FLEXIBLE_DATES_') && startDate && endDate && (
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-[#EFF6FF] text-[#2563EB]">
-                  <Calendar className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-[13px] font-bold text-[#0A0A0A] leading-tight">Período da viagem</p>
-                  <p className="text-[12px] text-[#6B6B6B] mt-0.5 leading-none">
-                    {formatTripPeriod(startDate, endDate)}
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
+            <div className="w-full px-4 pt-4 pb-0 flex flex-col gap-6">
+              <div className="flex flex-col gap-6">
+                <div className="flex flex-col gap-2">
+                  <h3 className="font-['Urbanist'] font-semibold text-[16px] leading-[19px] text-[#141530]">
+                    {tripName || 'Meu roteiro'}
+                  </h3>
 
-          {/* Description + tags */}
-          {(description || tags.length > 0) && (
-            <div className="mx-5 mt-4 pt-4 border-t border-[#0A0A0A]/8 space-y-3">
-              {description && (
-                <div>
-                  <p className="text-[11px] text-[#6B6B6B] font-semibold uppercase tracking-wide mb-1.5">Descrição</p>
-                  <p className="text-[13px] text-[#1A1C40] leading-snug line-clamp-3">{description}</p>
-                </div>
-              )}
-              {tags.length > 0 && (
-                <div>
-                  <p className="text-[11px] text-[#6B6B6B] font-semibold uppercase tracking-wide mb-1.5">Tags</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {tags.filter(t => t !== '_FLEXIBLE_DATES_').map((t) => (
-                      <span
-                        key={t}
-                        className="px-2.5 py-1 rounded-full text-[12px] font-semibold bg-[#E7E7EE] text-[#1A1C40]"
-                      >
-                        {t}
-                      </span>
-                    ))}
+                  <div className="flex flex-row items-center gap-2">
+                    <span className="font-['Urbanist'] font-medium text-[14px] leading-[17px] text-[#7F7F7F]">
+                      {reviewDays} {reviewDays === 1 ? 'dia' : 'dias'}
+                    </span>
+                    <div className="w-[11px] h-0 border border-[#7F7F7F] -rotate-90" />
+                    <span className="font-['Urbanist'] font-medium text-[14px] leading-[17px] text-[#7F7F7F]">
+                      {totalCities ?? 1} {(totalCities ?? 1) === 1 ? 'cidade' : 'cidades'}
+                    </span>
+                    <div className="w-[11px] h-0 border border-[#7F7F7F] -rotate-90" />
+                    <span className="font-['Urbanist'] font-medium text-[14px] leading-[17px] text-[#7F7F7F]">
+                      {totalActivities ?? 0} atividades
+                    </span>
                   </div>
                 </div>
-              )}
+
+                {description && (
+                  <p className="font-['Urbanist'] font-medium text-[14px] leading-[18px] text-[#7F7F7F]">
+                    {description}
+                  </p>
+                )}
+              </div>
+
+              {/* List items */}
+              <div className="flex flex-col gap-6 w-full">
+                {/* Destinos */}
+                <div className="flex flex-col gap-4 w-full">
+                  <div className="flex flex-row items-center gap-6 w-full">
+                    <div className="flex flex-row items-start gap-3 w-full">
+                      <Target size={24} className="text-[#141530] shrink-0" />
+                      <div className="flex flex-col justify-center gap-2 w-full">
+                        <span className="font-['Urbanist'] font-semibold text-[16px] leading-[19px] text-[#141530]">
+                          {destinations && destinations.length > 1 ? 'Destinos' : 'Destino'}
+                        </span>
+                        <span className="font-['Urbanist'] font-medium text-[14px] leading-[17px] text-[#7F7F7F]">
+                          {(destinations && destinations.length > 0) ? destinations.join(' | ') : 'Nenhum destino definido'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="w-full h-0 border border-[#F2F2F2]" />
+                </div>
+
+                {/* Época recomendada */}
+                <div className="flex flex-col gap-4 w-full">
+                  <div className="flex flex-row items-center gap-6 w-full">
+                    <div className="flex flex-row items-start gap-3 w-full">
+                      <Target size={24} className="text-[#141530] shrink-0" />
+                      <div className="flex flex-col justify-center gap-2 w-full">
+                        <span className="font-['Urbanist'] font-semibold text-[16px] leading-[19px] text-[#141530]">
+                          Época recomendada
+                        </span>
+                        <span className="font-['Urbanist'] font-medium text-[14px] leading-[17px] text-[#7F7F7F]">
+                          {seasons.length > 0 ? seasons.join(', ') : 'Nenhuma época definida'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="w-full h-0 border border-[#F2F2F2]" />
+                </div>
+
+                {/* Período do roteiro */}
+                <div className="flex flex-col gap-4 w-full">
+                  <div className="flex flex-row items-center gap-6 w-full">
+                    <div className="flex flex-row items-start gap-3 w-full">
+                      <Target size={24} className="text-[#141530] shrink-0" />
+                      <div className="flex flex-col justify-center gap-2 w-full">
+                        <span className="font-['Urbanist'] font-semibold text-[16px] leading-[19px] text-[#141530]">
+                          Período do roteiro
+                        </span>
+                        <span className="font-['Urbanist'] font-medium text-[14px] leading-[17px] text-[#7F7F7F]">
+                          {dateType === 'SPECIFIC' && startDateState && endDateState
+                            ? formatTripPeriod(startDateState, endDateState)
+                            : duration ? `${duration} dias${month ? ` (${month})` : ''}`
+                              : 'Nenhum período definido'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="w-full h-0 border border-[#F2F2F2]" />
+                </div>
+
+                {/* Características */}
+                <div className="flex flex-col gap-4 w-full">
+                  <div className="flex flex-row items-center gap-6 w-full">
+                    <div className="flex flex-row items-start gap-3 w-full">
+                      <Target size={24} className="text-[#141530] shrink-0" />
+                      <div className="flex flex-col justify-center gap-2 w-full">
+                        <span className="font-['Urbanist'] font-semibold text-[16px] leading-[19px] text-[#141530]">
+                          Perfeito para
+                        </span>
+                        <span className="font-['Urbanist'] font-medium text-[14px] leading-[17px] text-[#7F7F7F]">
+                          {tags.filter(t => t !== '_FLEXIBLE_DATES_').length > 0 
+                            ? tags
+                                .filter(t => t !== '_FLEXIBLE_DATES_')
+                                .map(t => t.charAt(0).toUpperCase() + t.slice(1))
+                                .join(' | ')
+                            : 'Nenhuma característica definida'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
             </div>
-          )}
-
-          <div className="pb-5" />
-        </motion.div>
-      </div>
-
-      <div className="sticky bottom-0 z-10">
-        <div className="h-8 bg-gradient-to-t from-[#F2F2F2] to-transparent pointer-events-none" />
-        <div className="px-6 pb-8 bg-[#F2F2F2]">
-          <div className="flex items-start gap-2.5 px-1 pb-4">
-            <Info size={16} strokeWidth={2} className="text-[#6B6B6B] shrink-0 mt-0.5" />
-            <p className="text-[12px] text-[#6B6B6B] leading-normal flex-1">
-              Ao publicar este roteiro, você concorda com os nossos{' '}
-              <button
-                onClick={onReviewTerms}
-                className="text-[#6B6B6B] font-semibold underline decoration-[#6B6B6B]/40 hover:decoration-[#6B6B6B] transition-colors"
-              >
-                Termos de Uso para Criadores
-              </button>
-              .
-            </p>
           </div>
 
-          <button
-            onClick={onPublish}
-            disabled={isPublishing}
-            className="w-full h-14 rounded-2xl font-bold text-[15px] tracking-[-0.01em] bg-[#9DCC36] text-[#0A0A0A] hover:brightness-105 active:scale-[0.99] disabled:opacity-70 disabled:active:scale-100 shadow-[0_8px_22px_-8px_rgba(157,204,54,0.5)] transition-all flex items-center justify-center gap-2"
-          >
-            {isPublishing ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Publicando...
-              </>
-            ) : (
-              'Publicar roteiro'
-            )}
-          </button>
+          {/* Termos e condições agora rola com a página */}
+          <span className="font-['Urbanist'] font-medium text-[14px] leading-[18px] text-[#646464]">
+            Ao publicar, você concorda com os{' '}
+            <button onClick={onReviewTerms} className="font-bold underline">
+              Termos e condições.
+            </button>
+          </span>
         </div>
       </div>
     </motion.div>
@@ -885,19 +967,23 @@ function ReviewScreen({
 
 /* ---------------- Description ---------------- */
 
-function DescriptionScreen({
-  value,
-  onChange,
+function InfoScreen({
+  name,
+  onNameChange,
+  description,
+  onDescriptionChange,
   onNext,
   canAdvance,
 }: {
-  value: string;
-  onChange: (v: string) => void;
+  name: string;
+  onNameChange: (v: string) => void;
+  description: string;
+  onDescriptionChange: (v: string) => void;
   onNext: () => void;
   canAdvance: boolean;
 }) {
   const MAX = 500;
-  const remaining = MAX - value.length;
+  const remaining = MAX - description.length;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -906,7 +992,7 @@ function DescriptionScreen({
       el.style.height = 'auto';
       el.style.height = el.scrollHeight + 'px';
     }
-  }, [value]);
+  }, [description]);
 
   return (
     <motion.div
@@ -914,57 +1000,58 @@ function DescriptionScreen({
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -24 }}
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-      className="absolute inset-0 flex flex-col bg-[#F2F2F2]"
+      className="absolute inset-0 flex flex-col bg-white overflow-hidden"
     >
       <div className="flex-1 overflow-y-auto min-h-0">
         <div
-          className="flex flex-col justify-end min-h-full px-7 pb-40"
-          style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 68px)' }}
+          className="flex flex-col justify-start px-4 pb-6"
+          style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 72px)' }}
         >
-          <StepDots current={1} total={TOTAL_QUESTION_STEPS} />
-          <h1
-            className="text-[#0A0A0A] leading-[1.1] tracking-[-0.02em]"
-            style={{ fontSize: '28px', fontWeight: 800 }}
-          >
-            Adicione uma<br />descrição
+          <PublishBreadcrumb step={1} />
+          <h1 className="font-['Urbanist'] font-semibold text-[22px] leading-[26px] text-[#171F2C] mb-2">
+            O que os viajantes vão encontrar neste roteiro?
           </h1>
-          <p className="mt-2 text-[#6B6B6B] text-[13px] leading-snug max-w-[320px]">
-            Conte aos viajantes o que torna esse roteiro especial. Você pode editar essa descrição depois.
+          <p className="font-['Urbanist'] font-medium text-[14px] leading-[20px] text-[#7F7F7F] mb-8">
+            Dê uma ideia do que está no roteiro e do que eles podem esperar da viagem.
           </p>
 
-          <div className="mt-6">
-            <Textarea
-              ref={textareaRef}
-              value={value}
-              onChange={(e) => onChange(e.target.value.slice(0, MAX))}
-              placeholder="Ex: Um roteiro de 5 dias por Lisboa com os melhores miradouros, restaurantes locais e dicas para fugir das multidões..."
-              autoFocus
-              className="rounded-2xl bg-white border-0 text-[#0A0A0A] placeholder:text-[#0A0A0A]/30 focus-visible:ring-2 focus-visible:ring-[#9DCC36] focus-visible:ring-offset-0 shadow-[0_2px_8px_-2px_rgba(10,10,10,0.06)] resize-none p-5"
-              style={{ fontSize: '16px', minHeight: '180px', lineHeight: '1.5', overflow: 'hidden' }}
-            />
-            <div className="mt-2 flex justify-between text-[12px] text-[#6B6B6B]">
-              <span>Mínimo 20 caracteres</span>
-              <span>{remaining} restantes</span>
+          <div className="flex flex-col gap-4">
+            {/* Input Name */}
+            <div className="bg-field border border-transparent focus-within:border-primary transition-colors rounded-[16px] p-4 flex flex-col gap-1">
+              <label className="font-['Urbanist'] text-[12px] font-medium text-[#7F7F7F]">
+                Nome do roteiro
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => onNameChange(e.target.value)}
+                className="bg-transparent border-0 p-0 font-['Urbanist'] text-[16px] font-semibold text-[#141530] focus:ring-0 placeholder:text-[#141530]/30 w-full outline-none"
+              />
+            </div>
+
+            {/* Input Description */}
+            <div className="flex flex-col gap-1">
+              <div className="bg-field border border-transparent focus-within:border-primary transition-colors rounded-[16px] p-4 flex flex-col gap-1">
+                <label className="font-['Urbanist'] text-[12px] font-medium text-[#7F7F7F]">
+                  Sobre o roteiro
+                </label>
+                <textarea
+                  ref={textareaRef}
+                  value={description}
+                  onChange={(e) => onDescriptionChange(e.target.value.slice(0, MAX))}
+                  placeholder="Conte sobre o seu roteiro..."
+                  className="bg-transparent border-0 p-0 font-['Urbanist'] text-[14px] font-medium text-[#141530] focus:ring-0 placeholder:text-[#141530]/30 resize-none outline-none w-full"
+                  style={{ minHeight: '120px' }}
+                />
+              </div>
+              <div className="flex justify-start text-[12px] font-['Urbanist'] font-medium text-[#7F7F7F] px-1 mt-1">
+                {description.length}/{MAX}
+              </div>
             </div>
           </div>
         </div>
       </div>
-
-      <div className="absolute left-0 right-0 bottom-0 px-6 pb-8 pt-4 bg-gradient-to-t from-[#F2F2F2] via-[#F2F2F2] to-transparent pointer-events-none z-10">
-        <button
-          onClick={onNext}
-          disabled={!canAdvance}
-          className={cn(
-            'w-full h-14 rounded-2xl font-bold text-[15px] tracking-[-0.01em] transition-all pointer-events-auto',
-            !canAdvance
-              ? 'bg-[#E5E7DD] text-[#0A0A0A]/25 cursor-not-allowed opacity-60 pointer-events-none shadow-none'
-              : 'bg-[#9DCC36] text-[#0A0A0A] hover:brightness-105 active:scale-[0.99] shadow-[0_8px_22px_-8px_rgba(157,204,54,0.5)]'
-          )}
-        >
-          Próximo
-        </button>
-      </div>
-    </motion.div >
+    </motion.div>
   );
 }
 
@@ -1047,167 +1134,320 @@ function TagsScreen({
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -24 }}
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-      className="absolute inset-0 flex flex-col bg-[#F2F2F2]"
+      className="absolute inset-0 flex flex-col bg-white overflow-hidden"
     >
       <div className="flex-1 overflow-y-auto min-h-0">
         <div
-          className="flex flex-col min-h-full px-7 pb-40"
-          style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 68px)' }}
+          className="flex flex-col justify-start px-4 pb-6"
+          style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 72px)' }}
         >
-          <div className="mt-auto">
-            <StepDots current={3} total={TOTAL_QUESTION_STEPS} />
-            <h1
-              className="text-[#0A0A0A] leading-[1.1] tracking-[-0.02em]"
-              style={{ fontSize: '28px', fontWeight: 800 }}
-            >
-              Sobre o que é<br />seu roteiro?
+          <PublishBreadcrumb step={2} />
+          <div className="flex flex-col gap-2 mb-10">
+            <h1 className="font-['Urbanist'] font-semibold text-[22px] leading-[26px] text-[#171F2C]">
+              O que combina com o seu roteiro?
             </h1>
-            <p className="mt-2 text-[#6B6B6B] text-[13px] leading-snug max-w-[320px]">
-              Selecione até 5 tags que descrevam a experiência.
+            <p className="font-['Urbanist'] font-medium text-[14px] leading-[20px] text-[#7F7F7F]">
+              Escolha até 5 opções que melhor representam a experiência.
             </p>
+          </div>
 
-            <div className="mt-8 flex flex-col gap-6">
-              {TAG_CATEGORIES.map((category) => (
-                <div key={category.title}>
-                  <h3 className="text-[15px] font-semibold text-[#0A0A0A] mb-3">
-                    {category.title}
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {category.tags.map((t) => {
-                      const isSelected = selected.includes(t.label);
-                      const disabled = !isSelected && limitReached;
-                      return (
-                        <button
-                          key={t.id}
-                          onClick={() => onToggle(t.label)}
-                          disabled={disabled}
-                          className={cn(
-                            'px-4 h-10 rounded-full text-[13px] font-semibold transition-all border flex items-center gap-1.5',
-                            isSelected
-                              ? 'bg-[#1A1C40] text-white border-[#1A1C40]'
-                              : disabled
-                                ? 'bg-white text-[#0A0A0A]/30 border-[#0A0A0A]/5 cursor-not-allowed'
-                                : 'bg-white text-[#1A1C40] border-[#0A0A0A]/8 hover:border-[#9DCC36]'
-                          )}
-                        >
-                          <span>{t.emoji}</span>
-                          <span>{t.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+          <div className="flex flex-col gap-8">
+            {TAG_CATEGORIES.map((cat) => (
+              <div key={cat.title} className="flex flex-col gap-4">
+                <h2 className="font-['Urbanist'] font-semibold text-[16px] leading-[19px] text-[#171F2C]">
+                  {cat.title}
+                </h2>
+                <div className="flex flex-wrap gap-3">
+                  {cat.tags.map((tag) => {
+                    const isSelected = selected.includes(tag.id);
+                    const disabled = !isSelected && limitReached;
+                    return (
+                      <button
+                        key={tag.id}
+                        onClick={() => onToggle(tag.id)}
+                        disabled={disabled}
+                        className={cn(
+                          "box-border flex flex-row items-center justify-center px-4 py-2 gap-1 h-10 border rounded-[16px] transition-all font-['Urbanist'] shrink-0",
+                          isSelected
+                            ? "bg-[#141530] text-white border-[#141530]"
+                            : "bg-white text-[#141530] border-[#141530]",
+                          disabled && "opacity-40 cursor-not-allowed border-[#141530]/20 text-[#141530]/40"
+                        )}
+                      >
+                        <div className="flex items-center justify-center w-6 h-6">
+                          <span className="text-[16px] leading-none">{tag.emoji}</span>
+                        </div>
+                        <span className="font-medium text-[14px] leading-[17px] text-center">{tag.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
-
-            <p className="mt-8 text-[12px] text-[#6B6B6B]">
-              {selected.length}/5 selecionadas
-            </p>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      <div className="absolute left-0 right-0 bottom-0 px-6 pb-8 pt-4 bg-gradient-to-t from-[#F2F2F2] via-[#F2F2F2] to-transparent pointer-events-none z-10">
-        <button
-          onClick={onNext}
-          disabled={!canAdvance}
-          className={cn(
-            'w-full h-14 rounded-2xl font-bold text-[15px] tracking-[-0.01em] transition-all pointer-events-auto',
-            !canAdvance
-              ? 'bg-[#E5E7DD] text-[#0A0A0A]/25 cursor-not-allowed opacity-60 pointer-events-none shadow-none'
-              : 'bg-[#9DCC36] text-[#0A0A0A] hover:brightness-105 active:scale-[0.99] shadow-[0_8px_22px_-8px_rgba(157,204,54,0.5)]'
-          )}
-        >
-          Próximo
-        </button>
-      </div>
-    </motion.div >
+
+    </motion.div>
   );
 }
 
 /* ---------------- Season ---------------- */
 
 function SeasonScreen({
-  value,
-  onSelect,
+  seasons,
+  onToggleSeason,
+  dateType,
+  setDateType,
+  duration,
+  setDuration,
+  month,
+  setMonth,
   onNext,
   canAdvance,
+  startDateState,
+  setStartDateState,
+  endDateState,
+  setEndDateState,
+  formatDateRange,
 }: {
-  value: string;
-  onSelect: (v: string) => void;
+  seasons: string[];
+  onToggleSeason: (v: string) => void;
+  dateType: 'FLEXIBLE' | 'SPECIFIC';
+  setDateType: (v: 'FLEXIBLE' | 'SPECIFIC') => void;
+  duration: string;
+  setDuration: (v: string) => void;
+  month: string;
+  setMonth: (v: string) => void;
   onNext: () => void;
   canAdvance: boolean;
+  startDateState: Date | undefined;
+  setStartDateState: (d: Date | undefined) => void;
+  endDateState: Date | undefined;
+  setEndDateState: (d: Date | undefined) => void;
+  formatDateRange: () => string;
 }) {
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const SEASONS_LIST = [
+    'Qualquer época do ano',
+    'Verão',
+    'Primavera',
+    'Inverno',
+    'Outono'
+  ];
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 24 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -24 }}
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-      className="absolute inset-0 flex flex-col bg-[#F2F2F2]"
+      className="absolute inset-0 flex flex-col bg-white overflow-hidden"
     >
       <div className="flex-1 overflow-y-auto min-h-0">
         <div
-          className="flex flex-col justify-end min-h-full px-7 pb-40"
-          style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 68px)' }}
+          className="flex flex-col justify-start px-4 pb-6"
+          style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 72px)' }}
         >
-          <StepDots current={2} total={TOTAL_QUESTION_STEPS} />
-          <h1
-            className="text-[#0A0A0A] leading-[1.1] tracking-[-0.02em]"
-            style={{ fontSize: '28px', fontWeight: 800 }}
-          >
-            Esse roteiro é ideal para qual época do ano?
-          </h1>
-          <p className="mt-2 text-[#6B6B6B] text-[13px] leading-snug max-w-[320px]">
-            Selecione a estação mais indicada para fazer esta viagem
-          </p>
+          <PublishBreadcrumb step={3} />
+          <div className="flex flex-col gap-2 mb-10">
+            <h1 className="font-['Urbanist'] font-semibold text-[22px] leading-[26px] text-[#171F2C]">
+              O que combina com o seu roteiro?
+            </h1>
+            <p className="font-['Urbanist'] font-medium text-[14px] leading-[20px] text-[#7F7F7F]">
+              Escolha as opções que melhor representam a sua viagem.
+            </p>
+          </div>
 
-          <div className="mt-6 flex flex-col gap-2.5">
-            {SEASONS_OPTIONS.map((s) => {
-              const isSelected = value === s.label;
-              return (
+          <div className="flex flex-col gap-10">
+            {/* Period Section */}
+            <div className="flex flex-col gap-4">
+              <h2 className="font-['Urbanist'] font-semibold text-[16px] leading-[19px] text-[#171F2C]">
+                Período da viagem
+              </h2>
+
+              <div className="flex bg-[#F4F4F4] rounded-[32px] p-[3px]">
                 <button
-                  key={s.id}
-                  onClick={() => onSelect(s.label)}
+                  onClick={() => {
+                    if (dateType !== 'FLEXIBLE') {
+                      setDateType('FLEXIBLE');
+                    }
+                  }}
                   className={cn(
-                    'h-14 rounded-2xl px-5 flex items-center gap-3 transition-all border-2 text-[15px] font-semibold text-left',
-                    isSelected
-                      ? 'border-[#9DCC36] bg-[#9DCC36]/10 text-[#0A0A0A]'
-                      : 'border-transparent bg-white text-[#0A0A0A] hover:border-[#0A0A0A]/10 shadow-[0_2px_8px_-2px_rgba(10,10,10,0.04)]'
+                    "flex-1 h-[44px] rounded-[32px] font-['Urbanist'] font-semibold text-[14px] transition-all",
+                    dateType === 'FLEXIBLE' ? "bg-[#141530] text-white" : "bg-transparent text-[#141530]"
                   )}
                 >
-                  <span className="text-[18px]">{s.emoji}</span>
-                  <span className="flex-1">{s.label}</span>
-                  <div
-                    className={cn(
-                      'w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-colors border-2',
-                      isSelected ? 'bg-[#9DCC36] border-[#9DCC36]' : 'border-[#0A0A0A]/25 bg-transparent'
-                    )}
-                  >
-                    {isSelected && <div className="w-2 h-2 rounded-full bg-[#0A0A0A]" />}
-                  </div>
+                  Data flexível
                 </button>
-              );
-            })}
+                <button
+                  onClick={() => {
+                    if (dateType !== 'SPECIFIC') {
+                      setDateType('SPECIFIC');
+                    }
+                  }}
+                  className={cn(
+                    "flex-1 h-[44px] rounded-[32px] font-['Urbanist'] font-semibold text-[14px] transition-all",
+                    dateType === 'SPECIFIC' ? "bg-[#141530] text-white" : "bg-transparent text-[#141530]"
+                  )}
+                >
+                  Data específica
+                </button>
+              </div>
+
+              {dateType === 'FLEXIBLE' && (
+                <div className="flex flex-col gap-3">
+                  <div className="relative">
+                    <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-[#646464]" size={20} />
+                    <input
+                      type="number"
+                      value={duration}
+                      onChange={(e) => setDuration(e.target.value)}
+                      className={cn(
+                        "w-full h-[60px] bg-field rounded-[12px] pl-12 pr-14 font-['Urbanist'] text-[16px] text-[#171F2C] outline-none border border-transparent focus:border-primary transition-all",
+                        duration.length > 0 ? "pt-4" : ""
+                      )}
+                    />
+                    {duration.length === 0 && (
+                      <div className="absolute left-12 top-1/2 -translate-y-1/2 pointer-events-none flex flex-col justify-center">
+                        <span className="font-['Urbanist'] text-[16px] text-[#646464] leading-none">Duração</span>
+                      </div>
+                    )}
+                    {duration.length > 0 && (
+                      <div className="absolute left-12 top-2 pointer-events-none">
+                        <span className="font-['Urbanist'] font-medium text-[10px] text-[#646464]">Duração</span>
+                      </div>
+                    )}
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 font-['Urbanist'] font-medium text-[14px] text-[#646464] pointer-events-none">
+                      dias
+                    </span>
+                  </div>
+
+                  <div className="relative">
+                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-[#646464]" size={20} />
+                    <select
+                      value={month}
+                      onChange={(e) => setMonth(e.target.value)}
+                      className={cn(
+                        "w-full h-[60px] bg-[#F6F6F6] rounded-[12px] pl-12 pr-12 font-['Urbanist'] text-[16px] text-[#171F2C] appearance-none outline-none focus:ring-1 focus:ring-[#141530] transition-all",
+                        month.length > 0 ? "pt-4" : ""
+                      )}
+                    >
+                      <option value="" disabled className="hidden"></option>
+                      <option value="Janeiro">Janeiro</option>
+                      <option value="Fevereiro">Fevereiro</option>
+                      <option value="Março">Março</option>
+                      <option value="Abril">Abril</option>
+                      <option value="Maio">Maio</option>
+                      <option value="Junho">Junho</option>
+                      <option value="Julho">Julho</option>
+                      <option value="Agosto">Agosto</option>
+                      <option value="Setembro">Setembro</option>
+                      <option value="Outubro">Outubro</option>
+                      <option value="Novembro">Novembro</option>
+                      <option value="Dezembro">Dezembro</option>
+                    </select>
+                    {month.length === 0 && (
+                      <div className="absolute left-12 top-1/2 -translate-y-1/2 pointer-events-none flex flex-col justify-center">
+                        <span className="font-['Urbanist'] text-[16px] text-[#646464] leading-none">Mês (Opcional)</span>
+                      </div>
+                    )}
+                    {month.length > 0 && (
+                      <div className="absolute left-12 top-2 pointer-events-none">
+                        <span className="font-['Urbanist'] font-medium text-[10px] text-[#646464]">Mês (Opcional)</span>
+                      </div>
+                    )}
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-[#171F2C] pointer-events-none" size={20} />
+                  </div>
+                </div>
+              )}
+
+              {dateType === 'SPECIFIC' && (
+                <div className="flex flex-col gap-3">
+                  <div className="relative">
+                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-[#646464] pointer-events-none" size={20} />
+                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          className={cn(
+                            "w-full h-[60px] bg-field rounded-[12px] pl-12 pr-14 font-['Urbanist'] text-[16px] text-[#171F2C] outline-none border border-transparent focus:border-primary transition-all flex items-center justify-start text-left",
+                            startDateState ? "pt-4" : ""
+                          )}
+                        >
+                          {formatDateRange() || (
+                            <span className="text-[#646464]">Data da viagem</span>
+                          )}
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0 z-[100] bg-white border border-[#E5E5E5] rounded-2xl shadow-2xl" align="start">
+                        <CalendarUI
+                          mode="range"
+                          selected={{ from: startDateState, to: endDateState }}
+                          onSelect={(range) => {
+                            setStartDateState(range?.from);
+                            setEndDateState(range?.to);
+                            if (range?.from && range?.to) {
+                              setIsCalendarOpen(false);
+                            }
+                          }}
+                          initialFocus
+                          locale={ptBR}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    {startDateState && (
+                      <div className="absolute left-12 top-2 pointer-events-none">
+                        <span className="font-['Urbanist'] font-medium text-[10px] text-[#646464]">Data da viagem</span>
+                      </div>
+                    )}
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-[#171F2C] pointer-events-none" size={20} />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="w-full border-t border-[#F2F2F2]" />
+
+            {/* When to recommend */}
+            <div className="flex flex-col gap-4">
+              <h2 className="font-['Urbanist'] font-semibold text-[16px] leading-[19px] text-[#171F2C]">
+                Quando você recomenda fazer essa viagem?
+              </h2>
+
+              <div className="flex flex-col gap-3">
+                {SEASONS_LIST.map((s) => {
+                  const isSelected = seasons.includes(s);
+                  return (
+                    <button
+                      key={s}
+                      onClick={() => onToggleSeason(s)}
+                      className="flex items-center justify-between w-full px-4 h-[68px] border border-[#EBEBEB] rounded-[16px] bg-white transition-all"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Target size={20} className={isSelected ? "text-[#141530]" : "text-[#141530]"} />
+                        <span className="font-['Urbanist'] font-semibold text-[16px] text-[#1A1C40]">
+                          {s}
+                        </span>
+                      </div>
+                      <div className={cn(
+                        "w-[20px] h-[20px] rounded-[4px] border flex items-center justify-center transition-all",
+                        isSelected ? "bg-[#141530] border-[#141530]" : "border-[#9E9E9E]"
+                      )}>
+                        {isSelected && <Check size={14} className="text-white" strokeWidth={3} />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="absolute left-0 right-0 bottom-0 px-6 pb-8 pt-4 bg-gradient-to-t from-[#F2F2F2] via-[#F2F2F2] to-transparent pointer-events-none z-10">
-        <button
-          onClick={onNext}
-          disabled={!canAdvance}
-          className={cn(
-            'w-full h-14 rounded-2xl font-bold text-[15px] tracking-[-0.01em] transition-all pointer-events-auto',
-            !canAdvance
-              ? 'bg-[#E5E7DD] text-[#0A0A0A]/25 cursor-not-allowed opacity-60 pointer-events-none shadow-none'
-              : 'bg-[#9DCC36] text-[#0A0A0A] hover:brightness-105 active:scale-[0.99] shadow-[0_8px_22px_-8px_rgba(157,204,54,0.5)]'
-          )}
-        >
-          Próximo
-        </button>
-      </div>
-    </motion.div >
+
+    </motion.div>
   );
 }
 

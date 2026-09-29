@@ -68,7 +68,7 @@ export function AddTripNoteSheet({ open, onClose, onSave, editingNote }: AddTrip
         {/* Form */}
         <div className="pt-2 pb-2 space-y-4 overflow-y-auto flex-1">
           {/* Title Field with Pin Icon: bg #EDEDED, radius 12px, padding 8px 12px, h 54px */}
-          <div className="bg-[#EDEDED] rounded-[12px] px-3 py-2 h-[54px] flex items-center gap-3">
+          <div className="bg-field border border-transparent focus-within:border-primary transition-colors rounded-[12px] px-3 py-2 h-[54px] flex items-center gap-3">
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
               <span className="font-['Urbanist'] font-medium text-[12px] leading-[16px] text-[#949494] block">
                 Titulo
@@ -85,7 +85,7 @@ export function AddTripNoteSheet({ open, onClose, onSave, editingNote }: AddTrip
 
           {/* Content Field (Textarea): bg #EDEDED, radius 16px, padding 24px, h 181px */}
           <div className="flex flex-col gap-2">
-            <div className="bg-[#EDEDED] rounded-[16px] p-6 flex flex-col min-h-[181px]">
+            <div className="bg-field border border-transparent focus-within:border-primary transition-colors rounded-[16px] p-6 flex flex-col min-h-[181px]">
               <textarea
                 value={content}
                 onChange={(e) => {

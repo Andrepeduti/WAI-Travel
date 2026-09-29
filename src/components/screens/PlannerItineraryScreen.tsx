@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { updateItinerary } from '@/lib/itinerariesApi';
 import { COUNTRY_TO_TAGS } from '@/data/countriesCatalog';
 import { SuccessToast } from '@/components/travel/SuccessToast';
-import { ItinerarySettingsSheet } from '@/components/travel/ItinerarySettingsSheet';
+import { DuplicatingOverlay } from '@/components/travel/DuplicatingOverlay'; import { ItinerarySettingsSheet } from '@/components/travel/ItinerarySettingsSheet';
 import { parseLocalDate } from '@/lib/localDate';
 import { PublishItineraryFlow } from '@/components/travel/PublishItineraryFlow';
 import { EditPublishSheet } from '@/components/travel/EditPublishSheet';
@@ -30,7 +30,6 @@ import { AddTripNoteSheet } from '@/components/travel/AddTripNoteSheet';
 import { AddDeslocamentoSheet, DeslocamentoData } from '@/components/travel/AddDeslocamentoSheet';
 import { AddBudgetExpenseSheet } from '@/components/travel/AddBudgetExpenseSheet';
 import { AddManualActivitySheet, ManualActivityData } from '@/components/travel/AddManualActivitySheet';
-import { EditTripInfoSheet } from '@/components/travel/EditTripInfoSheet';
 import { DraggableActivityList, type DragState } from '@/components/travel/DraggableActivityList';
 import { ReorderActivitiesScreen } from './ReorderActivitiesScreen';
 import { AiRecommendationsScreen } from './AiRecommendationsScreen';
@@ -42,7 +41,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { Check } from 'lucide-react';
+import { Check, Target } from 'lucide-react';
 
 import { format, differenceInDays, differenceInCalendarDays, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -52,13 +51,14 @@ import { resolveCoverImage } from '@/lib/coverImageResolver';
 import { useDestinationCover } from '@/hooks/use-destination-cover';
 import { getPlacesForDestinations, getDestinationForDay, toSuggestions, getAllCityPlaces } from '@/data/cityRecommendations';
 import { getCityCoordinates } from '@/lib/cityCoordinates';
-import { useDaySuggestions } from '@/hooks/use-day-suggestions';
 import { toast } from 'sonner';
 import { BackButton } from '@/components/ui/BackButton';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useAuth } from '@/contexts/AuthContext';
-import { updateItinerary as updateItineraryRow, publishItineraryAsCopy, leaveItinerary, createItinerary, type UserItinerary } from '@/lib/itinerariesApi';
+import { updateItinerary as updateItineraryRow, upsertStoreListing, publishItineraryAsCopy, leaveItinerary, createItinerary, type UserItinerary } from '@/lib/itinerariesApi';
 import { loadPlannerData, savePlannerData } from '@/lib/plannerApi';
+import { upsertPlace } from '@/lib/placesCache';
+import { resolveCountryFromText } from '@/lib/countryResolver';
 import { formatBRL } from '@/lib/utils';
 import { loadItineraryDocs, saveItineraryDocs } from '@/lib/itineraryDocsApi';
 import { loadItineraryNotes, saveItineraryNotes } from '@/lib/itineraryNotesApi';
@@ -89,6 +89,7 @@ interface Activity {
   observation?: string;
   lat?: number;
   lng?: number;
+  placeId?: string;
 }
 
 interface TransportBetween {
@@ -127,6 +128,8 @@ export interface PlannerItineraryScreenProps {
   /** When true, renders in "creator edit" mode: hides settings + participants management,
    *  and shows a sticky "Salvar alterações" button. */
   creatorEditMode?: boolean;
+  /** When true, renders in "read-only" mode where editing activities is disabled */
+  readOnlyMode?: boolean;
   /** When true, opens the publish flow automatically on mount (used by creator program). */
   autoOpenPublishFlow?: boolean;
   onBack: () => void;
@@ -136,6 +139,8 @@ export interface PlannerItineraryScreenProps {
   onSaveCreatorEdit?: () => void;
   onNavigateToSales?: () => void;
   onOpenItinerary?: (dataset: UserItinerary) => void;
+  /** Chamado após duplicar o roteiro: o pai deve levar o usuário à listagem e exibir o toast. */
+  onDuplicateSuccess?: () => void;
   onUpgrade?: () => void;
   onNavigateToFAQ?: () => void;
   initialRole?: 'owner' | 'editor' | 'viewer';
@@ -420,7 +425,7 @@ async function getRouteInfo(
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, isPurchased, creatorEditMode, autoOpenPublishFlow, onBack, onDelete, onUpdate, onNavigateToAI, onSaveCreatorEdit, onNavigateToSales, onOpenItinerary, onNavigateToFAQ, initialRole }: PlannerItineraryScreenProps) {
+export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, isPurchased, creatorEditMode, readOnlyMode, autoOpenPublishFlow, onBack, onDelete, onUpdate, onNavigateToAI, onSaveCreatorEdit, onNavigateToSales, onOpenItinerary, onDuplicateSuccess, onNavigateToFAQ, initialRole }: PlannerItineraryScreenProps) {
   const { user: currentUser } = useCurrentUser();
   const { session } = useAuth();
   const ownerAvatar = currentUser.avatar || '';
@@ -449,15 +454,23 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         cost: t.cost
       }))
     })) :
-    data.startDate && data.endDate ?
-      Array.from({ length: differenceInDays(data.endDate, data.startDate) + 1 }, (_, i) => ({
+    data.isFlexible && data.durationDays ?
+      Array.from({ length: data.durationDays }, (_, i) => ({
         day: i + 1,
         title: '',
-        date: addDays(data.startDate!, i),
+        date: addDays(new Date(), i), // Fallback base date for flexible itineraries without a start date
         activities: [] as Activity[],
         transports: [] as TransportBetween[]
       })) :
-      mockDays, [itineraryDataset, data.startDate, data.endDate]);
+      data.startDate && data.endDate ?
+        Array.from({ length: differenceInDays(data.endDate, data.startDate) + 1 }, (_, i) => ({
+          day: i + 1,
+          title: '',
+          date: addDays(data.startDate!, i),
+          activities: [] as Activity[],
+          transports: [] as TransportBetween[]
+        })) :
+        mockDays, [itineraryDataset, data.startDate, data.endDate, data.isFlexible, data.durationDays]);
 
   const fallbackSuggestions = itineraryDataset?.suggestions ?? suggestions;
 
@@ -501,11 +514,18 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   const [showShareSheet, setShowShareSheet] = useState(false);
   const [showPlanLimitSheet, setShowPlanLimitSheet] = useState(false);
   const [showPublishFlow, setShowPublishFlow] = useState(!!autoOpenPublishFlow);
+  const [showPublishToast, setShowPublishToast] = useState(false);
   const [showEditPublish, setShowEditPublish] = useState(false);
+  const [itineraryData, setItineraryData] = useState(data);
+  const [manualCover, setManualCover] = useState<string | null>(data.coverImage ?? null);
+  const isFlexibleDates = itineraryData.isFlexible || itineraryData.tags?.includes('_FLEXIBLE_DATES_') || (itineraryDataset as any)?.tags?.includes('_FLEXIBLE_DATES_');
+  const isFirstRender = useRef(true);
+
   const [isItineraryPublic, setIsItineraryPublic] = useState(data.isPublic ?? false);
   const [publishedPriceCents, setPublishedPriceCents] = useState<number | null>(data.priceCents ?? null);
   const [publishedDescription, setPublishedDescription] = useState<string>(data.description ?? '');
   const [publishedTags, setPublishedTags] = useState<string[]>(data.tags ?? []);
+  const [publishedSeasons, setPublishedSeasons] = useState<string[]>(data.seasons ?? []);
   const [publishedMainTag, setPublishedMainTag] = useState<string>(data.mainTag ?? '');
 
   // Persist publish state to backend whenever it changes (only for user-owned itineraries)
@@ -514,22 +534,42 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     description?: string;
     tags?: string[];
     mainTag?: string;
+    title?: string;
   }) => {
     setIsItineraryPublic(next);
     if (extras?.priceCents !== undefined) setPublishedPriceCents(extras.priceCents);
     if (extras?.description !== undefined) setPublishedDescription(extras.description);
     if (extras?.tags !== undefined) setPublishedTags(extras.tags);
+    if (extras?.seasons !== undefined) setPublishedSeasons(extras.seasons);
     if (extras?.mainTag !== undefined) setPublishedMainTag(extras.mainTag);
     if (typeof itineraryId === 'string' && !itineraryId.startsWith('pending-itinerary-')) {
       await updateItineraryRow(itineraryId, {
-        isPublic: next,
-        ...(extras?.priceCents !== undefined ? { priceCents: extras.priceCents } : {}),
+        status: next ? 'published' : 'draft',
         ...(extras?.description !== undefined ? { description: extras.description } : {}),
-        ...(extras?.tags !== undefined ? { tags: extras.tags } : {}),
-        ...(extras?.mainTag !== undefined ? { mainTag: extras.mainTag } : {}),
+        ...(extras?.title !== undefined ? { title: extras.title } : {}),
       });
+
+      if (session?.user?.id) {
+        if (next) {
+          await upsertStoreListing(itineraryId, {
+            sellerId: session.user.id,
+            listedTitle: extras?.title ?? itineraryData.tripName?.trim() ?? itineraryData.destinations[0] ?? 'Roteiro',
+            listedDescription: extras?.description ?? publishedDescription,
+            tags: extras?.tags ?? publishedTags,
+            seasons: extras?.seasons ?? publishedSeasons,
+            priceCents: extras?.priceCents ?? publishedPriceCents,
+            status: 'active'
+          });
+        } else {
+          await upsertStoreListing(itineraryId, {
+            sellerId: session.user.id,
+            listedTitle: extras?.title ?? itineraryData.tripName?.trim() ?? itineraryData.destinations[0] ?? 'Roteiro',
+            status: 'inactive'
+          });
+        }
+      }
     }
-  }, [itineraryId]);
+  }, [itineraryId, itineraryData.tripName, itineraryData.destinations, publishedDescription, publishedTags, publishedSeasons, publishedPriceCents, session?.user?.id]);
 
 
 
@@ -541,10 +581,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     (it) => it.userId === session?.user?.id && it.sourceDatasetId == null
   ).length;
 
-  const [itineraryData, setItineraryData] = useState(data);
-  const [manualCover, setManualCover] = useState<string | null>(data.coverImage ?? null);
-  const isFlexibleDates = itineraryData.tags?.includes('_FLEXIBLE_DATES_') || (itineraryDataset as any)?.tags?.includes('_FLEXIBLE_DATES_');
-  const isFirstRender = useRef(true);
+
 
   // Sync changes back to parent (trips list)
   useEffect(() => {
@@ -557,6 +594,20 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
 
   // Recompute days when itineraryData dates change (user edits dates)
   const effectiveDaysData: DayData[] = React.useMemo(() => {
+    if (itineraryData.isFlexible && itineraryData.durationDays) {
+      const totalDays = itineraryData.durationDays;
+      return Array.from({ length: totalDays }, (_, i) => {
+        const existingDay = daysData.find(d => d.day === i + 1);
+        return {
+          day: i + 1,
+          title: existingDay?.title ?? '',
+          date: addDays(new Date(), i),
+          activities: existingDay?.activities ?? [],
+          transports: existingDay?.transports ?? [],
+        };
+      });
+    }
+
     if (itineraryData.startDate && itineraryData.endDate) {
       const totalDays = differenceInDays(itineraryData.endDate, itineraryData.startDate) + 1;
       return Array.from({ length: totalDays }, (_, i) => {
@@ -571,14 +622,49 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       });
     }
     return daysData;
-  }, [itineraryData.startDate, itineraryData.endDate, daysData]);
-  const [duplicateToast, setDuplicateToast] = useState(false);
+  }, [itineraryData.startDate, itineraryData.endDate, itineraryData.isFlexible, itineraryData.durationDays, daysData]);
   const [isOpeningDuplicate, setIsOpeningDuplicate] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [mapFocusedPlace, setMapFocusedPlace] = useState<MapPlace | null>(null);
-  const [openDays, setOpenDays] = useState<Set<number>>(new Set());
+  const [openDays, setOpenDays] = useState<Set<number>>(new Set([1]));
   const openDaysRef = useRef<Set<number>>(openDays);
   openDaysRef.current = openDays;
+
+  const handleDuplicate = async () => {
+    if (isOpeningDuplicate || isViewer) return;
+    if (!isUuidId || typeof itineraryId !== 'string') {
+      toast.error('Não foi possível duplicar este roteiro.');
+      return;
+    }
+    setIsOpeningDuplicate(true);
+    try {
+      const firstDestination = itineraryData.destinations[0] ?? 'Paris, França';
+      const baseTitle = itineraryData.tripName?.trim() || itineraryDataset?.title || `${firstDestination.split(',')[0].trim()} trip`;
+
+      const newItinerary = await createItinerary({
+        title: `${baseTitle} (1)`,
+        destinations: itineraryData.destinations.length > 0 ? [...itineraryData.destinations] : ['Paris, França'],
+        startDate: itineraryData.startDate ? itineraryData.startDate.toISOString() : null,
+        endDate: itineraryData.endDate ? itineraryData.endDate.toISOString() : null,
+        isFlexible: itineraryData.isFlexible,
+        durationDays: itineraryData.durationDays,
+        travelMonth: itineraryData.travelMonth,
+      });
+      if (!newItinerary) throw new Error('createItinerary returned null');
+
+      await savePlannerData(newItinerary.id, { activities: dayActivities, transports: dayTransports });
+      await saveItineraryDocs(newItinerary.id, { reservas, transportes });
+      await saveBudget(newItinerary.id, expenses);
+
+      addOptimisticItinerary(newItinerary);
+      setIsOpeningDuplicate(false);
+      onDuplicateSuccess?.();
+    } catch (e) {
+      console.error('[PlannerItineraryScreen] duplicate failed', e);
+      setIsOpeningDuplicate(false);
+      toast.error('Erro ao duplicar roteiro.');
+    }
+  };
 
   const toggleDayAccordion = useCallback((day: number) => {
     setOpenDays((prev) => {
@@ -607,7 +693,6 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   const [checklistChecked, setChecklistChecked] = useState(0);
   const [checklistTotal, setChecklistTotal] = useState(12);
   const [showManualActivity, setShowManualActivity] = useState(false);
-  const [showEditTripInfo, setShowEditTripInfo] = useState(false);
   const [showReorder, setShowReorder] = useState(false);
   const [showAiPlanSheet, setShowAiPlanSheet] = useState(false);
   const [dragState, setDragState] = useState<DragState>({
@@ -650,7 +735,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   const [confirmOptimizeDay, setConfirmOptimizeDay] = useState<number | null>(null);
   const persistKey = String(itineraryId ?? itineraryDataset?.id ?? data.destinations[0] ?? 'default');
   const [budgetExtraPeople, setBudgetExtraPeople] = useState<{ id: string; name: string; color: string }[]>(itineraryDataset?.extraPeople ?? []);
-  
+
   // Persist budgetExtraPeople to backend when it changes
   useEffect(() => {
     if (itineraryId) {
@@ -754,7 +839,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       }
       const owner = getCachedOwnerProfile(itineraryId);
       if (owner?.userId === session.user.id) return 'owner';
-      
+
       const members = getCachedItineraryMembers(itineraryId) || [];
       const me = members.find(m => m.userId === session.user.id);
       if (me) return me.role;
@@ -774,12 +859,26 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     return false;
   });
   const isViewer = useMemo(() => {
+    if (readOnlyMode) return true;
     if (myRole === 'viewer') return true;
     if (myRole === 'editor' || myRole === 'owner') return false;
     // Assume viewer during initial load to prevent edit buttons from flickering to guests
     if (loadingMembers && isUuidId) return true;
     return false;
-  }, [myRole, loadingMembers, isUuidId]);
+  }, [myRole, loadingMembers, isUuidId, readOnlyMode]);
+
+  // Mantém os toasts (sonner) acima do FAB flutuante (56px, bottom 24px / 92px no modo edição).
+  useEffect(() => {
+    if (isViewer) return;
+    const root = document.documentElement;
+    const previous = root.style.getPropertyValue('--toast-bottom-offset');
+    root.style.setProperty('--toast-bottom-offset', creatorEditMode ? '148px' : '80px');
+    return () => {
+      if (previous) root.style.setProperty('--toast-bottom-offset', previous);
+      else root.style.removeProperty('--toast-bottom-offset');
+    };
+  }, [isViewer, creatorEditMode]);
+
   const reloadMembers = useCallback(async () => {
     if (!isUuidId || typeof itineraryId !== 'string') {
       setLoadingMembers(false);
@@ -949,7 +1048,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     }
     const { data, error } = await supabase
       .from('itineraries')
-      .select('title, start_date, end_date, images, destinations')
+      .select('title, start_date, end_date, cover_image_url, destinations')
       .eq('id', itineraryId)
       .maybeSingle();
     if (error || !data) return;
@@ -958,9 +1057,9 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       const destinations = Array.isArray(data.destinations) && data.destinations.length > 0
         ? data.destinations
         : prev.destinations;
-      const startDate = data.start_date ? parseLocalDate(data.start_date) : prev.startDate;
-      const endDate = data.end_date ? parseLocalDate(data.end_date) : prev.endDate;
-      const coverImage = Array.isArray(data.images) && data.images[0] ? data.images[0] : prev.coverImage;
+      const startDate = data.start_date ? parseLocalDate(data.start_date) : undefined;
+      const endDate = data.end_date ? parseLocalDate(data.end_date) : undefined;
+      const coverImage = data.cover_image_url ? data.cover_image_url : prev.coverImage;
 
       if (
         prev.tripName === tripName &&
@@ -1000,7 +1099,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   // Refetch on window focus to catch any realtime events missed while tab was in background
   useEffect(() => {
     if (typeof itineraryId !== 'string' || !isUuidId) return;
-    
+
     const handleFocus = () => {
       if (!document.hidden) {
         void reloadItineraryMeta();
@@ -1011,16 +1110,16 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         void reloadMembers();
       }
     };
-    
+
     window.addEventListener('focus', handleFocus);
     window.addEventListener('visibilitychange', handleFocus);
-    
+
     return () => {
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('visibilitychange', handleFocus);
     };
   }, [itineraryId, isUuidId, reloadItineraryMeta, reloadPlanner, reloadDocs, reloadBudget, reloadNotes, reloadMembers]);
-  
+
   const checkScrollArrows = useCallback(() => {
     if (tabsRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = tabsRef.current;
@@ -1145,9 +1244,11 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     setTimeout(checkScrollArrows, 350);
   }, [selectedDay]);
 
-  const tripDays = itineraryData.startDate && itineraryData.endDate ?
-    differenceInDays(itineraryData.endDate, itineraryData.startDate) + 1 :
-    7;
+  const tripDays = itineraryData.isFlexible && itineraryData.durationDays
+    ? itineraryData.durationDays
+    : (itineraryData.startDate && itineraryData.endDate
+      ? differenceInDays(itineraryData.endDate, itineraryData.startDate) + 1
+      : (effectiveDaysData.length > 0 ? effectiveDaysData.length : 7));
 
   // Destination-aware recommendations: resolve per selected day
   // Sugestões dinâmicas: usa banco local + busca POIs reais (Overpass/Wikipedia) da cidade do dia.
@@ -1155,127 +1256,9 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   // destinos definidos pelo usuário — caso contrário, mostraríamos Amsterdam para todos.
   const hasUserDestinations =
     Array.isArray(itineraryData.destinations) && itineraryData.destinations.length > 0;
-  const {
-    suggestionsByDay,
-    isLoadingByDay,
-    hasFetchedByDay,
-  } = useDaySuggestions(
-    itineraryData.destinations,
-    tripDays,
-    hasUserDestinations ? [] : fallbackSuggestions,
-  );
 
-  const suggestionsData = React.useMemo(() => {
-    // Se há suggestions explícitas do dataset (marketplace), priorizá-las
-    if (fallbackSuggestions && fallbackSuggestions.length > 0 && itineraryDataset?.suggestions) {
-      return fallbackSuggestions;
-    }
-    return suggestionsByDay[selectedDay] ?? [];
-  }, [fallbackSuggestions, itineraryDataset?.suggestions, selectedDay, suggestionsByDay]);
-
-  // Sugestões dinâmicas por dia:
-  // 1) Excluem QUALQUER lugar já presente no roteiro (em qualquer dia).
-  // 2) Distribuem itens diferentes entre dias da mesma cidade (fatia rotativa).
-  const dynamicSuggestionsByDay = React.useMemo<Record<number, ItinerarySuggestion[]>>(() => {
-    const result: Record<number, ItinerarySuggestion[]> = {};
-    // Não interferir quando o roteiro vem do marketplace com suggestions próprias
-    if (itineraryDataset?.suggestions) return result;
-
-    // Conjunto global de nomes já adicionados (todos os dias)
-    const usedNames = new Set<string>();
-    Object.values(dayActivities).forEach((acts) => {
-      acts?.forEach((a) => {
-        if (a?.name) usedNames.add(a.name.trim().toLowerCase());
-      });
-    });
-
-    // Agrupar dias por cidade (usa o mesmo getDestinationForDay do hook)
-    const daysByCity = new Map<string, number[]>();
-    for (let day = 1; day <= Math.max(tripDays, 1); day++) {
-      const dest = itineraryData.destinations?.length
-        ? getDestinationForDay(itineraryData.destinations, day, tripDays)
-        : '';
-      const cityKey = dest.split(',')[0].trim().toLowerCase();
-      const list = daysByCity.get(cityKey) ?? [];
-      list.push(day);
-      daysByCity.set(cityKey, list);
-    }
-
-    const bucketOfCat = (cat: string): string => {
-      const c = (cat || '').toLowerCase();
-      if (c.includes('restaurante') || c.includes('cafeteria') || c.includes('mercado')) return 'food';
-      if (c.includes('experiência') || c.includes('experiencia')) return 'experience';
-      if (c.includes('vida noturna') || c.includes('bar') || c.includes('pub') || c.includes('balada')) return 'night';
-      if (c.includes('evento')) return 'event';
-      return 'attraction';
-    };
-
-    daysByCity.forEach((daysOfCity) => {
-      const base = (suggestionsByDay[daysOfCity[0]] ?? []).filter(
-        (s) => !usedNames.has(s.name.trim().toLowerCase()),
-      );
-      const N = daysOfCity.length;
-      if (base.length === 0 || N === 0) {
-        daysOfCity.forEach((d) => { result[d] = []; });
-        return;
-      }
-      // Particiona por bucket e tenta garantir 3+ opções por chip em cada dia.
-      // Quando há volume suficiente, não repete entre dias; se faltar, rotaciona
-      // o pool para não deixar chips vazios.
-      const byBucket = new Map<string, ItinerarySuggestion[]>();
-      base.forEach((item) => {
-        const b = bucketOfCat(item.category || '');
-        const arr = byBucket.get(b) ?? [];
-        arr.push(item);
-        byBucket.set(b, arr);
-      });
-
-      const perDay: ItinerarySuggestion[][] = daysOfCity.map(() => []);
-      const MIN_PER_CHIP = 3;
-      byBucket.forEach((items) => {
-        if (items.length >= N * MIN_PER_CHIP) {
-          daysOfCity.forEach((_, dayIdx) => {
-            const start = dayIdx * MIN_PER_CHIP;
-            perDay[dayIdx].push(...items.slice(start, start + MIN_PER_CHIP));
-          });
-          items.slice(N * MIN_PER_CHIP).forEach((it, i) => {
-            perDay[i % N].push(it);
-          });
-          return;
-        }
-
-        daysOfCity.forEach((_, dayIdx) => {
-          const already = new Set(perDay[dayIdx].map((it) => it.name.toLowerCase().trim()));
-          for (let offset = 0; offset < Math.min(MIN_PER_CHIP, items.length); offset++) {
-            const it = items[(dayIdx * MIN_PER_CHIP + offset) % items.length];
-            const key = it.name.toLowerCase().trim();
-            if (!already.has(key)) {
-              perDay[dayIdx].push(it);
-              already.add(key);
-            }
-          }
-        });
-      });
-
-      daysOfCity.forEach((d, idx) => {
-        result[d] = perDay[idx];
-      });
-    });
-
-    return result;
-  }, [dayActivities, itineraryData.destinations, itineraryDataset?.suggestions, suggestionsByDay, tripDays]);
-
-  // Refs espelhando estados — usados pelo "Preencher com IA" para acessar valores
-  // atuais dentro de awaits/timeouts sem ficar preso à closure inicial.
-  const suggestionsByDayRef = useRef(suggestionsByDay);
-  const dynamicSuggestionsByDayRef = useRef(dynamicSuggestionsByDay);
-  const hasFetchedByDayRef = useRef(hasFetchedByDay);
   const dayActivitiesRef = useRef(dayActivities);
-  useEffect(() => { suggestionsByDayRef.current = suggestionsByDay; }, [suggestionsByDay]);
-  useEffect(() => { dynamicSuggestionsByDayRef.current = dynamicSuggestionsByDay; }, [dynamicSuggestionsByDay]);
-  useEffect(() => { hasFetchedByDayRef.current = hasFetchedByDay; }, [hasFetchedByDay]);
   useEffect(() => { dayActivitiesRef.current = dayActivities; }, [dayActivities]);
-
 
   // Migration: backfill category/categoryColor AND lat/lng for cached activities missing them
   useEffect(() => {
@@ -1291,27 +1274,12 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     for (const day of Object.keys(patched)) {
       patched[Number(day)] = patched[Number(day)].map(a => {
         let updated = a;
-        // Backfill category
-        if (!a.category) {
-          const match = suggestionsData.find(s => s.name.toLowerCase() === a.name.toLowerCase());
-          if (match?.category) {
-            changed = true;
-            updated = { ...updated, category: match.category, categoryColor: match.categoryColor || a.categoryColor };
-          }
-        }
         // Backfill lat/lng
         if (!a.lat || !a.lng) {
           const placeMatch = allCityPlaces.find(p => p.name.toLowerCase() === a.name.toLowerCase());
           if (placeMatch?.lat && placeMatch?.lng) {
             coordsChanged = true;
             updated = { ...updated, lat: placeMatch.lat, lng: placeMatch.lng };
-          } else {
-            // Try in suggestions
-            const sugMatch = suggestionsData.find(s => s.name.toLowerCase() === a.name.toLowerCase());
-            if (sugMatch && (sugMatch as any).lat && (sugMatch as any).lng) {
-              coordsChanged = true;
-              updated = { ...updated, lat: (sugMatch as any).lat, lng: (sugMatch as any).lng };
-            }
           }
         }
         return updated;
@@ -1326,7 +1294,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     if (coordsChanged) {
       setDayTransports({});
     }
-  }, [dayActivities, suggestionsData, itineraryData.destinations]);
+  }, [dayActivities, itineraryData.destinations]);
 
 
   const timeToMin = (t?: string): number => {
@@ -1912,7 +1880,10 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
 
       if (event.button !== 0) return;
 
-      const isTouch = event.pointerType === 'touch' || event.pointerType === 'pen';
+      // Com o handle (6 pontinhos) o drag começa direto, sem long-press:
+      // o scroll da tela continua livre no resto do card.
+      const fromHandle = !!target.closest('[data-drag-handle]');
+      const isTouch = !fromHandle && (event.pointerType === 'touch' || event.pointerType === 'pen');
       let dragTimer: NodeJS.Timeout | null = null;
       let isDragReady = !isTouch;
 
@@ -2134,6 +2105,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         }
 
         if (!isDragActive) {
+          if (fromHandle) return; // toque no handle não abre a atividade
           // Normal quick tap: open activity sheet!
           setSelectedDay(day);
           setSelectedActivityDay(day);
@@ -2293,46 +2265,73 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       const currentActivities = prev[day] !== undefined ? prev[day] : (effectiveDaysData.find((d) => d.day === day)?.activities ?? []);
       let workingActivities = [...currentActivities];
 
-      placesArray.forEach((place, index) => {
-        let start = '09:00';
-        let end = addMinutes('09:00', 90);
-        if (workingActivities.length > 0) {
-          const sortedCurrent = sortActivitiesChronologically(workingActivities);
-          const last = sortedCurrent[sortedCurrent.length - 1];
-          if (last.endTime && timeToMin(last.endTime) !== Infinity) {
-            start = addMinutes(last.endTime, 30);
-            end = addMinutes(start, 90);
-          } else if (last.startTime && timeToMin(last.startTime) !== Infinity) {
-            start = addMinutes(last.startTime, 120);
-            end = addMinutes(start, 90);
+      // Create an async function to handle place upserts before adding to state
+      const processPlaces = async () => {
+        let workingActivities = [...currentActivities];
+
+        for (let index = 0; index < placesArray.length; index++) {
+          const place = placesArray[index];
+          let start = '09:00';
+          let end = addMinutes('09:00', 90);
+          if (workingActivities.length > 0) {
+            const sortedCurrent = sortActivitiesChronologically(workingActivities);
+            const last = sortedCurrent[sortedCurrent.length - 1];
+            if (last.endTime && timeToMin(last.endTime) !== Infinity) {
+              start = addMinutes(last.endTime, 30);
+              end = addMinutes(start, 90);
+            } else if (last.startTime && timeToMin(last.startTime) !== Infinity) {
+              start = addMinutes(last.startTime, 120);
+              end = addMinutes(start, 90);
+            }
           }
+
+          const fallbackCity = itineraryData.destinations[0] ? itineraryData.destinations[0].split(',')[0].trim() : '';
+          const placeCity = place.city || fallbackCity;
+          const placeCountry = place.country || resolveCountryFromText(place.address || placeCity || itineraryData.destinations[0] || '');
+
+          const savedPlace = await upsertPlace({
+            name: place.name,
+            google_place_id: place.googlePlaceId,
+            category: place.category,
+            city: placeCity,
+            country: placeCountry,
+            latitude: place.lat,
+            longitude: place.lng,
+            cover_photo_url: place.image,
+            short_description: place.description,
+          });
+
+          const newActivity: Activity = {
+            id: Date.now() + index + Math.floor(Math.random() * 1000000),
+            type: 'activity',
+            startTime: start,
+            endTime: end,
+            category: place.category,
+            categoryColor: place.categoryColor,
+            name: place.name,
+            image: place.image,
+            openHours: place.openHours || '',
+            rating: place.rating || 0,
+            price: (place as any).price || estimatedPriceFor(place.name, (place as any).city),
+            lat: place.lat,
+            lng: place.lng,
+            placeId: savedPlace?.id,
+          };
+
+          workingActivities = sortActivitiesChronologically([...workingActivities, newActivity]);
         }
 
-        const newActivity: Activity = {
-          id: Date.now() + index + Math.floor(Math.random() * 1000000),
-          type: 'activity',
-          startTime: start,
-          endTime: end,
-          category: place.category,
-          categoryColor: place.categoryColor,
-          name: place.name,
-          image: place.image,
-          openHours: place.openHours,
-          rating: place.rating,
-          price: (place as any).price || estimatedPriceFor(place.name, (place as any).city),
-          lat: place.lat,
-          lng: place.lng,
-        };
+        setDayActivities((prevInner) => ({ ...prevInner, [day]: workingActivities }));
 
-        workingActivities = sortActivitiesChronologically([...workingActivities, newActivity]);
-      });
-      
-      nextActivities = workingActivities;
-      return { ...prev, [day]: nextActivities };
+        const nextTransports = await buildTransportsForActivities(workingActivities);
+        setDayTransports((prevTransports) => ({ ...prevTransports, [day]: nextTransports }));
+      };
+
+      processPlaces();
+
+      return prev; // We will update via setDayActivities in the async closure
     });
 
-    const nextTransports = await buildTransportsForActivities(nextActivities);
-    setDayTransports((prev) => ({ ...prev, [day]: nextTransports }));
     toast.success(
       placesArray.length === 1
         ? `${placesArray[0].name} adicionado ao Dia ${day}`
@@ -2423,7 +2422,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       updated = sortActivitiesChronologically([...current, newActivity]);
       return { ...prev, [data.day]: updated };
     });
-    
+
     // We compute the transports asynchronously and set them afterwards.
     // If the state changed in the meantime, this might overwrite it, but it's consistent with previous behavior.
     const nextTransports = await buildTransportsForActivities(updated);
@@ -2517,11 +2516,11 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       'planner_empty';
 
   const formatDateRange = () => {
+    if (itineraryData.isFlexible && itineraryData.durationDays) {
+      const diff = itineraryData.durationDays;
+      return `${diff} ${diff === 1 ? 'dia' : 'dias'} de viagem`;
+    }
     if (itineraryData.startDate && itineraryData.endDate) {
-      if (isFlexibleDates) {
-        const diff = differenceInDays(itineraryData.endDate, itineraryData.startDate) + 1;
-        return `${diff} ${diff === 1 ? 'dia' : 'dias'} de viagem`;
-      }
       const start = format(itineraryData.startDate, "d 'de' MMM.", { locale: ptBR });
       const end = format(itineraryData.endDate, "d 'de' MMM.", { locale: ptBR });
       return `${start} - ${end}`;
@@ -2624,9 +2623,15 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         isAutoCover={isAutoCover}
         startDate={itineraryData.startDate}
         endDate={itineraryData.endDate}
+        isFlexible={itineraryData.isFlexible}
+        durationDays={itineraryData.durationDays}
         currency={itineraryData.currency}
         destinations={itineraryData.destinations}
         onDelete={onDelete}
+        onPublish={() => {
+          setShowManageItinerary(false);
+          setShowPublishFlow(true);
+        }}
         itineraryId={typeof itineraryId === 'string' ? itineraryId : undefined}
         currentUserId={session?.user?.id}
         initialOwner={ownerProfile}
@@ -2663,17 +2668,22 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
             startDate: updated.startDate,
             endDate: updated.endDate,
             currency: updated.currency || prev.currency,
+            isFlexible: updated.isFlexible !== undefined ? updated.isFlexible : prev.isFlexible,
+            durationDays: updated.durationDays !== undefined ? updated.durationDays : prev.durationDays,
           }));
 
           if (typeof itineraryId === 'string' && !itineraryId.startsWith('pending-itinerary-')) {
-            const patch = {
+            const patch: any = {
               title: updated.tripName?.trim(),
               images: updated.coverImage ? [updated.coverImage] : undefined,
               destinations: updated.destinations && updated.destinations.length > 0 ? updated.destinations : undefined,
-              startDate: updated.startDate ? updated.startDate.toISOString() : undefined,
-              endDate: updated.endDate ? updated.endDate.toISOString() : undefined,
+              startDate: updated.isFlexible ? null : (updated.startDate ? updated.startDate.toISOString() : undefined),
+              endDate: updated.isFlexible ? null : (updated.endDate ? updated.endDate.toISOString() : undefined),
             };
-            
+
+            if (updated.isFlexible !== undefined) patch.isFlexible = updated.isFlexible;
+            if (updated.durationDays !== undefined) patch.durationDays = updated.durationDays;
+
             // Aplica instantaneamente no cache para a Home
             applyOptimisticPatch(itineraryId, patch);
 
@@ -2831,7 +2841,6 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     (itineraryDataset?.suggestions ?? []).forEach((s: any) => addToMap(s.name, s.lat, s.lng));
     const dests = itineraryData.destinations?.length ? itineraryData.destinations : ['paris'];
     getPlacesForDestinations(dests).forEach((p: any) => addToMap(p.name, p.lat, p.lng));
-    (suggestionsData ?? []).forEach((s: any) => addToMap(s.name, s.lat, s.lng));
     const acts: Activity[] = rawActs.map((a) => {
       if (a.lat != null && a.lng != null) return a;
       const hit = coordMap.get(String(a.name || '').toLowerCase().trim());
@@ -2959,11 +2968,10 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
             <button
               type="button"
               onClick={() => setShowAddAction((prev) => !prev)}
-              className={`w-[56px] h-[56px] rounded-full pointer-events-auto flex items-center justify-center active:scale-95 transition-all duration-200 ${
-                showAddAction
-                  ? 'bg-white text-[#141530] shadow-[0px_4px_20px_rgba(0,0,0,0.15)] border border-[#F0F0F0]'
-                  : 'bg-[#9DCC36] text-[#141530] shadow-lg'
-              }`}
+              className={`w-[56px] h-[56px] rounded-full pointer-events-auto flex items-center justify-center active:scale-95 transition-all duration-200 ${showAddAction
+                ? 'bg-white text-[#141530] shadow-[0px_4px_20px_rgba(0,0,0,0.15)] border border-[#F0F0F0]'
+                : 'bg-[#9DCC36] text-[#141530] shadow-lg'
+                }`}
               aria-label="Adicionar item ao roteiro"
             >
               {showAddAction ? (
@@ -2975,14 +2983,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
           </div>
         )}
 
-        {/* Aviso visual para viewer */}
-        {isViewer && (
-          <div className="fixed top-0 left-0 right-0 z-[60] pointer-events-none flex justify-center" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
-            <div className="mt-2 px-3 py-1 rounded-full bg-black/60 text-white text-[11px] font-medium">
-              Modo visualização
-            </div>
-          </div>
-        )}
+
 
         {/* Hero Header (Figma: Botões_Img height 244px) */}
         <div
@@ -3010,15 +3011,26 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
             >
               <Icon name="arrow_back" size={18} className="text-[#000000]" />
             </button>
-            {!creatorEditMode && (
-              <button
-                type="button"
-                onClick={() => setShowSettings(true)}
-                className="w-8 h-8 rounded-full bg-[#FEFEFE] flex items-center justify-center shadow-[0px_3.2px_16px_rgba(0,0,0,0.1)] active:scale-95 transition-transform"
-              >
-                <Icon name="more_horiz" size={18} className="text-[#141530]" />
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {!isItineraryPublic && !isViewer && itineraryData.isPersonal === false && (
+                <button
+                  type="button"
+                  onClick={() => setShowPublishFlow(true)}
+                  className="h-8 px-4 rounded-full bg-[#9DCC36] text-[#141530] font-bold text-[13px] shadow-[0px_4px_20px_rgba(0,0,0,0.1)] active:scale-95 transition-transform font-['Urbanist',sans-serif]"
+                >
+                  Publicar
+                </button>
+              )}
+              {!creatorEditMode && !readOnlyMode && (
+                <button
+                  type="button"
+                  onClick={() => setShowSettings(true)}
+                  className="w-8 h-8 rounded-full bg-[#FEFEFE] flex items-center justify-center shadow-[0px_3.2px_16px_rgba(0,0,0,0.1)] active:scale-95 transition-transform"
+                >
+                  <Icon name="more_horiz" size={18} className="text-[#141530]" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Title + metadata on image (Figma: Frame 1321316150) */}
@@ -3155,7 +3167,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
           {/* Info Card - overlapping hero (Figma: Frame 1321316149 - width 349px, height 49.5px, border-radius 16px) */}
           <div className="px-5 -mt-5 relative z-20 mb-4">
             <div
-              onClick={() => { if (!isViewer) setShowEditTripInfo(true); }}
+              onClick={() => setShowManageItinerary(true)}
               className="bg-white rounded-[16px] px-4 py-3 flex items-center justify-start cursor-pointer active:scale-[0.98] transition-transform"
               style={{ boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.1)' }}
             >
@@ -3195,6 +3207,26 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
               </div>
             </div>
           </div>
+
+          {isViewer && (
+            <div className="px-4 mb-4">
+              <div className="flex flex-row items-center p-4 gap-2 bg-white rounded-[16px] w-full">
+                <div className="flex flex-1 min-w-0 flex-row items-start gap-2">
+                  <Target size={16} strokeWidth={2} className="text-[#141530] flex-shrink-0" />
+                  <div className="flex flex-1 min-w-0 flex-col gap-1 justify-center">
+                    <span className="text-[14px] font-semibold text-[#141530] font-['Urbanist',sans-serif] leading-normal">
+                      {readOnlyMode ? 'Roteiro publicado!' : 'Acesso somente para visualização'}
+                    </span>
+                    <span className="text-[12px] font-medium text-[rgba(26,28,64,0.66)] font-['Urbanist',sans-serif] leading-normal">
+                      {readOnlyMode
+                        ? 'Este roteiro não pode mais ser editado, mas você pode continuar visualizando as informações.'
+                        : 'Seu perfil permite consultar o roteiro. Se precisar editar, solicite acesso ao criador do roteiro'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Summary Info Cards Block (Figma: Frame 1321316348 - cards 146x102px, border-radius 16px) */}
           <div className="px-4">
@@ -3271,9 +3303,9 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
           <div
             ref={stickyTabsRef}
             className="-mx-4 px-4 sticky top-0 z-30 pb-2"
-            style={{ 
-              backgroundColor: '#EFEFEF', 
-              paddingTop: 'calc(max(12px, env(safe-area-inset-top)))' 
+            style={{
+              backgroundColor: '#EFEFEF',
+              paddingTop: 'calc(max(12px, env(safe-area-inset-top)))'
             }}
           >
             {/* Day Carousel without side arrows (Figma: 50x62px, border-radius 32px) */}
@@ -3285,7 +3317,9 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
               {effectiveDaysData.map((tab) => {
                 const isSelected = selectedDay === tab.day;
                 const weekday = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][tab.date.getDay()];
-                const dayNum = format(tab.date, 'd');
+                const dayNum = format(tab.date, 'dd/MM');
+                const topText = itineraryData.isFlexible ? 'Dia' : weekday;
+                const bottomText = itineraryData.isFlexible ? tab.day.toString() : dayNum;
                 return (
                   <button
                     key={tab.day}
@@ -3301,17 +3335,16 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                         window.setTimeout(() => { isScrollingToDay.current = false; }, 550);
                       }
                     }}
-                    className={`flex flex-col items-center justify-center flex-shrink-0 transition-all duration-200 rounded-[32px] w-[50px] h-[62px] p-[12px] ${
-                      isSelected
-                        ? 'bg-[#080B43] text-[#FEFEFE] shadow-md'
-                        : 'bg-transparent text-[#555555] hover:bg-black/5'
-                    }`}
+                    className={`flex flex-col items-center justify-center flex-shrink-0 transition-all duration-200 rounded-[32px] min-w-[56px] w-auto h-[62px] px-3 py-[12px] ${isSelected
+                      ? 'bg-[#080B43] text-[#FEFEFE] shadow-md'
+                      : 'bg-transparent text-[#555555] hover:bg-black/5'
+                      }`}
                   >
                     <span className="text-[14px] leading-none font-medium font-['Urbanist',sans-serif]">
-                      {weekday}
+                      {topText}
                     </span>
                     <span className="text-[16px] mt-1 leading-none font-semibold font-['Urbanist',sans-serif]">
-                      {dayNum}
+                      {bottomText}
                     </span>
                   </button>
                 );
@@ -3340,7 +3373,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
 
           </div>
 
-          {/* All Days Timeline with Independent Accordions (Closed by default) (IMAGEM 3 & 4) */}
+          {/* All Days Timeline with Independent Accordions (Day 1 open by default, others closed) (IMAGEM 3 & 4) */}
           <div className="space-y-3 pt-2">
             {effectiveDaysData.map((dayItem) => {
               const dayActs = getAllActivities(dayItem.day);
@@ -3367,11 +3400,13 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                     <div className="flex flex-col items-start gap-1">
                       <div className="flex items-center gap-2">
                         <span className="text-[18px] font-semibold text-[#141530] font-['Urbanist',sans-serif]">
-                          Dia {dayItem.day} - {shortDate}
+                          {itineraryData.isFlexible ? `Dia ${dayItem.day}` : `Dia ${dayItem.day} - ${shortDate}`}
                         </span>
-                        <span className="text-[16px] font-medium text-[#7F7F7F] font-['Urbanist',sans-serif]">
-                          {capitalizedWeekday}
-                        </span>
+                        {!itineraryData.isFlexible && (
+                          <span className="text-[16px] font-medium text-[#7F7F7F] font-['Urbanist',sans-serif]">
+                            {capitalizedWeekday}
+                          </span>
+                        )}
                       </div>
 
                       <span className="text-[16px] font-medium text-[#7F7F7F] font-['Urbanist',sans-serif]">
@@ -3408,6 +3443,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                           daysData={effectiveDaysData}
                           selectedDay={dayItem.day}
                           dragState={dragState}
+                          readOnlyMode={isViewer}
                           onStartDrag={handleStartDrag}
                           onReorder={async (reordered) => {
                             setDayActivities((prev) => ({ ...prev, [dayItem.day]: reordered }));
@@ -3460,12 +3496,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
           </div>
         </div>
 
-        {isOpeningDuplicate &&
-          <div className="fixed inset-0 z-[210] bg-background/90 backdrop-blur-sm flex flex-col items-center justify-center gap-3">
-            <div className="w-10 h-10 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
-            <p className="text-[14px] font-semibold text-foreground">Abrindo cópia do roteiro...</p>
-          </div>
-        }
+        {isOpeningDuplicate && <DuplicatingOverlay />}
 
         {/* Bottom sheet Planejar com IA */}
         <Sheet open={showAiPlanSheet || isAiPlanning} onOpenChange={(open) => {
@@ -3663,12 +3694,14 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
           onClose={() => setShowSettings(false)}
           tripName={itineraryData.tripName?.trim() || itineraryDataset?.title || (itineraryData.destinations.length > 0 ? `${itineraryData.destinations[0].split(',')[0]} trip` : 'Paris trip')}
           onManageItinerary={() => setShowManageItinerary(true)}
+          isViewer={isViewer}
           onShare={isUuidId ? () => setShowShareSheet(true) : undefined}
           onDuplicate={() => {
             if (ownCreatedCount >= FREE_PLAN_ITINERARY_LIMIT) {
               setShowPlanLimitSheet(true);
             } else {
-              setDuplicateToast(true);
+              setShowSettings(false);
+              void handleDuplicate();
             }
           }}
           onDelete={onDelete ?? onBack}
@@ -3774,8 +3807,12 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
           onClose={() => setShowPublishFlow(false)}
           initialDescription={publishedDescription}
           initialTags={publishedTags}
+          initialSeasons={publishedSeasons}
           initialMainTag={publishedMainTag}
           onNavigateToFAQ={onNavigateToFAQ}
+          destinations={itineraryData.destinations}
+          isFlexible={itineraryData.isFlexible}
+          durationDays={itineraryData.durationDays}
           startDate={itineraryData.startDate}
           endDate={itineraryData.endDate}
           onPublished={async (result) => {
@@ -3784,6 +3821,9 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
               toast.error('Apenas o criador original do roteiro pode publicá-lo para venda.');
               return;
             }
+
+            // Simulate loading delay for better UX
+            await new Promise(resolve => setTimeout(resolve, 1500));
 
             let enhancedTags = [...result.tags];
             itineraryData.destinations.forEach((dest) => {
@@ -3799,11 +3839,79 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
               priceCents: Math.round((result.price || 0) * 100),
               description: result.description,
               tags: enhancedTags,
+              seasons: result.seasons || [],
               mainTag: result.mainTag,
             };
 
-            // Atualiza o mesmo registro no banco (transição in-place pessoal -> venda)
-            await persistPublishState(true, extras);
+            const isFlex = result.dateType === 'FLEXIBLE';
+            const finalStartDate = isFlex ? null : (result.startDate ? result.startDate.toISOString() : (itineraryData.startDate ? itineraryData.startDate.toISOString() : null));
+            const finalEndDate = isFlex ? null : (result.endDate ? result.endDate.toISOString() : (itineraryData.endDate ? itineraryData.endDate.toISOString() : null));
+            const finalDuration = isFlex ? (result.duration || itineraryData.durationDays) : null;
+            const finalMonth = isFlex ? (result.month || itineraryData.travelMonth) : null;
+
+            try {
+              const newTitle = result.name || itineraryData.tripName || itineraryData.destinations[0] || 'Roteiro';
+
+              const listingData = {
+                sellerId: currentUserId,
+                listedTitle: newTitle,
+                listedDescription: extras.description,
+                tags: extras.tags,
+                seasons: extras.seasons,
+                priceCents: extras.priceCents,
+                status: 'active',
+                isFlexibleDates: isFlex,
+                durationDays: finalDuration !== null ? finalDuration : undefined,
+                travelMonth: finalMonth !== null ? finalMonth : undefined,
+              };
+
+              if (itineraryData.isPersonal !== false) {
+                // Roteiro pessoal: publica uma CÓPIA independente na loja.
+                // O pessoal permanece intacto; editar/excluir um não afeta o outro.
+                const copy = await createItinerary({
+                  title: newTitle,
+                  destinations: itineraryData.destinations,
+                  startDate: finalStartDate,
+                  endDate: finalEndDate,
+                  images: coverImage ? [coverImage] : [],
+                  places: Array.from({ length: tripDays }, (_, i) => getAllActivities(i + 1).length).reduce((a, b) => a + b, 0),
+                  sourceDatasetId: itineraryDataset?.id ?? null,
+                  isPersonal: false,
+                  isPublic: false,
+                  sourceItineraryId: itineraryId as string,
+                  priceCents: extras.priceCents,
+                  description: extras.description,
+                  tags: extras.tags,
+                  mainTag: extras.mainTag,
+                  status: 'published',
+                  isFlexible: isFlex,
+                  durationDays: finalDuration ?? undefined,
+                  travelMonth: finalMonth ?? undefined,
+                });
+                if (!copy) throw new Error('Falha ao criar cópia do roteiro para a loja');
+
+                const { cloneItineraryContent } = await import('@/lib/plannerApi');
+                await cloneItineraryContent(itineraryId as string, copy.id);
+                await upsertStoreListing(copy.id, listingData);
+              } else {
+                await updateItineraryRow(itineraryId as string, {
+                  status: 'published',
+                });
+                await upsertStoreListing(itineraryId as string, listingData);
+
+                setItineraryData(prev => ({
+                  ...prev,
+                  status: 'published',
+                }));
+              }
+
+              setShowPublishToast(true);
+              if (onNavigateToSales) onNavigateToSales();
+            } catch (e) {
+              console.error(e);
+              toast.error("Erro ao publicar roteiro.");
+            }
+            setShowPublishFlow(false);
           }}
           onNavigateToSales={onNavigateToSales}
         />
@@ -3820,69 +3928,11 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         />
 
         <SuccessToast
-          isVisible={duplicateToast}
-          onClose={() => setDuplicateToast(false)}
-          title="Roteiro duplicado!"
-          description="Uma cópia do roteiro foi criada com sucesso"
-          actionLabel="Abrir roteiro"
-          onAction={async () => {
-            setDuplicateToast(false);
-            setIsOpeningDuplicate(true);
-
-            if (isUuidId && typeof itineraryId === 'string') {
-              try {
-                const firstDestination = itineraryData.destinations[0] ?? 'Paris, França';
-                const [city] = firstDestination.split(',');
-                const newTitle = itineraryData.tripName ? `Cópia de ${itineraryData.tripName}` : `Cópia de ${city.trim()}`;
-
-                const newItinerary = await createItinerary({
-                  title: newTitle,
-                  destinations: itineraryData.destinations.length > 0 ? [...itineraryData.destinations] : ['Paris, França'],
-                  startDate: itineraryData.startDate ? itineraryData.startDate.toISOString() : null,
-                  endDate: itineraryData.endDate ? itineraryData.endDate.toISOString() : null,
-                });
-
-                if (newItinerary) {
-                  // Save data to new itinerary
-                  await savePlannerData(newItinerary.id, { activities: dayActivities, transports: dayTransports });
-                  await saveItineraryDocs(newItinerary.id, { reservas, transportes });
-                  await saveBudget(newItinerary.id, expenses);
-
-                  setIsOpeningDuplicate(false);
-                  if (onOpenItinerary) {
-                    onOpenItinerary(newItinerary);
-                  } else if (onBack) {
-                    onBack();
-                  }
-                  return;
-                }
-              } catch (e) {
-                console.error(e);
-                toast.error("Erro ao duplicar roteiro.");
-              }
-            }
-
-            // Fallback (for local/new itinerary without DB ID)
-            setTimeout(() => {
-              setSelectedDay(1);
-              setReservas([]);
-              setExpenses([]);
-              setTransportes([]);
-              setDayTitles({});
-              setSelectedActivity(null);
-              setItineraryData((prev) => {
-                const firstDestination = prev.destinations[0] ?? 'Paris, França';
-                const [city] = firstDestination.split(',');
-                const newTitle = prev.tripName ? `Cópia de ${prev.tripName}` : `Cópia de ${city.trim()}`;
-
-                return {
-                  ...prev,
-                  tripName: newTitle,
-                };
-              });
-              setIsOpeningDuplicate(false);
-            }, 700);
-          }} />
+          isVisible={showPublishToast}
+          onClose={() => setShowPublishToast(false)}
+          title="Seu roteiro foi publicado!"
+          position="bottom"
+        />
 
         <AddPlacesScreen
           open={showAddPlace}
@@ -3979,41 +4029,9 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
           totalDays={tripDays}
           startDate={itineraryData.startDate} />
 
-        <EditTripInfoSheet
-          open={showEditTripInfo}
-          onClose={() => setShowEditTripInfo(false)}
-          destinations={itineraryData.destinations}
-          startDate={itineraryData.startDate}
-          endDate={itineraryData.endDate}
-          isFlexible={itineraryData.tags?.includes('_FLEXIBLE_DATES_')}
-          durationDays={tripDays}
-          isForSale={Boolean(creatorEditMode || itineraryData.isPersonal === false || (itineraryData.isPublic && itineraryData.isPersonal !== true))}
-          onSave={(data) => {
-            setItineraryData((prev) => {
-              const currentTags = prev.tags || [];
-              let nextTags = [...currentTags];
-
-              if (data.isFlexible) {
-                if (!nextTags.includes('_FLEXIBLE_DATES_')) nextTags.push('_FLEXIBLE_DATES_');
-              } else {
-                nextTags = nextTags.filter(t => t !== '_FLEXIBLE_DATES_');
-              }
-
-              return {
-                ...prev,
-                destinations: data.destinations,
-                startDate: data.startDate,
-                endDate: data.endDate,
-                tags: nextTags
-              };
-            });
-
-            // durationDays updates are automatically handled by tripDays recalculation based on data.startDate and data.endDate
-          }} />
-
         {/* Activity Action Sheet */}
-        
-        
+
+
         <AddBudgetExpenseSheet
           open={showAddExpense}
           onClose={() => setShowAddExpense(false)}
@@ -4025,7 +4043,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         />
 
         {/* Move to Day Sheet */}
-        
+
       </div>
 
       {/* Overlays — sub-telas montadas sobre o Planner para preservar estado/scroll ao voltar */}
@@ -4038,6 +4056,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
             reservas={reservas}
             onReservasChange={setReservas}
             splitPeople={splitPeopleList}
+            readOnlyMode={isViewer}
           />
         </div>
       )}
@@ -4065,6 +4084,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                 date: d.date,
               }));
             })}
+            readOnlyMode={isViewer}
           />
         </div>
       )}
@@ -4076,6 +4096,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
             destination={subScreenDestination}
             notes={tripNotes}
             onNotesChange={setTripNotes}
+            readOnlyMode={isViewer}
           />
         </div>
       )}
@@ -4108,6 +4129,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
             onBack={() => setShowChecklist(false)}
             destination={subScreenDestination}
             onChecklistChange={(checked, total) => { setChecklistChecked(checked); setChecklistTotal(total); }}
+            readOnlyMode={isViewer}
           />
         </div>
       )}

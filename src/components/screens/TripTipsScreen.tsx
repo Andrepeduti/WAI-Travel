@@ -534,7 +534,7 @@ export function TripTipsScreen({ onBack, destination = 'Amsterdam' }: TripTipsSc
                   onChange={e => setFormDescription(e.target.value)}
                   placeholder="Detalhes ou contexto sobre a dica..."
                   rows={3}
-                  className="w-full px-4 py-3 rounded-xl border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground outline-none resize-none focus:ring-2 focus:ring-primary/20 transition-shadow"
+                  className="w-full px-4 py-3 rounded-xl border border-border bg-field text-sm text-foreground placeholder:text-muted-foreground outline-none resize-none focus:border-primary transition-colors"
                 />
               </div>
 

@@ -8,7 +8,9 @@ interface SuccessToastProps {
   duration?: number;
   actionLabel?: string;
   onAction?: () => void;
-  position?: 'top' | 'bottom';
+  /** 'above-nav' fica logo acima da BottomNavigation (usa --toast-bottom-offset). */
+  /** 'screen-bottom' fica colado ao rodapé da tela (sem navbar nem FAB). */
+  position?: 'top' | 'bottom' | 'above-nav' | 'screen-bottom';
 }
 
 export function SuccessToast({
@@ -73,8 +75,14 @@ export function SuccessToast({
 
   return (
     <div
-      className={`fixed inset-x-0 z-[200] flex justify-center pointer-events-none px-4 ${position === 'top' ? 'top-0' : 'bottom-[100px]'}`}
-      style={position === 'top' ? { paddingTop: 'calc(max(15px, env(safe-area-inset-top)))' } : {}}
+      className={`fixed inset-x-0 z-[200] flex justify-center pointer-events-none px-4 ${position === 'top' ? 'top-0' : ''}`}
+      style={position === 'top'
+        ? { paddingTop: 'calc(max(15px, env(safe-area-inset-top)))' }
+        : position === 'above-nav'
+          ? { bottom: 'calc(var(--toast-bottom-offset, 0px) + 12px)' }
+          : position === 'screen-bottom'
+            ? { bottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)' }
+            : { bottom: 'calc(env(safe-area-inset-bottom, 0px) + 100px)' }}
     >
       <div
         className={`pointer-events-auto flex flex-row items-center justify-between px-4 gap-6 relative shadow-lg w-full ${isExiting ? 'animate-toast-exit' : 'animate-toast-enter'

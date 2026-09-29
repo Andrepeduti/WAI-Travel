@@ -114,6 +114,8 @@ export interface PublicItineraryRow {
 export async function getPublicItinerariesByUserId(
   userId: string,
 ): Promise<PublicItineraryRow[]> {
+  return []; // TEMP: Marketplace refactoring
+  /*
   if (!userId) return [];
   const { data, error } = await supabase
     .from('itineraries')
@@ -127,4 +129,5 @@ export async function getPublicItinerariesByUserId(
     return [];
   }
   return (data || []) as PublicItineraryRow[];
+  */
 }

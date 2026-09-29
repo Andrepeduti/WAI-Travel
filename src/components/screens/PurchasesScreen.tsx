@@ -527,8 +527,8 @@ export function PurchasesScreen({ onBack, onNavigateToItinerary, onResumeCheckou
               value={tempReview}
               onChange={(e) => setTempReview(e.target.value)}
               placeholder="Conte mais sobre sua experiência..."
-              className="w-full rounded-xl border p-3 text-foreground placeholder:text-muted-foreground resize-none"
-              style={{ borderColor: 'hsl(var(--divider))', fontSize: 'var(--text-sm)', minHeight: '90px' }}
+              className="w-full rounded-xl border border-divider bg-field p-3 text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors resize-none"
+              style={{ fontSize: 'var(--text-sm)', minHeight: '90px' }}
             />
 
             <button

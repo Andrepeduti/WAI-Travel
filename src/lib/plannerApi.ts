@@ -35,6 +35,7 @@ export interface PlannerActivity {
   lng?: number;
   city?: string;
   country?: string;
+  placeId?: string;
 }
 
 export interface PlannerTransport {
@@ -54,26 +55,28 @@ function isUuid(id: string): boolean {
 }
 
 function activityRowToObject(row: any): PlannerActivity {
-  const noteContent = row.note_text ?? row.metadata?.personalNote ?? undefined;
+  const meta = row.metadata || {};
+  const noteContent = row.note_text ?? meta.personalNote ?? undefined;
   return {
-    id: typeof row.metadata?.legacyId === 'number' ? row.metadata.legacyId : Date.now() + Math.random(),
+    id: typeof meta.legacyId === 'number' ? meta.legacyId : Date.now() + Math.random(),
     type: (row.type as 'activity' | 'note') ?? 'activity',
-    startTime: row.start_time ?? '',
-    endTime: row.end_time ?? '',
-    category: row.category ?? '',
-    categoryColor: row.category_color ?? '',
-    name: row.name ?? '',
-    image: row.image ?? '',
-    openHours: row.open_hours ?? '',
-    rating: Number(row.rating ?? 0),
-    price: row.price ?? '',
+    startTime: meta.startTime ?? row.start_time ?? '',
+    endTime: meta.endTime ?? row.end_time ?? '',
+    category: meta.category ?? row.category ?? '',
+    categoryColor: meta.categoryColor ?? row.category_color ?? '',
+    name: row.label ?? meta.name ?? row.name ?? '',
+    image: meta.image ?? row.image ?? '',
+    openHours: meta.openHours ?? row.open_hours ?? '',
+    rating: Number(meta.rating ?? row.rating ?? 0),
+    price: meta.price ?? row.price ?? '',
     noteText: noteContent,
     personalNote: noteContent,
-    observation: row.observation ?? undefined,
-    lat: row.lat ?? undefined,
-    lng: row.lng ?? undefined,
-    city: row.metadata?.city ?? undefined,
-    country: row.metadata?.country ?? undefined,
+    observation: meta.observation ?? row.observation ?? undefined,
+    lat: meta.lat ?? row.lat ?? undefined,
+    lng: meta.lng ?? row.lng ?? undefined,
+    city: meta.city ?? row.metadata?.city ?? undefined,
+    country: meta.country ?? row.metadata?.country ?? undefined,
+    placeId: row.place_id ?? undefined,
   };
 }
 
@@ -175,20 +178,27 @@ export async function savePlannerData(
         day,
         position,
         type: a.type ?? 'activity',
-        name: a.name ?? '',
-        category: a.category ?? '',
-        category_color: a.categoryColor ?? '',
-        image: a.image ?? '',
-        open_hours: a.openHours ?? '',
-        price: a.price ?? '',
-        start_time: a.startTime ?? '',
-        end_time: a.endTime ?? '',
-        rating: a.rating ?? 0,
-        lat: a.lat ?? null,
-        lng: a.lng ?? null,
+        label: a.name ?? '',
+        place_id: a.placeId ?? null,
         note_text: noteContent,
-        observation: a.observation ?? null,
-        metadata: { legacyId: a.id, personalNote: noteContent, city: a.city ?? null, country: a.country ?? null },
+        metadata: { 
+          legacyId: a.id, 
+          personalNote: noteContent, 
+          city: a.city ?? null, 
+          country: a.country ?? null,
+          name: a.name ?? '',
+          category: a.category ?? '',
+          categoryColor: a.categoryColor ?? '',
+          image: a.image ?? '',
+          openHours: a.openHours ?? '',
+          price: a.price ?? '',
+          startTime: a.startTime ?? '',
+          endTime: a.endTime ?? '',
+          rating: a.rating ?? 0,
+          lat: a.lat ?? null,
+          lng: a.lng ?? null,
+          observation: a.observation ?? null
+        },
       });
     });
   }

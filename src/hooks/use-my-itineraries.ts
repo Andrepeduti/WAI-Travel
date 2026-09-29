@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -58,8 +58,8 @@ export function buildOptimisticItinerary(input: CreateItineraryInput, userId: st
     id,
     title: input.title,
     destinations: input.destinations ?? [],
-    startDate: input.startDate ?? now,
-    endDate: input.endDate ?? input.startDate ?? now,
+    startDate: input.isFlexible ? '' : (input.startDate ?? now),
+    endDate: input.isFlexible ? '' : (input.endDate ?? input.startDate ?? now),
     images: input.images ?? [],
     participants: input.participants ?? [],
     places: input.places ?? 0,
@@ -127,30 +127,44 @@ export function useMyItineraries() {
     };
   }, [userId]);
 
+  const sharedIdsStr = useMemo(() => {
+    return itineraries
+      .filter(it => it.userId !== userId && !it.id.startsWith('pending-'))
+      .map(it => it.id)
+      .sort()
+      .join(',');
+  }, [itineraries, userId]);
+
   // Realtime sync between tabs / devices.
-  // Inclui também itinerários compartilhados: o filtro `user_id=eq.<me>` em
-  // `itineraries` só captura roteiros que EU sou dono. Para refletir mudanças
-  // do dono num roteiro onde sou apenas membro, escutamos a tabela inteira
-  // e refazemos o fetch — `listMyItineraries` já junta owned + shared.
   useEffect(() => {
     if (!userId) return;
     const channel = supabase
       .channel(`itineraries:${userId}:${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'itineraries' },
+        { event: '*', schema: 'public', table: 'itineraries', filter: `user_id=eq.${userId}` },
         () => { refetch(); },
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'itinerary_members', filter: `user_id=eq.${userId}` },
         () => { refetch(); },
-      )
-      .subscribe();
+      );
+
+    if (sharedIdsStr.length > 0) {
+      // Escuta mudanças nos roteiros compartilhados sem ouvir o banco de dados inteiro
+      channel.on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'itineraries', filter: `id=in.(${sharedIdsStr})` },
+        () => { refetch(); },
+      );
+    }
+
+    channel.subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, refetch]);
+  }, [userId, refetch, sharedIdsStr]);
 
   // Sincronização entre instâncias do hook montadas em paralelo (Trips/Home/Index).
   // Disparado por createItinerary/updateItinerary/deleteItinerary após sucesso.

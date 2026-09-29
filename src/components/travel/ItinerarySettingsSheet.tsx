@@ -27,6 +27,8 @@ interface ItinerarySettingsSheetProps {
   isParticipant?: boolean;
   /** Called when participant confirms leaving the itinerary */
   onLeave?: () => void;
+  /** When true (view-only access), hides publish and duplicate options */
+  isViewer?: boolean;
 }
 
 export function ItinerarySettingsSheet({
@@ -46,7 +48,8 @@ export function ItinerarySettingsSheet({
   onShare,
   isParticipant = false,
   onLeave,
-}: ItinerarySettingsSheetProps) {
+  isViewer = false,
+}:ItinerarySettingsSheetProps) {
   const [isPublic, setIsPublic] = useState(isPublicProp);
   const [isLocked, setIsLocked] = useState(isLockedProp);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -128,7 +131,7 @@ export function ItinerarySettingsSheet({
             </button>
 
             {/* 2. Publicar na loja WAI */}
-            <button
+            {!isViewer && <button
               onClick={() => {
                 onClose();
                 if (isPublic && onEditPublish) {
@@ -146,10 +149,10 @@ export function ItinerarySettingsSheet({
               </div>
               <span className="text-[15px] font-medium text-foreground flex-1 text-left">Publicar na loja WAI</span>
               <Icon name="chevron_right" size={20} className="text-muted-foreground/80" />
-            </button>
+            </button>}
 
             {/* 3. Duplicar */}
-            <button
+            {!isViewer && <button
               onClick={() => {
                 onClose();
                 onDuplicate?.();
@@ -161,7 +164,7 @@ export function ItinerarySettingsSheet({
               </div>
               <span className="text-[15px] font-medium text-foreground flex-1 text-left">Duplicar</span>
               <Icon name="chevron_right" size={20} className="text-muted-foreground/80" />
-            </button>
+            </button>}
           </div>
         </div>
       </div>

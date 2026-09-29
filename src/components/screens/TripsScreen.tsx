@@ -7,9 +7,8 @@ import { parseLocalDate } from '@/lib/localDate';
 import { ptBR } from 'date-fns/locale';
 import { resolveTripThumbnailImages, GENERIC_TRAVEL_PLACEHOLDER } from '@/lib/coverImageResolver';
 import { useMyItineraries } from '@/hooks/use-my-itineraries';
-import { type UserItinerary, fetchItineraryMemberAvatars, leaveItinerary } from '@/lib/itinerariesApi';
+import { type UserItinerary, fetchItineraryMemberAvatars, leaveItinerary, ITINERARIES_CHANGED_EVENT } from '@/lib/itinerariesApi';
 import { toast } from 'sonner';
-import { collectionsListKey, readJSON, writeJSON } from '@/lib/userScopedStorage';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { PURCHASES_CHANGED_EVENT } from '@/lib/purchasesApi';
@@ -20,36 +19,7 @@ import { DeleteConfirmSheet } from '@/components/travel/DeleteConfirmSheet';
 
 export type { UserItinerary };
 
-export interface UserCollection {
-  id: number;
-  title: string;
-  itemCount: number;
-  isFavorites: boolean;
-  isPrivate: boolean;
-  images: string[];
-  participants: string[];
-}
-
-export function getUserCollections(): UserCollection[] {
-  return readJSON<UserCollection[]>(collectionsListKey(), []);
-}
-
-export function saveUserCollection(collection: UserCollection) {
-  const key = collectionsListKey();
-  if (!key) return;
-  const existing = getUserCollections();
-  existing.unshift(collection);
-  writeJSON(key, existing);
-}
-
-export function deleteUserCollection(collectionId: number) {
-  const key = collectionsListKey();
-  if (!key) return;
-  const existing = getUserCollections();
-  writeJSON(key, existing.filter(c => c.id !== collectionId));
-}
-
-type TabType = 'private' | 'public' | 'favorites' | 'collections';
+type TabType = 'private' | 'public' | 'favorites';
 type SortOption = 'az' | 'za' | 'days-asc' | 'days-desc' | 'recent' | 'oldest';
 type OriginFilter = 'all' | 'mine' | 'shared' | 'purchased';
 
@@ -62,7 +32,6 @@ interface TripsScreenProps {
   onUserItineraryClick?: (itinerary: UserItinerary) => void;
   /** Open a user-published itinerary inside the marketplace ("for sale") view. */
   onUserPublicItineraryClick?: (itinerary: UserItinerary) => void;
-  onCollectionClick: (id: number) => void;
   /** Triggered from the empty state or + button */
   onCreateItinerary?: (type?: 'personal' | 'seller') => void;
   onBecomeCreator?: () => void;
@@ -195,6 +164,46 @@ export function TripsScreen({
     };
   }, [authUser?.id, userItineraries.length, purchasesVersion]);
 
+  // Listings da loja do próprio vendedor. Roteiros pessoais publicados na loja
+  // continuam com is_personal = true; o que os identifica é o listing.
+  const [listingsByItinerary, setListingsByItinerary] = useState<
+    Record<string, { status: string; priceCents: number | null; title: string | null }>
+  >({});
+  const [listingsVersion, setListingsVersion] = useState(0);
+
+  useEffect(() => {
+    const handler = () => setListingsVersion((v) => v + 1);
+    window.addEventListener(ITINERARIES_CHANGED_EVENT, handler);
+    return () => window.removeEventListener(ITINERARIES_CHANGED_EVENT, handler);
+  }, []);
+
+  useEffect(() => {
+    if (!authUser?.id) {
+      setListingsByItinerary({});
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('itinerary_store_listing')
+        .select('itinerary_id, status, price_cents, listed_title')
+        .eq('seller_id', authUser.id);
+      if (cancelled || error || !data) return;
+      const map: Record<string, { status: string; priceCents: number | null; title: string | null }> = {};
+      for (const row of data as any[]) {
+        map[row.itinerary_id] = {
+          status: row.status,
+          priceCents: row.price_cents ?? null,
+          title: row.listed_title ?? null,
+        };
+      }
+      setListingsByItinerary(map);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authUser?.id, userItineraries.length, listingsVersion]);
+
   // Carrega quais roteiros do usuário foram comprados
   useEffect(() => {
     if (!authUser?.id) {
@@ -264,7 +273,7 @@ export function TripsScreen({
         start.setHours(0, 0, 0, 0);
         end.setHours(0, 0, 0, 0);
 
-        const durationDays = Math.max(1, differenceInDays(end, start) + 1);
+        const durationDays = isFlexible && ui.durationDays ? ui.durationDays : Math.max(1, differenceInDays(end, start) + 1);
         const daysRemaining = parsedStart ? differenceInCalendarDays(start, today) : 999999;
         const isPast = !isCancelled && !isFlexible && !!parsedEnd && end < today;
         const isInProgress = !isCancelled && !isFlexible && !isPast && !!parsedStart && today >= start && today <= end;
@@ -322,27 +331,33 @@ export function TripsScreen({
     return userCards;
   }, [userItineraries, purchasedItineraryIds, authUser?.id, memberAvatarsByItin]);
 
-  // Roteiros publicados (apenas roteiros do próprio autor logado)
+  // Roteiros publicados ou rascunhos de venda (apenas roteiros do próprio autor logado)
   const mergedPublicItineraries = useMemo(() => {
     const userPublicCards = userItineraries
-      .filter((ui) => ui.isPublic && ui.userId === authUser?.id && !ui.deletedAt)
+      .filter(
+        (ui) =>
+          ui.userId === authUser?.id &&
+          !ui.deletedAt &&
+          (ui.isPersonal === false || !!listingsByItinerary[ui.id]),
+      )
       .map((ui) => {
         const validImages = ui.images.filter((image) => image && !image.startsWith('blob:'));
         const images = validImages.length > 0 ? validImages : resolveTripThumbnailImages(ui.destinations);
         const salesCount = salesByItinerary[ui.id] ?? 0;
+        const listing = listingsByItinerary[ui.id];
 
         let status: 'Ativo' | 'Rascunho' | 'Pausado' = 'Ativo';
-        if (ui.status === 'suspended' || ui.isPaused) {
+        if (ui.status === 'suspended' || ui.isPaused || (listing && listing.status !== 'active')) {
           status = 'Pausado';
-        } else if (ui.status === 'draft') {
+        } else if (ui.status === 'draft' && !listing) {
           status = 'Rascunho';
         }
 
         return {
           id: ui.id as string | number,
-          title: ui.title,
+          title: listing?.title || ui.title,
           images,
-          priceCents: ui.priceCents,
+          priceCents: listing?.priceCents ?? ui.priceCents,
           salesCount,
           rating: 0,
           likesCount: 0,
@@ -352,7 +367,7 @@ export function TripsScreen({
       });
 
     return userPublicCards;
-  }, [userItineraries, salesByItinerary, authUser?.id]);
+  }, [userItineraries, salesByItinerary, listingsByItinerary, authUser?.id]);
 
   // Filtro e busca
   const filteredPersonalList = useMemo(() => {
@@ -620,7 +635,7 @@ export function TripsScreen({
       ) && (
           <div className="px-6 pt-5 pb-3">
             <div className="flex items-center gap-3">
-              <div className="flex-1 flex items-center bg-[#F4F4F5] rounded-[10px] px-3.5 py-2.5 transition-colors focus-within:ring-1 focus-within:ring-[#1A1C40]/20">
+              <div className="flex-1 flex items-center bg-field border border-transparent rounded-[10px] px-3.5 py-2.5 transition-colors focus-within:border-primary">
                 <Icon name="search" size={18} className="text-[#8E8E93] mr-2.5 flex-shrink-0" />
                 <input
                   type="text"

@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { DaySelector } from './DaySelector';
-import { getDestinationForDay, type CityPlace } from '@/data/cityRecommendations';
+import { type CityPlace } from '@/data/cityRecommendations';
 import { searchPlaces } from '@/data/cityRecommendations';
 import { fetchPlacesForCity, mergePlaces } from '@/lib/placesApi';
 export interface PlaceResult {
@@ -18,6 +18,8 @@ export interface PlaceResult {
   city: string;
   description?: string;
   address?: string;
+  googlePlaceId?: string;
+  country?: string;
 }
 
 
@@ -36,6 +38,8 @@ export function cityPlaceToResult(p: CityPlace): PlaceResult {
     city: p.city,
     description: p.description,
     address: p.address,
+    googlePlaceId: p.googlePlaceId,
+    country: p.country,
   };
 }
 
@@ -77,6 +81,7 @@ export function AddPlacesScreen({
       setSelectedPlacesMap(new Map());
       setSearch('');
       setSubmittedSearch('');
+      setSelectedCity('');
       setGoogleResults([]);
       setApiResults([]);
       document.body.style.overflow = 'hidden';
@@ -89,12 +94,10 @@ export function AddPlacesScreen({
     };
   }, [open, dayNumber]);
 
-  const dayDestination = useMemo(() => {
-    if (destinations.length <= 1) return destinations[0] || '';
-    return getDestinationForDay(destinations, selectedDay, totalDays);
-  }, [destinations, selectedDay, totalDays]);
-
-  const dayCity = dayDestination.split(',')[0].trim();
+  // City the user is searching in (defaults to the first destination of the itinerary)
+  const [selectedCity, setSelectedCity] = useState('');
+  const searchDestination = destinations.includes(selectedCity) ? selectedCity : destinations[0] || '';
+  const dayCity = searchDestination.split(',')[0].trim();
 
   // We only fetch API places when user searches, unlike the old sheet which fetched on mount.
   const [apiResults, setApiResults] = useState<CityPlace[]>([]);
@@ -120,12 +123,16 @@ export function AddPlacesScreen({
         const { searchGooglePlacesText } = await import('@/lib/googlePlacesApi');
         const { incrementApiCounter } = await import('@/lib/placesCache');
 
+        const { resolveDestinationCoordinates } = await import('@/lib/cityCoordinates');
+
         const q = submittedSearch.trim();
-        const searchQuery = dayCity ? `${q} ${dayCity}` : q;
-        
-        // 1. Fetch Text Search
-        const suggestions = await searchGooglePlacesText(searchQuery, dayCity);
-        await incrementApiCounter('google_places', 1);
+
+        // Single call, restricted to the city chosen by the user
+        const cityName = searchDestination.split(',')[0].trim();
+        const coords = searchDestination ? await resolveDestinationCoordinates(searchDestination) : null;
+        if (cancelled) return;
+        const suggestions = await searchGooglePlacesText(q, cityName, coords ?? undefined);
+        incrementApiCounter('google_places', 1).catch(() => {});
 
         if (cancelled || suggestions.length === 0) {
           if (!cancelled) setLoadingApi(false);
@@ -147,13 +154,13 @@ export function AddPlacesScreen({
             category: p.primaryType || 'Atração',
             categoryColor: '#9DCC36',
             image: p.photoUrl || 'https://images.unsplash.com/photo-1488646953014-c8bf2c37e968?q=80&w=600&auto=format&fit=crop',
-            rating: 4.5, // Default placeholder
             price: '$$', // Default placeholder
             openHours: '',
             lat: p.lat,
             lng: p.lng,
             address: p.address,
-            googlePlaceId: p.id
+            googlePlaceId: p.id,
+            country: p.country
           };
         }) as CityPlace[];
         
@@ -172,7 +179,7 @@ export function AddPlacesScreen({
     return () => {
       cancelled = true;
     };
-  }, [submittedSearch, dayDestination, dayCity]);
+  }, [submittedSearch, searchDestination, dayCity]);
 
   // Combine static and Google results based on the search term
   const displayResults = useMemo(() => {
@@ -181,14 +188,14 @@ export function AddPlacesScreen({
     }
     
     // Search in static data
-    const { local: staticLocal } = searchPlaces(submittedSearch, destinations);
+    const { local: staticLocal } = searchPlaces(submittedSearch, searchDestination ? [searchDestination] : destinations);
     
     // googleResults already contains the hydrated autocomplete results
     let merged = mergePlaces(staticLocal, googleResults);
     
     // Return max 5 items
     return merged.slice(0, 5);
-  }, [submittedSearch, destinations, googleResults]);
+  }, [submittedSearch, destinations, searchDestination, googleResults]);
 
   if (!open) return null;
 
@@ -241,7 +248,7 @@ export function AddPlacesScreen({
 
         <div className="flex flex-col gap-4">
           {/* Day Selector */}
-          <div className="flex flex-row items-center p-[12px] gap-[12px] bg-[#EEEEEE] rounded-[12px] h-[60px] w-full">
+          <div className="flex flex-row items-center p-[12px] gap-[12px] bg-field rounded-[12px] h-[60px] w-full">
             <Icon name="calendar_today" size={20} className="text-[#141530] shrink-0" />
             <div className="flex flex-col flex-1 justify-center relative">
               <p className="text-[12px] font-medium text-[#949494] mb-[2px] leading-tight font-urbanist">Adicionar ao dia</p>
@@ -257,9 +264,30 @@ export function AddPlacesScreen({
             </div>
           </div>
 
+          {/* City Selector (only when the itinerary has more than one destination) */}
+          {destinations.length > 1 && (
+            <div className="flex flex-row gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1">
+              {destinations.map((dest) => {
+                const active = dest === searchDestination;
+                return (
+                  <button
+                    key={dest}
+                    type="button"
+                    onClick={() => setSelectedCity(dest)}
+                    className={`shrink-0 px-4 h-[36px] rounded-full border text-[14px] font-semibold font-urbanist text-[#141530] bg-white transition-colors ${
+                      active ? 'border-black' : 'border-[#E5E5E5]'
+                    }`}
+                  >
+                    {dest.split(',')[0].trim()}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {/* Search Input */}
           <form 
-            className="relative flex items-center bg-[#F2F2F2] rounded-xl h-[56px] px-4 gap-2"
+            className="relative flex items-center bg-field border border-transparent focus-within:border-primary transition-colors rounded-xl h-[56px] px-4 gap-2"
             onSubmit={(e) => {
               e.preventDefault();
               setSubmittedSearch(search);

@@ -200,7 +200,7 @@ export function BudgetFilterSheet({
           <h3 className="text-[16px] font-semibold text-[#171F2C]">Valor do gasto</h3>
           <div className="flex flex-row gap-4 w-full">
             {/* A partir de */}
-            <div className="flex-1 flex flex-row items-center px-2 py-3 gap-2 bg-[#EEEEEE] rounded-xl h-[60px]">
+            <div className="flex-1 flex flex-row items-center px-2 py-3 gap-2 bg-field border border-transparent focus-within:border-primary transition-colors rounded-xl h-[60px]">
               <div className="flex flex-col flex-1">
                 <span className="font-medium text-[12px] text-[#949494]">A partir de</span>
                 <div className="flex items-center">
@@ -217,7 +217,7 @@ export function BudgetFilterSheet({
             </div>
 
             {/* Até */}
-            <div className="flex-1 flex flex-row items-center px-2 py-3 gap-2 bg-[#EEEEEE] rounded-xl h-[60px]">
+            <div className="flex-1 flex flex-row items-center px-2 py-3 gap-2 bg-field border border-transparent focus-within:border-primary transition-colors rounded-xl h-[60px]">
               <div className="flex flex-col flex-1">
                 <span className="font-medium text-[12px] text-[#949494]">Até</span>
                 <div className="flex items-center">

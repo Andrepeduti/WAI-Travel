@@ -297,7 +297,7 @@ export function EditTripInfoSheet({
           {/* Data da Viagem Card & Optional Toggle */}
           <div className="flex flex-col gap-3">
             {/* Date Box */}
-            <div className="bg-[#EDEDED] rounded-[12px] p-3 flex items-center gap-3 min-h-[58px]">
+            <div className="bg-field rounded-[12px] p-3 flex items-center gap-3 min-h-[58px]">
               <Icon name="calendar_today" size={16} className="text-[#555555] flex-shrink-0" />
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
                 <label className="text-[12px] font-medium text-[#949494] leading-[16px] block">

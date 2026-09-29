@@ -34,50 +34,54 @@ interface TripChecklistScreenProps {
   itineraryId?: string;
   isPurchased?: boolean;
   onChecklistChange?: (checked: number, total: number) => void;
+  readOnlyMode?: boolean;
 }
 
-  // ─── Componente de Item da Categoria (Arrastável) ─────────────────────────
-  const CategoryItem = ({
-    cat,
-    isCollapsed,
-    toggleCollapse,
-    handleOpenEditCategory,
-    toggleItem,
-    deleteItem,
-    addingItemToCatId,
-    setAddingItemToCatId,
-    newItemText,
-    setNewItemText,
-    addItem,
-  }: {
-    cat: ChecklistCategory;
-    isCollapsed: boolean;
-    toggleCollapse: (id: string) => void;
-    handleOpenEditCategory: (cat: ChecklistCategory) => void;
-    toggleItem: (catId: string, itemId: string) => void;
-    deleteItem: (catId: string, itemId: string) => void;
-    addingItemToCatId: string | null;
-    setAddingItemToCatId: (id: string | null) => void;
-    newItemText: string;
-    setNewItemText: (text: string) => void;
-    addItem: (catId: string) => void;
-  }) => {
-    const dragControls = useDragControls();
-    const itemCount = cat.items.length;
+// ─── Componente de Item da Categoria (Arrastável) ─────────────────────────
+const CategoryItem = ({
+  cat,
+  isCollapsed,
+  toggleCollapse,
+  handleOpenEditCategory,
+  toggleItem,
+  deleteItem,
+  addingItemToCatId,
+  setAddingItemToCatId,
+  newItemText,
+  setNewItemText,
+  addItem,
+  readOnlyMode,
+}: {
+  cat: ChecklistCategory;
+  isCollapsed: boolean;
+  toggleCollapse: (id: string) => void;
+  handleOpenEditCategory: (cat: ChecklistCategory) => void;
+  toggleItem: (catId: string, itemId: string) => void;
+  deleteItem: (catId: string, itemId: string) => void;
+  addingItemToCatId: string | null;
+  setAddingItemToCatId: (id: string | null) => void;
+  newItemText: string;
+  setNewItemText: (text: string) => void;
+  addItem: (catId: string) => void;
+  readOnlyMode?: boolean;
+}) => {
+  const dragControls = useDragControls();
+  const itemCount = cat.items.length;
 
-    return (
-      <Reorder.Item
-        value={cat}
-        dragListener={false}
-        dragControls={dragControls}
-        transition={{ duration: 0.15, ease: 'easeOut' }}
-        className="bg-[#FFFFFF] rounded-[16px] p-6 shadow-sm flex flex-col gap-6"
-        whileDrag={{ scale: 1.02, boxShadow: '0 10px 30px rgba(0,0,0,0.12)', zIndex: 10 }}
-      >
-        {/* Header do Accordion */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 min-w-0">
-            {/* O arrasto agora é acionado APENAS pelo ícone */}
+  return (
+    <Reorder.Item
+      value={cat}
+      dragListener={false}
+      dragControls={dragControls}
+      transition={{ duration: 0.15, ease: 'easeOut' }}
+      className="bg-[#FFFFFF] rounded-[16px] p-6 shadow-sm flex flex-col gap-6"
+      whileDrag={{ scale: 1.02, boxShadow: '0 10px 30px rgba(0,0,0,0.12)', zIndex: 10 }}
+    >
+      {/* Header do Accordion */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3 min-w-0">
+          {/* O arrasto agora é acionado APENAS pelo ícone */}
+          {!readOnlyMode && (
             <div
               className="text-[#7F7F7F] p-1 -ml-1 cursor-grab active:cursor-grabbing"
               onPointerDown={(e) => dragControls.start(e)}
@@ -85,21 +89,23 @@ interface TripChecklistScreenProps {
             >
               <GripVertical size={20} />
             </div>
-            <div
-              onClick={() => toggleCollapse(cat.id)}
-              className="flex flex-col select-none min-w-0"
-            >
-              <h3 className="font-['Urbanist'] font-semibold text-[18px] leading-[22px] text-[#171F2C] truncate">
-                {cat.title}
-              </h3>
-              <span className="font-['Urbanist'] font-medium text-[14px] leading-[20px] text-[#7F7F7F] whitespace-nowrap">
-                {itemCount} {itemCount === 1 ? 'item' : 'itens'}
-              </span>
-            </div>
+          )}
+          <div
+            onClick={() => toggleCollapse(cat.id)}
+            className="flex flex-col select-none min-w-0"
+          >
+            <h3 className="font-['Urbanist'] font-semibold text-[18px] leading-[22px] text-[#171F2C] truncate">
+              {cat.title}
+            </h3>
+            <span className="font-['Urbanist'] font-medium text-[14px] leading-[20px] text-[#7F7F7F] whitespace-nowrap">
+              {itemCount} {itemCount === 1 ? 'item' : 'itens'}
+            </span>
           </div>
+        </div>
 
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {/* Botão de Editar Categoria */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Botão de Editar Categoria */}
+          {!readOnlyMode && (
             <button
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
@@ -111,79 +117,78 @@ interface TripChecklistScreenProps {
             >
               <Pencil size={16} strokeWidth={2.2} />
             </button>
+          )}
 
-            {/* Chevron de expansão/colapso */}
-            <div
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleCollapse(cat.id);
-              }}
-              className={`w-6 h-6 flex items-center justify-center text-[#171F2C] transition-transform duration-200 cursor-pointer ${
-                isCollapsed ? 'rotate-180' : 'rotate-0'
+          {/* Chevron de expansão/colapso */}
+          <div
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleCollapse(cat.id);
+            }}
+            className={`w-6 h-6 flex items-center justify-center text-[#171F2C] transition-transform duration-200 cursor-pointer ${isCollapsed ? 'rotate-180' : 'rotate-0'
               }`}
-            >
-              <ChevronDown size={20} strokeWidth={2} />
-            </div>
+          >
+            <ChevronDown size={20} strokeWidth={2} />
           </div>
         </div>
+      </div>
 
-        {/* Corpo do Accordion (Lista de Itens) */}
-        <AnimatePresence initial={false}>
-          {!isCollapsed && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.15, ease: 'easeOut' }}
-              className="overflow-hidden"
-            >
-              <div className="flex flex-col gap-4 pt-2">
-                <div className="flex flex-col">
-                  <AnimatePresence initial={false}>
-                    {cat.items.map((item: ChecklistItem) => (
-                      <motion.div
-                        key={item.id}
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.15, ease: 'easeOut' }}
-                        className="overflow-hidden border-b border-transparent [&:not(:last-child)]:border-[#D5D5D5]"
-                      >
-                        <div className="flex items-center justify-between gap-2 py-3">
-                          {/* Checkbox clicável e label */}
-                          <button
-                            onClick={() => toggleItem(cat.id, item.id)}
-                            className="flex items-center gap-2 flex-1 min-w-0 text-left cursor-pointer"
+      {/* Corpo do Accordion (Lista de Itens) */}
+      <AnimatePresence initial={false}>
+        {!isCollapsed && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
+            className="overflow-hidden"
+          >
+            <div className="flex flex-col gap-4 pt-2">
+              <div className="flex flex-col">
+                <AnimatePresence initial={false}>
+                  {cat.items.map((item: ChecklistItem) => (
+                    <motion.div
+                      key={item.id}
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.15, ease: 'easeOut' }}
+                      className="overflow-hidden border-b border-transparent [&:not(:last-child)]:border-[#D5D5D5]"
+                    >
+                      <div className="flex items-center justify-between gap-2 py-3">
+                        {/* Checkbox clicável e label */}
+                        <button
+                          onClick={readOnlyMode ? undefined : () => toggleItem(cat.id, item.id)}
+                          className="flex items-center gap-2 flex-1 min-w-0 text-left cursor-pointer"
+                        >
+                          <div
+                            className={`w-[22px] h-[22px] rounded-[5px] flex items-center justify-center flex-shrink-0 transition-all ${item.checked
+                                ? 'bg-[#9DCC36] border-[1.5px] border-[#9DCC36] text-[#141530]'
+                                : 'border-[1.5px] border-[#7F7F7F] bg-transparent'
+                              }`}
                           >
-                            <div
-                              className={`w-[22px] h-[22px] rounded-[5px] flex items-center justify-center flex-shrink-0 transition-all ${
-                                item.checked
-                                  ? 'bg-[#9DCC36] border-[1.5px] border-[#9DCC36] text-[#141530]'
-                                  : 'border-[1.5px] border-[#7F7F7F] bg-transparent'
-                              }`}
-                            >
-                              {item.checked && (
-                                <Check
-                                  size={14}
-                                  strokeWidth={3.5}
-                                  className="text-[#141530]"
-                                />
-                              )}
-                            </div>
+                            {item.checked && (
+                              <Check
+                                size={14}
+                                strokeWidth={3.5}
+                                className="text-[#141530]"
+                              />
+                            )}
+                          </div>
 
-                            <span
-                              className={`font-['Urbanist'] font-semibold text-[14px] leading-[17px] break-words flex-1 ${
-                                item.checked
-                                  ? 'line-through text-[#7F7F7F]'
-                                  : 'text-[#171F2C]'
+                          <span
+                            className={`font-['Urbanist'] font-semibold text-[14px] leading-[17px] break-words flex-1 ${item.checked
+                                ? 'line-through text-[#7F7F7F]'
+                                : 'text-[#171F2C]'
                               }`}
-                            >
-                              {item.label}
-                            </span>
-                          </button>
+                          >
+                            {item.label}
+                          </span>
+                        </button>
 
-                          {/* Botão Excluir Item */}
+                        {/* Botão Excluir Item */}
+                        {!readOnlyMode && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -194,13 +199,15 @@ interface TripChecklistScreenProps {
                           >
                             <X size={14} strokeWidth={2.2} />
                           </button>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-                </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
 
-                {/* Rodapé do Accordion: + Adicionar item */}
+              {/* Rodapé do Accordion: + Adicionar item */}
+              {!readOnlyMode && (
                 <div className="pt-2">
                   {addingItemToCatId === cat.id ? (
                     <div className="flex items-center gap-2 pt-1 pb-1">
@@ -248,13 +255,14 @@ interface TripChecklistScreenProps {
                     </button>
                   )}
                 </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </Reorder.Item>
-    );
-  };
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Reorder.Item>
+  );
+};
 
 
 export function TripChecklistScreen({
@@ -263,6 +271,7 @@ export function TripChecklistScreen({
   itineraryId,
   isPurchased = false,
   onChecklistChange,
+  readOnlyMode,
 }: TripChecklistScreenProps) {
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [categories, setCategories] = useState<ChecklistCategory[]>(() => {
@@ -361,11 +370,11 @@ export function TripChecklistScreen({
     const updated = categories.map((cat) =>
       cat.id === categoryId
         ? {
-            ...cat,
-            items: cat.items.map((item) =>
-              item.id === itemId ? { ...item, checked: !item.checked } : item,
-            ),
-          }
+          ...cat,
+          items: cat.items.map((item) =>
+            item.id === itemId ? { ...item, checked: !item.checked } : item,
+          ),
+        }
         : cat,
     );
     persistCategories(updated);
@@ -414,7 +423,7 @@ export function TripChecklistScreen({
 
   const handleUndoDelete = () => {
     if (!deletedItemInfo) return;
-    
+
     const updated = categories.map((cat) => {
       if (cat.id === deletedItemInfo.categoryId) {
         const newItems = [...cat.items];
@@ -423,7 +432,7 @@ export function TripChecklistScreen({
       }
       return cat;
     });
-    
+
     persistCategories(updated);
     setDeletedItemInfo(null);
     setShowUndoDeleteToast(false);
@@ -513,19 +522,20 @@ export function TripChecklistScreen({
 
   return (
     <div className="h-[100dvh] overflow-y-auto bg-[#F3F3F3] flex flex-col font-['Urbanist',sans-serif]">
-      <SuccessToast 
-        isVisible={showSuccessToast} 
-        onClose={() => setShowSuccessToast(false)} 
+      <SuccessToast
+        isVisible={showSuccessToast}
+        onClose={() => setShowSuccessToast(false)}
         title="Categoria adicionada com sucesso!"
+        position="screen-bottom"
       />
 
-      <SuccessToast 
-        isVisible={showUndoDeleteToast} 
-        onClose={() => setShowUndoDeleteToast(false)} 
+      <SuccessToast
+        isVisible={showUndoDeleteToast}
+        onClose={() => setShowUndoDeleteToast(false)}
         title="Item excluído"
         actionLabel="Desfazer"
         onAction={handleUndoDelete}
-        position="bottom"
+        position="screen-bottom"
       />
 
       {/* ─── Topbar Header (Figma specs: flat chevron sem background circular branco) ─── */}
@@ -549,7 +559,7 @@ export function TripChecklistScreen({
           </div>
 
           {/* Botão 3 pontinhos (Menu de Ações) */}
-          {!isEmpty && (
+          {!isEmpty && !readOnlyMode && (
             <button
               onClick={() => setShowHeaderMenu(true)}
               className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-black/5 active:scale-95 transition-all flex-shrink-0"
@@ -584,33 +594,37 @@ export function TripChecklistScreen({
             </div>
 
             {/* Main button: border 1px solid #141530, border-radius 16px, h 48px, font 16px bold #141530 */}
-            <button
-              onClick={() => {
-                setNewCategoryName('');
-                setShowAddCategorySheet(true);
-              }}
-              className="h-[48px] px-6 rounded-[16px] border border-[#141530] bg-[#F3F3F3] text-[#141530] font-['Urbanist'] font-bold text-[16px] leading-[19px] hover:bg-black/5 active:scale-95 transition-all flex items-center justify-center shadow-none"
-            >
-              Criar checklist
-            </button>
+            {!readOnlyMode && (
+              <button
+                onClick={() => {
+                  setNewCategoryName('');
+                  setShowAddCategorySheet(true);
+                }}
+                className="h-[48px] px-6 rounded-[16px] border border-[#141530] bg-[#F3F3F3] text-[#141530] font-['Urbanist'] font-bold text-[16px] leading-[19px] hover:bg-black/5 active:scale-95 transition-all flex items-center justify-center shadow-none"
+              >
+                Criar checklist
+              </button>
+            )}
           </div>
         </div>
       ) : (
         /* ─── Estado Preenchido (Listagem) [image_e1afee.png - Esquerda] ─── */
         <div className="flex-1 px-6 pb-12 pt-6 flex flex-col gap-6">
           {/* Botão + Adicionar categoria (Figma: gap 8px, font 14px bold, text #141530) */}
-          <div>
-            <button
-              onClick={() => {
-                setNewCategoryName('');
-                setShowAddCategorySheet(true);
-              }}
-              className="flex items-center gap-2 font-['Urbanist'] font-bold text-[14px] leading-[17px] text-[#141530] active:opacity-70 transition-opacity"
-            >
-              <Plus size={16} strokeWidth={2.5} className="text-[#141530]" />
-              <span>Adicionar categoria</span>
-            </button>
-          </div>
+          {!readOnlyMode && (
+            <div>
+              <button
+                onClick={() => {
+                  setNewCategoryName('');
+                  setShowAddCategorySheet(true);
+                }}
+                className="flex items-center gap-2 font-['Urbanist'] font-bold text-[14px] leading-[17px] text-[#141530] active:opacity-70 transition-opacity"
+              >
+                <Plus size={16} strokeWidth={2.5} className="text-[#141530]" />
+                <span>Adicionar categoria</span>
+              </button>
+            </div>
+          )}
 
           {/* Lista de Categorias (Accordion Cards: bg #FFFFFF, border-radius 16px, padding 24px, gap 24px) */}
           <Reorder.Group axis="y" values={categories} onReorder={persistCategories} className="flex flex-col gap-6">
@@ -628,6 +642,7 @@ export function TripChecklistScreen({
                 newItemText={newItemText}
                 setNewItemText={setNewItemText}
                 addItem={addItem}
+                readOnlyMode={readOnlyMode}
               />
             ))}
           </Reorder.Group>
@@ -706,7 +721,7 @@ export function TripChecklistScreen({
                       <RotateCcw size={16} className="text-[#141530]" strokeWidth={2.5} />
                     </div>
                     <span className="font-['Urbanist'] font-medium text-[16px] leading-[19px] text-[#141530]">
-                      Resetar aos padrões
+                      Restaurar checklist padrão
                     </span>
                   </div>
                 </button>
@@ -747,7 +762,7 @@ export function TripChecklistScreen({
               </h3>
 
               {/* Input container Search (Figma: bg #EDEDED, border-radius 12px, padding 8px 12px, height 54px) */}
-              <div className="bg-[#EDEDED] rounded-[12px] px-3 py-2 flex items-center gap-3 h-[54px]">
+              <div className="bg-field border border-transparent focus-within:border-primary transition-colors rounded-[12px] px-3 py-2 flex items-center gap-3 h-[54px]">
                 <Tag size={16} className="text-[#7F7F7F] flex-shrink-0" />
                 <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
                   <label className="font-['Urbanist'] font-medium text-[12px] leading-[16px] text-[#949494] block">
@@ -810,7 +825,7 @@ export function TripChecklistScreen({
               </h3>
 
               {/* Input container Search (Figma: bg #EDEDED, border-radius 12px, padding 8px 12px, height 54px) */}
-              <div className="bg-[#EDEDED] rounded-[12px] px-3 py-2 flex items-center gap-3 h-[54px]">
+              <div className="bg-field border border-transparent focus-within:border-primary transition-colors rounded-[12px] px-3 py-2 flex items-center gap-3 h-[54px]">
                 <Tag size={16} className="text-[#7F7F7F] flex-shrink-0" />
                 <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
                   <label className="font-['Urbanist'] font-medium text-[12px] leading-[16px] text-[#949494] block">

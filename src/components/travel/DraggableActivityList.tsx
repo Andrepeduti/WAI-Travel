@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { EditTransportSheet } from './EditTransportSheet';
 import { MoveActivityToDaySheet } from './MoveActivityToDaySheet';
-import { MoreHorizontal, Trash2, Pencil, Footprints, MessageSquare } from 'lucide-react';
+import { MoreHorizontal, Trash2, Pencil, Footprints, MessageSquare, GripVertical } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -80,6 +80,7 @@ interface DraggableActivityListProps {
   getTransportIcon?: (type: TransportBetween['type']) => string;
   onUpdateTransport?: (index: number, data: TransportBetween) => void;
   onDeleteTransport?: (index: number) => void;
+  readOnlyMode?: boolean;
 }
 
 export function DraggableActivityList({
@@ -101,6 +102,7 @@ export function DraggableActivityList({
   onEditNote,
   onUpdateTransport,
   onDeleteTransport,
+  readOnlyMode,
 }: DraggableActivityListProps) {
   const [movingActivity, setMovingActivity] = useState<Activity | null>(null);
   const [optionsActivity, setOptionsActivity] = useState<Activity | null>(null);
@@ -111,6 +113,26 @@ export function DraggableActivityList({
       ? `${activity.lat},${activity.lng}`
       : encodeURIComponent(`${activity.name}, ${activity.city || ''}`);
     window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
+  };
+
+  const renderDragHandle = (activity: Activity, index: number) => {
+    if (readOnlyMode) return null;
+    return (
+      <div
+        data-drag-handle="true"
+        role="button"
+        aria-label="Arrastar para reordenar"
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          onStartDrag && onStartDrag(activity, selectedDay, index, e);
+        }}
+        onClick={(e) => e.stopPropagation()}
+        style={{ touchAction: 'none' }}
+        className="self-stretch flex items-center justify-center w-9 -ml-3 -mr-2 shrink-0 cursor-grab active:cursor-grabbing text-[#7F7F7F] pointer-events-auto"
+      >
+        <GripVertical className="w-7 h-7" />
+      </div>
+    );
   };
 
   const renderDropPlaceholder = (posKey?: string | number) => (
@@ -180,8 +202,7 @@ export function DraggableActivityList({
               data-activity-id={activity.id}
               data-activity-index={index}
               data-day={selectedDay}
-              onPointerDown={(e) => onStartDrag && onStartDrag(activity, selectedDay, index, e)}
-              className={`transition-all duration-200 select-none cursor-grab active:cursor-grabbing touch-none ${isCurrentlyDragged
+              className={`transition-all duration-200 select-none ${isCurrentlyDragged
                   ? 'opacity-30 border-2 border-dashed border-[#1D4ED8] rounded-2xl bg-[#EFF6FF]/40 pointer-events-none scale-[0.98]'
                   : ''
                 }`}
@@ -191,6 +212,7 @@ export function DraggableActivityList({
                 /* Standalone Personal Note (Matching user image & Figma Frame 1321316481) */
                 <div className="bg-white py-1.5 pl-3 pr-1 relative">
                   <div className="flex gap-3.5 items-start w-full isolate">
+                    {renderDragHandle(activity, index)}
                     {/* Left Box (Grey thumbnail with Map Pin Marker + Chat Bubble Icon) */}
                     <div className="relative w-[85px] h-[75px] rounded-[8px] bg-[#E8E8EB] flex items-center justify-center shrink-0 pointer-events-none">
                       {/* Map Pin Badge on Top-Left */}
@@ -228,28 +250,30 @@ export function DraggableActivityList({
                     <div className="flex-1 min-w-0 flex flex-col justify-start py-0.5 pointer-events-none">
                       {/* Title Row */}
                       <div className="flex items-start justify-between">
-                        <h4 className="text-[16px] font-bold text-[#1A1C40] font-['Urbanist',sans-serif] leading-tight truncate">
-                          {activity.name || 'Anotação pessoal'}
-                        </h4>
+                          <h4 className="text-[16px] font-bold text-[#1A1C40] font-['Urbanist',sans-serif] leading-tight truncate">
+                            {activity.name || 'Anotação pessoal'}
+                          </h4>
 
-                        <div
-                          className="flex items-center gap-1 pointer-events-auto"
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOptionsActivity(activity);
-                            }}
-                            className="p-1 -mr-1 rounded-full text-[#141530] hover:bg-black/5 transition-colors"
-                            aria-label="Opções"
-                          >
-                            <MoreHorizontal className="w-5 h-5 text-[#141530]" />
-                          </button>
+                          {!readOnlyMode && (
+                            <div
+                              className="flex items-center gap-1 pointer-events-auto"
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOptionsActivity(activity);
+                                }}
+                                className="p-1 -mr-1 rounded-full text-[#141530] hover:bg-black/5 transition-colors"
+                                aria-label="Opções"
+                              >
+                                <MoreHorizontal className="w-5 h-5 text-[#141530]" />
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      </div>
 
                       {/* Note Text */}
                       {(activity.noteText || activity.personalNote || activity.observation) && (
@@ -269,6 +293,7 @@ export function DraggableActivityList({
                       onClick={() => onActivityClick(activity)}
                       className="flex gap-3.5 items-start w-full cursor-pointer hover:opacity-95 transition-opacity"
                     >
+                      {renderDragHandle(activity, index)}
                       {/* Thumbnail with Blue Pin Number Badge */}
                       <div className="relative w-[85px] h-[75px] rounded-[8px] bg-muted shrink-0 pointer-events-none">
                         <img
@@ -313,23 +338,25 @@ export function DraggableActivityList({
                             {activity.name}
                           </h4>
 
-                          <div
-                            className="flex items-center gap-1 pointer-events-auto"
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setOptionsActivity(activity);
-                              }}
-                              className="p-1 -mr-1 rounded-full text-[#141530] hover:bg-black/5 transition-colors"
-                              aria-label="Opções"
+                          {!readOnlyMode && (
+                            <div
+                              className="flex items-center gap-1 pointer-events-auto"
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              <MoreHorizontal className="w-5 h-5 text-[#141530]" />
-                            </button>
-                          </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOptionsActivity(activity);
+                                }}
+                                className="p-1 -mr-1 rounded-full text-[#141530] hover:bg-black/5 transition-colors"
+                                aria-label="Opções"
+                              >
+                                <MoreHorizontal className="w-5 h-5 text-[#141530]" />
+                              </button>
+                            </div>
+                          )}
                         </div>
 
                         {/* Category | Country / Location */}
@@ -350,35 +377,38 @@ export function DraggableActivityList({
                     </div>
 
                     {/* Attached Personal Note */}
-                    <div
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (onEditNote) {
-                          onEditNote(activity);
-                        }
-                      }}
-                      className="w-full cursor-pointer group/note hover:opacity-90 transition-opacity pointer-events-auto"
-                    >
-                      {activity.personalNote || activity.noteText ? (
-                        <div className="flex items-stretch gap-3 w-full">
-                          <div className="w-[4px] rounded-[8px] bg-[#233ACF] shrink-0 self-stretch min-h-[39px]" />
-                          <div className="flex flex-col gap-1 min-w-0 flex-1 justify-center">
-                            <div className="flex items-center gap-2 text-[14px] font-semibold text-[#1A1C40] font-['Urbanist',sans-serif]">
-                              <Pencil className="w-4 h-4 text-[#141530] shrink-0" />
-                              <span>Anotação pessoal:</span>
+                    {(activity.personalNote || activity.noteText || !readOnlyMode) && (
+                      <div
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (readOnlyMode) return;
+                          if (onEditNote) {
+                            onEditNote(activity);
+                          }
+                        }}
+                        className={`w-full group/note transition-opacity pointer-events-auto ${readOnlyMode ? '' : 'cursor-pointer hover:opacity-90'}`}
+                      >
+                        {activity.personalNote || activity.noteText ? (
+                          <div className="flex items-stretch gap-3 w-full">
+                            <div className="w-[4px] rounded-[8px] bg-[#233ACF] shrink-0 self-stretch min-h-[39px]" />
+                            <div className="flex flex-col gap-1 min-w-0 flex-1 justify-center">
+                              <div className="flex items-center gap-2 text-[14px] font-semibold text-[#1A1C40] font-['Urbanist',sans-serif]">
+                                <Pencil className="w-4 h-4 text-[#141530] shrink-0" />
+                                <span>Anotação pessoal:</span>
+                              </div>
+                              <p className="text-[12px] font-medium text-[#141530] font-['Urbanist',sans-serif] leading-[14px] break-words">
+                                {activity.personalNote || activity.noteText}
+                              </p>
                             </div>
-                            <p className="text-[12px] font-medium text-[#141530] font-['Urbanist',sans-serif] leading-[14px] break-words">
-                              {activity.personalNote || activity.noteText}
-                            </p>
                           </div>
-                        </div>
-                      ) : (
-                        <p className="text-[14px] font-medium italic text-[#7F7F7F] font-['Urbanist',sans-serif] group-hover/note:text-[#233ACF] transition-colors">
-                          Adicionar nota do lugar....
-                        </p>
-                      )}
-                    </div>
+                        ) : (
+                          <p className="text-[14px] font-medium italic text-[#7F7F7F] font-['Urbanist',sans-serif] group-hover/note:text-[#233ACF] transition-colors">
+                            Adicionar nota do lugar....
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -400,19 +430,28 @@ export function DraggableActivityList({
                     <div
                       onPointerDown={(e) => e.stopPropagation()}
                       onClick={(e) => {
+                        if (readOnlyMode) return;
                         e.stopPropagation();
                         setEditingTransportIndex(index);
                       }}
-                      className="pt-6 pb-2 pl-3 flex items-center gap-2 text-[#7F7F7F] cursor-pointer group hover:opacity-80 transition-opacity"
+                      className={`pt-6 pb-2 pl-3 flex items-center gap-2 text-[#7F7F7F] group transition-opacity ${readOnlyMode ? '' : 'cursor-pointer hover:opacity-80'}`}
                     >
                       <div className="flex items-center gap-1.5 text-[12px] font-medium text-[#141530] font-['Urbanist',sans-serif] flex-shrink-0">
                         <Footprints className="w-3.5 h-3.5 text-[#141530]" />
                         <span>
                           {transport.duration} {transport.distance ? `(${transport.distance})` : ''}
                         </span>
-                        <span className="text-[11px] text-[#7F7F7F]">&gt;</span>
+                        {!readOnlyMode && <span className="text-[11px] text-[#7F7F7F]">&gt;</span>}
                       </div>
                       <div className="flex-1 h-[1px] bg-[#E6E6E6] ml-1" />
+                    </div>
+                  );
+                }
+
+                if (readOnlyMode) {
+                  return (
+                    <div className="pt-6 pb-2.5 pl-3 flex items-center gap-2 group">
+                      <div className="flex-1 h-[1px] bg-[#E6E6E6] ml-2" />
                     </div>
                   );
                 }

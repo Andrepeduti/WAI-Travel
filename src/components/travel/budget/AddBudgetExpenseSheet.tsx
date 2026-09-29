@@ -253,15 +253,17 @@ export function AddBudgetExpenseSheet({
                 <h2 className="font-['Urbanist'] font-semibold text-[22px] leading-[26px] text-[#171F2C]">
                   {editingExpense ? 'Editar gasto' : 'Adicionar gasto'}
                 </h2>
-                <p className="font-['Urbanist'] font-medium text-[14px] leading-[20px] text-[#7F7F7F]">
-                  Preencha as informações do gasto para o planejamento da viagem.
-                </p>
+                {!editingExpense && (
+                  <p className="font-['Urbanist'] font-medium text-[14px] leading-[20px] text-[#7F7F7F]">
+                    Preencha as informações do gasto para o planejamento da viagem.
+                  </p>
+                )}
               </div>
 
               {/* Form Fields Stack */}
               <div className="flex flex-col gap-4 w-full">
                 {/* Field 1: Nome */}
-                <div className="bg-[#EEEEEE] rounded-[12px] h-[60px] p-3 flex flex-row items-center gap-3 border border-transparent focus-within:border-[#949494] transition-all w-full">
+                <div className="bg-field rounded-[12px] h-[60px] p-3 flex flex-row items-center gap-3 border border-transparent focus-within:border-primary transition-all w-full">
                   <div className="w-4 h-4 flex items-center justify-center text-[#141530] flex-shrink-0">
                     <CircleDot size={16} strokeWidth={2} />
                   </div>
@@ -283,7 +285,7 @@ export function AddBudgetExpenseSheet({
                 <div className="relative w-full">
                   <div
                     onClick={() => activities.length > 0 && setShowActivityPicker(prev => !prev)}
-                    className={`bg-[#EEEEEE] rounded-[12px] h-[60px] p-3 flex flex-row items-center gap-3 border border-transparent transition-all w-full ${activities.length > 0 ? 'cursor-pointer active:bg-[#E5E5E5]' : ''
+                    className={`bg-field rounded-[12px] h-[60px] p-3 flex flex-row items-center gap-3 border border-transparent focus-within:border-primary transition-all w-full ${activities.length > 0 ? 'cursor-pointer active:bg-[#E5E5E5]' : ''
                       }`}
                   >
                     <div className="w-4 h-4 flex items-center justify-center text-[#141530] flex-shrink-0">
@@ -348,7 +350,7 @@ export function AddBudgetExpenseSheet({
                 <div className="relative w-full">
                   <div
                     onClick={() => setShowCategoryPicker(prev => !prev)}
-                    className="bg-[#EEEEEE] rounded-[12px] h-[60px] p-3 flex flex-row items-center gap-3 border border-transparent active:bg-[#E5E5E5] cursor-pointer transition-all w-full"
+                    className="bg-field rounded-[12px] h-[60px] p-3 flex flex-row items-center gap-3 border border-transparent active:bg-[#E5E5E5] cursor-pointer transition-all w-full"
                   >
                     <div className="w-4 h-4 flex items-center justify-center text-[#141530] flex-shrink-0">
                       <CircleDot size={16} strokeWidth={2} />
@@ -394,7 +396,7 @@ export function AddBudgetExpenseSheet({
                 </div>
 
                 {/* Field 4: Valor */}
-                <div className="bg-[#EEEEEE] rounded-[12px] h-[60px] p-3 flex flex-row items-center gap-3 border border-transparent focus-within:border-[#949494] transition-all w-full">
+                <div className="bg-field rounded-[12px] h-[60px] p-3 flex flex-row items-center gap-3 border border-transparent focus-within:border-primary transition-all w-full">
                   <div className="w-4 h-4 flex items-center justify-center text-[#141530] flex-shrink-0">
                     <CircleDot size={16} strokeWidth={2} />
                   </div>

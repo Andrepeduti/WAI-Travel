@@ -501,9 +501,11 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
       const rows = await getPublicItinerariesByUserId(friend.userId!);
       if (cancelled) return;
       const mapped: PublicItinerary[] = rows.map((r) => {
-        const days = r.start_date && r.end_date
-          ? Math.max(1, differenceInDays(new Date(r.end_date), new Date(r.start_date)) + 1)
-          : 1;
+        const days = r.is_flexible && r.duration_days
+          ? r.duration_days
+          : r.start_date && r.end_date
+            ? Math.max(1, differenceInDays(new Date(r.end_date), new Date(r.start_date)) + 1)
+            : 1;
         const uniqueCities = new Set((r.destinations || []).map(d => d.split(',')[0].trim()));
         
         const userItinerary: UserItinerary = {
@@ -1481,9 +1483,11 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
                   const cover = resolveTripThumbnailImages(it.destinations || [], customCover)[0];
                   const primaryDest = (it.destinations?.[0] || '').split(',')[0];
                   const cities = (it.destinations || []).length;
-                  const days = it.startDate && it.endDate
-                    ? Math.max(1, differenceInDays(new Date(it.endDate), new Date(it.startDate)) + 1)
-                    : null;
+                  const days = it.isFlexible && it.durationDays
+                    ? it.durationDays
+                    : it.startDate && it.endDate
+                      ? Math.max(1, differenceInDays(new Date(it.endDate), new Date(it.startDate)) + 1)
+                      : null;
                   const priceReais = it.priceCents != null ? it.priceCents / 100 : null;
                   return (
                     <button

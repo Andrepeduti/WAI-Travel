@@ -21,6 +21,7 @@ interface TripNotesScreenProps {
   destination?: string;
   notes?: TripNote[];
   onNotesChange?: (notes: TripNote[]) => void;
+  readOnlyMode?: boolean;
 }
 
 const noteActions = [
@@ -85,7 +86,7 @@ const NoteItemComponent = ({ note, currentUser, onClick }: { note: TripNote, cur
   );
 };
 
-export function TripNotesScreen({ onBack, notes: externalNotes, onNotesChange }: TripNotesScreenProps) {
+export function TripNotesScreen({ onBack, notes: externalNotes, onNotesChange, readOnlyMode }: TripNotesScreenProps) {
   const { user: currentUser } = useCurrentUser();
   const [internalNotes, setInternalNotes] = useState<TripNote[]>([]);
   const notes = externalNotes ?? internalNotes;
@@ -100,6 +101,19 @@ export function TripNotesScreen({ onBack, notes: externalNotes, onNotesChange }:
   const [editingNote, setEditingNote] = useState<TripNote | null>(null);
 
   const isEmpty = notes.length === 0;
+
+  // Mantém os toasts (sonner) acima do container do botão fixo inferior.
+  const hasFixedBottomBar = !isEmpty && !readOnlyMode;
+  useEffect(() => {
+    if (!hasFixedBottomBar) return;
+    const root = document.documentElement;
+    const previous = root.style.getPropertyValue('--toast-bottom-offset');
+    root.style.setProperty('--toast-bottom-offset', '97px');
+    return () => {
+      if (previous) root.style.setProperty('--toast-bottom-offset', previous);
+      else root.style.removeProperty('--toast-bottom-offset');
+    };
+  }, [hasFixedBottomBar]);
 
   // Travar o scroll da tela de trás (body)
   useEffect(() => {
@@ -156,13 +170,15 @@ export function TripNotesScreen({ onBack, notes: externalNotes, onNotesChange }:
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowAddNote(true)}
-              className="w-[146px] h-[48px] rounded-[16px] border border-[#141530] bg-transparent text-[#141530] font-['Urbanist'] font-bold text-[16px] leading-[19px] active:scale-[0.98] transition-all flex items-center justify-center hover:bg-[#141530]/5"
-            >
-              Adicionar observação
-            </button>
+            {!readOnlyMode && (
+              <button
+                type="button"
+                onClick={() => setShowAddNote(true)}
+                className="min-w-[146px] w-auto px-5 whitespace-nowrap h-[48px] rounded-[16px] border border-[#141530] bg-transparent text-[#141530] font-['Urbanist'] font-bold text-[16px] leading-[19px] active:scale-[0.98] transition-all flex items-center justify-center hover:bg-[#141530]/5"
+              >
+                Adicionar observação
+              </button>
+            )}
           </div>
         </main>
       ) : (
@@ -174,7 +190,7 @@ export function TripNotesScreen({ onBack, notes: externalNotes, onNotesChange }:
                 key={note.id} 
                 note={note} 
                 currentUser={currentUser} 
-                onClick={() => {
+                onClick={readOnlyMode ? undefined : () => {
                   setSelectedNote(note);
                   setShowActions(true);
                 }} 
@@ -184,8 +200,8 @@ export function TripNotesScreen({ onBack, notes: externalNotes, onNotesChange }:
         </main>
       )}
 
-      {/* Fixed Bottom Button */}
-      {!isEmpty && (
+      {/* Fixed Bottom Button (container: py-6 + botão 48px + border = 97px) */}
+      {!isEmpty && !readOnlyMode && (
         <div className="fixed bottom-0 left-0 right-0 z-30 bg-[#F3F3F3] border-t border-[#B6B6B6] px-4 py-6 flex justify-center">
           <button
             type="button"

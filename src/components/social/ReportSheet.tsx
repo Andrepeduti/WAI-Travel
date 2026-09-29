@@ -164,7 +164,7 @@ export function ReportSheet({ open, onClose, targetType, targetName, onSubmit }:
             onChange={(e) => setDetails(e.target.value.slice(0, 500))}
             placeholder="Descreva o que aconteceu para ajudar nossa análise."
             rows={4}
-            className="w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2.5 text-[15px] text-[#1A1C40] placeholder:text-[#9CA0B0] focus:outline-none focus:ring-2 focus:ring-[#1A1C40]/10 resize-none"
+            className="w-full rounded-xl border border-[#E5E7EB] bg-field px-3 py-2.5 text-[15px] text-[#1A1C40] placeholder:text-[#9CA0B0] focus:outline-none focus:border-primary resize-none"
             style={{ fontSize: 16 }}
           />
           <div className="flex justify-end mt-1">

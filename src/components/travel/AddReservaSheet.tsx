@@ -217,7 +217,7 @@ export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva, initia
     return { hora: '14', minuto: '00' };
   };
 
-  const inputClass = "w-full px-4 py-3 rounded-xl border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary-official transition-colors";
+  const inputClass = "w-full px-4 py-3 rounded-xl border border-border bg-field text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors";
   const timeButtonClass = "px-4 py-3 rounded-xl border border-border bg-background text-sm text-foreground flex items-center gap-2 transition-colors hover:border-muted-foreground";
   const { hora: tpHora, minuto: tpMinuto } = getTimePickerInitial();
 

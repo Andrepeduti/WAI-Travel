@@ -5,7 +5,6 @@ import { shareItinerary } from '@/lib/shareItinerary';
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useCart } from '@/contexts/CartContext';
 import { useFavorites } from '@/contexts/FavoritesContext';
-import { SaveToCollectionSheet, SavePlaceData } from '@/components/travel/SaveToCollectionSheet';
 import { CheckoutScreen } from '@/components/screens/CheckoutScreen';
 import { PurchaseRulesScreen } from '@/components/travel/PurchaseRulesScreen';
 import { PurchaseSuccessScreen } from '@/components/screens/PurchaseSuccessScreen';
@@ -200,7 +199,9 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
 
     // We only have startDate and endDate strings in marketplaceData
     let totalDays = 3;
-    if (marketplaceData.startDate && marketplaceData.endDate) {
+    if (marketplaceData.isFlexible && marketplaceData.durationDays) {
+      totalDays = marketplaceData.durationDays;
+    } else if (marketplaceData.startDate && marketplaceData.endDate) {
       try {
         totalDays = Math.max(1, differenceInDays(parseISO(marketplaceData.endDate), parseISO(marketplaceData.startDate)) + 1);
       } catch (e) { }
@@ -229,8 +230,10 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
       description: marketplaceData.description ?? '',
       tags: marketplaceData.tags ?? [],
       destinations: marketplaceData.destinations ?? [],
-      startDate: marketplaceData.startDate ? parseISO(marketplaceData.startDate) : new Date(),
-      endDate: marketplaceData.endDate ? parseISO(marketplaceData.endDate) : addDays(new Date(), totalDays - 1),
+      isFlexible: marketplaceData.isFlexible,
+      durationDays: marketplaceData.durationDays,
+      startDate: marketplaceData.startDate ? parseISO(marketplaceData.startDate) : undefined,
+      endDate: marketplaceData.endDate ? parseISO(marketplaceData.endDate) : undefined,
       salesCount: (marketplaceData as any).salesCount || 0,
       createdAt: marketplaceData.createdAt,
     };
@@ -274,12 +277,12 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
   }, [plannerData]);
 
   const seasonLabel = useMemo(() => {
-    if (!itineraryData) return '';
+    if (!itineraryData?.startDate) return '';
     return getSeasonForDate(itineraryData.startDate, itineraryData.destinations);
   }, [itineraryData]);
 
   const suggestedDateLabel = useMemo(() => {
-    if (!itineraryData) return '';
+    if (!itineraryData?.startDate || !itineraryData?.endDate) return '';
     return `${format(itineraryData.startDate, "dd MMM", { locale: ptBR })} — ${format(itineraryData.endDate, "dd MMM yyyy", { locale: ptBR })}`;
   }, [itineraryData]);
 
@@ -288,12 +291,9 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
   const { toggleFavorite, isFavorite } = useFavorites();
   const isFavorited = itineraryData ? isFavorite(itineraryData.id) : false;
   const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set([1]));
-  const [savedPlaces, setSavedPlaces] = useState<Set<number>>(new Set());
   const [showOwnerSheet, setShowOwnerSheet] = useState(false);
   const [showAllReviews, setShowAllReviews] = useState(false);
   const [showAllDays, setShowAllDays] = useState(false);
-  const [saveSheetOpen, setSaveSheetOpen] = useState(false);
-  const [savingPlace, setSavingPlace] = useState<SavePlaceData | null>(null);
   const [showCheckout, setShowCheckout] = useState(false);
   const [showPurchaseRules, setShowPurchaseRules] = useState(false);
   const [showPurchaseSuccess, setShowPurchaseSuccess] = useState(false);
@@ -372,6 +372,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
   }, [addToCart, itineraryId, itineraryData]);
 
   const totalDaysCount = useMemo(() => {
+    if (itineraryData?.isFlexible && itineraryData?.durationDays) return itineraryData.durationDays;
     if (!itineraryData?.startDate || !itineraryData?.endDate) return 3;
     return differenceInDays(itineraryData.endDate, itineraryData.startDate);
   }, [itineraryData]);
@@ -398,27 +399,6 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
       newExpanded.add(day);
     }
     setExpandedDays(newExpanded);
-  };
-
-  const handleSavePlaceClick = (place: SavePlaceData, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (savedPlaces.has(place.id)) {
-      const newSaved = new Set(savedPlaces);
-      newSaved.delete(place.id);
-      setSavedPlaces(newSaved);
-    } else {
-      setSavingPlace(place);
-      setSaveSheetOpen(true);
-    }
-  };
-
-  const handlePlaceSaved = (_collectionTitle: string) => {
-    if (savingPlace) {
-      const newSaved = new Set(savedPlaces);
-      newSaved.add(savingPlace.id);
-      setSavedPlaces(newSaved);
-    }
-    setSavingPlace(null);
   };
 
   const [visualsReady, setVisualsReady] = useState(false);
@@ -713,7 +693,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
             <div className="flex items-center gap-2 mb-4 text-[13px] text-[#1A1C40]">
               <Icon name="calendar_month" size={16} className="text-[#1A1C40]" />
               <span>
-                {itineraryData.tags?.includes('_FLEXIBLE_DATES_') ? (
+                {itineraryData.isFlexible || itineraryData.tags?.includes('_FLEXIBLE_DATES_') ? (
                   <span className="font-semibold">Datas flexíveis</span>
                 ) : (
                   <>
@@ -969,13 +949,6 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
         </div>
       </div>
 
-      <SaveToCollectionSheet
-        open={saveSheetOpen}
-        onClose={() => { setSaveSheetOpen(false); setSavingPlace(null); }}
-        place={savingPlace}
-        onSaved={handlePlaceSaved}
-      />
-
       {/* Date choice bottom sheet - overlays on top */}
       {showDateChoice && (
         <div className="fixed inset-0 z-[60] bg-black/40" onClick={() => { setShowDateChoice(false); onBack(); }}>
@@ -1020,7 +993,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
                 <div className="text-left">
                   <p className="text-sm font-semibold text-foreground">Manter datas originais</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {dataset ? `${format(dataset.startDate, "dd MMM", { locale: ptBR })} — ${format(dataset.endDate, "dd MMM yyyy", { locale: ptBR })}` : ''}
+                    {dataset?.startDate && dataset?.endDate ? `${format(dataset.startDate, "dd MMM", { locale: ptBR })} — ${format(dataset.endDate, "dd MMM yyyy", { locale: ptBR })}` : ''}
                   </p>
                 </div>
               </button>

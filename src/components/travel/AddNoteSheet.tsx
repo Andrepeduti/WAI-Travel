@@ -104,7 +104,7 @@ export function AddNoteSheet({
                 <button
                   type="button"
                   onClick={() => setIsDayDropdownOpen(!isDayDropdownOpen)}
-                  className={`w-full min-h-[54px] px-3 py-2 bg-[#EDEDED] rounded-[12px] flex items-center justify-between gap-3 text-left transition-all hover:bg-[#E5E5E5] ${
+                  className={`w-full min-h-[54px] px-3 py-2 bg-field rounded-[12px] flex items-center justify-between gap-3 text-left transition-all hover:bg-[#E5E5E5] ${
                     isDayDropdownOpen ? 'ring-2 ring-[#9DCC36]' : ''
                   }`}
                 >
@@ -173,7 +173,7 @@ export function AddNoteSheet({
             )}
 
             {/* Note Textarea Container */}
-            <div className="bg-[#EDEDED] rounded-[16px] p-6 flex flex-col justify-between min-h-[181px] gap-4">
+            <div className="bg-field border border-transparent focus-within:border-primary transition-colors rounded-[16px] p-6 flex flex-col justify-between min-h-[181px] gap-4">
               <textarea
                 value={text}
                 onChange={(e) => {

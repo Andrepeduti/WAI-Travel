@@ -191,7 +191,7 @@ export function AddAtividadeForm({
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Field 1: Nome da atividade */}
-              <div className="flex items-center gap-3 px-3 py-2 rounded-[12px] bg-[#EDEDED] h-[54px] transition-colors">
+              <div className="flex items-center gap-3 px-3 py-2 rounded-[12px] bg-field border border-transparent focus-within:border-primary transition-colors h-[54px] transition-colors">
                 <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
                   <MapPin size={16} className="text-[#7F7F7F]" />
                 </div>
@@ -212,7 +212,7 @@ export function AddAtividadeForm({
 
               {/* Field 2: Local */}
               <div className="relative">
-                <div className="flex items-center gap-3 px-3 py-2 rounded-[12px] bg-[#EDEDED] h-[54px] transition-colors">
+                <div className="flex items-center gap-3 px-3 py-2 rounded-[12px] bg-field border border-transparent focus-within:border-primary transition-colors h-[54px] transition-colors">
                   <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
                     <MapPin size={16} className="text-[#7F7F7F]" />
                   </div>
@@ -261,7 +261,7 @@ export function AddAtividadeForm({
                   <PopoverTrigger asChild>
                     <button
                       type="button"
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-[12px] bg-[#EDEDED] h-[54px] text-left transition-colors"
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-[12px] bg-field h-[54px] text-left transition-colors"
                     >
                       <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
                         <MapPin size={16} className="text-[#7F7F7F]" />
@@ -292,7 +292,7 @@ export function AddAtividadeForm({
                 </Popover>
 
                 {/* Horário */}
-                <div className="flex items-center gap-2.5 px-3 py-2 rounded-[12px] bg-[#EDEDED] h-[54px] relative overflow-hidden">
+                <div className="flex items-center gap-2.5 px-3 py-2 rounded-[12px] bg-field border border-transparent focus-within:border-primary transition-colors h-[54px] relative overflow-hidden">
                   <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
                     <MapPin size={16} className="text-[#7F7F7F]" />
                   </div>
@@ -311,7 +311,7 @@ export function AddAtividadeForm({
               </div>
 
               {/* Field: Valor */}
-              <div className="flex items-center gap-3 px-3 py-2 rounded-[12px] bg-[#EDEDED] h-[54px] transition-colors">
+              <div className="flex items-center gap-3 px-3 py-2 rounded-[12px] bg-field border border-transparent focus-within:border-primary transition-colors h-[54px] transition-colors">
                 <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
                   <MapPin size={16} className="text-[#7F7F7F]" />
                 </div>

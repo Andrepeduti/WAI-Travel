@@ -172,8 +172,7 @@ export function AddReservationSheet({ open, onClose, onSave, dayNumber }: AddRes
               value={notes}
               onChange={e => setNotes(e.target.value)}
               rows={3}
-              className="w-full rounded-xl px-4 py-3 text-[14px] text-foreground placeholder:text-muted-foreground outline-none resize-none"
-              style={{ background: '#F2F2F2' }}
+              className="w-full rounded-xl border border-transparent bg-field px-4 py-3 text-[14px] text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors resize-none"
             />
           </div>
         </div>

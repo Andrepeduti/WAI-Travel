@@ -4,6 +4,9 @@
  * and asynchronous fallback geocoding with caching.
  */
 
+import { searchGooglePlacesText } from './googlePlacesApi';
+import { getCityByName, upsertCity } from './citiesCache';
+
 export interface LatLng {
   lat: number;
   lng: number;
@@ -218,19 +221,28 @@ export function getCityCoordinates(destinationName: string): LatLng | null {
 const geocodeCache = new Map<string, LatLng>();
 
 export async function resolveDestinationCoordinates(destinationName: string): Promise<LatLng | null> {
-  const local = getCityCoordinates(destinationName);
-  if (local) return local;
-
   const key = normalizeCityName(destinationName);
+
+  // 1. Check in-memory geocode cache
   if (geocodeCache.has(key)) {
     return geocodeCache.get(key)!;
   }
 
+  // 2. Check Database (cities table)
+  const dbCity = await getCityByName(destinationName);
+  if (dbCity && dbCity.latitude && dbCity.longitude) {
+    const result: LatLng = { lat: dbCity.latitude, lng: dbCity.longitude };
+    geocodeCache.set(key, result);
+    return result;
+  }
+
+  // 3. Fallback to Nominatim (OpenStreetMap)
   try {
     const query = encodeURIComponent(destinationName);
     const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`, {
       headers: {
         'Accept-Language': 'pt-BR,en',
+        'User-Agent': 'WAITravelHub/1.0 (MVP)'
       },
     });
     if (!res.ok) return null;
@@ -241,11 +253,28 @@ export async function resolveDestinationCoordinates(destinationName: string): Pr
       if (Number.isFinite(lat) && Number.isFinite(lng)) {
         const result: LatLng = { lat, lng };
         geocodeCache.set(key, result);
+        void upsertCity({ name: destinationName, latitude: lat, longitude: lng });
         return result;
       }
     }
   } catch {
     // ignore network errors and fallback
+  }
+
+  // 4. Fallback to Google Places API
+  try {
+    const googleResults = await searchGooglePlacesText(destinationName);
+    if (googleResults && googleResults.length > 0) {
+      const bestMatch = googleResults[0];
+      if (bestMatch.lat && bestMatch.lng) {
+        const result: LatLng = { lat: bestMatch.lat, lng: bestMatch.lng };
+        geocodeCache.set(key, result);
+        void upsertCity({ name: destinationName, latitude: bestMatch.lat, longitude: bestMatch.lng });
+        return result;
+      }
+    }
+  } catch (err) {
+    console.error('[cityCoordinates] Google Places fallback failed:', err);
   }
 
   return null;

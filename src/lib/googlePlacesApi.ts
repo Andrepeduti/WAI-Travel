@@ -27,6 +27,7 @@ export interface GooglePlaceResult {
   primaryType: string;
   photoUrl?: string;
   city?: string;
+  country?: string;
 }
 
 function getApiKey(): string {
@@ -208,6 +209,14 @@ export async function getGooglePlaceFullDetails(placeId: string): Promise<Google
       }
     }
 
+    let country = '';
+    if (Array.isArray(p.addressComponents)) {
+      const countryComp = p.addressComponents.find((c: any) => c?.types?.includes('country'));
+      if (countryComp) {
+        country = countryComp.longText || countryComp.text || '';
+      }
+    }
+
     incrementApiCounter('google_places', 1).catch(() => {});
 
     return {
@@ -219,6 +228,7 @@ export async function getGooglePlaceFullDetails(placeId: string): Promise<Google
       primaryType: formatGooglePlaceType(p.primaryType || ''),
       photoUrl,
       city,
+      country,
     };
   } catch (error) {
     console.error('Google Full Place Details error:', error);
@@ -229,11 +239,16 @@ export async function getGooglePlaceFullDetails(placeId: string): Promise<Google
 /**
  * Text Search for POIs (Points of Interest).
  */
-export async function searchGooglePlacesText(query: string, city?: string): Promise<GooglePlaceResult[]> {
+export async function searchGooglePlacesText(
+  query: string,
+  city?: string,
+  restrictTo?: { lat: number; lng: number; radiusDeg?: number }
+): Promise<GooglePlaceResult[]> {
   const apiKey = getApiKey();
   if (!apiKey || query.trim().length < 2) return [];
 
-  const cacheKey = `gplaces_text_${query.trim().toLowerCase()}_${city?.toLowerCase() || ''}`;
+  const restrictKey = restrictTo ? `_${restrictTo.lat.toFixed(2)},${restrictTo.lng.toFixed(2)}` : '';
+  const cacheKey = `gplaces_text_${query.trim().toLowerCase()}_${city?.toLowerCase() || ''}${restrictKey}`;
   
   const sessionData = getSessionCache<GooglePlaceResult[]>(cacheKey);
   if (sessionData) return sessionData;
@@ -259,6 +274,20 @@ export async function searchGooglePlacesText(query: string, city?: string): Prom
       body: JSON.stringify({
         textQuery: fullQuery,
         languageCode: 'pt-BR',
+        ...(restrictTo && {
+          locationRestriction: {
+            rectangle: {
+              low: {
+                latitude: restrictTo.lat - (restrictTo.radiusDeg ?? 0.25),
+                longitude: restrictTo.lng - (restrictTo.radiusDeg ?? 0.25),
+              },
+              high: {
+                latitude: restrictTo.lat + (restrictTo.radiusDeg ?? 0.25),
+                longitude: restrictTo.lng + (restrictTo.radiusDeg ?? 0.25),
+              },
+            },
+          },
+        }),
       }),
     });
 
@@ -277,10 +306,18 @@ export async function searchGooglePlacesText(query: string, city?: string): Prom
         if (locality) {
           city = locality.longText || locality.text || '';
         } else {
-          const admin2 = p.addressComponents.find((c: any) => c?.types?.includes('administrative_area_level_2'));
+        const admin2 = p.addressComponents.find((c: any) => c?.types?.includes('administrative_area_level_2'));
           if (admin2) {
             city = admin2.longText || admin2.text || '';
           }
+        }
+      }
+      
+      let country = '';
+      if (Array.isArray(p.addressComponents)) {
+        const countryComp = p.addressComponents.find((c: any) => c?.types?.includes('country'));
+        if (countryComp) {
+          country = countryComp.longText || countryComp.text || '';
         }
       }
       
@@ -293,6 +330,7 @@ export async function searchGooglePlacesText(query: string, city?: string): Prom
         primaryType: formatGooglePlaceType(p.primaryType || ''),
         photoUrl,
         city,
+        country,
       };
     });
     

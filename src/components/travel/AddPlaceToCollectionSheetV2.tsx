@@ -88,7 +88,7 @@ export function AddPlaceToCollectionSheetV2({
       const targetCity = inferredCity || '';
       const searchQuery = targetCity ? `${q} ${targetCity}` : q;
       const suggestions = await searchGooglePlacesAutocomplete(searchQuery);
-      await incrementApiCounter('google_places', 1);
+      incrementApiCounter('google_places', 1).catch(() => {});
 
       const converted: CityPlace[] = suggestions.map(s => ({
         id: Math.floor(Math.random() * 1000000) + 900000,

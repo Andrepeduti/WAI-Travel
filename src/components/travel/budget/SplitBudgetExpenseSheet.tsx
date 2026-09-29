@@ -339,7 +339,7 @@ export function SplitBudgetExpenseSheet({
                     </div>
 
                     {/* Custom amount card: #EDEDED, border-radius 12px, 54px */}
-                    <div className="w-[140px] bg-[#EDEDED] rounded-[12px] px-3 py-1.5 flex flex-col justify-center border border-transparent focus-within:border-[#949494] transition-all">
+                    <div className="w-[140px] bg-field rounded-[12px] px-3 py-1.5 flex flex-col justify-center border border-transparent focus-within:border-primary transition-all">
                       <span className="font-['Urbanist'] font-medium text-[11px] leading-[14px] text-[#949494] block">
                         Valor
                       </span>

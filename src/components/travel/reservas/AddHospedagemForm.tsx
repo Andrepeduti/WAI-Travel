@@ -199,7 +199,7 @@ export function AddHospedagemForm({
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Field 1: Nome da acomodação (Height 54px, bg #EDEDED, radius 12px) */}
               <div className="relative">
-                <div className="flex items-center gap-3 px-3 py-2 rounded-[12px] bg-[#EDEDED] h-[54px] transition-colors">
+                <div className="flex items-center gap-3 px-3 py-2 rounded-[12px] bg-field border border-transparent focus-within:border-primary transition-colors h-[54px] transition-colors">
                   <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
                     <MapPin size={16} className="text-[#7F7F7F]" />
                   </div>
@@ -241,7 +241,7 @@ export function AddHospedagemForm({
               </div>
 
               {/* Field 2: Valor (Height 54px, bg #EDEDED, radius 12px) */}
-              <div className="flex items-center gap-3 px-3 py-2 rounded-[12px] bg-[#EDEDED] h-[54px] transition-colors">
+              <div className="flex items-center gap-3 px-3 py-2 rounded-[12px] bg-field border border-transparent focus-within:border-primary transition-colors h-[54px] transition-colors">
                 <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
                   <MapPin size={16} className="text-[#7F7F7F]" />
                 </div>
@@ -265,7 +265,7 @@ export function AddHospedagemForm({
                 <PopoverTrigger asChild>
                   <button
                     type="button"
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-[12px] bg-[#EDEDED] h-[54px] text-left transition-colors"
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-[12px] bg-field h-[54px] text-left transition-colors"
                   >
                     <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
                       <MapPin size={16} className="text-[#7F7F7F]" />

@@ -515,7 +515,7 @@ export function EditProfileScreen({ onBack, onSave }: EditProfileScreenProps) {
                   }}
                   placeholder="Conte um pouco sobre você e seu estilo de viajar..."
                   rows={3}
-                  className="w-full rounded-xl border border-border bg-background px-4 py-3 text-foreground outline-none focus:border-primary transition-colors resize-none"
+                  className="w-full rounded-xl border border-border bg-field px-4 py-3 text-foreground outline-none focus:border-primary transition-colors resize-none"
                   style={{ fontSize: 'var(--text-base)' }}
                 />
                 <div

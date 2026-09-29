@@ -84,7 +84,6 @@ export async function addFavorite(snapshot: FavoriteSnapshot): Promise<void> {
         user_id: userId,
         itinerary_id: legacyIdToUuid(snapshot.id),
         legacy_id: snapshot.id,
-        snapshot: snapshot as unknown as never,
       },
     ],
     { onConflict: 'user_id,itinerary_id' },

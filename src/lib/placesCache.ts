@@ -163,7 +163,7 @@ export async function upsertPlace(place: Partial<PlaceRecord> & { name: string }
       const fields = [
         'google_place_id', 'name', 'short_description', 'country', 'city',
         'category', 'tags', 'latitude', 'longitude', 'formatted_address',
-        'rating', 'user_ratings_total', 'price_level', 'website', 'phone',
+        'rating', 'user_ratings_total', 'price_level',
         'opening_hours', 'cover_photo_url', 'photos', 'ai_tips',
         'ai_full_description', 'average_expense', 'price',
       ];
@@ -212,7 +212,7 @@ export async function upsertPlace(place: Partial<PlaceRecord> & { name: string }
     const optionalFields = [
       'google_place_id', 'short_description', 'country', 'city',
       'category', 'tags', 'latitude', 'longitude', 'formatted_address',
-      'rating', 'user_ratings_total', 'price_level', 'website', 'phone',
+      'rating', 'user_ratings_total', 'price_level',
       'opening_hours', 'cover_photo_url', 'photos', 'ai_tips',
       'ai_full_description', 'average_expense', 'price',
     ];

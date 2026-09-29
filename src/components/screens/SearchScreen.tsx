@@ -290,7 +290,7 @@ export function SearchScreen({ onClose, onItineraryClick, onPublicUserItineraryC
 
         const start = new Date(row.startDate);
         const end = new Date(row.endDate);
-        const days = Math.max(1, differenceInDays(end, start) + 1);
+        const days = row.isFlexible && row.durationDays ? row.durationDays : Math.max(1, differenceInDays(end, start) + 1);
 
         return {
           id: row.id,

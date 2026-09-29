@@ -24,6 +24,7 @@ export interface ReservasScreenProps {
   transportes?: Transporte[];
   onTransportesChange?: (transportes: Transporte[]) => void;
   splitPeople?: SplitPerson[];
+  readOnlyMode?: boolean;
 }
 
 export function ReservasScreen({
@@ -33,6 +34,7 @@ export function ReservasScreen({
   transportes: externalTransportes,
   onTransportesChange,
   splitPeople,
+  readOnlyMode,
 }: ReservasScreenProps) {
   // Internal fallback state if not externally managed
   const [internalReservas, setInternalReservas] = useState<Reserva[]>([]);
@@ -242,12 +244,14 @@ export function ReservasScreen({
             </div>
 
             {/* Main Button: 195px x 48px, #9DCC36, radius 16px */}
-            <button
-              onClick={handleOpenTypePicker}
-              className="w-[195px] h-[48px] px-6 rounded-[16px] bg-[#9DCC36] text-[#141530] font-['Urbanist'] font-bold text-[16px] leading-[19px] shadow-xs active:scale-[0.98] transition-all flex items-center justify-center"
-            >
-              Adicionar documento
-            </button>
+            {!readOnlyMode && (
+              <button
+                onClick={handleOpenTypePicker}
+                className="w-[195px] h-[48px] px-6 rounded-[16px] bg-[#9DCC36] text-[#141530] font-['Urbanist'] font-bold text-[16px] leading-[19px] shadow-xs active:scale-[0.98] transition-all flex items-center justify-center"
+              >
+                Adicionar documento
+              </button>
+            )}
           </div>
         </main>
       ) : (
@@ -257,16 +261,16 @@ export function ReservasScreen({
             <ReservaCard
               key={item.id}
               item={item}
-              onClick={handleEditCard}
-              onEdit={handleEditCard}
-              onDelete={handleDeleteCard}
+              onClick={readOnlyMode ? undefined : handleEditCard}
+              onEdit={readOnlyMode ? undefined : handleEditCard}
+              onDelete={readOnlyMode ? undefined : handleDeleteCard}
             />
           ))}
         </main>
       )}
 
       {/* Fixed Bottom Button (Figma: width 345px, height 48px, bg #9DCC36, radius 16px, 16px bold #141530) */}
-      {!isEmpty && (
+      {!isEmpty && !readOnlyMode && (
         <div className="fixed bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-[#F3F3F3] via-[#F3F3F3]/90 to-transparent pt-4 pb-6 px-6 flex justify-center pointer-events-none">
           <div className="w-full max-w-[345px] safe-bottom pointer-events-auto">
             <button

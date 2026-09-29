@@ -102,7 +102,7 @@ export function DestinationItinerariesScreen({
       .map<DisplayItinerary>((it) => {
         const start = new Date(it.startDate);
         const end = new Date(it.endDate);
-        const days = Math.max(1, differenceInDays(end, start) + 1);
+        const days = it.isFlexible && it.durationDays ? it.durationDays : Math.max(1, differenceInDays(end, start) + 1);
 
         let itCover = it.images?.[0];
         if (!itCover || itCover.includes('placeholder')) {

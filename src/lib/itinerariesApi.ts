@@ -49,6 +49,9 @@ export interface UserItinerary {
   createdAt?: string;
   updatedAt?: string;
   myRole?: 'owner' | 'editor' | 'viewer';
+  tags?: string[];
+  seasons?: string[];
+  mainTag?: string;
 }
 
 export interface CreateItineraryInput {
@@ -60,6 +63,8 @@ export interface CreateItineraryInput {
   participants?: string[];
   places?: number;
   sourceDatasetId?: number | null;
+  /** Roteiro pessoal que originou esta cópia (ex.: publicação na loja). */
+  sourceItineraryId?: string | null;
   isPersonal?: boolean;
   isPublic?: boolean;
   priceCents?: number | null;
@@ -68,6 +73,8 @@ export interface CreateItineraryInput {
   isFlexible?: boolean;
   durationDays?: number;
   travelMonth?: string;
+  tags?: string[];
+  mainTag?: string;
 }
 
 export interface UpdateItineraryInput {
@@ -89,6 +96,8 @@ export interface UpdateItineraryInput {
   isPaused?: boolean;
   extraPeople?: any[];
   deletedAt?: string | null;
+  tags?: string[];
+  mainTag?: string;
 }
 
 function rowToItinerary(row: any, myRole?: 'owner' | 'editor' | 'viewer'): UserItinerary {
@@ -98,13 +107,13 @@ function rowToItinerary(row: any, myRole?: 'owner' | 'editor' | 'viewer'): UserI
     destinations: row.destinations ?? [],
     startDate: row.start_date ? String(row.start_date).slice(0, 10) : '',
     endDate: row.end_date ? String(row.end_date).slice(0, 10) : '',
-    images: row.images ?? [],
-    participants: row.participants ?? [],
+    images: row.cover_image_url ? [row.cover_image_url] : [],
+    participants: [],
     places: row.places_count ?? 0,
     sourceDatasetId: row.source_dataset_id ?? null,
-    isPersonal: row.is_personal !== undefined ? row.is_personal : (row.is_public ? false : true),
+    isPersonal: row.is_personal ?? true,
     isPublic: row.is_public ?? false,
-    priceCents: row.price_cents,
+    priceCents: row.price_cents ?? null,
     description: row.description,
     status: row.status ?? 'draft',
     isFlexible: row.is_flexible ?? false,
@@ -112,11 +121,14 @@ function rowToItinerary(row: any, myRole?: 'owner' | 'editor' | 'viewer'): UserI
     travelMonth: row.travel_month ?? undefined,
     userId: row.user_id,
     isPaused: row.is_paused ?? false,
-    extraPeople: row.extra_people ?? [],
+    extraPeople: [],
     deletedAt: row.deleted_at ? String(row.deleted_at) : null,
     createdAt: row.created_at ? String(row.created_at) : undefined,
     updatedAt: row.updated_at ? String(row.updated_at) : (row.created_at ? String(row.created_at) : undefined),
     myRole,
+    tags: row.tags ?? [],
+    seasons: row.seasons ?? [],
+    mainTag: row.main_tag ?? undefined,
   };
 }
 
@@ -171,6 +183,27 @@ export async function listMyItineraries(providedUserId?: string): Promise<UserIt
     if (seen.has(it.id)) continue;
     seen.add(it.id);
     merged.push(it);
+  }
+
+  // Preço, tags, temporadas e descrição comerciais vivem em itinerary_store_listing.
+  if (merged.length > 0) {
+    const { data: listings, error: lErr } = await supabase
+      .from('itinerary_store_listing')
+      .select('itinerary_id, tags, seasons, price_cents, listed_description')
+      .in('itinerary_id', merged.map(it => it.id));
+    if (lErr) {
+      console.error('[itinerariesApi] listMyItineraries listings failed', lErr);
+    } else {
+      const byId = new Map((listings ?? []).map((l: any) => [l.itinerary_id, l]));
+      for (const it of merged) {
+        const l: any = byId.get(it.id);
+        if (!l) continue;
+        it.tags = sanitizeListingTags(l.tags);
+        it.seasons = l.seasons ?? [];
+        it.priceCents = l.price_cents ?? null;
+        if (l.listed_description) it.description = l.listed_description;
+      }
+    }
   }
   // Ordena por regras de data:
   // 1. Em andamento sempre em primeiro
@@ -252,6 +285,24 @@ export async function getUserItineraryById(id: string): Promise<UserItinerary | 
     return null;
   }
   if (!data) return null;
+
+  // Se o roteiro está publicado ou tem dados na loja, precisamos pegar as tags, preço, etc. da loja
+  const { data: storeData } = await supabase
+    .from('itinerary_store_listing')
+    .select('tags, price_cents, listed_description, seasons')
+    .eq('itinerary_id', id)
+    .maybeSingle();
+
+  if (storeData) {
+    data.tags = sanitizeListingTags(storeData.tags);
+    data.price_cents = storeData.price_cents;
+    data.seasons = storeData.seasons;
+    // We only override description if it's missing or if we prefer listed_description
+    if (storeData.listed_description) {
+      data.description = storeData.listed_description;
+    }
+  }
+
   return rowToItinerary(data);
 }
 
@@ -263,29 +314,26 @@ export async function createItinerary(input: CreateItineraryInput): Promise<User
     return null;
   }
   const isPersonal = input.isPersonal !== undefined ? input.isPersonal : !input.isPublic;
+  const insertData: any = {
+    user_id: userId,
+    title: input.title,
+    destinations: input.destinations ?? [],
+    start_date: input.isFlexible ? null : (input.startDate ? toIsoDate(input.startDate) : null),
+    end_date: input.isFlexible ? null : (input.endDate ? toIsoDate(input.endDate) : null),
+    cover_image_url: input.images && input.images.length > 0 ? input.images[0] : null,
+    places_count: input.places ?? 0,
+    is_personal: isPersonal,
+    source_itinerary_id: input.sourceItineraryId ?? null,
+    description: input.description ?? '',
+    status: input.status ?? 'draft',
+    is_flexible: input.isFlexible ?? false,
+    duration_days: input.durationDays ?? null,
+    travel_month: input.travelMonth ?? null
+  };
+
   const { data, error } = await supabase
     .from('itineraries')
-    .insert({
-      user_id: userId,
-      title: input.title,
-      destinations: input.destinations ?? [],
-      start_date: toIsoDate(input.startDate),
-      end_date: toIsoDate(input.endDate),
-      images: input.images ?? [],
-      participants: input.participants ?? [],
-      places_count: input.places ?? 0,
-      source_dataset_id: input.sourceDatasetId ?? null,
-      is_personal: isPersonal,
-      is_public: input.isPublic ?? false,
-      price_cents: input.priceCents ?? null,
-      description: input.description ?? '',
-      status: input.status ?? 'draft',
-      is_flexible: input.isFlexible ?? false,
-      duration_days: input.durationDays ?? null,
-      travel_month: input.travelMonth ?? null,
-      is_paused: input.isPaused ?? false,
-      extra_people: input.extraPeople ?? []
-    })
+    .insert(insertData)
     .select('*')
     .single();
   if (error) {
@@ -310,22 +358,25 @@ export async function updateItinerary(id: string, patch: UpdateItineraryInput): 
   const updates: any = {};
   if (patch.title !== undefined) updates.title = patch.title;
   if (patch.destinations !== undefined) updates.destinations = patch.destinations;
-  if (patch.startDate !== undefined) updates.start_date = toIsoDate(patch.startDate);
-  if (patch.endDate !== undefined) updates.end_date = toIsoDate(patch.endDate);
-  if (patch.images !== undefined) updates.images = patch.images;
-  if (patch.participants !== undefined) updates.participants = patch.participants;
+  
+  if (patch.isFlexible) {
+    updates.start_date = null;
+    updates.end_date = null;
+  } else {
+    if (patch.startDate !== undefined) updates.start_date = toIsoDate(patch.startDate);
+    if (patch.endDate !== undefined) updates.end_date = toIsoDate(patch.endDate);
+  }
+
+  if (patch.images !== undefined) updates.cover_image_url = patch.images && patch.images.length > 0 ? patch.images[0] : null;
   if (patch.places !== undefined) updates.places_count = patch.places;
   if (patch.isPersonal !== undefined) updates.is_personal = patch.isPersonal;
-  if (patch.isPublic !== undefined) updates.is_public = patch.isPublic;
-  if (patch.priceCents !== undefined) updates.price_cents = patch.priceCents;
   if (patch.description !== undefined) updates.description = patch.description;
   if (patch.status !== undefined) updates.status = patch.status;
   if (patch.isFlexible !== undefined) updates.is_flexible = patch.isFlexible;
   if (patch.durationDays !== undefined) updates.duration_days = patch.durationDays;
   if (patch.travelMonth !== undefined) updates.travel_month = patch.travelMonth;
-  if (patch.isPaused !== undefined) updates.is_paused = patch.isPaused;
-  if (patch.extraPeople !== undefined) updates.extra_people = patch.extraPeople;
   if (patch.deletedAt !== undefined) updates.deleted_at = patch.deletedAt;
+  if (patch.isPaused !== undefined) updates.is_paused = patch.isPaused;
   
   if (Object.keys(updates).length === 0) return;
   (updates as any).updated_at = new Date().toISOString();
@@ -338,7 +389,71 @@ export async function updateItinerary(id: string, patch: UpdateItineraryInput): 
 }
 
 /**
+ * Remove marcadores internos que não são tags reais (datas flexíveis já vivem em
+ * `is_flexible_dates`; mês de viagem em `travel_month`).
+ */
+export function sanitizeListingTags(tags?: string[] | null): string[] {
+  return (tags ?? []).filter(t => t !== '_FLEXIBLE_DATES_' && !t.startsWith('_TRAVEL_MONTH_'));
+}
+
+/** Atualiza campos comerciais do listing (preço, descrição, tags, título) sem recriá-lo. */
+export async function updateStoreListing(itineraryId: string, patch: {
+  listedTitle?: string;
+  listedDescription?: string;
+  tags?: string[];
+  seasons?: string[];
+  priceCents?: number | null;
+}): Promise<void> {
+  const updates: any = { updated_at: new Date().toISOString() };
+  if (patch.listedTitle !== undefined) updates.listed_title = patch.listedTitle;
+  if (patch.listedDescription !== undefined) updates.listed_description = patch.listedDescription;
+  if (patch.tags !== undefined) updates.tags = sanitizeListingTags(patch.tags);
+  if (patch.seasons !== undefined) updates.seasons = patch.seasons;
+  if (patch.priceCents !== undefined) updates.price_cents = patch.priceCents ?? 0;
+
+  const { error } = await supabase.from('itinerary_store_listing').update(updates).eq('itinerary_id', itineraryId);
+  if (error) {
+    console.error('[itinerariesApi] updateStoreListing failed', error);
+    return;
+  }
+  emitItinerariesChanged('update', itineraryId);
+}
+
+export async function upsertStoreListing(itineraryId: string, data: {
+  sellerId: string;
+  listedTitle: string;
+  listedDescription?: string;
+  tags?: string[];
+  seasons?: string[];
+  priceCents?: number | null;
+  status?: string;
+  isFlexibleDates?: boolean;
+  durationDays?: number;
+  travelMonth?: string;
+}) {
+  const { error } = await supabase.from('itinerary_store_listing').upsert({
+    itinerary_id: itineraryId,
+    seller_id: data.sellerId,
+    listed_title: data.listedTitle,
+    listed_description: data.listedDescription ?? null,
+    tags: sanitizeListingTags(data.tags),
+    seasons: data.seasons ?? [],
+    price_cents: data.priceCents ?? 0,
+    status: data.status ?? 'active',
+    is_flexible_dates: data.isFlexibleDates ?? true,
+    duration_days: data.durationDays ?? null,
+    travel_month: data.travelMonth ?? null,
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'itinerary_id' });
+  
+  if (error) {
+    console.error('[itinerariesApi] upsertStoreListing failed', error);
+  }
+}
+
+/**
  * Atualiza o timestamp `updated_at` de um roteiro no Supabase para a hora atual
+
  * e dispara o evento global `ITINERARIES_CHANGED_EVENT` para colocar o roteiro no topo da listagem.
  */
 export async function touchItinerary(id: string | number | undefined | null): Promise<void> {
@@ -483,8 +598,6 @@ export async function deleteItinerary(id: string): Promise<void> {
     .from('itineraries')
     .update({
       deleted_at: now,
-      is_public: false,
-      is_paused: true,
       updated_at: now,
     } as never)
     .eq('id', id);
@@ -537,22 +650,22 @@ export interface PublicItinerarySearchRow extends UserItinerary {
 
 export async function listPublicItineraries(limit = 200): Promise<PublicItinerarySearchRow[]> {
   const { data, error } = await supabase
-    .from('itineraries')
-    .select('*')
-    .eq('is_public', true)
-    .eq('status', 'published')
-    .is('deleted_at', null)
-    .order('created_at', { ascending: false })
+    .from('itinerary_store_listing')
+    .select('*, itineraries(*)')
+    .eq('status', 'active')
+    .order('published_at', { ascending: false })
     .limit(limit);
+    
   if (error) {
     console.error('[itinerariesApi] listPublicItineraries failed', error);
     return [];
   }
+  
   const rows = data ?? [];
   if (rows.length === 0) return [];
 
   // Carrega perfis dos autores numa única query
-  const userIds = Array.from(new Set(rows.map((r: any) => r.user_id))).filter(Boolean);
+  const userIds = Array.from(new Set(rows.map((r: any) => r.seller_id))).filter(Boolean);
   let profileById = new Map<string, { name: string; username: string | null; avatar_url: string }>();
   if (userIds.length > 0) {
     const { data: profiles, error: pErr } = await supabase
@@ -572,10 +685,18 @@ export async function listPublicItineraries(limit = 200): Promise<PublicItinerar
   }
 
   return rows.map((row: any) => {
-    const base = rowToItinerary(row);
-    const profile = profileById.get(row.user_id);
+    const base = row.itineraries ? rowToItinerary(row.itineraries) : {} as UserItinerary;
+    const profile = profileById.get(row.seller_id);
     return {
       ...base,
+      id: row.itinerary_id,
+      title: row.listed_title,
+      description: row.listed_description,
+      priceCents: row.price_cents,
+      tags: row.tags,
+      isFlexible: row.is_flexible_dates,
+      durationDays: row.duration_days,
+      travelMonth: row.travel_month,
       authorName: profile?.name || profile?.username || 'Viajante',
       authorUsername: profile?.username || '',
       authorAvatar: profile?.avatar_url || '',
@@ -630,6 +751,48 @@ export async function publishItineraryAsCopy(
   }
 
 
+
+  return created;
+}
+
+/**
+ * Duplica um roteiro.
+ * @param source O roteiro original
+ * @param asPublic Se true, duplica para a aba de loja (isPublic=false mas focado em venda). Se false, duplica como viagem pessoal (isPersonal=true).
+ */
+export async function duplicateItinerary(
+  source: UserItinerary,
+  asPublic: boolean
+): Promise<UserItinerary | null> {
+  const created = await createItinerary({
+    title: source.title + ' (Cópia)',
+    destinations: source.destinations,
+    startDate: source.startDate,
+    endDate: source.endDate,
+    images: source.images,
+    participants: source.participants,
+    places: source.places,
+    sourceDatasetId: source.sourceDatasetId ?? null,
+    isPersonal: !asPublic,
+    isPublic: false, // Mesmo para loja, começa como rascunho privado até o usuário publicar
+    priceCents: asPublic ? (source.priceCents ?? null) : null,
+    description: source.description,
+    status: 'draft',
+    isFlexible: source.isFlexible,
+    durationDays: source.durationDays,
+    travelMonth: source.travelMonth,
+    tags: source.tags,
+    mainTag: source.mainTag,
+  });
+  
+  if (!created) return null;
+
+  try {
+    const { cloneItineraryContent } = await import('./plannerApi');
+    await cloneItineraryContent(source.id, created.id);
+  } catch (err) {
+    console.error('[itinerariesApi] cloneItineraryContent failed during duplicate', err);
+  }
 
   return created;
 }

@@ -43,6 +43,7 @@ interface BudgetScreenProps {
   isShareSheetOpen?: boolean;
   itineraryId?: string;
   ownerId?: string;
+  readOnlyMode?: boolean;
 }
 
 const personColors = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444', '#EC4899', '#14B8A6', '#F97316'];
@@ -85,6 +86,7 @@ export function BudgetScreen({
   isShareSheetOpen = false,
   itineraryId,
   ownerId,
+  readOnlyMode,
 }: BudgetScreenProps) {
   const setExpenses = onExpensesChange;
 
@@ -349,13 +351,15 @@ export function BudgetScreen({
             </div>
 
             {/* Main Button: Auto width, #9DCC36, border-radius 16px */}
-            <button
-              type="button"
-              onClick={() => { setEditingExpense(null); setShowAddExpense(true); }}
-              className="box-border flex flex-row justify-center items-center py-[12px] px-[24px] gap-2 h-[48px] border border-[#141530] rounded-2xl flex-none bg-transparent text-[#141530] font-['Urbanist'] font-bold text-[16px] leading-[19px] whitespace-nowrap active:scale-[0.98] transition-all"
-            >
-              Adicionar gasto
-            </button>
+            {!readOnlyMode && (
+              <button
+                type="button"
+                onClick={() => { setEditingExpense(null); setShowAddExpense(true); }}
+                className="box-border flex flex-row justify-center items-center py-[12px] px-[24px] gap-2 h-[48px] border border-[#141530] rounded-2xl flex-none bg-transparent text-[#141530] font-['Urbanist'] font-bold text-[16px] leading-[19px] whitespace-nowrap active:scale-[0.98] transition-all"
+              >
+                Adicionar gasto
+              </button>
+            )}
           </div>
         </main>
       ) : (
@@ -393,7 +397,7 @@ export function BudgetScreen({
 
             {/* Search Bar + Filter Options Button */}
             <div className="flex items-center gap-4 mb-4">
-              <div className="flex-1 bg-[#F3F4F6] rounded-[10px] flex items-center px-3.5 py-2.5 gap-2.5 focus-within:ring-2 focus-within:ring-border transition-all">
+              <div className="flex-1 bg-field border border-transparent focus-within:border-primary transition-colors rounded-[10px] flex items-center px-3.5 py-2.5 gap-2.5 transition-all">
                 <Search size={18} className="text-[#9CA3AF] flex-shrink-0" />
                 <input
                   type="text"
@@ -443,7 +447,7 @@ export function BudgetScreen({
                   people={people}
                   currency={currency}
                   hideDivider={index === filteredExpenses.length - 1}
-                  onClick={() => {
+                  onClick={readOnlyMode ? undefined : () => {
                     setEditingExpense(expense);
                     setShowAddExpense(true);
                   }}
@@ -461,7 +465,7 @@ export function BudgetScreen({
       )}
 
       {/* ─── Fixed Bottom Button (Filled State) ─── */}
-      {!isEmpty && (
+      {!isEmpty && !readOnlyMode && (
         <div
           className="fixed bottom-0 left-0 right-0 z-30 bg-background/95 backdrop-blur-md px-4 py-6 border-t border-[#B6B6B6] flex flex-row items-center gap-6"
           style={{ paddingBottom: 'calc(24px + max(env(safe-area-inset-bottom), 0px))' }}

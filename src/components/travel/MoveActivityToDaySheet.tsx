@@ -143,7 +143,7 @@ export function MoveActivityToDaySheet({
           <button
             type="button"
             onClick={() => setIsDropdownOpen((prev) => !prev)}
-            className="w-full h-[60px] bg-[#EEEEEE] rounded-[12px] px-3.5 flex items-center justify-between gap-3 text-left transition-all active:scale-[0.99] hover:bg-[#E5E5E5] border border-transparent focus:outline-none"
+            className="w-full h-[60px] bg-field rounded-[12px] px-3.5 flex items-center justify-between gap-3 text-left transition-all active:scale-[0.99] hover:bg-[#E5E5E5] border border-transparent focus:outline-none"
           >
             <div className="flex items-center gap-3 flex-1 min-w-0">
               {/* Calendar Icon */}

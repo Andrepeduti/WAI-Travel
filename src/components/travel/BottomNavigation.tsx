@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion, LayoutGroup } from 'framer-motion';
 
 export type TabType = 'home' | 'explore' | 'create' | 'trips' | 'ai' | 'profile';
@@ -92,6 +92,14 @@ const navItems: {
 ];
 
 export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationProps) {
+  useEffect(() => {
+    // Set global CSS variable for toast offset (93px = 64px height + 29px bottom spacing)
+    document.documentElement.style.setProperty('--toast-bottom-offset', '93px');
+    return () => {
+      document.documentElement.style.removeProperty('--toast-bottom-offset');
+    };
+  }, []);
+
   return (
     <nav
       className="fixed bottom-[29px] left-1/2 -translate-x-1/2 z-40 w-[358px] max-w-[calc(100vw-32px)] pointer-events-none"

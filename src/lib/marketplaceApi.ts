@@ -27,7 +27,6 @@ export async function getMarketplaceItinerary(id: string): Promise<MarketplaceIt
     .from('itineraries')
     .select('*')
     .eq('id', id)
-    .eq('is_public', true)
     .is('deleted_at', null)
     .maybeSingle();
 
@@ -51,11 +50,11 @@ export async function getMarketplaceItinerary(id: string): Promise<MarketplaceIt
     images: data.images ?? [],
     participants: data.participants ?? [],
     places: data.places_count ?? 0,
-    sourceDatasetId: data.source_dataset_id ?? null,
-    isPublic: data.is_public ?? false,
-    priceCents: data.price_cents ?? null,
+    sourceDatasetId: null,
+    isPublic: false,
+    priceCents: null,
     description: data.description ?? '',
-    tags: data.tags ?? [],
+    tags: [],
     userId: data.user_id,
     authorName: profile?.name || profile?.username || 'Viajante',
     authorUsername: profile?.username || '',

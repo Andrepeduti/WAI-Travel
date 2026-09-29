@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { SuccessToast } from '@/components/travel/SuccessToast';
+import { DuplicatingOverlay } from '@/components/travel/DuplicatingOverlay';
 import { ItinerarySettingsSheet } from '@/components/travel/ItinerarySettingsSheet';
 import { PublishItineraryFlow } from '@/components/travel/PublishItineraryFlow';
 import { EditPublishSheet } from '@/components/travel/EditPublishSheet';
@@ -60,10 +61,10 @@ interface NewItineraryScreenProps {
 
 const activityColors = ['#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EF4444', '#EC4899'];
 
-function generateEmptyDays(startDate: Date | undefined, endDate: Date | undefined): DayData[] {
+function generateEmptyDays(startDate: Date | undefined, endDate: Date | undefined, durationDays?: number): DayData[] {
   const numDays = startDate && endDate
     ? differenceInDays(endDate, startDate) + 1
-    : 7;
+    : (durationDays ?? 7);
   const base = startDate ?? new Date();
   return Array.from({ length: numDays }, (_, i) => ({
     day: i + 1,
@@ -104,6 +105,7 @@ export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales, 
   const [showSettings, setShowSettings] = useState(false);
   const [showPlanLimitSheet, setShowPlanLimitSheet] = useState(false);
   const [showPublishFlow, setShowPublishFlow] = useState(false);
+  const [showPublishToast, setShowPublishToast] = useState(false);
   const [showEditPublish, setShowEditPublish] = useState(false);
   const [isItineraryPublic, setIsItineraryPublic] = useState(false);
   const [publishedPriceCents, setPublishedPriceCents] = useState<number | null>(null);
@@ -121,7 +123,7 @@ export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales, 
   const coverImage = manualCover || autoCover.url;
   const isAutoCover = !manualCover;
 
-  const [days] = useState<DayData[]>(() => generateEmptyDays(data.startDate, data.endDate));
+  const [days] = useState<DayData[]>(() => generateEmptyDays(data.startDate, data.endDate, data.durationDays));
 
   const tripDays = days.length;
 
@@ -174,6 +176,8 @@ export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales, 
               : updated.tripName ? [updated.tripName] : prev.destinations,
             startDate: updated.startDate,
             endDate: updated.endDate,
+            isFlexible: updated.isFlexible !== undefined ? updated.isFlexible : prev.isFlexible,
+            durationDays: updated.durationDays !== undefined ? updated.durationDays : prev.durationDays,
           }));
         }}
       />
@@ -526,34 +530,7 @@ export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales, 
 
       </div>
 
-      {isOpeningDuplicate && (
-        <div className="fixed inset-0 z-[210] flex flex-col items-center justify-center gap-6" style={{ backgroundColor: '#1A1C40' }}>
-          <div className="relative w-[80px] h-[80px] animate-spin">
-            <div 
-              className="absolute inset-0 rounded-full"
-              style={{ 
-                background: 'conic-gradient(from 180deg at 50% 50%, rgba(134, 182, 31, 0) 0deg, #86B61F 360deg)',
-                WebkitMaskImage: 'radial-gradient(circle at center, transparent 34px, black 35px)',
-                maskImage: 'radial-gradient(circle at center, transparent 34px, black 35px)'
-              }} 
-            />
-            <div 
-              className="absolute"
-              style={{ 
-                width: '12px',
-                height: '12px',
-                borderRadius: '50%',
-                background: '#9DCC36',
-                top: '67.57px',
-                left: '34.18px'
-              }}
-            />
-          </div>
-          <p className="text-[24px] font-semibold text-[#FEFEFE]" style={{ fontFamily: 'Urbanist, sans-serif' }}>
-            Duplicando roteiro...
-          </p>
-        </div>
-      )}
+      {isOpeningDuplicate && <DuplicatingOverlay />}
 
       <ItinerarySettingsSheet
         open={showSettings}
@@ -584,6 +561,7 @@ export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales, 
           setPublishedDescription(result.description);
           setPublishedTags(result.tags);
           setPublishedMainTag(result.mainTag);
+          setShowPublishToast(true);
         }}
         onNavigateToSales={onNavigateToSales}
         onNavigateToFAQ={onNavigateToFAQ}
@@ -604,6 +582,13 @@ export function NewItineraryScreen({ data, onBack, onDelete, onNavigateToSales, 
           setPublishedMainTag(patch.mainTag);
         }}
         onUnpublish={() => setIsItineraryPublic(false)}
+      />
+
+      <SuccessToast
+        isVisible={showPublishToast}
+        onClose={() => setShowPublishToast(false)}
+        title="Seu roteiro foi publicado!"
+        position="bottom"
       />
 
       <PlanLimitReachedSheet

@@ -132,14 +132,13 @@ export function ItineraryMapScreen({
     let isCancelled = false;
 
     async function resolveAllDestinations() {
-      const results: LatLng[] = [];
-      for (const dest of destinations) {
-        const coord = await resolveDestinationCoordinates(dest);
-        if (coord && !isCancelled) {
-          results.push(coord);
-        }
-      }
-      if (!isCancelled && results.length > 0) {
+      const coords = await Promise.all(
+        destinations.map(dest => resolveDestinationCoordinates(dest))
+      );
+      if (isCancelled) return;
+      
+      const results = coords.filter((c): c is LatLng => c !== null);
+      if (results.length > 0) {
         setAsyncDestCoords(results);
       }
     }

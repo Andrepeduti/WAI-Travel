@@ -97,6 +97,9 @@ export async function recordPurchase({ datasetId, priceBRL, snapshot }: RecordPu
     });
   };
 
+  return { ok: false, skipped: true }; // TEMP: Disable mock purchases since we are migrating the marketplace feed
+
+  /*
   // 1) Resolve o roteiro real a partir do legacy id (pode não existir para datasets estáticos).
   const { data: itinerary, error: itinErr } = await supabase
     .from('itineraries')
@@ -157,6 +160,7 @@ export async function recordPurchase({ datasetId, priceBRL, snapshot }: RecordPu
   await ensureBuyerCopy();
   emitPurchasesChanged();
   return { ok: true, saleId: inserted.id, itineraryId: itinerary.id };
+  */
 }
 
 export interface PurchasedItineraryView {

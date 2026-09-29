@@ -447,8 +447,8 @@ export function ActivityDetailScreen({ activity, onBack, onOpenMap }: ActivityDe
     activity.image ||
     'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1000';
 
-  const categoryName = details?.category || activity.category || 'Monumento';
-  const cityName = details?.city || activity.city || (activity.location ? activity.location.split(',')[0] : 'Paris');
+  const categoryName = details?.category || activity.category || 'Atração';
+  const cityName = details?.city || activity.city || (activity.location ? activity.location.split(',')[0] : '');
   const titleDisplay = activity.name || 'Lugar';
 
   return (
@@ -520,7 +520,11 @@ export function ActivityDetailScreen({ activity, onBack, onOpenMap }: ActivityDe
               </div>
               
               {/* Rating */}
-              {(details?.rating || activity.rating) && (
+              {isLoading && !details?.rating && !activity.rating ? (
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <div className="w-[100px] h-[20px] bg-[#E7E7EE]/30 animate-pulse rounded" />
+                </div>
+              ) : (details?.rating || activity.rating) ? (
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <Star className="w-4 h-4 fill-[#FFB800] text-[#FFB800]" />
                   <span className="font-['Urbanist',sans-serif] font-semibold text-[14px] leading-[17px] text-[#FEFEFE]">
@@ -532,7 +536,7 @@ export function ActivityDetailScreen({ activity, onBack, onOpenMap }: ActivityDe
                     </span>
                   )}
                 </div>
-              )}
+              ) : null}
             </div>
 
             {/* Glass Action Tags (Frame 1321316054) */}
