@@ -752,6 +752,9 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [needsScroll, setNeedsScroll] = useState(false);
   const [stickyTabsHeight, setStickyTabsHeight] = useState(64);
+  const stickySentinelRef = useRef<HTMLDivElement>(null);
+  const safeTopBarRef = useRef<HTMLDivElement>(null);
+  const [tabsStuck, setTabsStuck] = useState(false);
   const daySectionRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const isScrollingToDay = useRef(false);
 
@@ -1151,13 +1154,36 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     };
   }, [checkScrollArrows, effectiveDaysData]);
 
+  // Detecta quando o carrossel de dias está "grudado" no topo, para exibir a faixa
+  // que cobre a área da ilha/status bar (evita padding permanente acima do carrossel).
+  useEffect(() => {
+    let rafId = 0;
+    const check = () => {
+      rafId = 0;
+      const sentinel = stickySentinelRef.current;
+      if (!sentinel) return;
+      const stuck = sentinel.getBoundingClientRect().top <= 0;
+      setTabsStuck((current) => current === stuck ? current : stuck);
+    };
+    const onScroll = () => { if (!rafId) rafId = window.requestAnimationFrame(check); };
+    check();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      if (rafId) window.cancelAnimationFrame(rafId);
+    };
+  }, []);
+
   useEffect(() => {
     const el = stickyTabsRef.current;
     if (!el) return;
 
     let rafId = 0;
     const updateHeight = () => {
-      const nextHeight = Math.round(el.getBoundingClientRect().height || 64);
+      const safeTop = safeTopBarRef.current?.offsetHeight ?? 0;
+      const nextHeight = Math.round((el.getBoundingClientRect().height || 64) + safeTop);
       setStickyTabsHeight((current) => current === nextHeight ? current : nextHeight);
     };
     const scheduleUpdate = () => {
@@ -3002,21 +3028,21 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
             }}
           />
 
-          {/* Nav buttons (Figma: 32x32px white circles) */}
+          {/* Nav buttons (Figma: 40x40px white circles) */}
           <div className="relative px-6 flex items-center justify-between z-10">
             <button
               type="button"
               onClick={onBack}
-              className="w-8 h-8 rounded-full bg-[#FFFFFF] flex items-center justify-center shadow-[0px_4px_20px_rgba(0,0,0,0.1)] active:scale-95 transition-transform"
+              className="w-10 h-10 rounded-full bg-[#FFFFFF] flex items-center justify-center shadow-[0px_4px_20px_rgba(0,0,0,0.1)] active:scale-95 transition-transform"
             >
-              <Icon name="arrow_back" size={18} className="text-[#000000]" />
+              <Icon name="arrow_back" size={20} className="text-[#000000]" />
             </button>
             <div className="flex items-center gap-2">
               {!isItineraryPublic && !isViewer && itineraryData.isPersonal === false && (
                 <button
                   type="button"
                   onClick={() => setShowPublishFlow(true)}
-                  className="h-8 px-4 rounded-full bg-[#9DCC36] text-[#141530] font-bold text-[13px] shadow-[0px_4px_20px_rgba(0,0,0,0.1)] active:scale-95 transition-transform font-['Urbanist',sans-serif]"
+                  className="h-10 px-4 rounded-full bg-[#9DCC36] text-[#141530] font-bold text-[13px] shadow-[0px_4px_20px_rgba(0,0,0,0.1)] active:scale-95 transition-transform font-['Urbanist',sans-serif]"
                 >
                   Publicar
                 </button>
@@ -3025,9 +3051,9 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                 <button
                   type="button"
                   onClick={() => setShowSettings(true)}
-                  className="w-8 h-8 rounded-full bg-[#FEFEFE] flex items-center justify-center shadow-[0px_3.2px_16px_rgba(0,0,0,0.1)] active:scale-95 transition-transform"
+                  className="w-10 h-10 rounded-full bg-[#FEFEFE] flex items-center justify-center shadow-[0px_3.2px_16px_rgba(0,0,0,0.1)] active:scale-95 transition-transform"
                 >
-                  <Icon name="more_horiz" size={18} className="text-[#141530]" />
+                  <Icon name="more_horiz" size={20} className="text-[#141530]" />
                 </button>
               )}
             </div>
@@ -3300,12 +3326,29 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         {/* Content */}
         <div className="px-4">
 
+          {/* Sentinel: top <= 0 quando o carrossel encosta abaixo da safe-area */}
+          <div
+            ref={stickySentinelRef}
+            aria-hidden
+            style={{ height: 0, position: 'relative', top: 'calc(-1 * env(safe-area-inset-top, 0px))', pointerEvents: 'none' }}
+          />
+          {/* Faixa que cobre a área da ilha/status bar só enquanto o carrossel está fixo */}
+          <div
+            ref={safeTopBarRef}
+            aria-hidden
+            className="fixed top-0 left-0 right-0 z-30 pointer-events-none"
+            style={{
+              height: 'env(safe-area-inset-top, 0px)',
+              backgroundColor: '#EFEFEF',
+              opacity: tabsStuck ? 1 : 0,
+            }}
+          />
           <div
             ref={stickyTabsRef}
-            className="-mx-4 px-4 sticky top-0 z-30 pb-2"
+            className="-mx-4 px-4 sticky z-30 pb-2 pt-2"
             style={{
               backgroundColor: '#EFEFEF',
-              paddingTop: 'calc(max(12px, env(safe-area-inset-top)))'
+              top: 'env(safe-area-inset-top, 0px)',
             }}
           >
             {/* Day Carousel without side arrows (Figma: 50x62px, border-radius 32px) */}

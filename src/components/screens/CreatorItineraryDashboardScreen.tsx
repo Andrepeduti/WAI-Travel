@@ -601,7 +601,7 @@ export function CreatorItineraryDashboardScreen({
       >
         <div className="flex flex-col items-start px-4 w-full bg-white">
           <div className="flex flex-col items-start gap-[32px] w-full">
-            <h2 className="font-['Urbanist'] font-semibold text-[24px] leading-[29px] text-[#171F2C]">
+            <h2 className="font-['Urbanist'] font-bold text-[24px] leading-[29px] text-[#171F2C]">
               Configurações da publicação
             </h2>
             
@@ -615,7 +615,7 @@ export function CreatorItineraryDashboardScreen({
                   <div className="w-6 h-6 flex items-center justify-center shrink-0">
                     <Icon name="star" size={24} className="text-[#141530]" />
                   </div>
-                  <span className="font-['Urbanist'] font-semibold text-[16px] leading-[19px] text-[#141530]">
+                  <span className="font-['Urbanist'] font-medium text-[16px] leading-[19px] text-[#141530]">
                     Destacar
                   </span>
                 </div>
@@ -647,7 +647,7 @@ export function CreatorItineraryDashboardScreen({
                   <div className="w-6 h-6 flex items-center justify-center shrink-0">
                     <Icon name="content_copy" size={24} className="text-[#141530]" />
                   </div>
-                  <span className="font-['Urbanist'] font-semibold text-[16px] leading-[19px] text-[#141530]">
+                  <span className="font-['Urbanist'] font-medium text-[16px] leading-[19px] text-[#141530]">
                     Duplicar roteiro
                   </span>
                 </div>
@@ -668,7 +668,7 @@ export function CreatorItineraryDashboardScreen({
                   <div className="w-6 h-6 flex items-center justify-center shrink-0">
                     <Icon name="share" size={24} className="text-[#141530]" />
                   </div>
-                  <span className="font-['Urbanist'] font-semibold text-[16px] leading-[19px] text-[#141530]">
+                  <span className="font-['Urbanist'] font-medium text-[16px] leading-[19px] text-[#141530]">
                     Compartilhar
                   </span>
                 </div>
@@ -692,7 +692,7 @@ export function CreatorItineraryDashboardScreen({
                   <div className="w-6 h-6 flex items-center justify-center shrink-0">
                     <Icon name="delete" size={24} className="text-[#D00004]" />
                   </div>
-                  <span className="font-['Urbanist'] font-semibold text-[16px] leading-[19px] text-[#D00004]">
+                  <span className="font-['Urbanist'] font-medium text-[16px] leading-[19px] text-[#D00004]">
                     Excluir
                   </span>
                 </div>
