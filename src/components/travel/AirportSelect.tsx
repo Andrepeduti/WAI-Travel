@@ -71,7 +71,7 @@ export function AirportSelect({ value, onChange, placeholder = 'Buscar aeroporto
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 right-0 z-[200] mt-1 bg-card border border-border rounded-xl shadow-lg overflow-hidden">
+        <div className="absolute top-full left-0 right-0 z-[200] mt-1 bg-card border border-border rounded-[10px] shadow-lg overflow-hidden">
           <div className="p-2 border-b border-border">
             <input
               autoFocus

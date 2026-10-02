@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Icon } from '@/components/ui/Icon';
 import { X } from 'lucide-react';
 
 interface AddTripNoteSheetProps {
@@ -40,70 +39,85 @@ export function AddTripNoteSheet({ open, onClose, onSave, editingNote }: AddTrip
   };
 
   return (
-    <div className="fixed inset-0 z-[210]" onClick={handleClose}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
+    <div className="fixed inset-0 z-[210] flex items-end justify-center" onClick={handleClose}>
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity animate-in fade-in duration-200" />
       <div
-        className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl animate-in slide-in-from-bottom duration-300 flex flex-col"
-        style={{ maxHeight: '85vh' }}
-        onClick={e => e.stopPropagation()}
+        className="relative bg-white rounded-t-[24px] w-full shadow-2xl p-6 pointer-events-auto animate-in slide-in-from-bottom duration-300 flex flex-col z-10"
+        style={{ maxHeight: '90vh', fontFamily: 'var(--font-family-primary, "Urbanist", sans-serif)' }}
+        onClick={(e) => e.stopPropagation()}
       >
-        {/* Handle */}
-        <div className="w-10 h-1 rounded-full bg-muted mx-auto mt-3 mb-2" />
-
-        {/* Header */}
-        <div className="px-5 pb-4 flex items-center justify-between">
-          <h2 className="text-[17px] font-bold text-foreground">{editingNote ? 'Editar nota' : 'Nova nota'}</h2>
+        {/* Top Bar with Close Button */}
+        <div className="flex items-center justify-end pb-2">
           <button
+            type="button"
             onClick={handleClose}
-            className="w-9 h-9 rounded-full flex items-center justify-center"
-            style={{ background: '#F2F2F2' }}
+            className="p-1 text-[#171F2C] hover:opacity-70 active:scale-95 transition-all flex items-center justify-center -mr-1"
+            aria-label="Fechar"
           >
-            <Icon name="close" size={20} className="text-foreground" />
+            <X size={18} strokeWidth={2} className="text-[#171F2C]" />
           </button>
         </div>
 
+        {/* Title and Subtitle */}
+        <div className="flex flex-col gap-2 pb-2">
+          <h2 className="font-['Urbanist'] font-semibold text-[22px] leading-[26px] text-[#171F2C] my-0">
+            {editingNote ? 'Editar observação' : 'Adicionar observação'}
+          </h2>
+        </div>
+
         {/* Form */}
-        <div className="px-5 pb-6 space-y-4 overflow-y-auto flex-1">
-          {/* Title */}
-          <div>
-            <label className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
-              Título
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ex: Melhores restaurantes em Paris"
-              className="w-full rounded-xl px-4 py-3 text-[14px] text-foreground placeholder:text-muted-foreground outline-none leading-relaxed"
-              style={{ background: '#F2F2F2' }}
-            />
+        <div className="pt-2 pb-2 space-y-4 overflow-y-auto flex-1">
+          {/* Title Field with Pin Icon: bg #EDEDED, radius 12px, padding 8px 12px, h 54px */}
+          <div className="bg-field border border-transparent focus-within:border-primary transition-colors rounded-[12px] px-3 py-2 h-[54px] flex items-center gap-3">
+            <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
+              <span className="font-['Urbanist'] font-medium text-[12px] leading-[16px] text-[#949494] block">
+                Titulo
+              </span>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Nome da observação"
+                className="w-full bg-transparent font-['Urbanist'] font-medium text-[14px] leading-[16px] text-[#141530] placeholder:text-[#949494] outline-none"
+              />
+            </div>
           </div>
 
-          {/* Content */}
-          <div>
-            <label className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
-              Conteúdo
-            </label>
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Escreva sua nota aqui..."
-              rows={6}
-              className="w-full rounded-xl px-4 py-3 text-[14px] text-foreground placeholder:text-muted-foreground outline-none resize-none leading-relaxed"
-              style={{ background: '#F2F2F2' }}
-            />
+          {/* Content Field (Textarea): bg #EDEDED, radius 16px, padding 24px, h 181px */}
+          <div className="flex flex-col gap-2">
+            <div className="bg-field border border-transparent focus-within:border-primary transition-colors rounded-[16px] p-6 flex flex-col min-h-[181px]">
+              <textarea
+                value={content}
+                onChange={(e) => {
+                  if (e.target.value.length <= 500) {
+                    setContent(e.target.value);
+                  }
+                }}
+                placeholder="Escreva sua observação aqui..."
+                rows={6}
+                className="w-full bg-transparent font-['Urbanist'] font-medium text-[14px] leading-[16px] text-[#141530] placeholder:text-[#B6B6B6] focus:outline-none resize-none flex-1"
+              />
+            </div>
+            {/* Character counter aligned bottom-left: 12px, color #676767 */}
+            <span className="font-['Urbanist'] font-medium text-[12px] leading-[16px] text-[#676767] block text-left">
+              {content.length}/500
+            </span>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-5 pb-8 pt-3 border-t border-border/40">
+        {/* Action Button: 48px, bg #9DCC36, radius 16px, 16px bold #141530 */}
+        <div className="pt-4 pb-2">
           <button
+            type="button"
             onClick={handleSave}
             disabled={!title.trim()}
-            className="w-full py-3.5 rounded-2xl text-[15px] font-semibold transition-colors disabled:bg-[#D1D5DB] disabled:text-white"
-            style={title.trim() ? { backgroundColor: '#9DCC36', color: '#141530' } : undefined}
+            className={`w-full h-[48px] rounded-[16px] font-['Urbanist'] font-bold text-[16px] leading-[19px] transition-all shadow-xs flex items-center justify-center ${
+              title.trim()
+                ? 'bg-[#9DCC36] text-[#141530] hover:opacity-95 active:scale-[0.98]'
+                : 'bg-[#E5E5E7] text-[#8E8E93] cursor-not-allowed'
+            }`}
           >
-            Salvar
+            {editingNote ? 'Salvar' : 'Adicionar'}
           </button>
         </div>
       </div>

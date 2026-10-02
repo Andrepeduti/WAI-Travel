@@ -48,7 +48,7 @@ export function AddVideoFromGalleryScreen({ onBack, onSubmit }: AddVideoFromGall
 
   return (
     <div 
-      className="min-h-screen bg-background flex flex-col"
+      className="min-h-[100dvh] bg-background flex flex-col"
       style={{ fontFamily: 'var(--font-family-primary)' }}
     >
       {/* Header */}
@@ -100,7 +100,7 @@ export function AddVideoFromGalleryScreen({ onBack, onSubmit }: AddVideoFromGall
               {!isProcessing && (
                 <button
                   onClick={handleRemoveVideo}
-                  className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center"
+                  className="absolute top-3 right-3 w-10 h-10 rounded-full bg-black/60 flex items-center justify-center"
                 >
                   <Icon name="close" size={18} className="text-white" />
                 </button>

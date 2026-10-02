@@ -130,27 +130,29 @@ export function EditInterestsSheet({
           <div className="w-10 h-1 rounded-full" style={{ background: '#E5E5EA' }} />
         </div>
 
+        {/* Top Bar with Close Button */}
+        <div className="flex items-center justify-end px-5 pt-1 pb-1 flex-shrink-0">
+          <button
+            onClick={() => onOpenChange(false)}
+            className="inline-flex items-center justify-center w-8 h-8 rounded-full active:opacity-70 -mr-1"
+            style={{ background: '#F2F2F7' }}
+            aria-label="Fechar"
+          >
+            <Icon name="close" size={18} style={{ color: '#1A1C40' }} />
+          </button>
+        </div>
+
         <SheetHeader className="px-5 pb-3 flex-shrink-0">
-          <div className="flex items-center justify-between w-full">
-            <div className="flex flex-col items-start">
-              <SheetTitle
-                className="text-left"
-                style={{ fontSize: 16, fontWeight: 700, color: '#1A1C40' }}
-              >
-                Editar interesses
-              </SheetTitle>
-              <p className="text-left text-xs mt-1" style={{ color: '#8E8E93' }}>
-                {draft.length}/{maxItems} selecionados
-              </p>
-            </div>
-            <button
-              onClick={() => onOpenChange(false)}
-              className="inline-flex items-center justify-center w-8 h-8 rounded-full active:opacity-70"
-              style={{ background: '#F2F2F7' }}
-              aria-label="Fechar"
+          <div className="flex flex-col items-start">
+            <SheetTitle
+              className="text-left"
+              style={{ fontSize: 20, fontWeight: 700, color: '#1A1C40' }}
             >
-              <Icon name="close" size={18} style={{ color: '#1A1C40' }} />
-            </button>
+              Editar interesses
+            </SheetTitle>
+            <p className="text-left text-xs mt-1" style={{ color: '#8E8E93' }}>
+              {draft.length}/{maxItems} selecionados
+            </p>
           </div>
         </SheetHeader>
 
@@ -207,7 +209,7 @@ export function EditInterestsSheet({
         </div>
 
         <div
-          className="px-5 pt-3 pb-5 flex-shrink-0 border-t"
+          className="px-5 pt-3 pb-[34px] flex-shrink-0 border-t"
           style={{ borderColor: '#F2F2F7' }}
         >
           <button

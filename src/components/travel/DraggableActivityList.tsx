@@ -1,474 +1,671 @@
 import React, { useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
-import { EditTransportSheet, TransportData } from './EditTransportSheet';
-import {
-  Sheet,
-  SheetContent,
-} from '@/components/ui/sheet';
-
-// ... keep existing code (interfaces, SPEED_MAP, calcDistance, DAY_COLORS unchanged)
-
-interface Activity {
-  id: number;
-  type?: 'activity' | 'note';
-  startTime: string;
-  endTime: string;
-  category: string;
-  categoryColor: string;
-  name: string;
-  image: string;
-  openHours: string;
-  rating: number;
-  price: string;
-  noteText?: string;
-  observation?: string;
-}
-
-interface TransportBetween {
-  type: 'walk' | 'bus' | 'metro' | 'car';
-  duration: string;
-  cost?: string;
-  distance?: string;
-}
-
-interface PlaceCoord {
-  name: string;
-  lat: number;
-  lng: number;
-}
-
-interface DraggableActivityListProps {
-  activities: Activity[];
-  transports: TransportBetween[];
-  dayTabsRef: React.RefObject<HTMLDivElement>;
-  daysData: { day: number; date: Date }[];
-  selectedDay: number;
-  compactView?: boolean;
-  onReorder: (activities: Activity[]) => void;
-  onDelete: (activity: Activity) => void;
-  onMoveToDay: (activity: Activity, targetDay: number) => void;
-  onActivityClick: (activity: Activity) => void;
-  getTransportIcon: (type: TransportBetween['type']) => string;
-  onUpdateTransport?: (index: number, data: TransportData) => void;
-  onDeleteTransport?: (index: number) => void;
-  places?: PlaceCoord[];
-  repeatedNames?: Set<string>;
-}
-
-const SPEED_MAP: Record<TransportBetween['type'], number> = {
-  walk: 5,
-  bus: 25,
-  metro: 35,
-  car: 40,
-};
-
-function calcDistance(type: TransportBetween['type'], duration: string): string | null {
-  const match = duration.match(/(\d+)/);
-  if (!match) return null;
-  const minutes = parseInt(match[1], 10);
-  if (minutes <= 0) return null;
-  const km = (SPEED_MAP[type] * minutes) / 60;
-  return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
-}
+import { EditTransportSheet } from './EditTransportSheet';
+import { MoveActivityToDaySheet } from './MoveActivityToDaySheet';
+import { MoreHorizontal, Trash2, Pencil, Footprints, MessageSquare, GripVertical } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function recommendTransportType(distKm: number): TransportBetween['type'] {
-  const road = distKm * 1.3;
-  if (road <= 1.2) return 'walk';
-  if (road <= 5) return 'bus';
-  if (road <= 15) return 'metro';
-  return 'car';
+export interface Activity {
+  id: number;
+  type?: 'activity' | 'note';
+  startTime?: string;
+  endTime?: string;
+  category: string;
+  categoryColor?: string;
+  name: string;
+  image: string;
+  openHours?: string;
+  rating?: number;
+  price?: string;
+  noteText?: string;
+  observation?: string;
+  lat?: number;
+  lng?: number;
+  city?: string;
+  country?: string;
+  personalNote?: string;
 }
 
-const DAY_COLORS = [
-  'rgba(53, 135, 242, 0.30)',
-  'rgba(41, 166, 153, 0.30)',
-  'rgba(179, 242, 41, 0.30)',
-  'rgba(242, 89, 34, 0.30)',
-  'rgba(242, 176, 12, 0.30)',
-  'rgba(242, 139, 12, 0.30)',
-  'rgba(26, 28, 64, 0.30)',
-  'rgba(10, 14, 89, 0.30)',
-];
+export type TransportType = 'none' | 'train' | 'metro' | 'walk' | 'bus' | 'car' | 'bike' | 'other';
+
+export interface TransportBetween {
+  type: TransportType;
+  duration: string;
+  cost?: string;
+  distance?: string;
+}
+
+export interface DragState {
+  isDragging: boolean;
+  activity: Activity | null;
+  sourceDay: number | null;
+  sourceIndex: number | null;
+  targetDay: number | null;
+  targetIndex: number | null;
+  pointerPos: { x: number; y: number };
+  dragOffset: { x: number; y: number };
+  cardWidth: number;
+}
+
+import { resolveActivityCountry, resolveActivityLocationLabel } from '@/lib/countryResolver';
+
+interface DraggableActivityListProps {
+  activities: Activity[];
+  transports: TransportBetween[];
+  destinations?: string[];
+  dayTabsRef?: React.RefObject<HTMLDivElement>;
+  daysData: { day: number; date: Date }[];
+  selectedDay: number;
+  compactView?: boolean;
+  itineraryCurrency?: string;
+  isFlexibleDates?: boolean;
+  getActivityCount?: (day: number) => number;
+  dragState?: DragState;
+  onStartDrag?: (activity: Activity, day: number, index: number, event: React.PointerEvent) => void;
+  onReorder: (activities: Activity[]) => void;
+  onDelete: (activity: Activity) => void;
+  onMoveToDay: (activity: Activity, targetDay: number) => void;
+  onActivityClick: (activity: Activity) => void;
+  onEditNote?: (activity: Activity) => void;
+  getTransportIcon?: (type: TransportBetween['type']) => string;
+  onUpdateTransport?: (index: number, data: TransportBetween) => void;
+  onDeleteTransport?: (index: number) => void;
+  readOnlyMode?: boolean;
+}
 
 export function DraggableActivityList({
   activities,
   transports,
+  destinations,
+  daysData,
   selectedDay,
-  compactView = false,
+  compactView,
+  itineraryCurrency,
+  isFlexibleDates,
+  getActivityCount,
+  dragState,
+  onStartDrag,
+  onReorder,
+  onDelete,
+  onMoveToDay,
   onActivityClick,
-  getTransportIcon,
+  onEditNote,
   onUpdateTransport,
   onDeleteTransport,
-  places = [],
-  repeatedNames,
+  readOnlyMode,
 }: DraggableActivityListProps) {
-  const [editTransportIndex, setEditTransportIndex] = useState<number | null>(null);
-  const [transportActionIndex, setTransportActionIndex] = useState<number | null>(null);
-  const stepColor = DAY_COLORS[(selectedDay - 1) % DAY_COLORS.length];
+  const [movingActivity, setMovingActivity] = useState<Activity | null>(null);
+  const [optionsActivity, setOptionsActivity] = useState<Activity | null>(null);
+  const [editingTransportIndex, setEditingTransportIndex] = useState<number | null>(null);
 
-  const handleOpenMap = (index: number) => {
-    // Get the two activities around this transport
-    const fromActivity = activities[index];
-    const toActivity = activities[index + 1];
-    const query = toActivity ? toActivity.name : fromActivity.name;
-    const geoUrl = `geo:0,0?q=${encodeURIComponent(query)}`;
-    const fallbackUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
-    
-    // Try native geo scheme, fallback to Google Maps
-    const link = document.createElement('a');
-    link.href = geoUrl;
-    link.click();
-    
-    // Fallback after a short delay
-    setTimeout(() => {
-      window.open(fallbackUrl, '_blank');
-    }, 500);
-    
-    setTransportActionIndex(null);
+  const handleOpenGoogleMaps = (activity: Activity) => {
+    const query = activity.lat && activity.lng
+      ? `${activity.lat},${activity.lng}`
+      : encodeURIComponent(`${activity.name}, ${activity.city || ''}`);
+    window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
   };
 
-  return (
-    <>
-      <div className="mb-6 relative">
-        {activities.map((activity, index) => {
-          const isLast = index === activities.length - 1;
-          const transport = transports[index];
-
-          return (
-            <React.Fragment key={`${activity.id}-${index}`}>
-              {/* Activity row: timeline left + card right */}
-              <div className="flex gap-3">
-                {/* Timeline left column - times only */}
-                <div className="flex flex-col items-center flex-shrink-0" style={{ width: 44 }}>
-                  {/* Start & end time */}
-                  <div className="flex flex-col items-center pt-[15px]">
-                    <span className="text-[12px] font-semibold text-foreground leading-tight">
-                      {activity.startTime}
-                    </span>
-                    <span className="text-[12px] text-muted-foreground leading-tight mt-0.5">
-                      {activity.endTime}
-                    </span>
-                  </div>
-                  {/* Vertical dashed line */}
-                  {!isLast && (
-                    <div className="flex-1 w-px border-l-2 border-dashed border-muted-foreground/20 min-h-[16px] mt-1.5" />
-                  )}
-                </div>
-
-                {/* Card */}
-                <div className="flex-1 min-w-0 pb-2">
-                  {activity.type === 'note' ? (
-                    /* Note card */
-                    compactView ? (
-                      <div
-                        className="bg-card rounded-2xl px-3.5 py-3 cursor-pointer active:scale-[0.98] transition-all border border-border/40"
-                        onClick={() => onActivityClick(activity)}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0"
-                            style={{ backgroundColor: stepColor, color: '#0A0E59' }}
-                          >
-                            {index + 1}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <span className="text-[14px] font-semibold text-foreground truncate block">
-                              {activity.name || 'Tempo livre'}
-                            </span>
-                            {activity.noteText && (
-                              <p className="text-[12px] font-medium text-muted-foreground mt-0.5 line-clamp-1">
-                                {activity.noteText}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div
-                        className="bg-card rounded-2xl p-3.5 cursor-pointer active:scale-[0.98] transition-all border border-border/40"
-                        onClick={() => onActivityClick(activity)}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div
-                            className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0"
-                            style={{ backgroundColor: stepColor, color: '#0A0E59' }}
-                          >
-                            {index + 1}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1.5">
-                              <span className="text-[14px] font-semibold text-foreground">
-                                {activity.name || 'Tempo livre'}
-                              </span>
-                            </div>
-                            {activity.noteText && (
-                              <p className="text-[13px] font-medium text-muted-foreground leading-relaxed mt-1.5">
-                                {activity.noteText}
-                              </p>
-                            )}
-                          </div>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); onActivityClick(activity); }}
-                            className="p-1 flex-shrink-0 -mr-1 -mt-0.5"
-                          >
-                            <Icon name="more_horiz" size={20} className="text-muted-foreground" />
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  ) : compactView ? (
-                    /* Compact activity card */
-                    <div
-                      className="bg-card rounded-2xl px-3.5 py-3 cursor-pointer active:scale-[0.98] transition-all border border-border/40"
-                      onClick={() => onActivityClick(activity)}
-                    >
-                      <div className="flex items-center gap-3">
-                        {/* Step number badge */}
-                        <div
-                          className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0"
-                          style={{ backgroundColor: stepColor, color: '#0A0E59' }}
-                        >
-                          {index + 1}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[14px] font-semibold text-foreground truncate">
-                              {activity.name}
-                            </span>
-                            {repeatedNames?.has(activity.name?.trim().toLowerCase() ?? '') && (
-                              <span className="inline-flex items-center text-[10px] font-semibold px-2 h-[18px] rounded-2xl flex-shrink-0" style={{ backgroundColor: '#FFE9D6', color: '#C2410C' }}>
-                                Repetido
-                              </span>
-                            )}
-                          </div>
-                          {activity.observation && (
-                            <p className="text-[12px] font-medium text-muted-foreground mt-0.5 line-clamp-1">
-                              {activity.observation}
-                            </p>
-                          )}
-                        </div>
-                        {activity.price && (
-                          <span className="text-[12px] font-semibold text-foreground flex-shrink-0">
-                            {activity.price}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    /* Full activity card */
-                    <div
-                      className="bg-card rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-all border border-border/40"
-                      onClick={() => onActivityClick(activity)}
-                    >
-                      <div className="flex gap-3 p-3">
-                        {/* Text content first */}
-                        <div className="flex-1 min-w-0">
-                           <div className="flex items-start justify-between">
-                             <div className="flex items-center gap-2">
-                               {/* Step number badge */}
-                               <div
-                                 className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0"
-                                 style={{ backgroundColor: stepColor, color: '#0A0E59' }}
-                               >
-                                 {index + 1}
-                               </div>
-                               <h4 className="text-[14px] font-semibold text-foreground leading-tight line-clamp-2">
-                                 {activity.name}
-                               </h4>
-                             </div>
-                           </div>
-                           <div className="flex items-center gap-2 mt-1.5 ml-9">
-                             {activity.category && (
-                               <span className="inline-flex items-center text-[11px] font-medium text-[#8E8E93] px-2.5 h-5 rounded-2xl bg-[#F2F2F2]">
-                                 {activity.category}
-                               </span>
-                             )}
-                             {repeatedNames?.has(activity.name?.trim().toLowerCase() ?? '') && (
-                               <span className="inline-flex items-center text-[11px] font-semibold px-2.5 h-5 rounded-2xl" style={{ backgroundColor: '#FFE9D6', color: '#C2410C' }}>
-                                 Repetido
-                               </span>
-                             )}
-                              {activity.price && (() => {
-                                const raw = String(activity.price).replace(/[^\d.,]/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.');
-                                const num = parseFloat(raw);
-                                if (!isFinite(num) || num <= 0) return null;
-                                const formatted = num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                                return (
-                                  <span className="text-[12px] font-medium text-muted-foreground">
-                                    R$ {formatted}
-                                  </span>
-                                );
-                              })()}
-                           </div>
-                           {activity.observation && (
-                              <p className="text-[12px] font-medium text-muted-foreground mt-1 ml-9 line-clamp-1">
-                                {activity.observation}
-                              </p>
-                            )}
-                        </div>
-                        {/* Image on the right */}
-                        {activity.image && (
-                          <img
-                            src={activity.image}
-                            alt={activity.name}
-                            className="w-[68px] h-[68px] rounded-xl object-cover flex-shrink-0"
-                          />
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Transport between items */}
-              {!isLast && (
-                <div className="flex gap-3" style={{ marginTop: -2, marginBottom: 6 }}>
-                  {/* Timeline column - transport icon */}
-                  <div className="flex flex-col items-center flex-shrink-0" style={{ width: 44 }}>
-                    {transport ? (
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center bg-muted/60 border border-border/40">
-                        <Icon name={getTransportIcon(transport.type)} size={15} className="text-foreground" />
-                      </div>
-                    ) : (
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center bg-muted/60 border border-border/40">
-                        <Icon name="directions_walk" size={15} className="text-muted-foreground" />
-                      </div>
-                    )}
-                    {/* Continue dashed line */}
-                    <div className="flex-1 w-px border-l-2 border-dashed border-muted-foreground/20 min-h-[6px]" />
-                  </div>
-
-                  {/* Transport info */}
-                  <button
-                    className="flex items-center gap-1.5 text-muted-foreground py-0.5 flex-1 min-w-0 rounded-lg hover:bg-muted/30 transition-colors cursor-pointer"
-                    onClick={() => transport ? setTransportActionIndex(index) : undefined}
-                  >
-                    {transport ? (
-                      <>
-                        <span className="text-[12px] font-medium">{transport.duration}</span>
-                        {(() => {
-                          const km = transport.distance || calcDistance(transport.type, transport.duration);
-                          return (
-                            <>
-                              <span className="text-[9px]">·</span>
-                              <span className="text-[12px] font-medium">{km || '0 km'}</span>
-                            </>
-                          );
-                        })()}
-                        {transport.cost && (
-                          <>
-                            <span className="text-[9px]">·</span>
-                            <span className="text-[12px] font-medium">R$ {String(transport.cost).replace(/^[€$R$\s]+/, '')}</span>
-                          </>
-                        )}
-                        <Icon name="chevron_right" size={16} style={{ color: '#1A1C40' }} className="ml-1" />
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-[12px] font-medium">0 min</span>
-                        <span className="text-[9px]">·</span>
-                        <span className="text-[12px] font-medium">0 km</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
-            </React.Fragment>
-          );
-        })}
+  const renderDragHandle = (activity: Activity, index: number) => {
+    if (readOnlyMode) return null;
+    return (
+      <div
+        data-drag-handle="true"
+        role="button"
+        aria-label="Arrastar para reordenar"
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          onStartDrag && onStartDrag(activity, selectedDay, index, e);
+        }}
+        onClick={(e) => e.stopPropagation()}
+        style={{ touchAction: 'none' }}
+        className="self-stretch flex items-center justify-center w-9 -ml-3 -mr-2 shrink-0 cursor-grab active:cursor-grabbing text-[#7F7F7F] pointer-events-auto"
+      >
+        <GripVertical className="w-7 h-7" />
       </div>
+    );
+  };
 
-      {/* Transport action sheet */}
-      <Sheet open={transportActionIndex !== null} onOpenChange={(open) => { if (!open) setTransportActionIndex(null); }}>
-        <SheetContent side="bottom" className="rounded-t-3xl px-0 pb-8">
-          <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-5 mt-1" />
-          <h3 className="text-[18px] font-bold text-foreground px-5 mb-4">Deslocamento</h3>
-          <div className="px-5 space-y-1">
-            <button
-              className="w-full flex items-center gap-3 py-3.5 px-4 rounded-xl hover:bg-muted/30 transition-colors"
-              onClick={() => {
-                if (transportActionIndex !== null) {
-                  setTransportActionIndex(null);
-                  setEditTransportIndex(transportActionIndex);
-                }
-              }}
-            >
-              <div className="w-9 h-9 rounded-full bg-[#F2F2F2] flex items-center justify-center flex-shrink-0">
-                <Icon name="edit" size={18} className="text-foreground" />
-              </div>
-              <span className="text-[14px] font-medium text-foreground flex-1 text-left">Editar</span>
-              <Icon name="chevron_right" size={18} className="text-muted-foreground" />
-            </button>
-            <button
-              className="w-full flex items-center gap-3 py-3.5 px-4 rounded-xl hover:bg-muted/30 transition-colors"
-              onClick={() => {
-                if (transportActionIndex !== null) {
-                  handleOpenMap(transportActionIndex);
-                }
-              }}
-            >
-              <div className="w-9 h-9 rounded-full bg-[#F2F2F2] flex items-center justify-center flex-shrink-0">
-                <Icon name="map" size={18} className="text-foreground" />
-              </div>
-              <span className="text-[14px] font-medium text-foreground flex-1 text-left">Ver no mapa</span>
-              <Icon name="chevron_right" size={18} className="text-muted-foreground" />
-            </button>
-            {/* 
-            <button
-              className="w-full flex items-center gap-3 py-3.5 px-4 rounded-xl hover:bg-destructive/10 transition-colors"
-              onClick={() => {
-                if (transportActionIndex !== null) {
-                  onDeleteTransport?.(transportActionIndex);
-                  setTransportActionIndex(null);
-                }
-              }}
-            >
-              <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#FEE2E2' }}>
-                <Icon name="delete" size={18} className="text-destructive" />
-              </div>
-              <span className="text-[14px] font-medium text-destructive flex-1 text-left">Excluir</span>
-            </button>
-            */}
+  const renderDropPlaceholder = (posKey?: string | number) => (
+    <motion.div
+      key={`subtle-gap-${selectedDay}-${posKey ?? 'end'}`}
+      layout
+      initial={{ height: 0, opacity: 0 }}
+      animate={{ height: 32, opacity: 1 }}
+      exit={{ height: 0, opacity: 0 }}
+      transition={{ type: 'spring', damping: 28, stiffness: 380 }}
+      className="w-full flex items-center justify-center my-0.5 pointer-events-none"
+    >
+      <div className="w-12 h-1 rounded-full bg-[#1D4ED8]/40" />
+    </motion.div>
+  );
+
+  if (activities.length === 0) {
+    const isDropTargetEmptyDay = dragState?.isDragging && dragState.targetDay === selectedDay;
+
+    return (
+      <div className="space-y-2">
+        {isDropTargetEmptyDay ? (
+          <motion.div
+            layout
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 48 }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 380 }}
+            className="w-full rounded-2xl border border-dashed border-[#1D4ED8]/40 bg-[#EFF6FF]/40 flex items-center justify-center pointer-events-none my-1"
+          >
+            <div className="w-12 h-1 rounded-full bg-[#1D4ED8]/50" />
+          </motion.div>
+        ) : (
+          <div className="py-1 px-1">
+            <p className="text-[15px] font-medium text-[#7F7F7F] font-['Urbanist',sans-serif]">Este dia ainda está vazio.</p>
           </div>
-        </SheetContent>
-      </Sheet>
+        )}
+      </div>
+    );
+  }
 
-      {editTransportIndex !== null && transports[editTransportIndex] && (() => {
-        const fromAct = activities[editTransportIndex];
-        const toAct = activities[editTransportIndex + 1];
-        const fromPlace = fromAct ? places.find(p => p.name.toLowerCase() === fromAct.name.toLowerCase()) : undefined;
-        const toPlace = toAct ? places.find(p => p.name.toLowerCase() === toAct.name.toLowerCase()) : undefined;
-        const distKm = fromPlace && toPlace ? haversineKm(fromPlace.lat, fromPlace.lng, toPlace.lat, toPlace.lng) : undefined;
-        const recType = distKm !== undefined ? recommendTransportType(distKm) : undefined;
+  return (
+    <div className="space-y-3 relative">
+      {activities.map((activity, index) => {
+        const transport = transports[index];
+        const hasTransport = index < activities.length - 1 && transport;
+
+        const isCurrentlyDragged =
+          dragState?.isDragging &&
+          dragState.sourceDay === selectedDay &&
+          dragState.sourceIndex === index;
+
+        const shouldShowPlaceholderBefore =
+          dragState?.isDragging &&
+          dragState.targetDay === selectedDay &&
+          dragState.targetIndex === index;
+
+        const activityKey = activity.id ? `${activity.id}-${index}` : `${activity.name}-${activity.startTime}-${index}`;
 
         return (
-          <EditTransportSheet
-            open
-            onClose={() => setEditTransportIndex(null)}
-            transport={transports[editTransportIndex]}
-            fromName={fromAct?.name}
-            toName={toAct?.name}
-            distanceKm={distKm}
-            recommendedType={recType}
-            onSave={(data) => {
-              onUpdateTransport?.(editTransportIndex, data);
-              setEditTransportIndex(null);
-            }}
-            onDelete={() => {
-              onDeleteTransport?.(editTransportIndex);
-              setEditTransportIndex(null);
-            }}
-          />
+          <React.Fragment key={activityKey}>
+            {/* Subtle Insertion Spacing (espaçamento sutil entre os cards) */}
+            {shouldShowPlaceholderBefore && renderDropPlaceholder(index)}
+
+            <div
+              data-activity-card="true"
+              data-activity-id={activity.id}
+              data-activity-index={index}
+              data-day={selectedDay}
+              className={`transition-all duration-200 select-none ${isCurrentlyDragged
+                  ? 'opacity-30 border-2 border-dashed border-[#1D4ED8] rounded-2xl bg-[#EFF6FF]/40 pointer-events-none scale-[0.98]'
+                  : ''
+                }`}
+            >
+              {/* Activity Card or Standalone Note Card */}
+              {activity.type === 'note' ? (
+                /* Standalone Personal Note (Matching user image & Figma Frame 1321316481) */
+                <div className="bg-white py-1.5 pl-3 pr-1 relative">
+                  <div className="flex gap-3.5 items-start w-full isolate">
+                    {renderDragHandle(activity, index)}
+                    {/* Left Box (Grey thumbnail with Map Pin Marker + Chat Bubble Icon) */}
+                    <div className="relative w-[85px] h-[75px] rounded-[8px] bg-[#E8E8EB] flex items-center justify-center shrink-0 pointer-events-none">
+                      {/* Map Pin Badge on Top-Left */}
+                      <div className="absolute -top-2.5 -left-2.5 z-10 w-7 h-[34px] drop-shadow-xs">
+                        <svg
+                          viewBox="0 0 28 34"
+                          className="w-full h-full"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M14 0C6.26801 0 0 6.26801 0 14C0 24 14 34 14 34C14 34 28 24 28 14C28 6.26801 21.732 0 14 0Z"
+                            fill="#233ACF"
+                          />
+                          <text
+                            x="14"
+                            y="13.5"
+                            textAnchor="middle"
+                            dominantBaseline="central"
+                            fill="#FEFEFE"
+                            fontSize="13"
+                            fontWeight="700"
+                            fontFamily="'Urbanist', system-ui, -apple-system, sans-serif"
+                          >
+                            {index + 1}
+                          </text>
+                        </svg>
+                      </div>
+
+                      {/* Speech Bubble Icon */}
+                      <MessageSquare className="w-7 h-7 text-[#141530]" strokeWidth={1.8} />
+                    </div>
+
+                    {/* Content Info */}
+                    <div className="flex-1 min-w-0 flex flex-col justify-start py-0.5 pointer-events-none">
+                      {/* Title Row */}
+                      <div className="flex items-start justify-between">
+                          <h4 className="text-[16px] font-bold text-[#1A1C40] font-['Urbanist',sans-serif] leading-tight truncate">
+                            {activity.name || 'Anotação pessoal'}
+                          </h4>
+
+                          {!readOnlyMode && (
+                            <div
+                              className="flex items-center gap-1 pointer-events-auto"
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOptionsActivity(activity);
+                                }}
+                                className="p-1 -mr-1 rounded-full text-[#141530] hover:bg-black/5 transition-colors"
+                                aria-label="Opções"
+                              >
+                                <MoreHorizontal className="w-5 h-5 text-[#141530]" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                      {/* Note Text */}
+                      {(activity.noteText || activity.personalNote || activity.observation) && (
+                        <p className="text-[13px] font-medium text-[#7F7F7F] font-['Urbanist',sans-serif] line-clamp-2 leading-[16px] mt-1.5 break-words">
+                          {activity.noteText || activity.personalNote || activity.observation}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Standard Activity Card (Figma Frame 1321316470 / 1321316480) */
+                <div className="bg-white py-1.5 pl-3 pr-1 relative">
+                  <div className="flex flex-col items-start gap-3 w-full isolate">
+                    {/* Top Row: Image (with Map Pin Marker) + Content Info */}
+                    <div
+                      onClick={() => onActivityClick(activity)}
+                      className="flex gap-3.5 items-start w-full cursor-pointer hover:opacity-95 transition-opacity"
+                    >
+                      {renderDragHandle(activity, index)}
+                      {/* Thumbnail with Blue Pin Number Badge */}
+                      <div className="relative w-[85px] h-[75px] rounded-[8px] bg-muted shrink-0 pointer-events-none">
+                        <img
+                          src={activity.image}
+                          alt={activity.name}
+                          className="w-full h-full object-cover rounded-[8px]"
+                          loading="lazy"
+                        />
+                        {/* Map Pin Badge on Top-Left */}
+                        <div className="absolute -top-2.5 -left-2.5 z-10 w-7 h-[34px] drop-shadow-xs">
+                          <svg
+                            viewBox="0 0 28 34"
+                            className="w-full h-full"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              d="M14 0C6.26801 0 0 6.26801 0 14C0 24 14 34 14 34C14 34 28 24 28 14C28 6.26801 21.732 0 14 0Z"
+                              fill="#233ACF"
+                            />
+                            <text
+                              x="14"
+                              y="13.5"
+                              textAnchor="middle"
+                              dominantBaseline="central"
+                              fill="#FEFEFE"
+                              fontSize="13"
+                              fontWeight="700"
+                              fontFamily="'Urbanist', system-ui, -apple-system, sans-serif"
+                            >
+                              {index + 1}
+                            </text>
+                          </svg>
+                        </div>
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0 flex flex-col justify-start py-0.5 pointer-events-none">
+                        {/* Title Row */}
+                        <div className="flex items-start justify-between">
+                          <h4 className="text-[16px] font-semibold text-[#1A1C40] font-['Urbanist',sans-serif] leading-tight truncate">
+                            {activity.name}
+                          </h4>
+
+                          {!readOnlyMode && (
+                            <div
+                              className="flex items-center gap-1 pointer-events-auto"
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOptionsActivity(activity);
+                                }}
+                                className="p-1 -mr-1 rounded-full text-[#141530] hover:bg-black/5 transition-colors"
+                                aria-label="Opções"
+                              >
+                                <MoreHorizontal className="w-5 h-5 text-[#141530]" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Category | Country / Location */}
+                        {(() => {
+                          const locationLabel = resolveActivityLocationLabel(activity, destinations);
+                          return (
+                            <p className="text-[12px] font-semibold text-[#080B43] font-['Urbanist',sans-serif] truncate mb-1">
+                              {activity.category}{locationLabel ? ` | ${locationLabel}` : ''}
+                            </p>
+                          );
+                        })()}
+
+                        {/* Description */}
+                        <p className="text-[12px] font-medium text-[#7F7F7F] font-['Urbanist',sans-serif] line-clamp-2 leading-[14px]">
+                          {activity.observation || 'Ícone do destino e um dos lugares mais famosos da região.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Attached Personal Note */}
+                    {(activity.personalNote || activity.noteText || !readOnlyMode) && (
+                      <div
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (readOnlyMode) return;
+                          if (onEditNote) {
+                            onEditNote(activity);
+                          }
+                        }}
+                        className={`w-full group/note transition-opacity pointer-events-auto ${readOnlyMode ? '' : 'cursor-pointer hover:opacity-90'}`}
+                      >
+                        {activity.personalNote || activity.noteText ? (
+                          <div className="flex items-stretch gap-3 w-full">
+                            <div className="w-[4px] rounded-[8px] bg-[#233ACF] shrink-0 self-stretch min-h-[39px]" />
+                            <div className="flex flex-col gap-1 min-w-0 flex-1 justify-center">
+                              <div className="flex items-center gap-2 text-[14px] font-semibold text-[#1A1C40] font-['Urbanist',sans-serif]">
+                                <Pencil className="w-4 h-4 text-[#141530] shrink-0" />
+                                <span>Anotação pessoal:</span>
+                              </div>
+                              <p className="text-[12px] font-medium text-[#141530] font-['Urbanist',sans-serif] leading-[14px] break-words">
+                                {activity.personalNote || activity.noteText}
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-[14px] font-medium italic text-[#7F7F7F] font-['Urbanist',sans-serif] group-hover/note:text-[#233ACF] transition-colors">
+                            Adicionar nota do lugar....
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Displacement / Transit info between consecutive activities */}
+              {index < activities.length - 1 && (() => {
+                const currentAct = activities[index];
+                const nextAct = activities[index + 1];
+                const isAdjacentToNote = currentAct.type === 'note' || nextAct.type === 'note';
+                const hasCalculatedTransport =
+                  !isAdjacentToNote &&
+                  transport &&
+                  transport.duration &&
+                  transport.duration !== '' &&
+                  transport.duration !== '0 min';
+
+                if (hasCalculatedTransport) {
+                  return (
+                    <div
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        if (readOnlyMode) return;
+                        e.stopPropagation();
+                        setEditingTransportIndex(index);
+                      }}
+                      className={`pt-6 pb-2 pl-3 flex items-center gap-2 text-[#7F7F7F] group transition-opacity ${readOnlyMode ? '' : 'cursor-pointer hover:opacity-80'}`}
+                    >
+                      <div className="flex items-center gap-1.5 text-[12px] font-medium text-[#141530] font-['Urbanist',sans-serif] flex-shrink-0">
+                        <Footprints className="w-3.5 h-3.5 text-[#141530]" />
+                        <span>
+                          {transport.duration} {transport.distance ? `(${transport.distance})` : ''}
+                        </span>
+                        {!readOnlyMode && <span className="text-[11px] text-[#7F7F7F]">&gt;</span>}
+                      </div>
+                      <div className="flex-1 h-[1px] bg-[#E6E6E6] ml-1" />
+                    </div>
+                  );
+                }
+
+                if (readOnlyMode) {
+                  return (
+                    <div className="pt-6 pb-2.5 pl-3 flex items-center gap-2 group">
+                      <div className="flex-1 h-[1px] bg-[#E6E6E6] ml-2" />
+                    </div>
+                  );
+                }
+
+                return (
+                  <div
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingTransportIndex(index);
+                    }}
+                    className="pt-6 pb-2.5 pl-3 flex items-center gap-2 text-[#141530] cursor-pointer group hover:opacity-80 transition-opacity"
+                  >
+                    <div className="flex items-center gap-1.5 text-[13px] font-medium text-[#141530] font-['Urbanist',sans-serif] flex-shrink-0">
+                      <span>Adicionar locomoção</span>
+                      <span className="text-[12px] text-[#141530]">&gt;</span>
+                    </div>
+                    <div className="flex-1 h-[1px] bg-[#E6E6E6] ml-2" />
+                  </div>
+                );
+              })()}
+            </div>
+          </React.Fragment>
         );
-      })()}
-    </>
+      })}
+
+      {/* Dynamic Placeholder at the end of the list if dragged to bottom */}
+      {dragState?.isDragging &&
+        dragState.targetDay === selectedDay &&
+        dragState.targetIndex !== null &&
+        dragState.targetIndex >= activities.length &&
+        renderDropPlaceholder()}
+
+      {/* Move to another day bottom sheet */}
+      {movingActivity && (
+        <MoveActivityToDaySheet
+          open={!!movingActivity}
+          onClose={() => setMovingActivity(null)}
+          onBack={() => {
+            const act = movingActivity;
+            setMovingActivity(null);
+            setOptionsActivity(act);
+          }}
+          activityName={movingActivity.name}
+          currentDay={selectedDay}
+          daysData={daysData}
+          isFlexibleDates={isFlexibleDates}
+          getActivityCount={getActivityCount}
+          onConfirm={(targetDay) => {
+            onMoveToDay(movingActivity, targetDay);
+            setMovingActivity(null);
+          }}
+        />
+      )}
+
+      {/* Activity Options Bottom Sheet (Matching user Image 2) */}
+      {optionsActivity && (
+        <div
+          className="fixed inset-0 z-[120] flex items-end justify-center"
+          onClick={() => setOptionsActivity(null)}
+        >
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/40"
+            style={{ animation: 'fadeIn 0.2s ease-out' }}
+          />
+
+          {/* Sheet Container */}
+          <div
+            className="relative w-full bg-white rounded-t-3xl max-h-[85vh] overflow-y-auto"
+            style={{ animation: 'slideUpSheet 0.32s cubic-bezier(0.32, 0.72, 0, 1)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top Drag Handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 rounded-full bg-muted" />
+            </div>
+
+            {/* Header with Close X and Title */}
+            <div className="px-5 pb-3 pt-2">
+              <div className="flex justify-end -mt-2 -mr-1 mb-2">
+                <button
+                  type="button"
+                  onClick={() => setOptionsActivity(null)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0"
+                  aria-label="Fechar"
+                >
+                  <Icon name="close" size={20} className="text-foreground" />
+                </button>
+              </div>
+              <div className="pr-2">
+                <h3 className="text-[18px] font-bold text-foreground font-['Urbanist',sans-serif]">
+                  Mais opções
+                </h3>
+                <p className="text-[14px] text-muted-foreground font-medium mt-0.5 font-['Urbanist',sans-serif]">
+                  {optionsActivity.name || (optionsActivity.type === 'note' ? 'Anotação' : 'Opções')}
+                </p>
+              </div>
+            </div>
+
+            {/* Options List strictly matching Image 2 */}
+            <div className="px-5 pb-6 divide-y divide-border/40 font-['Urbanist',sans-serif]">
+              {/* 1. Abrir no Google Maps */}
+              {optionsActivity.type !== 'note' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const act = optionsActivity;
+                    setOptionsActivity(null);
+                    handleOpenGoogleMaps(act);
+                  }}
+                  className="w-full flex items-center gap-3.5 py-4 px-1 text-foreground hover:bg-muted/30 transition-colors"
+                >
+                  <div className="w-6 h-6 flex items-center justify-center text-foreground">
+                    <Icon name="map" size={20} className="text-foreground" />
+                  </div>
+                  <span className="text-[15px] font-medium text-foreground flex-1 text-left">
+                    Abrir no Google Maps
+                  </span>
+                  <Icon name="chevron_right" size={20} className="text-muted-foreground/80" />
+                </button>
+              )}
+
+              {/* For notes: Editar anotação */}
+              {optionsActivity.type === 'note' && onEditNote && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const act = optionsActivity;
+                    setOptionsActivity(null);
+                    onEditNote(act);
+                  }}
+                  className="w-full flex items-center gap-3.5 py-4 px-1 text-foreground hover:bg-muted/30 transition-colors"
+                >
+                  <div className="w-6 h-6 flex items-center justify-center text-foreground">
+                    <Pencil size={18} className="text-foreground" />
+                  </div>
+                  <span className="text-[15px] font-medium text-foreground flex-1 text-left">
+                    Editar
+                  </span>
+                  <Icon name="chevron_right" size={20} className="text-muted-foreground/80" />
+                </button>
+              )}
+
+              {/* 2. Mover para outro dia */}
+              <button
+                type="button"
+                onClick={() => {
+                  const act = optionsActivity;
+                  setOptionsActivity(null);
+                  setMovingActivity(act);
+                }}
+                className="w-full flex items-center gap-3.5 py-4 px-1 text-foreground hover:bg-muted/30 transition-colors"
+              >
+                <div className="w-6 h-6 flex items-center justify-center text-foreground">
+                  <Icon name="swap_horiz" size={20} className="text-foreground" />
+                </div>
+                <span className="text-[15px] font-medium text-foreground flex-1 text-left">
+                  Mover para outro dia
+                </span>
+                <Icon name="chevron_right" size={20} className="text-muted-foreground/80" />
+              </button>
+
+              {/* 3. Excluir */}
+              <button
+                type="button"
+                onClick={() => {
+                  const act = optionsActivity;
+                  setOptionsActivity(null);
+                  onDelete(act);
+                }}
+                className="w-full flex items-center gap-3.5 py-4 px-1 text-[#DC2626] hover:bg-destructive/10 transition-colors"
+              >
+                <div className="w-6 h-6 flex items-center justify-center text-[#DC2626]">
+                  <Trash2 size={20} className="text-[#DC2626]" />
+                </div>
+                <span className="text-[15px] font-medium text-[#DC2626] flex-1 text-left">
+                  Excluir
+                </span>
+                <Icon name="chevron_right" size={20} className="text-[#DC2626]" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Transport Sheet */}
+      {editingTransportIndex !== null && (
+        <EditTransportSheet
+          open={true}
+          onClose={() => setEditingTransportIndex(null)}
+          transport={transports[editingTransportIndex] || { type: 'walk', duration: '15 min' }}
+          currency={itineraryCurrency || 'BRL'}
+          fromName={activities[editingTransportIndex]?.name}
+          toName={activities[editingTransportIndex + 1]?.name}
+          distanceKm={
+            activities[editingTransportIndex]?.lat && activities[editingTransportIndex]?.lng && 
+            activities[editingTransportIndex + 1]?.lat && activities[editingTransportIndex + 1]?.lng 
+              ? haversineKm(
+                  activities[editingTransportIndex].lat!, activities[editingTransportIndex].lng!,
+                  activities[editingTransportIndex + 1].lat!, activities[editingTransportIndex + 1].lng!
+                )
+              : undefined
+          }
+          onSave={(data) => {
+            onUpdateTransport?.(editingTransportIndex, data);
+            setEditingTransportIndex(null);
+          }}
+          onDelete={() => {
+            onDeleteTransport?.(editingTransportIndex);
+            setEditingTransportIndex(null);
+          }}
+        />
+      )}
+    </div>
   );
 }

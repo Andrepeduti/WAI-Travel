@@ -226,8 +226,8 @@ export function FollowListScreen({ profileUserId, profileLabel, initialTab, init
   };
 
   return (
-    <div className="min-h-screen bg-background w-full">
-      <div className="w-full bg-background min-h-screen flex flex-col" style={{ minHeight: '100dvh' }}>
+    <div className="min-h-[100dvh] bg-background w-full">
+      <div className="w-full bg-background min-h-[100dvh] flex flex-col" style={{ minHeight: '100dvh' }}>
         {/* Header */}
         <div className="sticky z-20 bg-background border-b border-border px-4 flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />

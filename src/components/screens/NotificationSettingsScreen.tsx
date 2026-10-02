@@ -32,7 +32,7 @@ export function NotificationSettingsScreen({ onBack }: NotificationSettingsScree
   };
 
   return (
-    <div className="min-h-screen bg-background pb-8">
+    <div className="min-h-[100dvh] bg-background pb-8">
       <div className="sticky top-0 z-20 bg-background">
         <div className="relative flex items-center justify-center px-4" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} className="absolute left-4" />

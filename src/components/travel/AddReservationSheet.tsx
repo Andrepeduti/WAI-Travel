@@ -57,15 +57,23 @@ export function AddReservationSheet({ open, onClose, onSave, dayNumber }: AddRes
         {/* Handle */}
         <div className="w-10 h-1 rounded-full bg-muted mx-auto mt-3 mb-2" />
 
-        {/* Header */}
-        <div className="px-5 pb-4 flex items-center justify-between">
-          <div>
-            <h2 className="text-[17px] font-bold text-foreground">Adicionar reserva</h2>
-            <span className="text-[12px] text-muted-foreground">Dia {dayNumber}</span>
-          </div>
-          <button onClick={onClose} className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#F2F2F2' }}>
+        {/* Top Bar with Close Button */}
+        <div className="px-5 pt-1 pb-2 flex items-center justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-10 h-10 rounded-full flex items-center justify-center -mr-1"
+            style={{ background: '#F2F2F2' }}
+            aria-label="Fechar"
+          >
             <Icon name="close" size={20} className="text-foreground" />
           </button>
+        </div>
+
+        {/* Title */}
+        <div className="px-5 pb-3">
+          <h2 className="text-[20px] font-bold text-foreground">Adicionar reserva</h2>
+          <span className="text-[12px] text-muted-foreground">Dia {dayNumber}</span>
         </div>
 
         {/* Content */}
@@ -75,7 +83,7 @@ export function AddReservationSheet({ open, onClose, onSave, dayNumber }: AddRes
             <label className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
               Nome do lugar
             </label>
-            <div className="rounded-xl px-4 py-3" style={{ background: '#F2F2F2' }}>
+            <div className="rounded-[10px] px-4 py-3" style={{ background: '#F2F2F2' }}>
               <input
                 type="text"
                 placeholder="Ex: Hotel Le Marais"
@@ -93,7 +101,7 @@ export function AddReservationSheet({ open, onClose, onSave, dayNumber }: AddRes
               <label className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
                 Data
               </label>
-              <div className="flex items-center gap-2 rounded-xl px-4 py-3" style={{ background: '#F2F2F2' }}>
+              <div className="flex items-center gap-2 rounded-[10px] px-4 py-3" style={{ background: '#F2F2F2' }}>
                 <Icon name="calendar_today" size={16} className="text-muted-foreground" />
                 <input
                   type="text"
@@ -108,14 +116,13 @@ export function AddReservationSheet({ open, onClose, onSave, dayNumber }: AddRes
               <label className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
                 Horário
               </label>
-              <div className="flex items-center gap-2 rounded-xl px-4 py-3" style={{ background: '#F2F2F2' }}>
-                <Icon name="schedule" size={16} className="text-muted-foreground" />
+              <div className="flex items-center gap-2 rounded-[10px] px-4 py-3 relative overflow-hidden cursor-pointer" style={{ background: '#F2F2F2' }}>
+                <Icon name="schedule" size={16} className="text-muted-foreground flex-shrink-0" />
                 <input
-                  type="text"
-                  placeholder="00:00"
+                  type="time"
                   value={time}
                   onChange={e => setTime(e.target.value)}
-                  className="flex-1 bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground outline-none"
+                  className="flex-1 text-[14px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-full"
                 />
               </div>
             </div>
@@ -126,7 +133,7 @@ export function AddReservationSheet({ open, onClose, onSave, dayNumber }: AddRes
             <label className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
               Número de pessoas
             </label>
-            <div className="flex items-center gap-2 rounded-xl px-4 py-3" style={{ background: '#F2F2F2' }}>
+            <div className="flex items-center gap-2 rounded-[10px] px-4 py-3" style={{ background: '#F2F2F2' }}>
               <Icon name="group" size={18} className="text-muted-foreground" />
               <input
                 type="text"
@@ -143,7 +150,7 @@ export function AddReservationSheet({ open, onClose, onSave, dayNumber }: AddRes
             <label className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
               Link da reserva (opcional)
             </label>
-            <div className="flex items-center gap-2 rounded-xl px-4 py-3" style={{ background: '#F2F2F2' }}>
+            <div className="flex items-center gap-2 rounded-[10px] px-4 py-3" style={{ background: '#F2F2F2' }}>
               <Icon name="link" size={18} className="text-muted-foreground" />
               <input
                 type="url"
@@ -165,8 +172,7 @@ export function AddReservationSheet({ open, onClose, onSave, dayNumber }: AddRes
               value={notes}
               onChange={e => setNotes(e.target.value)}
               rows={3}
-              className="w-full rounded-xl px-4 py-3 text-[14px] text-foreground placeholder:text-muted-foreground outline-none resize-none"
-              style={{ background: '#F2F2F2' }}
+              className="w-full rounded-xl border border-transparent bg-field px-4 py-3 text-[14px] text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors resize-none"
             />
           </div>
         </div>

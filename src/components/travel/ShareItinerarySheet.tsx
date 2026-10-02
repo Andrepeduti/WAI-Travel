@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Copy, Search, X } from 'lucide-react';
+import { Share2, X, Disc, Copy } from 'lucide-react';
 import {
   inviteUserToItinerary,
   createShareLink,
 } from '@/lib/itineraryMembersApi';
+import { SuccessToast } from './SuccessToast';
 
 interface ShareItinerarySheetProps {
   open: boolean;
@@ -13,6 +14,7 @@ interface ShareItinerarySheetProps {
   itineraryId: string;
   ownerId: string;
   tripName?: string;
+  onSuccess?: (msg: string) => void;
 }
 
 interface UserSearchResult {
@@ -28,27 +30,44 @@ export function ShareItinerarySheet({
   onClose,
   itineraryId,
   ownerId,
+  onSuccess,
 }: ShareItinerarySheetProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<UserSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [role, setRole] = useState<'editor' | 'viewer'>('editor');
-  const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(null);
+  const [selectedUsers, setSelectedUsers] = useState<UserSearchResult[]>([]);
   const [sending, setSending] = useState(false);
   const [copying, setCopying] = useState(false);
+  
+  // Custom Toast State
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+
   // Reset state when sheet opens
   useEffect(() => {
     if (open) {
       setQuery('');
       setResults([]);
       setRole('editor');
-      setSelectedUser(null);
+      setSelectedUsers([]);
+      setToastVisible(false);
+    }
+  }, [open]);
+
+  // Evitar scroll do fundo quando aberto
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+      };
     }
   }, [open]);
 
   // Busca usuários por nome/@username
   useEffect(() => {
-    if (!open || selectedUser) return;
+    if (!open) return;
     const q = query.trim();
     if (q.length < 2) { setResults([]); return; }
     let cancelled = false;
@@ -62,43 +81,59 @@ export function ShareItinerarySheet({
           .or(`name.ilike.%${q}%,username.ilike.%${q}%`)
           .limit(10);
 
-        if (!cancelled) setResults((data || []) as UserSearchResult[]);
+        if (!cancelled) {
+          // Filter out already selected users
+          const filtered = (data || []).filter(
+            (u) => !selectedUsers.some((su) => su.user_id === u.user_id)
+          );
+          setResults(filtered as UserSearchResult[]);
+        }
       } finally {
         if (!cancelled) setSearching(false);
       }
     }, 300);
     return () => { cancelled = true; clearTimeout(handle); };
-  }, [query, open, ownerId, selectedUser]);
+  }, [query, open, ownerId, selectedUsers]);
 
   const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(query.trim());
-  const canSend = !!selectedUser; // só envia para usuário existente
-  const showDropdown = !selectedUser && query.trim().length >= 2;
+  const canSend = selectedUsers.length > 0;
+  const showDropdown = query.trim().length >= 2;
   const showNoResults = showDropdown && !searching && results.length === 0;
 
   const handleSelectUser = (u: UserSearchResult) => {
-    setSelectedUser(u);
-    setQuery(u.name || u.username || u.email || '');
-    setResults([]);
-  };
-
-  const handleClearSelection = () => {
-    setSelectedUser(null);
+    setSelectedUsers([...selectedUsers, u]);
     setQuery('');
     setResults([]);
   };
 
+  const handleRemoveUser = (userId: string) => {
+    setSelectedUsers(selectedUsers.filter((u) => u.user_id !== userId));
+  };
+
   const handleSend = async () => {
-    if (!selectedUser || sending) return;
+    if (!canSend || sending) return;
     setSending(true);
+    let successCount = 0;
     try {
-      await inviteUserToItinerary({
-        itineraryId,
-        inviterId: ownerId,
-        inviteeUserId: selectedUser.user_id,
-        role,
-      });
-      toast.success(`Convite enviado para ${selectedUser.name || selectedUser.username || 'usuário'}`);
-      handleClearSelection();
+      for (const user of selectedUsers) {
+        await inviteUserToItinerary({
+          itineraryId,
+          inviterId: ownerId,
+          inviteeUserId: user.user_id,
+          role,
+        });
+        successCount++;
+      }
+      const msg = successCount === 1 ? 'Convite enviado!' : `${successCount} convites enviados!`;
+      setSelectedUsers([]);
+      if (onSuccess) {
+        onSuccess(msg);
+        onClose();
+      } else {
+        setToastMessage(msg);
+        setToastVisible(true);
+        setTimeout(() => onClose(), 1500);
+      }
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao enviar convite');
     } finally {
@@ -117,9 +152,40 @@ export function ShareItinerarySheet({
       });
       const url = `${window.location.origin}/convite/${token}`;
       try { await navigator.clipboard.writeText(url); } catch {/* noop */}
-      toast.success('Link copiado!');
+      setToastMessage('Link copiado!');
+      setToastVisible(true);
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao gerar link');
+    } finally {
+      setCopying(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (copying) return;
+    setCopying(true);
+    try {
+      const { token } = await createShareLink({
+        itineraryId,
+        inviterId: ownerId,
+        role,
+      });
+      const url = `${window.location.origin}/convite/${token}`;
+      if (navigator.share) {
+        await navigator.share({
+          title: 'Convite para Roteiro',
+          text: `Você foi convidado para participar de um roteiro no WAI Travel Hub!`,
+          url: url,
+        });
+      } else {
+        try { await navigator.clipboard.writeText(url); } catch {/* noop */}
+        setToastMessage('Link copiado!');
+        setToastVisible(true);
+      }
+    } catch (e: any) {
+      if (e.name !== 'AbortError') {
+        toast.error(e?.message || 'Erro ao gerar link');
+      }
     } finally {
       setCopying(false);
     }
@@ -128,176 +194,222 @@ export function ShareItinerarySheet({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-end justify-center" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/40" style={{ animation: 'fadeIn 0.3s ease-out' }} />
-      <div
-        className="relative w-full w-full bg-background rounded-t-2xl max-h-[85vh] flex flex-col"
-        style={{ animation: 'slideUpSheet 0.35s cubic-bezier(0.32, 0.72, 0, 1)' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 rounded-full bg-[#E0E0E0]" />
-        </div>
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-[#F2F2F2] flex items-center justify-center"
-          aria-label="Fechar"
+    <>
+      <div className="fixed inset-0 z-[120] flex items-end justify-center">
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} style={{ animation: 'fadeIn 0.3s ease-out' }} />
+        
+        <div
+          className="relative w-full bg-white flex flex-col items-start p-[16px] pb-[34px] gap-[24px]"
+          style={{ 
+            borderRadius: '24px 24px 0px 0px',
+            animation: 'slideUpSheet 0.35s cubic-bezier(0.32, 0.72, 0, 1)',
+            fontFamily: "'Urbanist', sans-serif"
+          }}
+          onClick={(e) => e.stopPropagation()}
         >
-          <X size={16} />
-        </button>
+          {/* Header */}
+          <div className="w-full flex flex-col items-end gap-2">
+            <button onClick={onClose} className="text-[#171F2C] active:scale-95 transition-transform" aria-label="Fechar">
+              <X size={24} />
+            </button>
+            <div className="w-full flex justify-start">
+              <h2 className="text-[22px] font-semibold text-[#171F2C] leading-[26px]">
+                Convidar para o roteiro
+              </h2>
+            </div>
+          </div>
 
-        <div className="px-5 pt-2 pb-4">
-          <h3 className="text-[18px] font-bold text-foreground">Compartilhar roteiro</h3>
-        </div>
-
-        {/* Linha: input + botão Convidar */}
-        <div className="px-5 relative z-10">
-          <div className="flex items-center gap-2">
-            <div className="flex-1 relative">
-              {selectedUser ? (
-                <div className="w-full h-11 pl-2 pr-2 rounded-xl border border-[#E5E5E5] bg-white flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-[#F2F2F2] overflow-hidden flex-shrink-0">
-                    {selectedUser.avatar_url ? (
-                      <img src={selectedUser.avatar_url} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-[12px] font-bold text-muted-foreground">
-                        {(selectedUser.name || selectedUser.username || '?').slice(0, 1).toUpperCase()}
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-[14px] font-medium text-foreground truncate flex-1">
-                    {selectedUser.name || selectedUser.username}
-                  </span>
-                  <button
-                    onClick={handleClearSelection}
-                    className="w-6 h-6 rounded-full bg-[#F2F2F2] flex items-center justify-center flex-shrink-0"
-                    aria-label="Remover"
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Buscar @usuário ou e-mail"
-                    autoFocus
-                    className="w-full h-11 pl-9 pr-3 rounded-xl border border-[#E5E5E5] bg-white text-[16px] placeholder:text-[13px] focus:outline-none focus:border-[#9DCC36]"
-                  />
-                </>
-              )}
-
-              {/* Dropdown de resultados */}
-              {showDropdown && (
-                <div
-                  className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl border border-[#E5E5E5] shadow-lg overflow-hidden max-h-[280px] overflow-y-auto z-20"
+          <div className="w-full flex flex-col items-start gap-[24px]">
+            {/* Frame 2087325162 (Roles + Input) */}
+            <div className="w-full flex flex-col items-start gap-[16px]">
+              {/* Permissão */}
+              <div className="flex flex-row items-start gap-[12px]">
+                <button
+                  onClick={() => setRole('editor')}
+                  className={`box-border flex flex-row items-center justify-center px-[16px] py-[8px] gap-[16px] w-[104px] h-[33px] rounded-[16px] transition-colors active:scale-[0.98] ${
+                    role === 'editor'
+                      ? 'bg-[#141530] text-[#FEFEFE]'
+                      : 'bg-[#F2F2F2] text-[#949494]'
+                  }`}
                 >
-                  {searching && (
-                    <p className="text-[12px] text-muted-foreground px-3 py-3">Buscando…</p>
-                  )}
+                  <span className="font-medium text-[14px] leading-[17px] text-center font-['Urbanist']">
+                    Pode editar
+                  </span>
+                </button>
 
-                  {!searching && results.length > 0 && (
-                    <div className="py-1">
-                      {results.map((u) => (
-                        <button
-                          key={u.user_id}
-                          onClick={() => handleSelectUser(u)}
-                          className="w-full flex items-center gap-3 px-3 py-2 hover:bg-[#F9FAFB] text-left"
-                        >
-                          <div className="w-9 h-9 rounded-full bg-[#F2F2F2] overflow-hidden flex-shrink-0">
+                <button
+                  onClick={() => setRole('viewer')}
+                  className={`box-border flex flex-row items-center justify-center px-[16px] py-[8px] gap-[16px] w-[110px] h-[33px] rounded-[16px] transition-colors active:scale-[0.98] ${
+                    role === 'viewer'
+                      ? 'bg-[#141530] text-[#FEFEFE]'
+                      : 'bg-[#F2F2F2] text-[#949494]'
+                  }`}
+                >
+                  <span className="font-medium text-[14px] leading-[17px] text-center font-['Urbanist']">
+                    Só visualizar
+                  </span>
+                </button>
+              </div>
+
+              {/* Input Multiplex */}
+              <div className="relative w-full">
+                <div 
+                  className={`w-full bg-[#EEEEEE] rounded-[12px] p-3 flex flex-col justify-start transition-all`}
+                >
+                  <div className="flex items-center gap-1.5 mb-2 px-1">
+                    <Disc size={16} className="text-[#141530]" strokeWidth={2.5} />
+                    <span className="text-[12px] font-medium text-[#949494] leading-[16px]">
+                      Usuário
+                    </span>
+                  </div>
+                  
+                  <div className="flex flex-col gap-2 flex-1 w-full">
+                    {selectedUsers.map((u) => (
+                      <div 
+                        key={u.user_id} 
+                        className="flex flex-row items-center justify-between p-2 pr-3 gap-2 h-[42px] bg-transparent border border-[#141530] rounded-[24px] w-fit"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="w-[26px] h-[26px] rounded-full overflow-hidden flex-shrink-0 bg-white flex items-center justify-center text-[11px] font-bold">
                             {u.avatar_url ? (
                               <img src={u.avatar_url} alt="" className="w-full h-full object-cover" />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center text-[12px] font-bold text-muted-foreground">
-                                {(u.name || u.username || u.email || '?').slice(0, 1).toUpperCase()}
-                              </div>
+                              (u.name || u.username || '?').slice(0, 1).toUpperCase()
                             )}
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[14px] font-medium text-foreground truncate">{u.name || u.username}</p>
-                            {u.username && (
-                              <p className="text-[12px] text-muted-foreground truncate">@{u.username}</p>
-                            )}
-                          </div>
+                          <span className="font-medium text-[14px] leading-[16px] text-[#141530] truncate max-w-[160px] font-['Urbanist']">
+                            {u.name || u.username}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveUser(u.user_id)}
+                          className="w-5 h-5 flex items-center justify-center text-[#141530] opacity-70 hover:opacity-100 transition-opacity ml-2"
+                        >
+                          <X size={14} strokeWidth={2.5} />
                         </button>
-                      ))}
-                    </div>
-                  )}
+                      </div>
+                    ))}
 
-                  {showNoResults && (
-                    <p className="text-[13px] text-muted-foreground px-3 py-3">
-                      {isEmail
-                        ? 'Nenhum usuário encontrado com esse e-mail. Use o link de convite abaixo.'
-                        : 'Nenhum usuário encontrado.'}
-                    </p>
-                  )}
+                    <div className="flex-1 w-full relative h-[36px] flex items-center">
+                      <input
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder={selectedUsers.length === 0 ? "Buscar por um @usuário ou e-mail..." : ""}
+                        className="w-full h-full bg-transparent text-[15px] text-[#141530] placeholder:text-[#949494] focus:outline-none placeholder:text-[14px] px-1 font-['Urbanist']"
+                      />
+                    </div>
+                  </div>
                 </div>
-              )}
+
+                {/* Dropdown de resultados */}
+                {showDropdown && (
+                  <div
+                    className="absolute left-0 right-0 top-[calc(100%+8px)] bg-white rounded-xl border border-[#E5E5E5] shadow-lg overflow-hidden max-h-[200px] overflow-y-auto z-20"
+                  >
+                    {searching && (
+                      <p className="text-[13px] text-muted-foreground px-4 py-3">Buscando…</p>
+                    )}
+
+                    {!searching && results.length > 0 && (
+                      <div className="py-1">
+                        {results.map((u) => (
+                          <button
+                            key={u.user_id}
+                            onClick={() => handleSelectUser(u)}
+                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#F9FAFB] text-left transition-colors"
+                          >
+                            <div className="w-9 h-9 rounded-full bg-[#F2F2F2] overflow-hidden flex-shrink-0">
+                              {u.avatar_url ? (
+                                <img src={u.avatar_url} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-[12px] font-bold text-muted-foreground">
+                                  {(u.name || u.username || u.email || '?').slice(0, 1).toUpperCase()}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[14px] font-medium text-foreground truncate">{u.name || u.username}</p>
+                              {u.username && (
+                                <p className="text-[12px] text-muted-foreground truncate">@{u.username}</p>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {showNoResults && (
+                      <p className="text-[13px] text-muted-foreground px-4 py-3">
+                        {isEmail
+                          ? 'Nenhum usuário encontrado. Use o link de convite.'
+                          : 'Nenhum usuário encontrado.'}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
+            {/* ou */}
+            <div className="flex flex-row items-center gap-8 w-full">
+              <div className="flex-1 h-px border-t border-[#F2F2F2]"></div>
+              <span className="font-medium text-[14px] text-[#141530] font-['Urbanist']">ou</span>
+              <div className="flex-1 h-px border-t border-[#F2F2F2]"></div>
+            </div>
+
+            {/* Convide pelo link */}
+            <div className="flex flex-col items-start p-[16px] gap-[12px] w-full bg-white border border-[#D5D5D5] rounded-[16px]">
+              <span className="font-semibold text-[16px] leading-[19px] text-[#141530] font-['Urbanist']">
+                Convide pelo link
+              </span>
+              <div className="w-full h-px border-t border-[#F2F2F2]"></div>
+              <div className="flex flex-row items-center justify-between w-full h-[40px]">
+                <span className="font-medium text-[14px] text-[#141530] truncate font-['Urbanist']">
+                  link.com.br
+                </span>
+                <div className="flex flex-row items-center gap-[12px]">
+                  <button
+                    onClick={handleCopyLink}
+                    disabled={copying}
+                    className="box-border flex flex-row items-center justify-center w-[40px] h-[40px] border border-[#141530] rounded-full active:scale-95 transition-transform disabled:opacity-70"
+                  >
+                    <Copy className="w-4 h-4 text-[#141530]" />
+                  </button>
+                  <button
+                    onClick={handleShare}
+                    disabled={copying}
+                    className="flex flex-row items-center justify-center w-[40px] h-[40px] bg-[#141530] rounded-full active:scale-95 transition-transform disabled:opacity-70"
+                  >
+                    <Share2 className="w-4 h-4 text-[#9DCC36]" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Button */}
+          <div className="w-full">
             <button
               onClick={handleSend}
               disabled={!canSend || sending}
-              className="h-11 px-4 rounded-xl bg-[#9DCC36] text-[#1A1C40] text-[14px] font-semibold disabled:bg-[#D1D5DB] disabled:text-[#9CA3AF] disabled:cursor-not-allowed active:opacity-80"
+              className="group flex flex-row justify-center items-center py-[16px] px-[16px] gap-[16px] w-full h-[48px] rounded-[16px] active:scale-[0.98] transition-all disabled:active:scale-100 disabled:bg-[#B6B6B6] bg-[#9DCC36]"
             >
-              {sending ? 'Enviando…' : 'Convidar'}
+              <span className="font-bold text-[16px] leading-[19px] font-['Urbanist'] group-disabled:text-[#7F7F7F] text-[#141530]">
+                {sending ? 'Enviando...' : 'Convidar'}
+              </span>
             </button>
           </div>
         </div>
-
-        {/* Permissão — radio sutil */}
-        <div className="px-5 pt-4">
-          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
-            Permissão
-          </p>
-          <div className="flex items-center gap-5">
-            {([
-              { key: 'editor' as const, label: 'Pode editar' },
-              { key: 'viewer' as const, label: 'Só visualizar' },
-            ]).map((opt) => {
-              const selected = role === opt.key;
-              return (
-                <button
-                  key={opt.key}
-                  onClick={() => setRole(opt.key)}
-                  className="flex items-center gap-2 py-1 active:opacity-70"
-                >
-                  <div
-                    className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0"
-                    style={{ borderColor: selected ? '#1A1C40' : '#D1D5DB' }}
-                  >
-                    {selected && <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#1A1C40' }} />}
-                  </div>
-                  <span className="text-[14px] font-medium text-foreground">{opt.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Copiar link de convite — inline */}
-        <div className="px-5 pt-4 pb-5">
-          <button
-            onClick={handleCopyLink}
-            disabled={copying}
-            className="w-full flex items-center gap-3 py-3 px-3 rounded-xl border border-[#E5E5E5] bg-white active:opacity-80 disabled:opacity-60"
-          >
-            <div className="w-9 h-9 rounded-full bg-[#F2F2F2] flex items-center justify-center">
-              <Copy size={16} />
-            </div>
-            <div className="flex-1 text-left">
-              <p className="text-[14px] font-medium text-foreground">
-                {copying ? 'Gerando link…' : 'Copiar link de convite'}
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                Link com permissão de {role === 'editor' ? 'edição' : 'visualização'}
-              </p>
-            </div>
-          </button>
-        </div>
       </div>
-    </div>
+      
+      {/* Success Snackbar */}
+      <SuccessToast
+        isVisible={toastVisible}
+        onClose={() => setToastVisible(false)}
+        title={toastMessage}
+        description=""
+      />
+    </>
   );
 }
+

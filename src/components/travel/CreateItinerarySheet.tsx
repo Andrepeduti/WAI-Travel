@@ -1,35 +1,37 @@
-import { useState, useRef, useEffect } from 'react';
-import { Icon } from '@/components/ui/Icon';
-import { format, addDays, differenceInDays } from 'date-fns';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import type { DateRange } from 'react-day-picker';
-import { resolveNextRange } from '@/lib/dateRangeSelection';
-import { BackButton } from '@/components/ui/BackButton';
-import { supabase } from '@/integrations/supabase/client';
 import { searchGooglePlacesAutocomplete } from '@/lib/googlePlacesApi';
-import { Switch } from '@/components/ui/switch';
+import {
+  ChevronLeft,
+  ChevronDown,
+  X,
+  Pencil,
+  MapPin,
+  Calendar as CalendarIcon,
+  Clock,
+  DollarSign,
+  Compass,
+} from 'lucide-react';
 
 export interface ItineraryFormData {
   destinations: string[];
   startDate: Date | undefined;
   endDate: Date | undefined;
   invitedFriends: InvitedFriend[];
-  /** User-edited title (overrides auto-generated one) */
   tripName?: string;
-  /** User-uploaded cover image URL */
   coverImage?: string;
-  /** Whether this itinerary is published to the marketplace */
+  isPersonal?: boolean;
   isPublic?: boolean;
-  /** Price in cents when published */
   priceCents?: number | null;
-  /** Public marketplace description */
   description?: string;
-  /** Up to 5 thematic tags */
-  tags?: string[];
-  /** Primary highlighted tag */
+  isFlexible?: boolean;
+  durationDays?: number;
+  travelMonth?: string;
+  status?: 'draft' | 'published' | 'suspended';
 }
 
 interface InvitedFriend {
@@ -41,76 +43,80 @@ interface InvitedFriend {
   status: 'pending' | 'accepted';
 }
 
-interface FriendSuggestion {
-  user_id: string;
-  name: string;
-  username: string | null;
-  avatar_url: string;
-  email: string;
-}
-
 interface CreateItinerarySheetProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: ItineraryFormData) => void | Promise<void>;
   initialDestinations?: string[];
+  initialCreationType?: 'personal' | 'seller';
 }
 
-// List of popular destinations
-const popularDestinations = [
-  { city: 'Paris', country: 'França', emoji: '🇫🇷', altCity: 'Paris', altCountry: 'France' },
-  { city: 'Londres', country: 'Reino Unido', emoji: '🇬🇧', altCity: 'London', altCountry: 'United Kingdom' },
-  { city: 'Roma', country: 'Itália', emoji: '🇮🇹', altCity: 'Rome', altCountry: 'Italy' },
-  { city: 'Barcelona', country: 'Espanha', emoji: '🇪🇸', altCity: 'Barcelona', altCountry: 'Spain' },
-  { city: 'Amsterdam', country: 'Países Baixos', emoji: '🇳🇱', altCity: 'Amsterdam', altCountry: 'Netherlands' },
-  { city: 'Berlim', country: 'Alemanha', emoji: '🇩🇪', altCity: 'Berlin', altCountry: 'Germany' },
-  { city: 'Praga', country: 'República Tcheca', emoji: '🇨🇿', altCity: 'Prague', altCountry: 'Czech Republic' },
-  { city: 'Viena', country: 'Áustria', emoji: '🇦🇹', altCity: 'Vienna', altCountry: 'Austria' },
-  { city: 'Lisboa', country: 'Portugal', emoji: '🇵🇹', altCity: 'Lisbon', altCountry: 'Portugal' },
-  { city: 'Budapeste', country: 'Hungria', emoji: '🇭🇺', altCity: 'Budapest', altCountry: 'Hungary' },
-  { city: 'Tóquio', country: 'Japão', emoji: '🇯🇵', altCity: 'Tokyo', altCountry: 'Japan' },
-  { city: 'Nova York', country: 'Estados Unidos', emoji: '🇺🇸', altCity: 'New York', altCountry: 'United States' },
-  { city: 'Sydney', country: 'Austrália', emoji: '🇦🇺', altCity: 'Sydney', altCountry: 'Australia' },
-  { city: 'Dubai', country: 'Emirados Árabes', emoji: '🇦🇪', altCity: 'Dubai', altCountry: 'United Arab Emirates' },
-  { city: 'Bangkok', country: 'Tailândia', emoji: '🇹🇭', altCity: 'Bangkok', altCountry: 'Thailand' },
-  { city: 'Singapura', country: 'Singapura', emoji: '🇸🇬', altCity: 'Singapore', altCountry: 'Singapore' },
-  { city: 'São Paulo', country: 'Brasil', emoji: '🇧🇷', altCity: 'Sao Paulo', altCountry: 'Brazil' },
-  { city: 'Rio de Janeiro', country: 'Brasil', emoji: '🇧🇷', altCity: 'Rio de Janeiro', altCountry: 'Brazil' },
-  { city: 'Buenos Aires', country: 'Argentina', emoji: '🇦🇷', altCity: 'Buenos Aires', altCountry: 'Argentina' },
-  { city: 'Cidade do México', country: 'México', emoji: '🇲🇽', altCity: 'Mexico City', altCountry: 'Mexico' },
-  { city: 'Cairo', country: 'Egito', emoji: '🇪🇬', altCity: 'Cairo', altCountry: 'Egypt' },
-  { city: 'Marrakech', country: 'Marrocos', emoji: '🇲🇦', altCity: 'Marrakech', altCountry: 'Morocco' },
-  { city: 'Cape Town', country: 'África do Sul', emoji: '🇿🇦', altCity: 'Cape Town', altCountry: 'South Africa' },
-  { city: 'Atenas', country: 'Grécia', emoji: '🇬🇷', altCity: 'Athens', altCountry: 'Greece' },
-  { city: 'Istambul', country: 'Turquia', emoji: '🇹🇷', altCity: 'Istanbul', altCountry: 'Turkey' },
+const monthsOfYear = [
+  'Janeiro',
+  'Fevereiro',
+  'Março',
+  'Abril',
+  'Maio',
+  'Junho',
+  'Julho',
+  'Agosto',
+  'Setembro',
+  'Outubro',
+  'Novembro',
+  'Dezembro',
 ];
 
-export function CreateItinerarySheet({ isOpen, onClose, onSubmit, initialDestinations }: CreateItinerarySheetProps) {
+const popularDestinations = [
+  { city: 'Paris', country: 'França', emoji: '🇫🇷' },
+  { city: 'Londres', country: 'Reino Unido', emoji: '🇬🇧' },
+  { city: 'Roma', country: 'Itália', emoji: '🇮🇹' },
+  { city: 'Amsterdam', country: 'Países Baixos', emoji: '🇳🇱' },
+  { city: 'Barcelona', country: 'Espanha', emoji: '🇪🇸' },
+  { city: 'Tóquio', country: 'Japão', emoji: '🇯🇵' },
+  { city: 'Nova York', country: 'Estados Unidos', emoji: '🇺🇸' },
+  { city: 'Rio de Janeiro', country: 'Brasil', emoji: '🇧🇷' },
+  { city: 'Lisboa', country: 'Portugal', emoji: '🇵🇹' },
+  { city: 'Berlim', country: 'Alemanha', emoji: '🇩🇪' },
+];
+
+export function CreateItinerarySheet({
+  isOpen,
+  onClose,
+  onSubmit,
+  initialDestinations,
+  initialCreationType,
+}: CreateItinerarySheetProps) {
+  // Step 1: selection ('type') | Step 2: form ('form')
+  const [step, setStep] = useState<'type' | 'form'>(initialCreationType ? 'form' : 'type');
+  const [creationType, setCreationType] = useState<'personal' | 'seller'>(initialCreationType || 'personal');
+
+  const [tripName, setTripName] = useState('');
   const [destinations, setDestinations] = useState<string[]>(initialDestinations ?? []);
   const [destinationInput, setDestinationInput] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [remoteResults, setRemoteResults] = useState<{ label: string; sub: string; full: string; emoji: string }[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [tripName, setTripName] = useState('');
+
+  // Date Control: 'specific' (Data específica) | 'flexible' (Data flexível)
+  const [dateMode, setDateMode] = useState<'specific' | 'flexible'>('specific');
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
-  const [isFixedDate, setIsFixedDate] = useState(true);
-  const [durationDays, setDurationDays] = useState<number | ''>(5);
-  const [friendInput, setFriendInput] = useState('');
-  const [invitedFriends, setInvitedFriends] = useState<InvitedFriend[]>([]);
-  const [friendSuggestions, setFriendSuggestions] = useState<FriendSuggestion[]>([]);
-  const [isSearchingFriends, setIsSearchingFriends] = useState(false);
-  const [showFriendSuggestions, setShowFriendSuggestions] = useState(false);
+  const [durationDays, setDurationDays] = useState<number | ''>('');
+  const [travelMonth, setTravelMonth] = useState<string>('');
+
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingTextIndex, setLoadingTextIndex] = useState(0);
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const loadingPhrases = [
     'Criando roteiro...',
     'Buscando melhores locais...',
     'Organizando os dias...',
-    'Preparando sugestões de IA...',
-    'Quase pronto...'
+    'Quase pronto...',
   ];
 
   useEffect(() => {
@@ -119,42 +125,72 @@ export function CreateItinerarySheet({ isOpen, onClose, onSubmit, initialDestina
       setLoadingTextIndex(0);
       interval = setInterval(() => {
         setLoadingTextIndex((prev) => (prev + 1) % loadingPhrases.length);
-      }, 5000);
+      }, 3500);
     }
     return () => {
       if (interval) clearInterval(interval);
     };
   }, [isSubmitting]);
-  
-  const inputRef = useRef<HTMLInputElement>(null);
-  const suggestionsRef = useRef<HTMLDivElement>(null);
-  const friendInputRef = useRef<HTMLInputElement>(null);
-  const friendSuggestionsRef = useRef<HTMLDivElement>(null);
 
-  // Filter destinations based on input
-  const filteredDestinations = popularDestinations.filter(dest => {
-    const search = destinationInput.toLowerCase();
-    const fullName = `${dest.city}, ${dest.country}`;
-    return (
-      !destinations.includes(fullName) &&
-      (dest.city.toLowerCase().includes(search) || 
-       dest.country.toLowerCase().includes(search) ||
-       dest.altCity.toLowerCase().includes(search) ||
-       dest.altCountry.toLowerCase().includes(search))
-    );
-  });
-  // Sync initial destinations when prop changes
+  // Reset states on open/close
   useEffect(() => {
-    if (initialDestinations && initialDestinations.length > 0) {
-      setDestinations(initialDestinations);
+    if (isOpen) {
+      setStep(initialCreationType ? 'form' : 'type');
+      setCreationType(initialCreationType || 'personal');
+    } else {
+      setTripName('');
+      setDestinations(initialDestinations ?? []);
+      setDestinationInput('');
+      setDateMode('specific');
+      setStartDate(undefined);
+      setEndDate(undefined);
+      setDurationDays('');
+      setTravelMonth('');
+      setIsSubmitting(false);
     }
-  }, [initialDestinations]);
+  }, [isOpen, initialDestinations, initialCreationType]);
 
+  // Handle autocomplete destination search
+  useEffect(() => {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
 
+    const term = destinationInput.trim();
+    if (term.length < 3) {
+      setRemoteResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const results = await searchGooglePlacesAutocomplete(term, ['(cities)']);
+        const mapped = results.map((r) => {
+          const rawDescription = r.description || r.fullText || (r.location ? `${r.name}, ${r.location}` : r.name) || '';
+          const parts = rawDescription.split(',');
+          const label = r.name || parts[0]?.trim() || term;
+          const sub = r.location || parts.slice(1).join(',').trim();
+          return { label, sub, full: rawDescription || label, emoji: '📍' };
+        });
+        setRemoteResults(mapped);
+      } catch (err) {
+        console.error('Failed to autocomplete destination:', err);
+        setRemoteResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 500);
+
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
+  }, [destinationInput]);
+
+  // Click outside suggestions
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
-        suggestionsRef.current && 
+        suggestionsRef.current &&
         !suggestionsRef.current.contains(e.target as Node) &&
         inputRef.current &&
         !inputRef.current.contains(e.target as Node)
@@ -166,535 +202,483 @@ export function CreateItinerarySheet({ isOpen, onClose, onSubmit, initialDestina
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Mapeia código de país (ISO 3166-1 alpha-2) -> emoji bandeira
-  const countryCodeToEmoji = (code?: string) => {
-    if (!code || code.length !== 2) return '🌍';
-    const cc = code.toUpperCase();
-    return String.fromCodePoint(...cc.split('').map(c => 0x1f1e6 - 65 + c.charCodeAt(0)));
-  };
-
-  // Busca cidades do mundo inteiro via Google Places com debounce
-  useEffect(() => {
-    const query = destinationInput.trim();
-    if (query.length < 2) {
-      setRemoteResults([]);
-      setIsSearching(false);
-      return;
-    }
-    setIsSearching(true);
-    let active = true;
-    const timeout = setTimeout(async () => {
-      try {
-        const predictions = await searchGooglePlacesAutocomplete(query, ['(cities)']);
-        
-        const seen = new Set<string>();
-        
-        const mapped = predictions
-          .map((p) => {
-            const cityName = p.name;
-            const sub = p.location || '';
-            const full = sub ? `${cityName}, ${sub}` : cityName;
-            return {
-              label: cityName,
-              sub: sub,
-              full: full,
-              emoji: '📍',
-            };
-          })
-          .filter((r) => {
-            if (destinations.includes(r.full)) return false;
-            const key = r.full.toLowerCase();
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return true;
-          })
-          .slice(0, 8);
-          
-        if (active) setRemoteResults(mapped);
-      } catch (err) {
-        if (active) setRemoteResults([]);
-      } finally {
-        if (active) setIsSearching(false);
-      }
-    }, 1000);
-    return () => {
-      active = false;
-      clearTimeout(timeout);
-    };
-  }, [destinationInput, destinations]);
-
-  const handleAddDestination = (destination: string) => {
-    if (!destinations.includes(destination)) {
-      setDestinations([...destinations, destination]);
+  const handleAddDestination = (dest: string) => {
+    const cityName = dest.split(',')[0].trim();
+    if (!destinations.includes(cityName)) {
+      setDestinations((prev) => [...prev, cityName]);
     }
     setDestinationInput('');
     setShowSuggestions(false);
-    inputRef.current?.focus();
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && destinationInput.trim()) {
-      e.preventDefault();
-      // Apenas cidades: aceita sugestão remota (Google) ou item da lista popular.
-      // Não aceita texto livre para evitar destinos genéricos (ex: "Japão").
-      if (remoteResults.length > 0) {
-        handleAddDestination(remoteResults[0].full);
-      } else if (filteredDestinations.length > 0) {
-        const first = filteredDestinations[0];
-        handleAddDestination(`${first.city}, ${first.country}`);
-      }
+    if (!tripName) {
+      setTripName(`${cityName} trip`);
     }
   };
 
   const handleRemoveDestination = (dest: string) => {
-    setDestinations(destinations.filter(d => d !== dest));
-  };
-
-  const handleSelectFriend = (s: FriendSuggestion) => {
-    if (invitedFriends.some(f => f.id === s.user_id)) return;
-    const newFriend: InvitedFriend = {
-      id: s.user_id,
-      name: s.name || s.username || 'Usuário',
-      email: s.email || '',
-      username: s.username || undefined,
-      avatar: s.avatar_url || undefined,
-      status: 'pending',
-    };
-    setInvitedFriends([...invitedFriends, newFriend]);
-    setFriendInput('');
-    setFriendSuggestions([]);
-    setShowFriendSuggestions(false);
-    friendInputRef.current?.focus();
-  };
-
-  const handleRemoveFriend = (id: string) => {
-    setInvitedFriends(invitedFriends.filter(f => f.id !== id));
-  };
-
-  // Live search profiles by name or @username
-  useEffect(() => {
-    const raw = friendInput.trim();
-    const query = raw.replace(/^@+/, '');
-    if (query.length < 2) {
-      setFriendSuggestions([]);
-      setIsSearchingFriends(false);
-      return;
-    }
-    
-    setIsSearchingFriends(true);
-    let active = true;
-    
-    const timeout = setTimeout(async () => {
-      try {
-        const { data: authData } = await supabase.auth.getUser();
-        const meId = authData?.user?.id;
-        
-        // Fetch users similar to FindPeopleScreen, filtering locally to avoid .or() syntax errors with special chars
-        const { data, error } = await supabase
-          .from('profiles_public')
-          .select('user_id, name, username, avatar_url')
-          .limit(100);
-          
-        if (!active) return;
-        
-        if (error || !data) {
-          console.error('Error fetching profiles:', error);
-          setFriendSuggestions([]);
-        } else {
-          const q = query.toLowerCase();
-          const filtered = data
-            .filter((p: any) => {
-              if (p.user_id === meId) return false;
-              if (invitedFriends.some(f => f.id === p.user_id)) return false;
-              
-              const nameMatch = p.name && p.name.toLowerCase().includes(q);
-              const userMatch = p.username && p.username.toLowerCase().includes(q);
-              return nameMatch || userMatch;
-            })
-            .slice(0, 8);
-            
-          setFriendSuggestions(filtered as FriendSuggestion[]);
-        }
-      } catch (err) {
-        console.error('Exception during friend search:', err);
-        if (active) setFriendSuggestions([]);
-      } finally {
-        if (active) setIsSearchingFriends(false);
-      }
-    }, 250);
-    
-    return () => { 
-      active = false; 
-      clearTimeout(timeout); 
-    };
-  }, [friendInput, invitedFriends]);
-
-  useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      if (
-        friendSuggestionsRef.current && !friendSuggestionsRef.current.contains(e.target as Node) &&
-        friendInputRef.current && !friendInputRef.current.contains(e.target as Node)
-      ) {
-        setShowFriendSuggestions(false);
-      }
-    };
-    document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
-  }, []);
-
-
-  const handleDateSelect = (range: DateRange | undefined, day: Date) => {
-    const currentRange: DateRange | undefined = startDate ? { from: startDate, to: endDate } : undefined;
-    const { range: next, isComplete } = resolveNextRange(currentRange, range, day);
-    setStartDate(next?.from);
-    setEndDate(next?.to);
-    if (isComplete) {
-      setIsCalendarOpen(false);
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-    try {
-      let finalStart = startDate;
-      let finalEnd = endDate;
-      const tags: string[] = [];
-      
-      if (!isFixedDate) {
-        finalStart = new Date();
-        finalEnd = addDays(new Date(), Math.max(1, Number(durationDays) || 1) - 1);
-        tags.push('_FLEXIBLE_DATES_');
-      }
-
-      await onSubmit({
-        destinations,
-        startDate: finalStart,
-        endDate: finalEnd,
-        invitedFriends,
-        tripName: tripName.trim() || undefined,
-        tags,
-      });
-      setIsSubmitting(false);
-    } catch {
-      setIsSubmitting(false);
-    }
+    setDestinations((prev) => prev.filter((d) => d !== dest));
   };
 
   const formatDateRange = () => {
     if (startDate && endDate) {
-      return `${format(startDate, "d 'de' MMM.", { locale: ptBR })} - ${format(endDate, "d 'de' MMM.", { locale: ptBR })}`;
+      return `${format(startDate, 'dd MMM', { locale: ptBR })} - ${format(endDate, 'dd MMM yyyy', { locale: ptBR })}`;
     }
     if (startDate) {
-      return format(startDate, "d 'de' MMM.", { locale: ptBR });
+      return `A partir de ${format(startDate, 'dd MMM yyyy', { locale: ptBR })}`;
     }
     return '';
   };
 
-  const isFormValid =
-    tripName.trim().length > 0 &&
-    destinations.length > 0 &&
-    (isFixedDate ? !!startDate && !!endDate : (typeof durationDays === 'number' && durationDays > 0));
+  // Reatividade e Validação dinâmica
+  const isFormValid = useMemo(() => {
+    if (destinations.length === 0) return false;
+
+    if (dateMode === 'flexible') {
+      return typeof durationDays === 'number' && durationDays > 0;
+    }
+
+    return !!startDate && !!endDate;
+  }, [destinations, dateMode, durationDays, startDate, endDate]);
+
+  const handleSubmit = async () => {
+    if (!isFormValid || isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      const isSelling = creationType === 'seller';
+      const isFlex = dateMode === 'flexible';
+      const daysCount = isFlex && typeof durationDays === 'number' ? durationDays : (startDate && endDate ? differenceInDays(endDate, startDate) + 1 : 7);
+
+      const effectiveStartDate = isFlex ? undefined : (startDate ?? new Date());
+      const effectiveEndDate = isFlex
+        ? undefined
+        : (endDate ?? new Date());
+
+      // Datas flexíveis e mês de viagem vão em isFlexible/travelMonth, não em tags.
+      const tags: string[] = [];
+
+      await onSubmit({
+        tripName: tripName.trim() || `${destinations[0]} trip`,
+        destinations,
+        startDate: effectiveStartDate,
+        endDate: effectiveEndDate,
+        invitedFriends: [],
+        isPersonal: !isSelling,
+        isPublic: isSelling,
+        priceCents: null,
+        tags,
+        isFlexible: isFlex,
+        durationDays: daysCount,
+        travelMonth: isFlex && travelMonth ? travelMonth : undefined,
+      });
+    } catch (err) {
+      console.error('Error submitting itinerary form:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (!isOpen) return null;
 
   return (
     <>
       {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/40 z-40 transition-opacity"
+      <div
+        className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 transition-opacity animate-in fade-in duration-200"
         onClick={onClose}
       />
-      
-      {/* Bottom Sheet */}
-      <div 
-        className="fixed bottom-0 left-0 right-0 z-50 flex justify-center"
-        style={{ fontFamily: 'var(--font-family-primary)' }}
-      >
-        <div className="bg-background rounded-t-3xl w-full w-full max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
-          {/* Handle */}
-          <div className="flex justify-center py-3 sticky top-0 bg-background z-10">
-            <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
-          </div>
-          
-          {/* Header with back button */}
-          <div className="px-6 pb-4" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
-            <BackButton onClick={onClose} />
-            <h2 className="text-xl font-bold text-foreground my-0 mt-[24px]">Criar Roteiro</h2>
-          </div>
-          
-          {/* Content */}
-          <div className="px-6 pb-8 space-y-6">
-            {/* Trip name */}
-            <div>
-              <label className="text-sm font-semibold text-foreground mb-2 block">Nome do roteiro</label>
-              <div className="flex items-center gap-2 px-4 py-3 border border-border rounded-2xl">
-                <Icon name="edit" size={20} className="text-muted-foreground flex-shrink-0" />
-                <input
-                  type="text"
-                  value={tripName}
-                  onChange={(e) => setTripName(e.target.value.slice(0, 80))}
-                  placeholder="Ex: Lua de mel em Paris"
-                  maxLength={80}
-                  className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
-                />
-              </div>
-            </div>
 
-            {/* Destinations */}
-            <div className="relative">
-              <label className="text-sm font-semibold text-foreground mb-2 block">Destinos</label>
-              <div className="flex items-center gap-2 px-4 py-3 border border-border rounded-2xl">
-                <Icon name="location_on" size={20} className="text-muted-foreground flex-shrink-0" />
-                <div className="flex flex-wrap items-center gap-2 flex-1">
-                  {destinations.map((dest) => (
-                    <span 
-                      key={dest}
-                      className="inline-flex items-center gap-1 px-3 py-1 bg-muted rounded-full text-sm"
-                    >
-                      {dest}
-                      <button 
-                        onClick={() => handleRemoveDestination(dest)}
-                        className="hover:text-destructive"
-                      >
-                        <Icon name="close" size={14} />
-                      </button>
-                    </span>
-                  ))}
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    value={destinationInput}
-                    onChange={(e) => {
-                      setDestinationInput(e.target.value);
-                      setShowSuggestions(true);
-                    }}
-                    onFocus={() => setShowSuggestions(true)}
-                    onKeyDown={handleKeyDown}
-                    placeholder={destinations.length === 0 ? "Adicionar destino..." : ""}
-                    className="flex-1 min-w-[120px] bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
-                  />
-                </div>
-              </div>
-              
-              {/* Suggestions Dropdown */}
-              {showSuggestions && (destinationInput.length > 0 || destinations.length === 0) && (
-                <div 
-                  ref={suggestionsRef}
-                  className="absolute left-0 right-0 mt-2 bg-background border border-border rounded-xl shadow-lg z-50 max-h-[260px] overflow-y-auto"
-                >
-                  {/* Resultados globais via Google quando há texto */}
-                  {destinationInput.trim().length >= 2 && remoteResults.length > 0 && (
-                    remoteResults.map((dest, idx) => (
-                      <button
-                        key={`remote-${dest.full}-${idx}`}
-                        onClick={() => handleAddDestination(dest.full)}
-                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors text-left"
-                      >
-                        <span className="text-lg">{dest.emoji}</span>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-foreground truncate">{dest.label}</p>
-                          {dest.sub && <p className="text-xs text-muted-foreground truncate">{dest.sub}</p>}
-                        </div>
-                      </button>
-                    ))
-                  )}
+      {/* Bottom Sheet Container */}
+      <div className="fixed inset-x-0 bottom-0 z-50 max-h-[90vh] flex flex-col justify-end pointer-events-none">
+        <div className="bg-[#FFFFFF] rounded-t-[24px] w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden pointer-events-auto animate-in slide-in-from-bottom duration-300 font-sans">
 
-                  {/* Lista popular como fallback inicial (sem texto) */}
-                  {destinationInput.trim().length < 2 && filteredDestinations.length > 0 && (
-                    filteredDestinations.slice(0, 8).map((dest) => (
-                      <button
-                        key={`${dest.city}-${dest.country}`}
-                        onClick={() => handleAddDestination(`${dest.city}, ${dest.country}`)}
-                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors text-left"
-                      >
-                        <span className="text-lg">{dest.emoji}</span>
-                        <div>
-                          <p className="text-sm font-medium text-foreground">{dest.city}</p>
-                          <p className="text-xs text-muted-foreground">{dest.country}</p>
-                        </div>
-                      </button>
-                    ))
-                  )}
+          {/* Header Block */}
+          <div className="px-6 pt-6 pb-3 flex items-center justify-between bg-[#FFFFFF] border-b border-transparent">
+            {step === 'form' && !initialCreationType ? (
+              <button
+                onClick={() => setStep('type')}
+                className="w-6 h-6 flex items-center justify-center text-[#141530] hover:opacity-75 transition-opacity active:scale-95"
+                aria-label="Voltar"
+              >
+                <ChevronLeft className="w-5 h-5 stroke-[1.5]" />
+              </button>
+            ) : (
+              <div className="w-6 h-6" />
+            )}
 
-                  {/* Loading */}
-                  {destinationInput.trim().length >= 2 && isSearching && remoteResults.length === 0 && (
-                    <div className="px-4 py-3 text-xs text-muted-foreground">Buscando destinos...</div>
-                  )}
-
-                  {/* Nenhuma cidade encontrada */}
-                  {destinationInput.trim().length >= 2 && !isSearching && remoteResults.length === 0 && (
-                    <div className="px-4 py-3 text-xs text-muted-foreground">
-                      Nenhuma cidade encontrada. Tente outro termo.
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Date */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-semibold text-foreground">Data da viagem</label>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">Datas fixas?</span>
-                  <Switch checked={isFixedDate} onCheckedChange={setIsFixedDate} />
-                </div>
-              </div>
-              
-              {isFixedDate ? (
-                <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                  <PopoverTrigger asChild>
-                    <button className="w-full flex items-center gap-2 px-4 py-3 border border-border rounded-2xl text-left">
-                      <Icon name="calendar_today" size={20} className="text-muted-foreground flex-shrink-0" />
-                      <span className={cn(
-                        "text-sm",
-                        !startDate && "text-muted-foreground"
-                      )}>
-                        {formatDateRange() || "Ex: 14 de jun. - 21 de jun."}
-                      </span>
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="range"
-                      selected={{ from: startDate, to: endDate }}
-                      onSelect={handleDateSelect}
-                      disabled={(date) => date < new Date()}
-                      initialFocus
-                      scrollable
-                      className={cn("pointer-events-auto")}
-                    />
-                    {startDate && !endDate && (
-                      <p className="px-3 pb-3 text-xs text-muted-foreground">
-                        Selecione a data de término
-                      </p>
-                    )}
-                  </PopoverContent>
-                </Popover>
-              ) : (
-                <div className="flex items-center gap-2 px-4 py-3 border border-border rounded-2xl">
-                  <Icon name="schedule" size={20} className="text-muted-foreground flex-shrink-0" />
-                  <input
-                    type="number"
-                    min="1"
-                    max="365"
-                    value={durationDays}
-                    onChange={(e) => setDurationDays(e.target.value === '' ? '' : parseInt(e.target.value) || '')}
-                    className="flex-1 bg-transparent text-sm text-foreground focus:outline-none"
-                  />
-                  <span className="text-sm text-muted-foreground">dias</span>
-                </div>
-              )}
-            </div>
-
-            {/* Invite friends */}
-            <div className="relative">
-              <label className="text-sm font-semibold text-foreground mb-2 block">Convidar amigos</label>
-              <div className="flex items-center gap-2 px-4 py-3 border border-border rounded-2xl">
-                <Icon name="person_add" size={20} className="text-muted-foreground flex-shrink-0" />
-                <input
-                  ref={friendInputRef}
-                  type="text"
-                  value={friendInput}
-                  onChange={(e) => { setFriendInput(e.target.value); setShowFriendSuggestions(true); }}
-                  onFocus={() => setShowFriendSuggestions(true)}
-                  placeholder="Buscar por nome ou @usuário"
-                  className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
-                />
-              </div>
-
-              {/* Suggestions dropdown */}
-              {showFriendSuggestions && friendInput.trim().replace(/^@+/, '').length >= 2 && (
-                <div
-                  ref={friendSuggestionsRef}
-                  className="absolute left-0 right-0 mt-2 bg-background border border-border rounded-xl shadow-lg z-50 max-h-[260px] overflow-y-auto"
-                >
-                  {isSearchingFriends && friendSuggestions.length === 0 && (
-                    <div className="px-4 py-3 text-xs text-muted-foreground">Buscando pessoas...</div>
-                  )}
-                  {!isSearchingFriends && friendSuggestions.length === 0 && (
-                    <div className="px-4 py-3 text-xs text-muted-foreground">Nenhuma pessoa encontrada</div>
-                  )}
-                  {friendSuggestions.map((s) => (
-                    <button
-                      key={s.user_id}
-                      onClick={() => handleSelectFriend(s)}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors text-left"
-                    >
-                      <div className="w-9 h-9 rounded-full bg-muted overflow-hidden flex items-center justify-center flex-shrink-0">
-                        {s.avatar_url ? (
-                          <img src={s.avatar_url} alt={s.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <Icon name="person" size={18} className="text-muted-foreground" />
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-foreground truncate">{s.name || s.username}</p>
-                        {s.username && <p className="text-xs text-muted-foreground truncate">@{s.username}</p>}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Invited friends list */}
-              {invitedFriends.length > 0 && (
-                <div className="mt-3 space-y-2">
-                  {invitedFriends.map((friend) => (
-                    <div
-                      key={friend.id}
-                      className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl"
-                    >
-                      <div className="w-10 h-10 rounded-full bg-muted overflow-hidden flex items-center justify-center">
-                        {friend.avatar ? (
-                          <img src={friend.avatar} alt={friend.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <Icon name="person" size={20} className="text-muted-foreground" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">{friend.name}</p>
-                        {friend.username && <p className="text-xs text-muted-foreground truncate">@{friend.username}</p>}
-                      </div>
-                      <button
-                        onClick={() => handleRemoveFriend(friend.id)}
-                        className="w-8 h-8 rounded-full hover:bg-muted flex items-center justify-center flex-shrink-0"
-                        aria-label="Remover"
-                      >
-                        <Icon name="close" size={16} className="text-muted-foreground" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-              )}
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="px-6 pb-8 sticky bottom-0 bg-background">
             <button
-              onClick={handleSubmit}
-              disabled={!isFormValid || isSubmitting}
-              className="w-full py-4 rounded-2xl text-base font-semibold transition-colors flex items-center justify-center gap-2"
-              style={{
-                background: isFormValid ? '#9DCC36' : '#D1D5DB',
-                color: isFormValid ? '#1A1C40' : '#FFFFFF',
-              }}
+              onClick={onClose}
+              className="w-[18px] h-[18px] flex items-center justify-center text-[#141530] hover:opacity-75 transition-opacity active:scale-95"
+              aria-label="Fechar"
             >
-              {isSubmitting ? (
-                <>
-                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  {loadingPhrases[loadingTextIndex]}
-                </>
-              ) : (
-                'Criar Roteiro'
-              )}
+              <X className="w-4 h-4 stroke-[1.5]" />
             </button>
+          </div>
+
+          {/* Content Block */}
+          <div className="px-6 pb-6 pt-1 overflow-y-auto space-y-6">
+            {step === 'type' ? (
+              /* Step 1: Type Selection */
+              <div className="space-y-4">
+                <h2 className="text-[22px] font-semibold text-[#171F2C] leading-[26px]">
+                  O que você quer fazer com seu roteiro?
+                </h2>
+
+                {/* Opção 1: Planejar minha viagem */}
+                <button
+                  type="button"
+                  onClick={() => setCreationType('personal')}
+                  className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-left ${creationType === 'personal'
+                    ? 'border-[#9DCC36] bg-[#F7FBEB]'
+                    : 'border-[#F0F0F0] bg-white hover:border-[#E0E0E0]'
+                    }`}
+                >
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-[#141530] flex-shrink-0">
+                      <Compass className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-[15px] font-semibold text-[#141530]">Planejar uma viagem pessoal</h3>
+                      <p className="text-[12px] text-[#949494] mt-0.5">Organize sua viagem do seu jeito.</p>
+                    </div>
+                  </div>
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${creationType === 'personal'
+                      ? 'border-[#9DCC36] bg-[#9DCC36]'
+                      : 'border-[#D1D5DB] bg-white'
+                      }`}
+                  >
+                    {creationType === 'personal' && (
+                      <div className="w-2 h-2 rounded-full bg-white" />
+                    )}
+                  </div>
+                </button>
+
+                {/* Opção 2: Criar um roteiro para vender */}
+                <button
+                  type="button"
+                  onClick={() => setCreationType('seller')}
+                  className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-left ${creationType === 'seller'
+                    ? 'border-[#9DCC36] bg-[#F7FBEB]'
+                    : 'border-[#F0F0F0] bg-white hover:border-[#E0E0E0]'
+                    }`}
+                >
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-[#141530] flex-shrink-0">
+                      <DollarSign className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-[15px] font-semibold text-[#141530]">Criar roteiro para vender</h3>
+                      <p className="text-[12px] text-[#949494] mt-0.5">Transforme seu roteiro em renda.</p>
+                    </div>
+                  </div>
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${creationType === 'seller'
+                      ? 'border-[#9DCC36] bg-[#9DCC36]'
+                      : 'border-[#D1D5DB] bg-white'
+                      }`}
+                  >
+                    {creationType === 'seller' && (
+                      <div className="w-2 h-2 rounded-full bg-white" />
+                    )}
+                  </div>
+                </button>
+
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (creationType === 'seller') {
+                        setDateMode('flexible');
+                      } else {
+                        setDateMode('specific');
+                      }
+                      setStep('form');
+                    }}
+                    className="w-full h-[48px] rounded-[16px] bg-[#9DCC36] text-[#141530] text-[16px] font-bold leading-[19px] flex items-center justify-center hover:opacity-95 active:scale-[0.99] transition-all shadow-none"
+                  >
+                    Continuar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Step 2: Form */
+              <div className="space-y-4">
+                {/* Title */}
+                <h2 className="text-[22px] font-semibold text-[#171F2C] leading-[26px]">
+                  {creationType === 'personal' ? 'Criar viagem pessoal' : 'Criar roteiro pra venda'}
+                </h2>
+
+                {/* Form Elements Container (gap: 16px) */}
+                <div className="space-y-4">
+                  {/* Input 1: Nome do roteiro (height: 60px, bg: #EEEEEE, radius: 12px) */}
+                  <div className="bg-field border border-transparent focus-within:border-primary transition-colors rounded-[12px] p-3 min-h-[60px] flex items-center gap-3">
+                    <Pencil className="w-4 h-4 text-[#141530] flex-shrink-0" />
+                    <div className="flex-1 flex flex-col justify-center gap-1">
+                      <label className="text-[12px] font-medium text-[#949494] leading-4 block">
+                        Nome do roteiro
+                      </label>
+                      <input
+                        type="text"
+                        value={tripName}
+                        onChange={(e) => setTripName(e.target.value)}
+                        placeholder="Dê um nome ao seu roteiro"
+                        className="w-full bg-transparent text-[14px] font-medium text-[#141530] leading-4 placeholder:text-[#949494] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Input 2: Destinos (Multiple input, bg: #EEEEEE, radius: 12px) */}
+                  <div className="bg-[#EEEEEE] rounded-[12px] p-3 min-h-[78px] flex items-center justify-center gap-3 relative">
+                    <MapPin className="w-4 h-4 text-[#141530] flex-shrink-0" />
+                    <div className="flex-1 flex flex-col justify-center gap-1">
+                      <label className="text-[12px] font-medium text-[#949494] leading-4 block">
+                        Destinos
+                      </label>
+
+                      {/* Chips Container */}
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        {destinations.map((dest) => (
+                          <div
+                            key={dest}
+                            className="bg-[#E7E7EE] border border-[#141530] rounded-[24px] px-[16px] py-[8px] h-[34px] inline-flex items-center gap-[10px] transition-all box-border"
+                          >
+                            <span className="text-[14px] font-medium text-[#141530] leading-4">
+                              {dest}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveDestination(dest)}
+                              className="text-[#141530] hover:opacity-70 transition-opacity flex items-center justify-center"
+                              aria-label={`Remover ${dest}`}
+                            >
+                              <X className="w-3 h-3 stroke-[2]" />
+                            </button>
+                          </div>
+                        ))}
+
+                        {/* Autocomplete Input */}
+                        <input
+                          ref={inputRef}
+                          type="text"
+                          value={destinationInput}
+                          onChange={(e) => {
+                            setDestinationInput(e.target.value);
+                            setShowSuggestions(true);
+                          }}
+                          onFocus={() => setShowSuggestions(true)}
+                          placeholder={destinations.length === 0 ? "Adicione os destinos" : "+ Adicionar..."}
+                          className={`bg-transparent text-[14px] font-medium text-[#141530] leading-4 placeholder:text-[#949494] focus:outline-none ${destinations.length === 0 ? 'w-full' : 'min-w-[80px] flex-1 py-1'
+                            }`}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Suggestions Popover */}
+                    {showSuggestions && (
+                      <div
+                        ref={suggestionsRef}
+                        className="absolute left-0 right-0 top-full mt-2 bg-white border border-[#E5E5E5] rounded-2xl shadow-xl z-50 max-h-56 overflow-y-auto divide-y divide-[#F0F0F0]"
+                      >
+                        {isSearching && (
+                          <div className="p-3 text-xs text-[#949494]">Buscando destinos...</div>
+                        )}
+
+                        {remoteResults.length > 0
+                          ? remoteResults.map((r, idx) => (
+                            <button
+                              key={`rem-${idx}`}
+                              type="button"
+                              onClick={() => handleAddDestination(r.full || `${r.label}, ${r.sub}`)}
+                              className="w-full px-4 py-2.5 text-left flex items-center gap-2 hover:bg-[#F4F4F4] transition-colors"
+                            >
+                              <span className="text-base">{r.emoji}</span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[13px] font-semibold text-[#141530] truncate">{r.label}</p>
+                                {r.sub && <p className="text-[11px] text-[#949494] truncate">{r.sub}</p>}
+                              </div>
+                            </button>
+                          ))
+                          : !isSearching && (
+                            (destinationInput.trim().length >= 2
+                              ? popularDestinations.filter(p =>
+                                p.city.toLowerCase().includes(destinationInput.trim().toLowerCase()) ||
+                                p.country.toLowerCase().includes(destinationInput.trim().toLowerCase())
+                              )
+                              : popularDestinations
+                            ).map((p, idx) => (
+                              <button
+                                key={`pop-${idx}`}
+                                type="button"
+                                onClick={() => handleAddDestination(`${p.city}, ${p.country}`)}
+                                className="w-full px-4 py-2.5 text-left flex items-center gap-2 hover:bg-[#F4F4F4] transition-colors"
+                              >
+                                <span className="text-base">{p.emoji}</span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-[13px] font-semibold text-[#141530] truncate">{p.city}</p>
+                                  <p className="text-[11px] text-[#949494] truncate">{p.country}</p>
+                                </div>
+                              </button>
+                            ))
+                          )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Frame 2087325080: Date Control + Dynamic Fields (gap: 12px) */}
+                  <div className="space-y-3">
+                    {/* Control (Segment/Tabs, height: 44px, bg: #F4F4F4, radius: rounded-full) */}
+                    <div className="bg-[#F4F4F4] rounded-full p-[3.37px] flex items-center h-[44px]">
+                      <button
+                        type="button"
+                        onClick={() => setDateMode('specific')}
+                        className={cn(
+                          "flex-1 h-[37.23px] rounded-[20.23px] text-[14px] font-semibold leading-[17px] transition-all flex items-center justify-center px-[26.98px]",
+                          dateMode === 'specific'
+                            ? "bg-[#1A1C40] text-[#FEFEFE] shadow-xs"
+                            : "bg-transparent text-[#141530] hover:bg-black/5"
+                        )}
+                      >
+                        Data específica
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDateMode('flexible')}
+                        className={cn(
+                          "flex-1 h-[37.23px] rounded-[20.23px] text-[14px] font-semibold leading-[17px] transition-all flex items-center justify-center px-[26.98px]",
+                          dateMode === 'flexible'
+                            ? "bg-[#1A1C40] text-[#FEFEFE] shadow-xs"
+                            : "bg-transparent text-[#141530] hover:bg-black/5"
+                        )}
+                      >
+                        Data flexível
+                      </button>
+                    </div>
+
+                    {/* Dynamic Fields */}
+                    {dateMode === 'flexible' ? (
+                      <div className="space-y-4">
+                        {/* 1. Duração da viagem (height: 60px, bg: #EDEDED, radius: 12px) */}
+                        <div className="bg-field border border-transparent focus-within:border-primary transition-colors rounded-[12px] p-3 min-h-[60px] flex items-center gap-3">
+                          <Clock className="w-4 h-4 text-[#555555] flex-shrink-0" />
+                          <div className="flex-1 flex flex-col justify-center gap-1">
+                            <label className="text-[12px] font-medium text-[#949494] leading-4 block">
+                              Duração da viagem
+                            </label>
+                            <div className="flex items-center justify-between gap-2">
+                              <input
+                                type="number"
+                                min="1"
+                                max="365"
+                                value={durationDays}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setDurationDays(val === '' ? '' : Math.max(1, parseInt(val) || 1));
+                                }}
+                                placeholder="Informe a quantidade de dias"
+                                className="w-full bg-transparent text-[14px] font-medium text-[#141530] leading-4 placeholder:text-[#949494] focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              />
+                              <span className="text-[14px] font-medium text-[#555555] leading-4 shrink-0 select-none">
+                                dias
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 2. Mês da viagem (Opcional) (Select, height: 60px, bg: #EEEEEE, radius: 12px) */}
+                        <div className="bg-field rounded-[12px] p-3 min-h-[60px] flex items-center gap-3 relative">
+                          <CalendarIcon className="w-4 h-4 text-[#141530] flex-shrink-0" />
+                          <div className="flex-1 flex flex-col justify-center gap-1 relative">
+                            <label className="text-[12px] font-medium text-[#949494] leading-4 block">
+                              Mês da viagem (Opcional)
+                            </label>
+                            <select
+                              value={travelMonth}
+                              onChange={(e) => setTravelMonth(e.target.value)}
+                              className={`w-full bg-transparent text-[14px] font-medium leading-4 focus:outline-none appearance-none cursor-pointer pr-6 ${travelMonth ? 'text-[#141530]' : 'text-[#949494]'}`}
+                            >
+                              <option value="" className="text-[#949494]">Selecione o mês</option>
+                              {monthsOfYear.map((m) => (
+                                <option key={m} value={m} className="text-[#141530]">
+                                  {m}
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown className="w-4 h-4 text-[#141530] absolute right-0 bottom-0 pointer-events-none stroke-[2]" />
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Modo: Data específica (Select/Popover) */
+                      <div className="bg-field rounded-[12px] p-3 min-h-[60px] flex items-center gap-3">
+                        <CalendarIcon className="w-4 h-4 text-[#141530] flex-shrink-0" />
+                        <div className="flex-1 flex flex-col justify-center gap-1">
+                          <label className="text-[12px] font-medium text-[#949494] leading-4 block">
+                            Data da viagem
+                          </label>
+
+                          <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                            <PopoverTrigger asChild>
+                              <button
+                                type="button"
+                                className="w-full flex items-center justify-between text-left text-[14px] font-medium text-[#141530] leading-4 focus:outline-none"
+                              >
+                                <span>
+                                  {formatDateRange() || (
+                                    <span className="text-[#949494] font-medium">Selecione a data da viagem</span>
+                                  )}
+                                </span>
+                                <ChevronDown className={`w-4 h-4 text-[#141530] shrink-0 stroke-[2] transition-transform duration-200 ${isCalendarOpen ? 'rotate-180' : ''}`} />
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0 z-50 bg-white border border-[#E5E5E5] rounded-2xl shadow-2xl" align="start">
+                              <Calendar
+                                mode="range"
+                                selected={{ from: startDate, to: endDate }}
+                                onSelect={(range) => {
+                                  setStartDate(range?.from);
+                                  setEndDate(range?.to);
+                                  if (range?.from && range?.to) {
+                                    setIsCalendarOpen(false);
+                                  }
+                                }}
+                                disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                                initialFocus
+                                className={cn('pointer-events-auto p-3')}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Main Button ("Criar", height: 48px, bg: #9DCC36, radius: 16px) */}
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={!isFormValid || isSubmitting}
+                    className={`w-full h-[48px] rounded-[16px] text-[16px] font-bold leading-[19px] transition-all shadow-none flex items-center justify-center gap-2 ${isFormValid && !isSubmitting
+                      ? 'bg-[#9DCC36] text-[#141530] hover:opacity-95 active:scale-[0.99]'
+                      : 'bg-[#E5E5E7] text-[#949494] cursor-not-allowed'
+                      }`}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <svg className="animate-spin h-5 w-5 text-[#141530]" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        <span>{loadingPhrases[loadingTextIndex]}</span>
+                      </>
+                    ) : (
+                      'Criar'
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

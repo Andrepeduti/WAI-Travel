@@ -1500,7 +1500,7 @@ function CityScreen({
     if (searchTimer.current) clearTimeout(searchTimer.current);
     
     const query = value.trim();
-    if (query.length < 2 || selectedFromList) {
+    if (query.length < 3 || selectedFromList) {
       if (!selectedFromList) {
         setSuggestions([]);
       }
@@ -1529,11 +1529,11 @@ function CityScreen({
         
         setSuggestions(results.slice(0, 5));
       } catch (err) {
-        console.error('Erro ao buscar cidades na API do Photon:', err);
+        console.error('Erro ao buscar cidades:', err);
       } finally {
         setIsLoading(false);
       }
-    }, 400);
+    }, 500);
 
     return () => {
       if (searchTimer.current) clearTimeout(searchTimer.current);

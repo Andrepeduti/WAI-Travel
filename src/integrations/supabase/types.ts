@@ -1,1 +1,0 @@
-{"_tag":"Error","error":{"code":"LegacyGenTypesUnexpectedStatusError","message":"failed to retrieve generated types: {\"message\":\"{\\\"code\\\":\\\"PGRST002\\\",\\\"details\\\":null,\\\"hint\\\":null,\\\"message\\\":\\\"Could not query the database for the schema cache. Retrying.\\\"}\"}"}}

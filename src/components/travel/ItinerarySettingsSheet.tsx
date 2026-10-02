@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
-import { Share2, Copy, Trash2, Pencil, Download, LogOut, DollarSign } from 'lucide-react';
+import { Share2, Copy, Trash2, Pencil, LogOut, DollarSign } from 'lucide-react';
 import { shareItinerary } from '@/lib/shareItinerary';
+import { DeleteConfirmSheet } from './DeleteConfirmSheet';
 
 interface ItinerarySettingsSheetProps {
   open: boolean;
@@ -20,14 +21,14 @@ interface ItinerarySettingsSheetProps {
   onPublish?: () => void;
   /** Called when user wants to edit existing publication (price, description, tags) */
   onEditPublish?: () => void;
-  /** Called when the user wants to download the itinerary as a PDF */
-  onDownloadPdf?: () => void;
   /** Called when the user wants to open the share-with-people sheet */
   onShare?: () => void;
   /** When true, hides delete and shows "Sair do roteiro" with leave confirmation */
   isParticipant?: boolean;
   /** Called when participant confirms leaving the itinerary */
   onLeave?: () => void;
+  /** When true (view-only access), hides publish and duplicate options */
+  isViewer?: boolean;
 }
 
 export function ItinerarySettingsSheet({
@@ -44,11 +45,11 @@ export function ItinerarySettingsSheet({
   isPurchased = false,
   onPublish,
   onEditPublish,
-  onDownloadPdf,
   onShare,
   isParticipant = false,
-  onLeave
-}: ItinerarySettingsSheetProps) {
+  onLeave,
+  isViewer = false,
+}:ItinerarySettingsSheetProps) {
   const [isPublic, setIsPublic] = useState(isPublicProp);
   const [isLocked, setIsLocked] = useState(isLockedProp);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -94,234 +95,106 @@ export function ItinerarySettingsSheet({
           
           {/* Handle */}
           <div className="flex justify-center pt-3 pb-1">
-            <div className="w-10 h-1 rounded-full bg-[#E0E0E0]" />
+            <div className="w-10 h-1 rounded-full bg-muted" />
           </div>
 
-          {/* Header */}
-          <div className="px-5 pb-4 pt-2">
-            <h3 className="text-[18px] font-bold text-foreground">Configurações</h3>
-          </div>
-
-          {/* Options */}
-          <div className="px-5 pb-6 space-y-1">
-            {/* Gerenciar roteiro */}
-            <button
-              onClick={() => {onClose();onManageItinerary?.();}}
-              className="w-full flex items-center gap-3.5 py-3 px-1 rounded-xl hover:bg-muted/50 transition-colors">
-              
-               <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#F2F2F2' }}>
-                <Pencil size={18} className="text-foreground" />
-              </div>
-              <span className="text-[14px] font-medium text-foreground flex-1 text-left">Gerenciar roteiro</span>
-              <Icon name="chevron_right" size={18} className="text-muted-foreground" />
-            </button>
-
-            {/* Compartilhar roteiro */}
-            <button
-              onClick={async () => {
-                if (onShare) { onClose(); onShare(); return; }
-                await shareItinerary({ title: tripName });
-                onClose();
-              }}
-              className="w-full flex items-center gap-3.5 py-3 px-1 rounded-xl hover:bg-muted/50 transition-colors">
-              
-               <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#F2F2F2' }}>
-                <Share2 size={18} className="text-foreground" />
-              </div>
-              <span className="text-[14px] font-medium text-foreground flex-1 text-left">Compartilhar roteiro</span>
-              <Icon name="chevron_right" size={18} className="text-muted-foreground" />
-            </button>
-
-            {/* Duplicar roteiro – only the owner can duplicate */}
-            {!isParticipant && (
-            <button
-              onClick={() => {onClose();onDuplicate?.();}}
-              className="w-full flex items-center gap-3.5 py-3 px-1 rounded-xl hover:bg-muted/50 transition-colors">
-              
-               <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#F2F2F2' }}>
-                <Copy size={18} className="text-foreground" />
-              </div>
-              <span className="text-[14px] font-medium text-foreground flex-1 text-left">Duplicar roteiro</span>
-              <Icon name="chevron_right" size={18} className="text-muted-foreground" />
-            </button>
-            )}
-
-            {/* Baixar em PDF */}
-            <button
-              onClick={() => {onClose();onDownloadPdf?.();}}
-              className="w-full flex items-center gap-3.5 py-3 px-1 rounded-xl hover:bg-muted/50 transition-colors">
-              
-               <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#F2F2F2' }}>
-                <Download size={18} className="text-foreground" />
-              </div>
-              <span className="text-[14px] font-medium text-foreground flex-1 text-left">Baixar em PDF</span>
-              <Icon name="chevron_right" size={18} className="text-muted-foreground" />
-            </button>
-
-            {/* Colocar à venda - hidden for purchased itineraries */}
-            {!isPurchased && (
+          {/* Header with Title and Close X */}
+          <div className="px-5 pb-4 pt-0 flex flex-col">
+            <div className="flex justify-end w-full mb-2">
               <button
-                onClick={handleTogglePublic}
-                className="w-full flex items-center gap-3.5 py-3 px-1 rounded-xl hover:bg-muted/50 transition-colors">
-                
-                 <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#F2F2F2' }}>
-                  <DollarSign size={18} className="text-foreground" />
-                </div>
-                <span className="text-[14px] font-medium text-foreground flex-1 text-left">
-                  {isPublic ? 'Roteiro público' : 'Colocar à venda'}
-                </span>
-                {isPublic ? (
-                  <div className="w-11 h-6 rounded-full relative bg-primary transition-colors">
-                    <div className="absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm translate-x-[22px]" />
-                  </div>
-                ) : (
-                  <Icon name="chevron_right" size={18} className="text-muted-foreground" />
-                )}
-              </button>
-            )}
-
-            {/* Editar publicação - only when published */}
-            {!isPurchased && isPublic && onEditPublish && (
-              <button
-                onClick={() => { onClose(); onEditPublish(); }}
-                className="w-full flex items-center gap-3.5 py-3 px-1 rounded-xl hover:bg-muted/50 transition-colors">
-                <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#F2F2F2' }}>
-                  <Pencil size={18} className="text-foreground" />
-                </div>
-                <span className="text-[14px] font-medium text-foreground flex-1 text-left">Editar publicação</span>
-                <Icon name="chevron_right" size={18} className="text-muted-foreground" />
-              </button>
-            )}
-            {/* Bloquear edição - Toggle */}
-            
-
-
-
-
-
-
-
-
-
-
-            
-
-            {/* Danger zone */}
-            <div className="pt-3 mt-2 border-t border-border">
-              <button
-                onClick={() => isParticipant ? setShowLeaveConfirm(true) : setShowDeleteConfirm(true)}
-                className="w-full flex items-center gap-3.5 py-3 px-1 rounded-xl hover:bg-destructive/10 transition-colors">
-
-                <div className="w-9 h-9 rounded-full bg-destructive/10 flex items-center justify-center flex-shrink-0">
-                  {isParticipant ? (
-                    <LogOut size={18} className="text-destructive" />
-                  ) : (
-                    <Trash2 size={18} className="text-destructive" />
-                  )}
-                </div>
-                <span className="text-[14px] font-medium text-destructive">
-                  {isParticipant ? 'Sair do roteiro' : 'Excluir roteiro'}
-                </span>
+                type="button"
+                onClick={onClose}
+                className="w-10 h-10 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors -mr-2"
+                aria-label="Fechar"
+              >
+                <Icon name="close" size={20} className="text-foreground" />
               </button>
             </div>
+            <h3 className="text-[24px] font-bold text-foreground font-['Urbanist',sans-serif] leading-tight">Configurações do roteiro</h3>
+          </div>
+
+          {/* Options List matching Image 2 */}
+          <div className="px-5 pb-6 divide-y divide-border/40 font-['Urbanist',sans-serif] flex flex-col w-full">
+            {/* 1. Gerenciar */}
+            <button
+              onClick={() => {
+                onClose();
+                onManageItinerary?.();
+              }}
+              className="w-full flex items-center gap-3.5 py-4 px-1 text-foreground bg-transparent active:opacity-70 transition-all"
+            >
+              <div className="w-6 h-6 flex items-center justify-center text-foreground">
+                <Icon name="map" size={20} className="text-foreground" />
+              </div>
+              <span className="text-[15px] font-medium text-foreground flex-1 text-left">Gerenciar</span>
+              <Icon name="chevron_right" size={20} className="text-muted-foreground/80" />
+            </button>
+
+            {/* 2. Publicar na loja WAI */}
+            {!isViewer && <button
+              onClick={() => {
+                onClose();
+                if (isPublic && onEditPublish) {
+                  onEditPublish();
+                } else if (onPublish) {
+                  onPublish();
+                } else {
+                  handleTogglePublic();
+                }
+              }}
+              className="w-full flex items-center gap-3.5 py-4 px-1 text-foreground bg-transparent active:opacity-70 transition-all"
+            >
+              <div className="w-6 h-6 flex items-center justify-center text-foreground">
+                <Icon name="swap_horiz" size={20} className="text-foreground" />
+              </div>
+              <span className="text-[15px] font-medium text-foreground flex-1 text-left">Publicar na loja WAI</span>
+              <Icon name="chevron_right" size={20} className="text-muted-foreground/80" />
+            </button>}
+
+            {/* 3. Duplicar */}
+            {!isViewer && <button
+              onClick={() => {
+                onClose();
+                onDuplicate?.();
+              }}
+              className="w-full flex items-center gap-3.5 py-4 px-1 text-foreground bg-transparent active:opacity-70 transition-all"
+            >
+              <div className="w-6 h-6 flex items-center justify-center text-foreground">
+                <Icon name="swap_horiz" size={20} className="text-foreground" />
+              </div>
+              <span className="text-[15px] font-medium text-foreground flex-1 text-left">Duplicar</span>
+              <Icon name="chevron_right" size={20} className="text-muted-foreground/80" />
+            </button>}
           </div>
         </div>
       </div>
 
       {/* Delete confirmation bottom sheet */}
-      {showDeleteConfirm &&
-      <div className="fixed inset-0 z-[110] flex items-end justify-center" onClick={() => setShowDeleteConfirm(false)}>
-          <div
-          className="absolute inset-0 bg-black/20"
-          style={{ animation: 'fadeIn 0.2s ease-out' }} />
-        
-          <div
-          className="relative w-full w-full bg-background rounded-t-2xl"
-          style={{ animation: 'slideUpSheet 0.35s cubic-bezier(0.32, 0.72, 0, 1)' }}
-          onClick={(e) => e.stopPropagation()}>
-          
-            {/* Handle */}
-            <div className="flex justify-center pt-3 pb-1">
-              <div className="w-10 h-1 rounded-full bg-[#E0E0E0]" />
-            </div>
-
-            <div className="px-5 pt-4 pb-8 text-center">
-              <div className="w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
-                <Trash2 size={26} className="text-destructive" />
-              </div>
-              <h3 className="text-[18px] font-bold text-foreground mb-1">Excluir roteiro?</h3>
-              <p className="text-[13px] text-muted-foreground mb-6 leading-relaxed">
-                {tripName ?
-              `"${tripName}" será excluído permanentemente. Esta ação não pode ser desfeita.` :
-              'Este roteiro será excluído permanentemente. Esta ação não pode ser desfeita.'}
-              </p>
-              <div className="flex gap-3">
-                <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 py-3.5 rounded-xl border border-border text-[14px] font-semibold text-foreground bg-card active:scale-[0.98] transition-transform">
-                
-                  Cancelar
-                </button>
-                <button
-                onClick={() => {
-                  setShowDeleteConfirm(false);
-                  onClose();
-                  onDelete?.();
-                }}
-                className="flex-1 py-3.5 rounded-xl bg-destructive text-destructive-foreground text-[14px] font-semibold active:scale-[0.98] transition-transform">
-                
-                  Sim, excluir
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      }
+      <DeleteConfirmSheet
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        title={tripName}
+        onConfirm={() => {
+          setShowDeleteConfirm(false);
+          onClose();
+          onDelete?.();
+        }}
+      />
 
       {/* Leave confirmation bottom sheet (participant only) */}
-      {showLeaveConfirm &&
-      <div className="fixed inset-0 z-[110] flex items-end justify-center" onClick={() => setShowLeaveConfirm(false)}>
-          <div
-          className="absolute inset-0 bg-black/20"
-          style={{ animation: 'fadeIn 0.2s ease-out' }} />
-
-          <div
-          className="relative w-full w-full bg-background rounded-t-2xl"
-          style={{ animation: 'slideUpSheet 0.35s cubic-bezier(0.32, 0.72, 0, 1)' }}
-          onClick={(e) => e.stopPropagation()}>
-
-            <div className="flex justify-center pt-3 pb-1">
-              <div className="w-10 h-1 rounded-full bg-[#E0E0E0]" />
-            </div>
-
-            <div className="px-5 pt-4 pb-8 text-center">
-              <div className="w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
-                <LogOut size={26} className="text-destructive" />
-              </div>
-              <h3 className="text-[18px] font-bold text-foreground mb-1">Sair deste roteiro?</h3>
-              <p className="text-[13px] text-muted-foreground mb-6 leading-relaxed">
-                Você deixará de participar deste roteiro e perderá acesso às futuras atualizações feitas pelo organizador. Essa ação não excluirá o roteiro para os demais participantes.
-              </p>
-              <div className="flex gap-3">
-                <button
-                onClick={() => setShowLeaveConfirm(false)}
-                className="flex-1 py-3.5 rounded-xl border border-border text-[14px] font-semibold text-foreground bg-card active:scale-[0.98] transition-transform">
-                  Cancelar
-                </button>
-                <button
-                onClick={() => {
-                  setShowLeaveConfirm(false);
-                  onClose();
-                  onLeave?.();
-                }}
-                className="flex-1 py-3.5 rounded-xl bg-destructive text-destructive-foreground text-[14px] font-semibold active:scale-[0.98] transition-transform">
-                  Sair do roteiro
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      }
-    </>);
-
+      <DeleteConfirmSheet
+        isOpen={showLeaveConfirm}
+        onClose={() => setShowLeaveConfirm(false)}
+        title={tripName}
+        isShared={true}
+        description="Você deixará de participar deste roteiro e perderá acesso às futuras atualizações feitas pelo organizador. Essa ação não excluirá o roteiro para os demais participantes."
+        confirmText="Sair do roteiro"
+        onConfirm={() => {
+          setShowLeaveConfirm(false);
+          onClose();
+          onLeave?.();
+        }}
+      />
+    </>
+  );
 }

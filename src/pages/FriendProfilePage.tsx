@@ -107,6 +107,13 @@ const FriendProfilePage = () => {
           friend={friend}
           onBack={() => navigate(-1)}
           onChat={() => setShowChat(true)}
+          onItineraryClick={(id, userItinerary) => {
+            if (userItinerary) {
+              navigate('/home', { state: { openUserPublicItinerary: userItinerary, fromStandaloneProfile: true } });
+            } else {
+              navigate('/home', { state: { openMarketplaceItineraryId: id, fromStandaloneProfile: true } });
+            }
+          }}
         />
       </div>
     </div>

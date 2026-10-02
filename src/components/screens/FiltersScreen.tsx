@@ -382,7 +382,7 @@ function CountrySearchList({ selected, onToggle }: { selected: string[]; onToggl
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-2 px-3 h-10 bg-white border border-border/60 rounded-[10px] mb-2 focus-within:border-[#1A1C40] transition-colors">
+      <div className="flex items-center gap-2 px-3 h-10 bg-field border border-border/60 rounded-[10px] mb-2 focus-within:border-primary transition-colors">
         <Icon name="search" size={18} className="text-muted-foreground" />
         <input
           value={query}
@@ -442,7 +442,7 @@ function RangeSliderWithInputs({ min, max, step, value, onValueChange, labelMin,
     <div>
       <Slider min={min} max={max} step={step} value={value} onValueChange={(v) => onValueChange([v[0], v[1]])} className="mt-4 mb-6 [&>:first-child]:!bg-[#E5E5EA] [&>:first-child>:first-child]:!bg-[#1A1C40] [&_[role=slider]]:!border-[#1A1C40]" />
       <div className="flex items-center gap-3">
-        <div className="flex-1 bg-white border border-border/60 rounded-[10px] px-3 py-1.5 focus-within:border-[#1A1C40] transition-colors relative">
+        <div className="flex-1 bg-field border border-border/60 rounded-[10px] px-3 py-1.5 focus-within:border-primary transition-colors relative">
           <div className="text-[11px] text-muted-foreground mb-0.5">{labelMin}</div>
           <div className="flex items-center gap-1">
             {prefix && <span className="text-[14px] text-foreground font-semibold">{prefix}</span>}
@@ -451,7 +451,7 @@ function RangeSliderWithInputs({ min, max, step, value, onValueChange, labelMin,
           </div>
         </div>
         <div className="w-3 h-[1px] bg-border/60" />
-        <div className="flex-1 bg-white border border-border/60 rounded-[10px] px-3 py-1.5 focus-within:border-[#1A1C40] transition-colors relative">
+        <div className="flex-1 bg-field border border-border/60 rounded-[10px] px-3 py-1.5 focus-within:border-primary transition-colors relative">
           <div className="text-[11px] text-muted-foreground mb-0.5">{labelMax}</div>
           <div className="flex items-center gap-1">
             {prefix && <span className="text-[14px] text-foreground font-semibold">{prefix}</span>}

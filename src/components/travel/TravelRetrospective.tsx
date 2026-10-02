@@ -222,7 +222,7 @@ export function TravelRetrospective({ countries, open, onClose }: TravelRetrospe
     <div className="fixed inset-0 z-50 flex flex-col" style={{ background: slideGradients[currentSlide % slideGradients.length] }}>
       {/* Top bar */}
       <div className="flex items-center justify-between px-4 pt-safe-top pb-2 relative z-10">
-        <button onClick={onClose} className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: 'hsla(0,0%,100%,0.1)' }}>
+        <button onClick={onClose} className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'hsla(0,0%,100%,0.1)' }}>
           <Icon name="close" size={20} style={{ color: 'white' }} />
         </button>
         {/* Progress bars */}
@@ -240,7 +240,7 @@ export function TravelRetrospective({ countries, open, onClose }: TravelRetrospe
             </div>
           ))}
         </div>
-        <button onClick={handleShare} className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: 'hsla(0,0%,100%,0.1)' }}>
+        <button onClick={handleShare} className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'hsla(0,0%,100%,0.1)' }}>
           <Icon name="share" size={18} style={{ color: 'white' }} />
         </button>
       </div>

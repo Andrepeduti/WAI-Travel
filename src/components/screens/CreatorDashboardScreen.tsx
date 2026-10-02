@@ -123,7 +123,7 @@ export function CreatorDashboardScreen({ onBack, onEditProfile, onViewSales }: C
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-[100dvh] bg-background pb-24">
       {/* Header */}
  <div className="flex items-center justify-between px-4 pb-2">
         <div className="flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>

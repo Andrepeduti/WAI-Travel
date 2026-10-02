@@ -20,6 +20,9 @@ function rowToFriendProfileData(row: {
   youtube: string | null;
   followers_count: number | null;
   following_count: number | null;
+  dream_trips?: any[];
+  highlight_trip?: string | null;
+  interests?: string[];
 }): FriendProfileData {
   const usernameRaw = row.username || '';
   const username = usernameRaw ? `@${usernameRaw.replace(/^@/, '')}` : '@usuario';
@@ -36,11 +39,14 @@ function rowToFriendProfileData(row: {
     following: row.following_count ?? 0,
     followers: String(row.followers_count ?? 0),
     countries: [],
+    dreamTrips: row.dream_trips ?? [],
+    highlightTrip: row.highlight_trip ?? null,
+    interests: row.interests ?? [],
   };
 }
 
 const PROFILE_COLUMNS =
-  'user_id, name, username, location, avatar_url, bio, instagram, tiktok, youtube, followers_count, following_count';
+  'user_id, name, username, location, avatar_url, bio, instagram, tiktok, youtube, followers_count, following_count, dream_trips, highlight_trip, interests';
 
 export async function getProfileByUsername(
   username: string,
@@ -97,23 +103,31 @@ export interface PublicItineraryRow {
   end_date: string | null;
   places_count: number;
   price_cents: number | null;
-  main_tag: string;
+  description?: string | null;
+  status?: string | null;
+  is_flexible?: boolean | null;
+  duration_days?: number | null;
+  travel_month?: string | null;
 }
 
 /** Busca os roteiros públicos publicados por um usuário. */
 export async function getPublicItinerariesByUserId(
   userId: string,
 ): Promise<PublicItineraryRow[]> {
+  return []; // TEMP: Marketplace refactoring
+  /*
   if (!userId) return [];
   const { data, error } = await supabase
     .from('itineraries')
-    .select('id, title, destinations, images, start_date, end_date, places_count, price_cents, main_tag')
+    .select('id, title, destinations, images, start_date, end_date, places_count, price_cents, status, is_flexible, duration_days, travel_month')
     .eq('user_id', userId)
     .eq('is_public', true)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false });
   if (error) {
     console.error('[profilesApi] getPublicItinerariesByUserId error', error);
     return [];
   }
   return (data || []) as PublicItineraryRow[];
+  */
 }

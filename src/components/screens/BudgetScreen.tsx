@@ -1,27 +1,20 @@
-import { useState, useEffect } from 'react';
-import { Icon } from '@/components/ui/Icon';
-import { Building2, Plane, UtensilsCrossed, Ticket, Pencil, X, Plus, Trash2 } from 'lucide-react';
-import { SuccessToast } from '@/components/travel/SuccessToast';
-import { AddBudgetExpenseSheet } from '@/components/travel/AddBudgetExpenseSheet';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, Mic, SlidersHorizontal, UserPlus, X } from 'lucide-react';
 import { BackButton } from '@/components/ui/BackButton';
+import { SuccessToast } from '@/components/travel/SuccessToast';
+import { LuggageIllustration } from '@/components/travel/reservas/LuggageIllustration';
+import { TravelerBudgetCard, BudgetPerson } from '@/components/travel/budget/TravelerBudgetCard';
+import { ExpenseCard, ExpenseItem } from '@/components/travel/budget/ExpenseCard';
+import { AddBudgetExpenseSheet, ActivityOption } from '@/components/travel/budget/AddBudgetExpenseSheet';
+import { ShareItinerarySheet } from '@/components/travel/ShareItinerarySheet';
+import { BudgetFilterSheet } from '@/components/travel/budget/BudgetFilterSheet';
+import { formatCurrency, getCurrencySymbol } from '@/lib/currencyUtils';
 
-export interface Expense {
-  id: string;
-  name: string;
+export type Expense = ExpenseItem & {
   description: string;
-  category: 'hospedagem' | 'transporte' | 'alimentacao' | 'atividade';
-  amountBRL: number;
+  category: 'hospedagem' | 'transporte' | 'alimentacao' | 'atividade' | 'outros';
   amountEUR: number;
-  assignedTo: string[];
-}
-
-interface Person {
-  id: string;
-  initials: string;
-  name: string;
-  color: string;
-  avatar?: string;
-}
+};
 
 export interface BudgetParticipant {
   id: string;
@@ -38,11 +31,19 @@ export interface BudgetExtraPerson {
 interface BudgetScreenProps {
   onBack: () => void;
   expenses: Expense[];
-  onExpensesChange: (expenses: Expense[]) => void;
+  onExpensesChange: (expenses: Expense[] | ((prev: Expense[]) => Expense[])) => void;
   autoOpenAdd?: boolean;
   participants?: BudgetParticipant[];
   extraPeople?: BudgetExtraPerson[];
   onExtraPeopleChange?: (people: BudgetExtraPerson[]) => void;
+  activities?: ActivityOption[];
+  isLoading?: boolean;
+  currency?: string;
+  onInvite?: () => void;
+  isShareSheetOpen?: boolean;
+  itineraryId?: string;
+  ownerId?: string;
+  readOnlyMode?: boolean;
 }
 
 const personColors = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444', '#EC4899', '#14B8A6', '#F97316'];
@@ -53,7 +54,7 @@ const getInitialsFromName = (name: string) => {
   return name.slice(0, 2).toUpperCase();
 };
 
-const buildPeopleFromParticipants = (participants: BudgetParticipant[] = []): Person[] =>
+const buildPeopleFromParticipants = (participants: BudgetParticipant[] = []): BudgetPerson[] =>
   participants.map((p, i) => ({
     id: p.id,
     name: p.name,
@@ -62,7 +63,7 @@ const buildPeopleFromParticipants = (participants: BudgetParticipant[] = []): Pe
     avatar: p.avatar,
   }));
 
-const buildPeopleFromExtras = (extras: BudgetExtraPerson[] = [], offset: number): Person[] =>
+const buildPeopleFromExtras = (extras: BudgetExtraPerson[] = [], offset: number): BudgetPerson[] =>
   extras.map((p, i) => ({
     id: p.id,
     name: p.name,
@@ -70,577 +71,463 @@ const buildPeopleFromExtras = (extras: BudgetExtraPerson[] = [], offset: number)
     color: p.color || personColors[(offset + i) % personColors.length],
   }));
 
-const categoryConfig = {
-  hospedagem: { label: 'Hospedagem', icon: Building2, color: '#10B981' },
-  transporte: { label: 'Transporte', icon: Plane, color: '#3B82F6' },
-  alimentacao: { label: 'Alimentação', icon: UtensilsCrossed, color: '#F59E0B' },
-  atividade: { label: 'Atividade', icon: Ticket, color: '#8B5CF6' },
-};
-
-type CategoryFilter = 'todos' | 'transporte' | 'hospedagem' | 'alimentacao' | 'atividade';
-
-export function BudgetScreen({ onBack, expenses, onExpensesChange, autoOpenAdd = false, participants, extraPeople, onExtraPeopleChange }: BudgetScreenProps) {
+export function BudgetScreen({
+  onBack,
+  expenses = [],
+  onExpensesChange,
+  autoOpenAdd = false,
+  participants = [],
+  extraPeople = [],
+  onExtraPeopleChange,
+  activities = [],
+  isLoading = false,
+  currency = 'BRL',
+  onInvite,
+  isShareSheetOpen = false,
+  itineraryId,
+  ownerId,
+  readOnlyMode,
+}: BudgetScreenProps) {
   const setExpenses = onExpensesChange;
-  const participantPeople = buildPeopleFromParticipants(participants);
-  const participantIds = new Set(participantPeople.map(p => p.id));
-  const initialExtras = buildPeopleFromExtras(extraPeople, participantPeople.length);
-  const [people, setPeople] = useState<Person[]>([...participantPeople, ...initialExtras]);
 
-  // Re-sync when participants/extras change from parent
+  // Build unified people list
+  const participantPeople = useMemo(() => buildPeopleFromParticipants(participants), [participants]);
+  const participantIds = useMemo(() => new Set(participantPeople.map(p => p.id)), [participantPeople]);
+  const initialExtras = useMemo(() => buildPeopleFromExtras(extraPeople, participantPeople.length), [extraPeople, participantPeople.length]);
+
+  const [people, setPeople] = useState<BudgetPerson[]>(() => {
+    const list = [...participantPeople, ...initialExtras];
+    return list.length > 0 ? list : [{ id: 'user-default', name: 'Você', initials: 'VO', color: '#3B82F6' }];
+  });
+
+  // Re-sync when props change
   useEffect(() => {
     const pp = buildPeopleFromParticipants(participants);
     const ee = buildPeopleFromExtras(extraPeople, pp.length);
-    setPeople([...pp, ...ee]);
+    const combined = [...pp, ...ee];
+    if (combined.length > 0) {
+      setPeople(combined);
+    }
   }, [JSON.stringify(participants), JSON.stringify(extraPeople)]);
 
-  const hasParticipants = people.length > 0;
-  const [activeFilter, setActiveFilter] = useState<CategoryFilter>('todos');
+  // Lock body scroll when overlay is active
+  useEffect(() => {
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalStyle;
+    };
+  }, []);
+
+  // Modals & UI States
   const [showAddExpense, setShowAddExpense] = useState(autoOpenAdd);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-  const [showAddPerson, setShowAddPerson] = useState(false);
-  const [editingPerson, setEditingPerson] = useState<Person | null>(null);
-  const [newPersonName, setNewPersonName] = useState('');
-  const [newExpense, setNewExpense] = useState({
-    name: '',
-    description: '',
-    category: 'hospedagem' as Expense['category'],
-    amountBRL: '',
-  });
-  const [splitType, setSplitType] = useState<'none' | 'equal' | 'custom'>('none');
-  const [selectedPeople, setSelectedPeople] = useState<string[]>([...participantPeople, ...initialExtras].map(p => p.id));
-  const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
-  const [splitOpen, setSplitOpen] = useState(false);
-  const [personMenuOpen, setPersonMenuOpen] = useState<string | null>(null);
-  const [selectedPersonExtrato, setSelectedPersonExtrato] = useState<Person | null>(null);
-  const [showEditPeople, setShowEditPeople] = useState(false);
-  const [toastVisible, setToastVisible] = useState(false);
-  const [toastMessage, setToastMessage] = useState({ title: '', description: '' });
+  const [showShareSheet, setShowShareSheet] = useState(false);
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
 
-  const showToast = (title: string, description: string) => {
-    setToastMessage({ title, description });
+  // Search & Filter State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedTravelers, setSelectedTravelers] = useState<string[]>([]);
+  const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
+  const [valueRange, setValueRange] = useState<{ min: string; max: string }>({ min: '', max: '' });
+
+  // Toast State
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState<{
+    title: string;
+    actionLabel?: string;
+    onAction?: () => void;
+  }>({ title: '' });
+
+  const showToast = (title: string, actionLabel?: string, onAction?: () => void) => {
+    setToastMessage({ title, actionLabel, onAction });
     setToastVisible(true);
   };
 
-  const totalBRL = expenses.reduce((sum, e) => sum + e.amountBRL, 0);
-
-  const perPersonBRL = people.length > 0 ? totalBRL / people.length : 0;
-
-  const filteredExpenses = activeFilter === 'todos'
-    ? expenses
-    : expenses.filter(e => e.category === activeFilter);
-
-  const filteredTotal = filteredExpenses.reduce((sum, e) => sum + e.amountBRL, 0);
-
-  const formatBRL = (v: number) => `R$ ${v.toFixed(2).replace('.', ',')}`;
-
-  const togglePerson = (id: string) => {
-    setSelectedPeople(prev =>
-      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
-    );
-  };
-
-  const handleAddExpense = () => {
-    if (!newExpense.name || !newExpense.amountBRL) return;
-    const brl = parseFloat(newExpense.amountBRL.replace(/[^\d,]/g, '').replace(',', '.'));
-    if (isNaN(brl)) return;
-    const eur = brl * 0.1792;
-
-    if (editingExpense) {
-      // Update existing expense
-      setExpenses(expenses.map(e => e.id === editingExpense.id ? {
-        ...e,
-        name: newExpense.name,
-        description: newExpense.description,
-        category: newExpense.category,
-        amountBRL: brl,
-        amountEUR: eur,
-        assignedTo: splitType === 'none' ? [] : selectedPeople,
-      } : e));
-      setEditingExpense(null);
-    } else {
-      // Add new expense
-      const expense: Expense = {
-        id: Date.now().toString(),
-        name: newExpense.name,
-        description: newExpense.description,
-        category: newExpense.category,
-        amountBRL: brl,
-        amountEUR: eur,
-        assignedTo: splitType === 'none' ? [] : selectedPeople,
-      };
-      setExpenses([...expenses, expense]);
-    }
-
-    setNewExpense({ name: '', description: '', category: 'hospedagem', amountBRL: '' });
-    setSplitType('none');
-    setSelectedPeople(people.map(p => p.id));
-    setCustomAmounts({});
-    setShowAddExpense(false);
-  };
-
-  const openEditExpense = (expense: Expense) => {
-    setEditingExpense(expense);
-    setNewExpense({
-      name: expense.name,
-      description: expense.description,
-      category: expense.category,
-      amountBRL: expense.amountBRL.toString().replace('.', ','),
-    });
-    setSplitType(expense.assignedTo.length > 0 ? 'equal' : 'none');
-    setSelectedPeople(expense.assignedTo.length > 0 ? expense.assignedTo : people.map(p => p.id));
-    setShowAddExpense(true);
-  };
-
-  const getInitials = (name: string) => {
-    const parts = name.trim().split(' ');
-    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-    return name.slice(0, 2).toUpperCase();
-  };
-
-  const syncExtras = (allPeople: Person[]) => {
+  const syncExtras = (allPeople: BudgetPerson[]) => {
     if (!onExtraPeopleChange) return;
     const extras = allPeople
       .filter(p => !participantIds.has(p.id))
-      .map(p => ({ id: p.id, name: p.name, color: p.color }));
+      .map(p => ({ id: p.id, name: p.name, color: p.color || personColors[0] }));
     onExtraPeopleChange(extras);
   };
 
-  const handleAddPerson = () => {
-    if (!newPersonName.trim()) return;
-    const newPerson: Person = {
-      id: `extra-${Date.now()}`,
-      initials: getInitials(newPersonName),
-      name: newPersonName.trim(),
-      color: personColors[people.length % personColors.length],
-    };
-    const next = [...people, newPerson];
-    setPeople(next);
-    syncExtras(next);
-    setSelectedPeople(prev => [...prev, newPerson.id]);
-    setNewPersonName('');
-    setShowAddPerson(false);
-    showToast('Pessoa adicionada!', `${newPersonName.trim()} foi adicionada ao grupo`);
-  };
-
-  const handleEditPerson = () => {
-    if (!editingPerson || !newPersonName.trim()) return;
-    const next = people.map(p => p.id === editingPerson.id
-      ? { ...p, name: newPersonName.trim(), initials: getInitials(newPersonName) }
-      : p
-    );
-    setPeople(next);
-    syncExtras(next);
-    setNewPersonName('');
-    setEditingPerson(null);
-    showToast('Pessoa editada!', `${newPersonName.trim()} foi atualizada`);
-  };
-
-  const handleDeletePerson = (id: string) => {
-    if (participantIds.has(id)) {
-      showToast('Não é possível excluir', 'Convidados do roteiro não podem ser removidos aqui');
-      return;
+  // Expense management callbacks
+  const handleSaveExpense = (savedExpense: any) => {
+    if (editingExpense) {
+      setExpenses(prev => (Array.isArray(prev) ? prev : expenses).map(e => e.id === savedExpense.id ? savedExpense : e));
+      showToast('Gasto atualizado');
+    } else {
+      setExpenses(prev => [...(Array.isArray(prev) ? prev : expenses), savedExpense]);
+      showToast('Gasto adicionado');
     }
-    const person = people.find(p => p.id === id);
-    const next = people.filter(p => p.id !== id);
-    setPeople(next);
-    syncExtras(next);
-    setSelectedPeople(prev => prev.filter(p => p !== id));
-    showToast('Pessoa excluída!', `${person?.name || 'Pessoa'} foi removida do grupo`);
-  };
-  const handleDeleteExpense = (id: string) => {
-    setExpenses(expenses.filter(e => e.id !== id));
+    setEditingExpense(null);
   };
 
-  const filters: { key: CategoryFilter; label: string; icon?: typeof Building2 }[] = [
-    { key: 'todos', label: 'Todos' },
-    { key: 'transporte', label: 'Transporte', icon: Plane },
-    { key: 'hospedagem', label: 'Hospedagem', icon: Building2 },
-    { key: 'alimentacao', label: 'Alimentação', icon: UtensilsCrossed },
-  ];
+  const handleDeleteExpense = (id: string) => {
+    const expenseToDelete = expenses.find(e => e.id === id);
+    if (!expenseToDelete) return;
+    const index = expenses.findIndex(e => e.id === id);
+
+    const updated = expenses.filter(e => e.id !== id);
+    setExpenses(updated);
+
+    showToast(
+      'Gasto removido',
+      'Desfazer',
+      () => {
+        setExpenses(prev => {
+          const current = Array.isArray(prev) ? prev : updated;
+          if (current.some(e => e.id === expenseToDelete.id)) return current;
+          const restored = [...current];
+          if (index >= 0 && index <= restored.length) {
+            restored.splice(index, 0, expenseToDelete);
+          } else {
+            restored.push(expenseToDelete);
+          }
+          return restored;
+        });
+      }
+    );
+  };
+
+  // Calculations
+  const totalBRL = useMemo(() => {
+    return expenses.reduce((sum, e) => sum + (e.amountBRL || 0), 0);
+  }, [expenses]);
+
+  const calculatePersonTotal = (personId: string): number => {
+    return expenses.reduce((sum, e) => {
+      if (people.length === 1) return sum + (e.amountBRL || 0);
+
+      // If custom split is defined
+      if (e.splitType === 'custom' && e.customSplits && e.customSplits[personId] !== undefined) {
+        return sum + e.customSplits[personId];
+      }
+
+      // If assigned specifically or equal
+      if (e.assignedTo && e.assignedTo.includes(personId)) {
+        const count = e.assignedTo.length || 1;
+        return sum + (e.amountBRL / count);
+      }
+
+      // If assignedTo is empty, it divides among all people
+      if (!e.assignedTo || e.assignedTo.length === 0) {
+        return sum + (e.amountBRL / (people.length || 1));
+      }
+
+      return sum;
+    }, 0);
+  };
+
+  // Filtered expenses list
+  const filteredExpenses = useMemo(() => {
+    return expenses.filter(e => {
+      // Search query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchesName = e.name?.toLowerCase().includes(q);
+        const matchesCategory = e.category?.toLowerCase().includes(q);
+        const matchesActivity = (e as any).activityName?.toLowerCase().includes(q);
+        if (!matchesName && !matchesCategory && !matchesActivity) return false;
+      }
+
+      // Categories filter (multi-select)
+      if (selectedCategories.length > 0) {
+        if (!selectedCategories.includes(e.category)) return false;
+      }
+
+      // Travelers filter (multi-select)
+      if (selectedTravelers.length > 0) {
+        if (!e.assignedTo || !e.assignedTo.some(tId => selectedTravelers.includes(tId))) {
+          // If no one is explicitly assigned, it's shared by everyone, so it should match
+          // unless assignedTo is explicitly empty (which might mean everyone or no one).
+          // Assuming empty assignedTo = all people, so it matches any traveler filter.
+          if (e.assignedTo && e.assignedTo.length > 0) {
+             return false;
+          }
+        }
+      }
+      
+      // Value Range filter
+      if (valueRange.min) {
+        if (e.amountBRL < parseFloat(valueRange.min)) return false;
+      }
+      if (valueRange.max) {
+        if (e.amountBRL > parseFloat(valueRange.max)) return false;
+      }
+
+      // Date Range filter
+      // (Requires e.date to exist in future implementations)
+
+      return true;
+    });
+  }, [expenses, searchQuery, selectedCategories, selectedTravelers, valueRange, people.length]);
+
+  const filteredTotalBRL = useMemo(() => {
+    return filteredExpenses.reduce((sum, e) => sum + (e.amountBRL || 0), 0);
+  }, [filteredExpenses]);
+
+  // Use dynamic currency formatting
+  const formattedTotal = formatCurrency(totalBRL, currency);
+  const formattedFilteredTotal = formatCurrency(filteredTotalBRL, currency);
+
+  const hasFilterActive = selectedCategories.length > 0 || selectedTravelers.length > 0 || dateRange.start || dateRange.end || valueRange.min || valueRange.max;
+  const isEmpty = expenses.length === 0;
 
   return (
-    <div className="min-h-screen pb-28 bg-background" style={{ fontFamily: 'var(--font-family-primary)' }}>
-      {/* Header */}
-      <header className="sticky top-0 z-20 bg-background px-4 pt-5 pb-3">
-        <div className="flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
-          <BackButton onClick={onBack} />
-          <h1 className="text-xl font-bold text-foreground my-0 mt-[24px]">Orçamento total</h1>
+    <div
+      className={`min-h-[100dvh] flex flex-col justify-between ${isEmpty ? 'bg-[#F3F3F3]' : 'bg-background'}`}
+      style={{ fontFamily: 'var(--font-family-primary, "Urbanist", sans-serif)' }}
+    >
+      {/* ─── Topbar Header ─── */}
+      <header className={`sticky top-0 z-20 ${isEmpty ? 'bg-[#F3F3F3]' : 'bg-background/95 backdrop-blur-md border-b border-border/20'} px-6 pb-4`}>
+        <div
+          className="flex items-center justify-between"
+          style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 8px)' }}
+        >
+          <div className="flex items-center gap-4">
+            <BackButton onClick={onBack} className="bg-transparent shadow-none" />
+            <h1 className="font-['Urbanist'] font-bold text-[20px] leading-[24px] text-[#171F2C] my-0">
+              Orçamento
+            </h1>
+          </div>
+
+          {/* Top-right Action (Add traveler button in filled state) */}
+          {!isEmpty && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowShareSheet(true);
+              }}
+              className="w-10 h-10 rounded-full flex items-center justify-center text-[#171F2C] hover:bg-muted/50 transition-colors active:scale-95"
+              aria-label="Adicionar viajante"
+            >
+              <UserPlus size={20} strokeWidth={2} />
+            </button>
+          )}
         </div>
       </header>
 
-      {/* Total amounts - 40px spacing from header */}
-      <div className="px-4 pb-6" style={{ marginTop: '40px' }}>
-        <div className="flex items-center gap-2">
-          <span className="text-lg">🇧🇷</span>
-          <span className="text-[28px] font-bold text-foreground">{formatBRL(totalBRL)}</span>
-        </div>
-      </div>
+      {/* ─── Main Content ─── */}
+      {isLoading ? (
+        /* Loading Skeleton State */
+        <div className="flex-1 px-6 pt-6 pb-28 animate-pulse space-y-6">
+          <div>
+            <div className="h-4 w-28 bg-muted rounded-md mb-2" />
+            <div className="h-9 w-48 bg-muted rounded-xl" />
+          </div>
 
-      {/* Per person — always visible, allows adding people for splitting */}
-      <div className="px-4 mb-6">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-[15px] font-semibold text-foreground">Por pessoa</span>
-          {hasParticipants && (
-            <button
-              onClick={() => setShowEditPeople(true)}
-              className="text-[12px] font-semibold text-foreground/80 px-2 py-1 rounded-md active:bg-muted"
-            >
-              Gerenciar
-            </button>
-          )}
+          <div className="flex gap-3 overflow-hidden">
+            <div className="h-24 w-36 bg-muted rounded-2xl flex-shrink-0" />
+            <div className="h-24 w-36 bg-muted rounded-2xl flex-shrink-0" />
+          </div>
+
+          <div className="space-y-3 pt-2">
+            <div className="h-5 w-20 bg-muted rounded-md mb-3" />
+            <div className="h-12 w-full bg-muted rounded-2xl" />
+            <div className="h-16 w-full bg-muted rounded-2xl" />
+            <div className="h-16 w-full bg-muted rounded-2xl" />
+          </div>
         </div>
-        <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
-          {people.map(person => {
-            const isSole = people.length === 1;
-            const personExpenses = isSole
-              ? expenses
-              : expenses.filter(e => e.assignedTo.includes(person.id));
-            const personTotal = personExpenses.reduce((sum, e) => {
-              if (isSole) return sum + e.amountBRL;
-              const assignedCount = e.assignedTo.length || 1;
-              return sum + (e.amountBRL / assignedCount);
-            }, 0);
-            return (
-              <div
-                key={person.id}
-                onClick={() => setSelectedPersonExtrato(person)}
-                className="flex-shrink-0 bg-card rounded-2xl p-4 min-w-[140px] border border-border/30 cursor-pointer active:scale-[0.97] transition-transform"
-                style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}
-              >
-                {person.avatar ? (
-                  <img src={person.avatar} alt={person.name} className="w-8 h-8 rounded-full object-cover mb-2" />
-                ) : (
-                  <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold mb-2"
-                    style={{ backgroundColor: person.color }}
-                  >
-                    {person.initials}
-                  </div>
-                )}
-                <span className="text-[13px] font-semibold text-foreground block">{person.name}</span>
-                <span className="text-[14px] font-bold text-foreground block">{formatBRL(personTotal)}</span>
+      ) : isEmpty ? (
+        /* ─── 1. Empty State (Exact Figma CSS: bg #F3F3F3, 345px width, 119x113.32px group, #171F2C 18px, #7F7F7F 14px, #9DCC36 button) ─── */
+        <main className="flex-1 flex flex-col items-center justify-center px-6 -mt-10 text-center select-none bg-[#F3F3F3]">
+          <div className="w-full max-w-[345px] flex flex-col items-center justify-center gap-6">
+            <div className="flex flex-col items-center gap-4 max-w-[293px]">
+              {/* Group 481513: 119px x 113.32px */}
+              <LuggageIllustration width={119} height={113} />
+
+              {/* Frame 1321316333: 293px x 62px, gap 8px */}
+              <div className="flex flex-col items-center gap-2">
+                <h2 className="font-['Urbanist'] font-semibold text-[18px] leading-[22px] text-[#171F2C] my-0">
+                  Nenhum gasto adicionado
+                </h2>
+                <p className="font-['Urbanist'] font-medium text-[14px] leading-[16px] text-[#7F7F7F] my-0 text-center">
+                  Registre seus gastos para acompanhar quanto você está gastando na viagem.
+                </p>
               </div>
-            );
-          })}
-          <button
-            onClick={() => { setNewPersonName(''); setShowAddPerson(true); }}
-            className="flex-shrink-0 rounded-2xl p-4 min-w-[140px] border border-dashed border-border flex flex-col items-center justify-center gap-2 active:scale-[0.97] transition-transform"
-            style={{ background: '#F3F3F3' }}
-          >
-            <div className="w-8 h-8 rounded-full bg-card flex items-center justify-center">
-              <Plus size={16} className="text-foreground" strokeWidth={2} />
             </div>
-            <span className="text-[13px] font-semibold text-foreground">Adicionar pessoa</span>
-          </button>
-        </div>
-      </div>
 
-
-      {/* Add/Edit person modal */}
-      {(showAddPerson || editingPerson) && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => { setShowAddPerson(false); setEditingPerson(null); }} />
-          <div className="relative w-full w-full bg-card rounded-t-3xl p-6 pb-8 animate-in slide-in-from-bottom duration-300">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-[18px] font-bold text-foreground">
-                {editingPerson ? 'Editar pessoa' : 'Adicionar pessoa'}
-              </h2>
+            {/* Main Button: Auto width, #9DCC36, border-radius 16px */}
+            {!readOnlyMode && (
               <button
-                onClick={() => { setShowAddPerson(false); setEditingPerson(null); }}
-                className="w-8 h-8 rounded-full bg-muted flex items-center justify-center"
+                type="button"
+                onClick={() => { setEditingExpense(null); setShowAddExpense(true); }}
+                className="box-border flex flex-row justify-center items-center py-[12px] px-[24px] gap-2 h-[48px] border border-[#141530] rounded-2xl flex-none bg-transparent text-[#141530] font-['Urbanist'] font-bold text-[16px] leading-[19px] whitespace-nowrap active:scale-[0.98] transition-all"
               >
-                <X size={18} className="text-foreground" />
+                Adicionar gasto
+              </button>
+            )}
+          </div>
+        </main>
+      ) : (
+        /* ─── 2. Filled State (Estado Preenchido) ─── */
+        <main className="flex-1 overflow-y-auto px-5 pt-4 pb-32">
+          {/* Top Summary: Orçamento Total */}
+          <div className="mb-5 flex flex-col gap-2">
+            <span className="font-['Urbanist'] font-medium text-[14px] leading-[17px] text-[#676767]">
+              Orçamento total
+            </span>
+            <div className="font-['Urbanist'] font-bold text-[24px] leading-[29px] text-[#171F2C]">
+              {formattedTotal}
+            </div>
+          </div>
+
+          {/* Horizontal Traveler Cards */}
+          <div className="mb-6 -mx-5 px-5 flex gap-3 overflow-x-auto scrollbar-hide pb-2 pt-1">
+            {people.map(person => (
+              <TravelerBudgetCard
+                key={person.id}
+                person={person}
+                amount={calculatePersonTotal(person.id)}
+                currency={currency}
+              />
+            ))}
+          </div>
+
+          {/* Section: Gastos */}
+          <section className="mt-2">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-['Urbanist'] font-semibold text-[18px] leading-[22px] text-[#171F2C] my-0">
+                Gastos
+              </h2>
+            </div>
+
+            {/* Search Bar + Filter Options Button */}
+            <div className="flex items-center gap-4 mb-4">
+              <div className="flex-1 bg-field border border-transparent focus-within:border-primary transition-colors rounded-[10px] flex items-center px-3.5 py-2.5 gap-2.5 transition-all">
+                <Search size={18} className="text-[#9CA3AF] flex-shrink-0" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Busque por um gasto..."
+                  className="w-full bg-transparent text-[14px] font-medium text-[#171F2C] outline-none placeholder:text-[#9CA3AF]"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="text-[#9CA3AF] hover:text-[#171F2C]"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+
+              {/* Filter button */}
+              <button
+                type="button"
+                onClick={() => setShowFilterSheet(true)}
+                className="w-11 h-11 rounded-2xl border flex items-center justify-center transition-all relative flex-shrink-0 bg-card text-[#171F2C] border-border/70 hover:bg-muted/40"
+                aria-label="Filtrar gastos"
+              >
+                <SlidersHorizontal size={18} />
+                {hasFilterActive && (
+                  <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-[#1A1C40] ring-2 ring-background" />
+                )}
               </button>
             </div>
-            <div className="mb-5">
-              <label className="text-[13px] font-medium text-foreground block mb-1.5">Nome</label>
-              <input
-                type="text"
-                value={newPersonName}
-                onChange={e => setNewPersonName(e.target.value)}
-                placeholder="Ex: Maria Silva"
-                className="w-full px-4 py-3 rounded-xl border border-border bg-background text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
-              />
+
+            {/* Subtotal Label */}
+            <div className="flex items-center justify-between mb-4 px-1">
+              <span className="font-['Urbanist'] font-medium text-[14px] leading-[17px] text-[#676767]">
+                Total: {formattedFilteredTotal}
+              </span>
             </div>
-            <button
-              onClick={editingPerson ? handleEditPerson : handleAddPerson}
-              disabled={!newPersonName.trim()}
-              className="w-full py-4 rounded-2xl bg-primary text-primary-foreground font-semibold text-[15px] disabled:bg-[#D1D5DB] disabled:text-white"
-            >
-              {editingPerson ? 'Salvar' : 'Adicionar'}
-            </button>
-          </div>
+
+            {/* Expense Cards List */}
+            <div className="flex flex-col items-start gap-4 w-full">
+              {filteredExpenses.map((expense, index) => (
+                <ExpenseCard
+                  key={expense.id}
+                  expense={expense}
+                  people={people}
+                  currency={currency}
+                  hideDivider={index === filteredExpenses.length - 1}
+                  onClick={readOnlyMode ? undefined : () => {
+                    setEditingExpense(expense);
+                    setShowAddExpense(true);
+                  }}
+                />
+              ))}
+
+              {filteredExpenses.length === 0 && (
+                <div className="py-12 text-center text-[#7F7F7F] text-[14px]">
+                  Nenhum gasto encontrado para os filtros selecionados.
+                </div>
+              )}
+            </div>
+          </section>
+        </main>
+      )}
+
+      {/* ─── Fixed Bottom Button (Filled State) ─── */}
+      {!isEmpty && !readOnlyMode && (
+        <div
+          className="fixed bottom-0 left-0 right-0 z-30 bg-background/95 backdrop-blur-md px-4 py-6 border-t border-[#B6B6B6] flex flex-row items-center gap-6"
+          style={{ paddingBottom: 'calc(24px + max(env(safe-area-inset-bottom), 0px))' }}
+        >
+          <button
+            type="button"
+            onClick={() => { setEditingExpense(null); setShowAddExpense(true); }}
+            className="flex-1 h-12 rounded-2xl bg-[#9DCC36] text-[#141530] font-['Urbanist'] font-bold text-[16px] leading-[19px] shadow-xs active:scale-[0.99] transition-all flex flex-row items-center justify-center py-3 pr-4 pl-6 gap-2"
+          >
+            Adicionar gasto
+          </button>
         </div>
       )}
 
-      {/* Expenses list */}
-      <div className="px-4">
-        <span className="text-[15px] font-semibold text-foreground block mb-3">Gastos</span>
-
-        {/* Filter chips */}
-        <div className="flex gap-2 mb-4 overflow-x-auto scrollbar-hide pb-1">
-          {filters.map(filter => {
-            const isActive = activeFilter === filter.key;
-            const FilterIcon = filter.icon;
-            return (
-              <button
-                key={filter.key}
-                onClick={() => setActiveFilter(filter.key)}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[13px] font-medium whitespace-nowrap transition-colors ${
-                  isActive
-                    ? 'bg-foreground text-background'
-                    : 'bg-card text-foreground border border-border'
-                }`}
-              >
-                {FilterIcon && (
-                  <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: isActive ? 'transparent' : '#F3F3F3' }}>
-                    <FilterIcon size={12} strokeWidth={1.5} />
-                  </div>
-                )}
-                {filter.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Category total when filtered */}
-        {activeFilter !== 'todos' && (
-          <div className="mb-4 px-1">
-            <span className="text-[13px] text-muted-foreground">Total {filters.find(f => f.key === activeFilter)?.label}:</span>
-            <span className="text-[16px] font-bold text-foreground ml-2">{formatBRL(filteredTotal)}</span>
-          </div>
-        )}
-
-        {/* Expense cards */}
-        <div className="space-y-3 mb-6">
-          {filteredExpenses.map(expense => {
-            const cat = categoryConfig[expense.category];
-            const CatIcon = cat.icon;
-            return (
-              <div key={expense.id} className="bg-card rounded-2xl p-4 flex items-center gap-3 border border-border/30" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#F3F3F3' }}>
-                  <CatIcon size={18} strokeWidth={1.5} className="text-foreground" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="text-[14px] font-semibold text-foreground block truncate">{expense.name}</span>
-                  
-                  <div className="flex items-center gap-1 mt-1">
-                    {expense.assignedTo.slice(0, 3).map(pId => {
-                      const person = people.find(p => p.id === pId);
-                      if (!person) return null;
-                      return person.avatar ? (
-                        <img key={pId} src={person.avatar} alt={person.name} className="w-5 h-5 rounded-full object-cover" />
-                      ) : (
-                        <div
-                          key={pId}
-                          className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[8px] font-bold"
-                          style={{ backgroundColor: person.color }}
-                        >
-                          {person.initials}
-                        </div>
-                      );
-                    })}
-                    {expense.assignedTo.length > 3 && (
-                      <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[8px] font-bold text-muted-foreground">
-                        +{expense.assignedTo.length - 3}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <span className="text-[14px] font-bold text-foreground block">{formatBRL(expense.amountBRL)}</span>
-                </div>
-                <button onClick={() => openEditExpense(expense)} className="ml-1" style={{ color: '#1A1C40' }}>
-                  <Pencil size={16} strokeWidth={1.5} />
-                </button>
-              </div>
-            );
-          })}
-          {filteredExpenses.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12">
-              <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-4">
-                <Icon name="receipt_long" size={24} className="text-muted-foreground" />
-              </div>
-              <span className="text-[16px] font-bold text-foreground mb-1">Nenhum gasto</span>
-              <span className="text-[13px] text-muted-foreground text-center max-w-[240px]">
-                Adicione seus gastos com hospedagem, transporte e atividades para controlar seu orçamento.
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Spacer for fixed footer */}
-      <div className="h-24" />
-
-      {/* Fixed Footer Button */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 bg-background px-5 pt-3 border-t border-border" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 24px)' }}>
-        <button
-          onClick={() => setShowAddExpense(true)}
-          className="w-full py-4 rounded-2xl text-base font-semibold flex items-center justify-center gap-2"
-          style={{ background: '#9DCC36', color: '#1A1C40' }}
-        >
-          <Icon name="add" size={20} />
-          Adicionar gasto
-        </button>
-      </div>
-
-      {/* Add expense bottom sheet */}
+      {/* ─── Add / Edit Expense Bottom Sheet ─── */}
       <AddBudgetExpenseSheet
         open={showAddExpense}
         onClose={() => { setShowAddExpense(false); setEditingExpense(null); }}
-        onSave={(expense) => {
-          if (editingExpense) {
-            setExpenses(expenses.map(e => e.id === expense.id ? expense : e));
-          } else {
-            setExpenses([...expenses, expense]);
-          }
-          setEditingExpense(null);
-          setNewExpense({ name: '', description: '', category: 'hospedagem', amountBRL: '' });
-          setSplitType('none');
-          setSelectedPeople(people.map(p => p.id));
-          setCustomAmounts({});
-        }}
-        onDelete={(id) => {
-          handleDeleteExpense(id);
-          setEditingExpense(null);
-          setNewExpense({ name: '', description: '', category: 'hospedagem', amountBRL: '' });
-        }}
+        onSave={handleSaveExpense}
+        onDelete={handleDeleteExpense}
         editingExpense={editingExpense}
+        people={people}
+        activities={activities}
+        onSoleTravelerInvite={onInvite}
+        isHidden={isShareSheetOpen}
+      />
+
+      {/* ─── Share Itinerary Sheet ─── */}
+      <ShareItinerarySheet
+        open={showShareSheet}
+        onClose={() => setShowShareSheet(false)}
+        itineraryId={itineraryId || ''}
+        ownerId={ownerId || ''}
+      />
+
+      {/* ─── Filter Sheet ─── */}
+      <BudgetFilterSheet
+        open={showFilterSheet}
+        onClose={() => setShowFilterSheet(false)}
+        selectedCategories={selectedCategories}
+        selectedTravelers={selectedTravelers}
+        dateRange={dateRange}
+        valueRange={valueRange}
+        onApplyFilters={(cats, travs, dRange, vRange) => {
+          setSelectedCategories(cats);
+          setSelectedTravelers(travs);
+          setDateRange(dRange);
+          setValueRange(vRange);
+        }}
         people={people}
       />
 
-      {/* Edit people sheet */}
-      {showEditPeople && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowEditPeople(false)} />
-          <div className="relative w-full w-full bg-card rounded-t-3xl p-6 pb-8 animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-y-auto">
-            <div className="w-10 h-1 rounded-full bg-muted-foreground/20 mx-auto mb-4" />
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-[18px] font-bold text-foreground">Editar pessoas</h2>
-              <button onClick={() => setShowEditPeople(false)} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-                <X size={18} className="text-foreground" />
-              </button>
-            </div>
-            <div className="space-y-3 mb-5">
-              {people.map(person => (
-                <div key={person.id} className="flex items-center gap-3 p-3 rounded-xl bg-muted/30">
-                  {person.avatar ? (
-                    <img src={person.avatar} alt={person.name} className="w-9 h-9 rounded-full object-cover" />
-                  ) : (
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-[11px] font-bold" style={{ backgroundColor: person.color }}>
-                      {person.initials}
-                    </div>
-                  )}
-                  <span className="text-[14px] font-medium text-foreground flex-1">{person.name}</span>
-                  <button onClick={() => { setEditingPerson(person); setNewPersonName(person.name); setShowEditPeople(false); }} className="w-8 h-8 rounded-full flex items-center justify-center">
-                    <Pencil size={14} className="text-muted-foreground" />
-                  </button>
-                  <button onClick={() => handleDeletePerson(person.id)} className="w-8 h-8 rounded-full flex items-center justify-center">
-                    <Trash2 size={14} className="text-destructive" />
-                  </button>
-                </div>
-              ))}
-            </div>
-            <button
-              onClick={() => { setShowEditPeople(false); setNewPersonName(''); setShowAddPerson(true); }}
-              className="w-full py-4 rounded-2xl font-semibold text-[15px] flex items-center justify-center gap-2"
-              style={{ background: '#9DCC36', color: '#1A1C40' }}
-            >
-              <Plus size={18} />
-              Adicionar pessoa
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Person extrato sheet */}
-      {selectedPersonExtrato && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setSelectedPersonExtrato(null)} />
-          <div className="relative w-full w-full bg-card rounded-t-3xl p-6 pb-8 animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-y-auto">
-            <div className="w-10 h-1 rounded-full bg-muted-foreground/20 mx-auto mb-4" />
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-[12px] font-bold" style={{ backgroundColor: selectedPersonExtrato.color }}>
-                {selectedPersonExtrato.initials}
-              </div>
-              <div className="flex-1">
-                <h2 className="text-[18px] font-bold text-foreground">{selectedPersonExtrato.name}</h2>
-                <span className="text-[13px] text-muted-foreground">Extrato de gastos</span>
-              </div>
-              <button onClick={() => setSelectedPersonExtrato(null)} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-                <X size={18} className="text-foreground" />
-              </button>
-            </div>
-
-            {(() => {
-              const isSole = people.length === 1;
-              const personExpenses = isSole
-                ? expenses
-                : expenses.filter(e => e.assignedTo.includes(selectedPersonExtrato.id));
-              const personTotal = personExpenses.reduce((sum, e) => {
-                if (isSole) return sum + e.amountBRL;
-                const assignedCount = e.assignedTo.length || 1;
-                return sum + (e.amountBRL / assignedCount);
-              }, 0);
-
-              return (
-                <>
-                  <div className="bg-muted/30 rounded-2xl p-4 mb-5">
-                    <span className="text-[13px] text-muted-foreground block mb-1">Total individual</span>
-                    <span className="text-[24px] font-bold text-foreground">{formatBRL(personTotal)}</span>
-                  </div>
-
-                  {personExpenses.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-10">
-                      <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
-                        <Icon name="receipt_long" size={22} className="text-muted-foreground" />
-                      </div>
-                      <span className="text-[14px] font-semibold text-foreground mb-1">Sem gastos</span>
-                      <span className="text-[13px] text-muted-foreground text-center">Nenhum gasto atribuído a {selectedPersonExtrato.name}</span>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {personExpenses.map(expense => {
-                        const cat = categoryConfig[expense.category];
-                        const CatIcon = cat.icon;
-                        const assignedCount = isSole ? 1 : (expense.assignedTo.length || 1);
-                        const individualAmount = expense.amountBRL / assignedCount;
-                        return (
-                          <div key={expense.id} className="flex items-center gap-3 p-3 rounded-xl bg-muted/20 border border-border/30">
-                            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#F3F3F3' }}>
-                              <CatIcon size={16} strokeWidth={1.5} className="text-foreground" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <span className="text-[13px] font-semibold text-foreground block truncate">{expense.name}</span>
-                              <span className="text-[11px] text-muted-foreground block">{expense.description}</span>
-                              {assignedCount > 1 && (
-                                <span className="text-[10px] text-muted-foreground">Dividido entre {assignedCount} pessoas</span>
-                              )}
-                            </div>
-                            <div className="text-right flex-shrink-0">
-                              <span className="text-[13px] font-bold text-foreground block">{formatBRL(individualAmount)}</span>
-                              {assignedCount > 1 && (
-                                <span className="text-[10px] text-muted-foreground block">de {formatBRL(expense.amountBRL)}</span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </>
-              );
-            })()}
-          </div>
-        </div>
-      )}
-
+      {/* ─── Success Toast ─── */}
       <SuccessToast
         isVisible={toastVisible}
         onClose={() => setToastVisible(false)}
         title={toastMessage.title}
-        description={toastMessage.description}
+        description=""
+        actionLabel={toastMessage.actionLabel}
+        onAction={toastMessage.onAction}
+        duration={5000}
+        position="bottom"
       />
     </div>
   );

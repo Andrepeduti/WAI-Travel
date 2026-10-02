@@ -85,7 +85,7 @@ export function ExperienceDetailScreen({ experienceId, onBack }: ExperienceDetai
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-[100dvh] bg-background">
       {/* Hero Image */}
       <div className="relative w-full h-[320px]">
         <img
@@ -209,7 +209,7 @@ export function ExperienceDetailScreen({ experienceId, onBack }: ExperienceDetai
                   >
                     <Icon name="bookmark" size={16} filled={savedPlaces.has(place.id)} className={savedPlaces.has(place.id) ? 'text-primary' : 'text-muted-foreground'} />
                   </button>
-                  <button className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                  <button className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                     <Icon name="add" size={16} className="text-primary" />
                   </button>
                 </div>

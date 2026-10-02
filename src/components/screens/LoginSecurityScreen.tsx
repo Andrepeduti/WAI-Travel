@@ -27,7 +27,7 @@ export function LoginSecurityScreen({ onBack }: LoginSecurityScreenProps) {
 
 
   return (
-    <div className="min-h-screen bg-background" style={{ paddingBottom: showBlockedList ? '32px' : '80px' }}>
+    <div className="min-h-[100dvh] bg-background" style={{ paddingBottom: showBlockedList ? '32px' : '80px' }}>
       <div className="sticky top-0 z-20 bg-background">
         <div className="flex items-center gap-3 px-4" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={showBlockedList ? () => setShowBlockedList(false) : onBack} />
@@ -128,7 +128,7 @@ export function LoginSecurityScreen({ onBack }: LoginSecurityScreenProps) {
 
       {/* Delete / Deactivate Account Bottom Sheet */}
       <Sheet open={showDeleteSheet} onOpenChange={(open) => { if (!open) closeDeleteSheet(); else setShowDeleteSheet(true); }}>
-        <SheetContent side="bottom" className="rounded-t-[20px] px-5 pb-8 pt-3 w-full mx-auto">
+        <SheetContent side="bottom" className="rounded-t-[20px] px-5 pb-[34px] pt-3 w-full mx-auto">
           <div className="flex justify-center mb-4">
             <div className="w-10 h-1 rounded-full" style={{ background: 'hsl(var(--divider))' }} />
           </div>

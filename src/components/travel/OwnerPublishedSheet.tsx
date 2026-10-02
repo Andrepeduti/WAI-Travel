@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
-import { Share2, Trash2, BarChart3, Pencil, Download, EyeOff } from 'lucide-react';
+import { Share2, Trash2, BarChart3, Pencil, EyeOff } from 'lucide-react';
 import { shareItinerary } from '@/lib/shareItinerary';
+import { DeleteConfirmSheet } from './DeleteConfirmSheet';
 
 interface OwnerPublishedSheetProps {
   open: boolean;
@@ -12,7 +13,6 @@ interface OwnerPublishedSheetProps {
   onManageItinerary?: () => void;
   onViewSalesDashboard?: () => void;
   onUnpublish?: () => void;
-  onDownloadPdf?: () => void;
   onDelete?: () => void;
 }
 
@@ -28,7 +28,6 @@ export function OwnerPublishedSheet({
   onManageItinerary,
   onViewSalesDashboard,
   onUnpublish,
-  onDownloadPdf,
   onDelete,
 }: OwnerPublishedSheetProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -106,12 +105,6 @@ export function OwnerPublishedSheet({
             />
 
             <Row
-              icon={<Download size={18} className="text-foreground" />}
-              label="Baixar em PDF"
-              onClick={() => { onClose(); onDownloadPdf?.(); }}
-            />
-
-            <Row
               icon={<EyeOff size={18} className="text-foreground" />}
               label="Tornar privado"
               onClick={() => { onClose(); onUnpublish?.(); }}
@@ -129,49 +122,16 @@ export function OwnerPublishedSheet({
         </div>
       </div>
 
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-[110] flex items-end justify-center" onClick={() => setShowDeleteConfirm(false)}>
-          <div className="absolute inset-0 bg-black/20" style={{ animation: 'fadeIn 0.2s ease-out' }} />
-          <div
-            className="relative w-full w-full bg-background rounded-t-2xl"
-            style={{ animation: 'slideUpSheet 0.35s cubic-bezier(0.32, 0.72, 0, 1)' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-center pt-3 pb-1">
-              <div className="w-10 h-1 rounded-full bg-[#E0E0E0]" />
-            </div>
-            <div className="px-5 pt-4 pb-8 text-center">
-              <div className="w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
-                <Trash2 size={26} className="text-destructive" />
-              </div>
-              <h3 className="text-[18px] font-bold text-foreground mb-1">Excluir roteiro?</h3>
-              <p className="text-[13px] text-muted-foreground mb-6 leading-relaxed">
-                {tripName
-                  ? `"${tripName}" será excluído permanentemente. Esta ação não pode ser desfeita.`
-                  : 'Este roteiro será excluído permanentemente. Esta ação não pode ser desfeita.'}
-              </p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="flex-1 py-3.5 rounded-xl border border-border text-[14px] font-semibold text-foreground bg-card active:scale-[0.98] transition-transform"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={() => {
-                    setShowDeleteConfirm(false);
-                    onClose();
-                    onDelete?.();
-                  }}
-                  className="flex-1 py-3.5 rounded-xl bg-destructive text-destructive-foreground text-[14px] font-semibold active:scale-[0.98] transition-transform"
-                >
-                  Sim, excluir
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmSheet
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        title={tripName}
+        onConfirm={() => {
+          setShowDeleteConfirm(false);
+          onClose();
+          onDelete?.();
+        }}
+      />
     </>
   );
 }

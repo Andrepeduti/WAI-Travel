@@ -14,23 +14,28 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { touchItinerary } from '@/lib/itinerariesApi';
 
 export interface PlannerActivity {
   id: number;
   type?: 'activity' | 'note';
-  startTime: string;
-  endTime: string;
+  startTime?: string;
+  endTime?: string;
   category: string;
-  categoryColor: string;
+  categoryColor?: string;
   name: string;
   image: string;
-  openHours: string;
-  rating: number;
-  price: string;
+  openHours?: string;
+  rating?: number;
+  price?: string;
   noteText?: string;
+  personalNote?: string;
   observation?: string;
   lat?: number;
   lng?: number;
+  city?: string;
+  country?: string;
+  placeId?: string;
 }
 
 export interface PlannerTransport {
@@ -50,22 +55,28 @@ function isUuid(id: string): boolean {
 }
 
 function activityRowToObject(row: any): PlannerActivity {
+  const meta = row.metadata || {};
+  const noteContent = row.note_text ?? meta.personalNote ?? undefined;
   return {
-    id: typeof row.metadata?.legacyId === 'number' ? row.metadata.legacyId : Date.now() + Math.random(),
+    id: typeof meta.legacyId === 'number' ? meta.legacyId : Date.now() + Math.random(),
     type: (row.type as 'activity' | 'note') ?? 'activity',
-    startTime: row.start_time ?? '',
-    endTime: row.end_time ?? '',
-    category: row.category ?? '',
-    categoryColor: row.category_color ?? '',
-    name: row.name ?? '',
-    image: row.image ?? '',
-    openHours: row.open_hours ?? '',
-    rating: Number(row.rating ?? 0),
-    price: row.price ?? '',
-    noteText: row.note_text ?? undefined,
-    observation: row.observation ?? undefined,
-    lat: row.lat ?? undefined,
-    lng: row.lng ?? undefined,
+    startTime: meta.startTime ?? row.start_time ?? '',
+    endTime: meta.endTime ?? row.end_time ?? '',
+    category: meta.category ?? row.category ?? '',
+    categoryColor: meta.categoryColor ?? row.category_color ?? '',
+    name: row.label ?? meta.name ?? row.name ?? '',
+    image: meta.image ?? row.image ?? '',
+    openHours: meta.openHours ?? row.open_hours ?? '',
+    rating: Number(meta.rating ?? row.rating ?? 0),
+    price: meta.price ?? row.price ?? '',
+    noteText: noteContent,
+    personalNote: noteContent,
+    observation: meta.observation ?? row.observation ?? undefined,
+    lat: meta.lat ?? row.lat ?? undefined,
+    lng: meta.lng ?? row.lng ?? undefined,
+    city: meta.city ?? row.metadata?.city ?? undefined,
+    country: meta.country ?? row.metadata?.country ?? undefined,
+    placeId: row.place_id ?? undefined,
   };
 }
 
@@ -111,7 +122,16 @@ export async function loadPlannerData(itineraryId: string): Promise<PlannerData 
   for (const row of activitiesRes.data ?? []) {
     const day = (row as any).day as number;
     if (!activities[day]) activities[day] = [];
-    activities[day].push(activityRowToObject(row));
+    const act = activityRowToObject(row);
+    const isDuplicate = activities[day].some((existing) =>
+      existing.id === act.id ||
+      (existing.name.trim().toLowerCase() === act.name.trim().toLowerCase() &&
+       existing.startTime === act.startTime &&
+       existing.type === act.type)
+    );
+    if (!isDuplicate) {
+      activities[day].push(act);
+    }
   }
 
   const transports: Record<number, PlannerTransport[]> = {};
@@ -141,27 +161,44 @@ export async function savePlannerData(
   const activityRows: any[] = [];
   for (const [dayStr, list] of Object.entries(data.activities)) {
     const day = Number(dayStr);
+    const seenIds = new Set<number>();
+    const seenSignatures = new Set<string>();
+
     list.forEach((a, position) => {
+      if (!a) return;
+      const noteContent = a.noteText ?? a.personalNote ?? null;
+      const sig = `${a.type ?? 'activity'}_${(a.name ?? '').trim().toLowerCase()}_${a.startTime ?? ''}`;
+      if (seenIds.has(a.id) || seenSignatures.has(sig)) return;
+      seenIds.add(a.id);
+      seenSignatures.add(sig);
+
       activityRows.push({
         itinerary_id: itineraryId,
         user_id: userId,
         day,
         position,
         type: a.type ?? 'activity',
-        name: a.name ?? '',
-        category: a.category ?? '',
-        category_color: a.categoryColor ?? '',
-        image: a.image ?? '',
-        open_hours: a.openHours ?? '',
-        price: a.price ?? '',
-        start_time: a.startTime ?? '',
-        end_time: a.endTime ?? '',
-        rating: a.rating ?? 0,
-        lat: a.lat ?? null,
-        lng: a.lng ?? null,
-        note_text: a.noteText ?? null,
-        observation: a.observation ?? null,
-        metadata: { legacyId: a.id },
+        label: a.name ?? '',
+        place_id: a.placeId ?? null,
+        note_text: noteContent,
+        metadata: { 
+          legacyId: a.id, 
+          personalNote: noteContent, 
+          city: a.city ?? null, 
+          country: a.country ?? null,
+          name: a.name ?? '',
+          category: a.category ?? '',
+          categoryColor: a.categoryColor ?? '',
+          image: a.image ?? '',
+          openHours: a.openHours ?? '',
+          price: a.price ?? '',
+          startTime: a.startTime ?? '',
+          endTime: a.endTime ?? '',
+          rating: a.rating ?? 0,
+          lat: a.lat ?? null,
+          lng: a.lng ?? null,
+          observation: a.observation ?? null
+        },
       });
     });
   }
@@ -199,6 +236,8 @@ export async function savePlannerData(
     const { error } = await supabase.from('itinerary_transports').insert(transportRows);
     if (error) console.error('[plannerApi] insert transports failed', error);
   }
+
+  await touchItinerary(itineraryId);
 }
 
 /**

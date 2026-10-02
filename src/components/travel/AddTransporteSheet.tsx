@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { TimePickerSheet } from '@/components/travel/TimePickerSheet';
 import { cn } from '@/lib/utils';
 import { searchGooglePlacesAutocomplete } from '@/lib/googlePlacesApi';
+import { getCurrencySymbol } from '@/lib/currencyUtils';
 
 export type TransporteTipo = 'voo' | 'trem' | 'onibus' | 'carro';
 
@@ -26,6 +27,14 @@ export interface Transporte {
   chegadaMinuto?: string;
   codigo?: string;
   valor?: string;
+  terminalOrigem?: string;
+  portaoOrigem?: string;
+  terminalDestino?: string;
+  portaoDestino?: string;
+  baggageClaim?: string;
+  statusVoo?: string;
+  ciaAerea?: string;
+  aeronave?: string;
   /** Caminho no bucket `itinerary-documents` (após upload). */
   attachmentPath?: string;
   /** Nome original do arquivo, exibido na lista. */
@@ -39,6 +48,7 @@ interface AddTransporteSheetProps {
   onClose: () => void;
   onAdd: (transporte: Transporte) => void;
   editingTransporte?: Transporte | null;
+  currency?: string;
 }
 
 type TimePickerTarget = 'partida' | 'chegada' | null;
@@ -50,7 +60,7 @@ const tipoConfig: Record<TransporteTipo, { label: string; icon: typeof Plane; pl
   carro: { label: 'Carro', icon: Car, placeholder: 'Ex: Aluguel Hertz' },
 };
 
-export function AddTransporteSheet({ isOpen, onClose, onAdd, editingTransporte }: AddTransporteSheetProps) {
+export function AddTransporteSheet({ isOpen, onClose, onAdd, editingTransporte, currency = 'BRL' }: AddTransporteSheetProps) {
   const [tipo, setTipo] = useState<TransporteTipo>(editingTransporte?.tipo || 'voo');
   const [isLoading, setIsLoading] = useState(false);
   const [nome, setNome] = useState(editingTransporte?.nome || '');
@@ -215,7 +225,7 @@ export function AddTransporteSheet({ isOpen, onClose, onAdd, editingTransporte }
     return { hora: '08', minuto: '00' };
   };
 
-  const inputClass = "w-full px-4 py-3 rounded-xl border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary-official transition-colors";
+  const inputClass = "w-full px-4 py-3 rounded-xl border border-border bg-field text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors";
   const timeButtonClass = "px-4 py-3 rounded-xl border border-border bg-background text-sm text-foreground flex items-center gap-2 transition-colors hover:border-muted-foreground";
   const { hora: tpHora, minuto: tpMinuto } = getTimePickerInitial();
 
@@ -268,30 +278,52 @@ export function AddTransporteSheet({ isOpen, onClose, onAdd, editingTransporte }
             <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
           </div>
 
+          {/* Top Bar with Close Button */}
+          <div className="flex justify-end items-center px-6 pt-1 pb-2">
+            <button
+              onClick={onClose}
+              className="w-10 h-10 flex items-center justify-center -mr-1"
+              aria-label="Fechar"
+            >
+              <Icon name="close" size={20} className="text-muted-foreground" />
+            </button>
+          </div>
+
           <div className="px-6">
-            <div className="flex items-center justify-between mb-6">
+            {/* Title */}
+            <div className="mb-6">
               <h2 className="text-lg font-bold text-foreground">{editingTransporte ? 'Editar transporte' : 'Novo transporte'}</h2>
-              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center">
-                <Icon name="close" size={20} className="text-muted-foreground" />
-              </button>
             </div>
 
             {/* Tipo */}
             <label className="text-sm font-medium text-foreground mb-2 block">Tipo</label>
-            <div className="grid grid-cols-4 gap-2 mb-5">
+            <div className="flex gap-2 mb-5 overflow-x-auto scrollbar-hide">
               {(Object.keys(tipoConfig) as TransporteTipo[]).map((t) => {
                 const config = tipoConfig[t];
                 const IconComp = config.icon;
+                const active = tipo === t;
                 return (
                   <button
                     key={t}
+                    type="button"
                     onClick={() => setTipo(t)}
-                    className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 transition-colors ${
-                      tipo === t ? 'border-primary-official bg-primary-official/10' : 'border-border bg-background'
-                    }`}
+                    className="h-9 px-4 rounded-full text-[13px] font-semibold transition-all whitespace-nowrap flex-shrink-0 active:scale-[0.97] border inline-flex items-center gap-1.5"
+                    style={
+                      active
+                        ? {
+                            backgroundColor: '#1A1C40',
+                            color: '#FFFFFF',
+                            borderColor: 'transparent',
+                          }
+                        : {
+                            background: 'hsl(var(--card))',
+                            color: 'hsl(var(--foreground))',
+                            borderColor: 'hsl(var(--border))',
+                          }
+                    }
                   >
-                    <IconComp size={20} strokeWidth={1.5} className={tipo === t ? 'text-primary-official' : 'text-muted-foreground'} />
-                    <span className={`text-xs font-medium ${tipo === t ? 'text-foreground' : 'text-muted-foreground'}`}>{config.label}</span>
+                    <IconComp size={14} strokeWidth={2} className={active ? 'text-white' : ''} />
+                    {config.label}
                   </button>
                 );
               })}
@@ -320,10 +352,22 @@ export function AddTransporteSheet({ isOpen, onClose, onAdd, editingTransporte }
                     <Calendar mode="single" selected={partidaDate} onSelect={(date) => { setPartidaDate(date); setIsPartidaCalendarOpen(false); }} initialFocus className="p-3 pointer-events-auto" />
                   </PopoverContent>
                 </Popover>
-                <button onClick={() => setTimePickerTarget('partida')} className={timeButtonClass}>
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  {partidaHora}:{partidaMinuto}
-                </button>
+                <div className={cn(timeButtonClass, "relative overflow-hidden cursor-pointer")}>
+                  <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <input
+                    type="time"
+                    value={`${partidaHora}:${partidaMinuto}`}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val) {
+                        const [h, m] = val.split(':');
+                        setPartidaHora(h);
+                        setPartidaMinuto(m);
+                      }
+                    }}
+                    className="text-[14px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-[45px] text-center"
+                  />
+                </div>
               </div>
             </div>
 
@@ -333,9 +377,9 @@ export function AddTransporteSheet({ isOpen, onClose, onAdd, editingTransporte }
                 type="button"
                 onClick={() => setShowChegada(true)}
                 className="flex items-center gap-1.5 text-sm font-medium mb-4 transition-colors"
-                style={{ color: '#9DCC36' }}
+                style={{ color: '#1A1C40' }}
               >
-                <Icon name="add" size={16} />
+                <Icon name="add" size={16} style={{ color: '#1A1C40' }} />
                 Adicionar chegada
               </button>
             ) : (
@@ -367,10 +411,22 @@ export function AddTransporteSheet({ isOpen, onClose, onAdd, editingTransporte }
                       <Calendar mode="single" selected={chegadaDate} onSelect={(date) => { setChegadaDate(date); setIsChegadaCalendarOpen(false); }} initialFocus className="p-3 pointer-events-auto" />
                     </PopoverContent>
                   </Popover>
-                  <button onClick={() => setTimePickerTarget('chegada')} className={timeButtonClass}>
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    {chegadaHora}:{chegadaMinuto}
-                  </button>
+                  <div className={cn(timeButtonClass, "relative overflow-hidden cursor-pointer")}>
+                    <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <input
+                      type="time"
+                      value={`${chegadaHora}:${chegadaMinuto}`}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val) {
+                          const [h, m] = val.split(':');
+                          setChegadaHora(h);
+                          setChegadaMinuto(m);
+                        }
+                      }}
+                      className="text-[14px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-[45px] text-center"
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -380,8 +436,8 @@ export function AddTransporteSheet({ isOpen, onClose, onAdd, editingTransporte }
               Valor <span className="text-muted-foreground font-normal">(opcional)</span>
             </label>
             <div className="relative mb-4">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">R$</span>
-              <input type="text" inputMode="numeric" placeholder="0,00" value={valor} onChange={handleValorChange} className={cn(inputClass, 'pl-10')} />
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">{getCurrencySymbol(currency)}</span>
+              <input type="text" inputMode="numeric" placeholder="0,00" value={valor} onChange={handleValorChange} className={cn(inputClass, 'pl-[50px]')} />
             </div>
 
 

@@ -15,10 +15,6 @@ interface ReceivingData {
 }
 
 const loadInitial = (): ReceivingData => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
   return { cpf: '000.000.000-00', pixKey: 'email@exemplo.com' };
 };
 
@@ -61,9 +57,6 @@ export function PaymentSettingsScreen({ onBack }: PaymentSettingsScreenProps) {
   const handleSave = () => {
     if (!isValid) return;
     const data = { cpf, pixKey };
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch {}
     setSavedData(data);
     setIsEditing(false);
     toast.success('Dados atualizados com sucesso');
@@ -84,7 +77,7 @@ export function PaymentSettingsScreen({ onBack }: PaymentSettingsScreenProps) {
   } as const;
 
   return (
-    <div className="min-h-screen bg-background pb-28">
+    <div className="min-h-[100dvh] bg-background pb-28">
       {/* Header */}
       <div className="sticky top-0 z-20 bg-background">
         <div className="flex items-center gap-3 px-4" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>

@@ -1,139 +1,36 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { motion, useMotionValue, useTransform, PanInfo } from 'framer-motion';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { motion, useMotionValue, useTransform, PanInfo, animate } from 'framer-motion';
 import { Icon } from '../ui/Icon';
-import { Crown, Users, ShoppingBag } from 'lucide-react';
-import { CreateCollectionSheet } from '../travel/CreateCollectionSheet';
-import { BottomSheet } from '../ui/BottomSheet';
-import { format, differenceInDays } from 'date-fns';
+import { ShoppingBag, Star, Heart, Mic, SlidersHorizontal, Plus, Trash2, LogOut } from 'lucide-react';
+import { format, differenceInDays, differenceInCalendarDays } from 'date-fns';
 import { parseLocalDate } from '@/lib/localDate';
 import { ptBR } from 'date-fns/locale';
 import { resolveTripThumbnailImages, GENERIC_TRAVEL_PLACEHOLDER } from '@/lib/coverImageResolver';
-import { useFavorites } from '@/contexts/FavoritesContext';
 import { useMyItineraries } from '@/hooks/use-my-itineraries';
-import { type UserItinerary, fetchItineraryMemberAvatars, leaveItinerary } from '@/lib/itinerariesApi';
+import { type UserItinerary, fetchItineraryMemberAvatars, leaveItinerary, ITINERARIES_CHANGED_EVENT } from '@/lib/itinerariesApi';
 import { toast } from 'sonner';
-import { collectionsListKey, collectionsDataKey, readJSON, writeJSON } from '@/lib/userScopedStorage';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { PURCHASES_CHANGED_EVENT } from '@/lib/purchasesApi';
 import { ItineraryListSkeleton } from '@/components/ui/LoadingShimmers';
-import { isItineraryPaused } from '@/lib/itineraryPauseState';
+import { TripsFilterScreen } from '@/components/screens/TripsFilterScreen';
+import { EmptyItinerariesIllustration } from '@/components/travel/EmptyItinerariesIllustration';
+import { DeleteConfirmSheet } from '@/components/travel/DeleteConfirmSheet';
 
 export type { UserItinerary };
 
-
-export interface UserCollection {
-  id: number;
-  title: string;
-  itemCount: number;
-  isFavorites: boolean;
-  isPrivate: boolean;
-  images: string[];
-  participants: string[];
-}
-
-// UserItinerary type is now imported from '@/lib/itinerariesApi' (see top of file).
-// Itinerary persistence moved from localStorage to Supabase. Use useMyItineraries()
-// for reads, and createItinerary/updateItinerary/deleteItinerary for writes.
-
-export function getUserCollections(): UserCollection[] {
-  return readJSON<UserCollection[]>(collectionsListKey(), []);
-}
-
-export function saveUserCollection(collection: UserCollection) {
-  const key = collectionsListKey();
-  if (!key) return;
-  const existing = getUserCollections();
-  existing.unshift(collection);
-  writeJSON(key, existing);
-}
-
-export function deleteUserCollection(collectionId: number) {
-  const key = collectionsListKey();
-  if (!key) return;
-  const existing = getUserCollections();
-  writeJSON(key, existing.filter(c => c.id !== collectionId));
-}
-
+type TabType = 'private' | 'public' | 'favorites';
 type SortOption = 'az' | 'za' | 'days-asc' | 'days-desc' | 'recent' | 'oldest';
 type OriginFilter = 'all' | 'mine' | 'shared' | 'purchased';
 
-const sortOptions: { id: SortOption; label: string; shortLabel: string }[] = [
-  { id: 'az', label: 'Ordem alfabética (A–Z)', shortLabel: 'A–Z' },
-  { id: 'za', label: 'Ordem alfabética (Z–A)', shortLabel: 'Z–A' },
-  { id: 'days-asc', label: 'Dias restantes: menor → maior', shortLabel: 'Dias restantes ↑' },
-  { id: 'days-desc', label: 'Dias restantes: maior → menor', shortLabel: 'Dias restantes ↓' },
-  { id: 'recent', label: 'Mais recentes', shortLabel: 'Mais recentes' },
-  { id: 'oldest', label: 'Mais antigos', shortLabel: 'Mais antigos' },
-];
 
-const originOptions: { id: OriginFilter; label: string }[] = [
-  { id: 'all', label: 'Todos' },
-  { id: 'mine', label: 'Meus roteiros' },
-  { id: 'shared', label: 'Compartilhados comigo' },
-  { id: 'purchased', label: 'Comprados' },
-];
+let cachedMemberAvatars: Record<string, any[]> = {};
 
-const privateItineraries: any[] = [];
-
-const publicItineraries: any[] = [];
-
-const favoriteItineraries: any[] = [];
-
-const collections = [{
-  id: 2,
-  title: 'Paris',
-  itemCount: 23,
-  isFavorites: false,
-  isPrivate: false,
-  images: [
-    'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=400'
-  ],
-  participants: [
-    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100'
-  ]
-}, {
-  id: 3,
-  title: 'Rio de Janeiro',
-  itemCount: 15,
-  isFavorites: false,
-  isPrivate: true,
-  images: [
-    'https://images.unsplash.com/photo-1483729558449-99ef09a8c325?w=400'
-  ],
-  participants: []
-}, {
-  id: 4,
-  title: 'Inverno Europeu',
-  itemCount: 31,
-  isFavorites: false,
-  isPrivate: false,
-  images: [
-    'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=400',
-    'https://images.unsplash.com/photo-1491002052546-bf38f186af56?w=400',
-    'https://images.unsplash.com/photo-1476820865390-c52aeebb9891?w=400',
-    'https://images.unsplash.com/photo-1548777123-e216912df7d8?w=400'
-  ],
-  participants: [
-    'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100',
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'
-  ]
-}, {
-  id: 5,
-  title: 'Tóquio & Kyoto',
-  itemCount: 18,
-  isFavorites: false,
-  isPrivate: true,
-  images: [
-    'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=400'
-  ],
-  participants: []
-}];
-
-let cachedMemberAvatars: Record<string, string[]> = {};
-
-type TabType = 'private' | 'public' | 'favorites' | 'collections';
+// Referências estáveis para quando as consultas ainda não retornaram.
+const EMPTY_SALES_COUNTS: Record<string, number> = {};
+const EMPTY_PURCHASED_IDS: Set<string> = new Set();
+const EMPTY_LISTINGS: Record<string, { status: string; priceCents: number | null; title: string | null }> = {};
 
 interface TripsScreenProps {
   onItineraryClick: (id: number) => void;
@@ -141,55 +38,69 @@ interface TripsScreenProps {
   onUserItineraryClick?: (itinerary: UserItinerary) => void;
   /** Open a user-published itinerary inside the marketplace ("for sale") view. */
   onUserPublicItineraryClick?: (itinerary: UserItinerary) => void;
-  onCollectionClick: (id: number) => void;
-  /** Triggered from the empty state on the "Privados" tab. */
-  onCreateItinerary?: () => void;
-  /** Triggered from the empty state on the "Públicos" tab. */
+  /** Triggered from the empty state or + button */
+  onCreateItinerary?: (type?: 'personal' | 'seller') => void;
   onBecomeCreator?: () => void;
-  /** Triggered from the empty state on the "Favoritos" tab — opens the Explore screen. */
   onExplore?: () => void;
-  /** Navigate to the subscription/upgrade screen. */
   onUpgrade?: () => void;
-  /** Quantos roteiros criados pelo próprio usuário já existem (para o chip de limite). */
   itineraryUsedCount?: number;
-  /** Limite total do plano (free=3). */
   itineraryLimit?: number;
   defaultTab?: TabType;
+  onOpenCreateSheet?: () => void;
 }
 
-// Single cover image thumbnail (square 1:1)
-function TripThumbnail({ images }: { images: string[] }) {
+// Single cover image thumbnail (Figma: width 95px, height 117px, border-radius 8px)
+function TripThumbnail({ images, className }: { images: string[], className?: string }) {
   const cover = images.find((image) => image && !image.startsWith('blob:')) || GENERIC_TRAVEL_PLACEHOLDER;
   return (
-    <div className="w-24 h-full aspect-square rounded-2xl overflow-hidden flex-shrink-0">
+    <div className={`rounded-[8px] overflow-hidden flex-shrink-0 bg-muted ${className || "w-[95px] h-[117px] min-w-[95px] min-h-[117px]"}`}>
       <img
         src={cover}
         alt=""
-        className="w-full h-full object-cover bg-muted"
+        className="w-full h-full object-cover"
+        loading="lazy"
       />
     </div>
   );
 }
 
-// Component for avatar stack
-function AvatarStack({ participants }: { participants: string[] }) {
-  const maxVisible = 4;
-  const visible = participants.slice(0, maxVisible);
-  const extraCount = Math.max(0, participants.length - maxVisible);
+interface ParticipantItem {
+  avatar: string;
+  name?: string;
+  isOwner?: boolean;
+}
+
+// Component for avatar stack (Figma: 32x32px, border 1.33px #FEFEFE, border-radius 53px)
+function AvatarStack({ participants }: { participants?: (string | ParticipantItem)[] }) {
+  if (!participants || participants.length === 0) {
+    return null;
+  }
+
+  const list: ParticipantItem[] = participants.map((p, idx) => {
+    if (typeof p === 'string') {
+      return { avatar: p, isOwner: idx === 0 };
+    }
+    return p;
+  });
+
+  const maxVisible = 2;
+  const visible = list.slice(0, maxVisible);
+  const extraCount = Math.max(0, list.length - maxVisible);
 
   return (
-    <div className="flex -space-x-2">
-      {visible.map((avatar, index) => (
+    <div className="flex items-center -space-x-[11px] h-[32px]">
+      {visible.map((item, index) => (
         <img
           key={index}
-          src={avatar}
-          alt=""
-          className="w-7 h-7 rounded-full border-2 border-white object-cover"
+          src={item.avatar}
+          alt={item.name || ''}
+          title={item.name ? `${item.name}${item.isOwner ? ' (Dono)' : ''}` : undefined}
+          className="w-[32px] h-[32px] rounded-full border-[1.33px] border-[#FEFEFE] object-cover bg-muted flex-shrink-0"
         />
       ))}
       {extraCount > 0 && (
-        <div className="w-7 h-7 rounded-full border-2 border-white bg-muted flex items-center justify-center">
-          <span className="text-[10px] font-semibold text-muted-foreground">
+        <div className="w-[32px] h-[32px] rounded-full border-[1.33px] border-[#FEFEFE] bg-[#F2F2F2] flex items-center justify-center flex-shrink-0 z-10">
+          <span className="text-[10px] font-bold text-[#1A1C40]">
             +{extraCount}
           </span>
         </div>
@@ -198,412 +109,105 @@ function AvatarStack({ participants }: { participants: string[] }) {
   );
 }
 
-// Section divider for upcoming vs past trips
-function SectionHeader({
-  icon,
-  label,
-  count,
-  variant,
-}: {
-  icon: string;
-  label: string;
-  count: number;
-  variant: 'upcoming' | 'past';
-}) {
-  const isUpcoming = variant === 'upcoming';
-  return (
-    <div className="flex items-center gap-3">
-      <h2 className="text-[15px] font-bold text-foreground">{label}</h2>
-      <span className="text-[13px] font-medium text-muted-foreground">
-        {count}
-      </span>
-      <div className="flex-1 h-px bg-border ml-1" />
-    </div>
-  );
-}
-
-// Swipeable itinerary card with delete action
-function SwipeableItineraryCard({
-  item,
-  isPrivate,
-  isShared,
-  isSwiped,
-  onSwipeOpen,
-  onSwipeClose,
-  onClick,
-  onDelete,
-  getDaysRemainingStyle,
-}: {
-  item: any;
-  isPrivate: boolean;
-  isShared: boolean;
-  isSwiped: boolean;
-  onSwipeOpen: () => void;
-  onSwipeClose: () => void;
-  onClick: () => void;
-  onDelete: () => void;
-  getDaysRemainingStyle: (days: number) => string;
-}) {
-  const x = useMotionValue(0);
-  const DELETE_WIDTH = 80;
-  const dragThreshold = 40;
-
-  const handleDragEnd = (_: any, info: PanInfo) => {
-    if (info.offset.x < -dragThreshold) {
-      onSwipeOpen();
-      x.set(-DELETE_WIDTH);
-    } else {
-      onSwipeClose();
-      x.set(0);
-    }
-  };
-
-  useEffect(() => {
-    if (!isSwiped) x.set(0);
-  }, [isSwiped, x]);
-
-  return (
-    <div className="relative overflow-hidden rounded-2xl">
-      {/* Action behind: Excluir (dono) ou Sair (participante) */}
-      <div className="absolute right-0 top-0 bottom-0 w-20 flex items-center justify-center bg-destructive rounded-r-2xl">
-        <button onClick={onDelete} className="flex flex-col items-center gap-1">
-          <Icon name={isShared ? 'logout' : 'delete'} size={22} className="text-destructive-foreground" />
-          <span className="text-[11px] font-medium text-destructive-foreground">{isShared ? 'Sair' : 'Excluir'}</span>
-        </button>
-      </div>
-
-      {/* Draggable card */}
-      <motion.div
-        style={{ x }}
-        drag="x"
-        dragConstraints={{ left: -DELETE_WIDTH, right: 0 }}
-        dragElastic={0.1}
-        onDragEnd={handleDragEnd}
-        className="flex gap-4 items-stretch bg-white rounded-2xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.03)] relative z-10"
-      >
-        <button onClick={() => { if (!isSwiped) onClick(); else onSwipeClose(); }} className="flex-shrink-0 self-stretch">
-          <div className={`h-full ${item.isPast ? 'grayscale-[0.6] opacity-80 transition' : ''}`}>
-            <TripThumbnail images={item.images} />
-          </div>
-        </button>
-        <div className="flex-1 min-w-0 flex flex-col gap-2">
-          <button onClick={() => { if (!isSwiped) onClick(); else onSwipeClose(); }} className="text-left min-w-0">
-            <h3 className={`font-semibold text-[16px] leading-tight truncate ${item.isPast ? 'text-muted-foreground' : 'text-[#1A1C40]'}`}>
-              {item.title}
-            </h3>
-          </button>
-          {isPrivate ? (
-            <>
-              <p className="text-[12px] font-medium text-muted-foreground">
-                {item.dateRange} <span className="inline-block w-1 h-1 rounded-full bg-muted-foreground mx-1 align-middle" /> {item.places} lugares
-              </p>
-              {item.participants && item.participants.length > 0 && (
-                <AvatarStack participants={item.participants} />
-              )}
-              <div className="flex items-center gap-2 flex-wrap">
-                {item.isPast ? (
-                  <span className="h-7 inline-flex items-center gap-1 text-[12px] font-medium px-3 rounded-2xl bg-[#F2F2F2] text-[#8E8E93]">
-                    <Icon name="check_circle" size={14} className="text-[#8E8E93]" />
-                    Concluída
-                  </span>
-                ) : item.isFlexible ? null : (
-                  <span className={`h-7 inline-flex items-center text-[12px] font-medium px-3 rounded-2xl ${getDaysRemainingStyle(item.daysRemaining)}`}>
-                    Em {item.daysRemaining} dias
-                  </span>
-                )}
-                {item.isPurchased ? (
-                  <span
-                    title="Comprado"
-                    aria-label="Comprado"
-                    className="h-7 w-7 inline-flex items-center justify-center rounded-2xl text-[#8E8E93] bg-[#F2F2F2]"
-                  >
-                    <ShoppingBag size={14} className="text-[#8E8E93]" />
-                  </span>
-                ) : item.isShared ? (
-                  <span
-                    title="Compartilhado"
-                    aria-label="Compartilhado"
-                    className="h-7 w-7 inline-flex items-center justify-center rounded-2xl text-[#8E8E93] bg-[#F2F2F2]"
-                  >
-                    <Users size={14} className="text-[#8E8E93]" />
-                  </span>
-                ) : (
-                  <span
-                    title="Criado por mim"
-                    aria-label="Criado por mim"
-                    className="h-7 w-7 inline-flex items-center justify-center rounded-2xl text-[#8E8E93] bg-[#F2F2F2]"
-                  >
-                    <Crown size={14} className="text-[#8E8E93]" />
-                  </span>
-                )}
-              </div>
-            </>
-          ) : (
-            <>
-              {(() => {
-                const paused = isItineraryPaused(item.id);
-                return (
-                  <span
-                    className="h-7 inline-flex items-center gap-1.5 self-start text-[12px] font-semibold px-2.5 rounded-2xl bg-[#F2F2F2]"
-                    style={{ color: paused ? '#8A6D00' : '#3F7A0F' }}
-                  >
-                    <span
-                      className="w-1.5 h-1.5 rounded-full"
-                      style={{ background: paused ? '#E0B400' : '#3F7A0F' }}
-                    />
-                    {paused ? 'Pausado' : 'Ativo'}
-                  </span>
-                );
-              })()}
-              <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                <div className="flex items-center gap-1">
-                  <Icon name="shopping_bag" size={14} className="text-muted-foreground" />
-                  <span className="text-[12px] font-medium text-muted-foreground">
-                    {(item.salesCount ?? 0).toLocaleString('pt-BR')} {item.salesCount === 1 ? 'venda' : 'vendas'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Icon name="star" size={14} className="text-amber-500" />
-                  <span className="text-[12px] font-medium text-muted-foreground">
-                    {item.rating ?? '—'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Icon name="favorite" size={14} style={{ color: '#DA501F' }} />
-                  <span className="text-[12px] font-medium text-muted-foreground">
-                    {(item.favoritesCount ?? 0).toLocaleString('pt-BR')}
-                  </span>
-                </div>
-              </div>
-              <p className="text-[14px] font-bold text-foreground mt-2">
-                {item.priceCents != null
-                  ? `R$ ${(item.priceCents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                  : 'Grátis'}
-              </p>
-            </>
-          )}
-        </div>
-      </motion.div>
-    </div>
-  );
-}
-
-// Collection card with mosaic / cover / placeholder thumbnail
-function CollectionCard({
-  collection,
-  onClick,
-  isEditing,
-  isSelected,
-  onToggleSelect,
-  onLongPress
-}: {
-  collection: typeof collections[0];
-  onClick: () => void;
-  isEditing: boolean;
-  isSelected: boolean;
-  onToggleSelect: () => void;
-  onLongPress: () => void;
-}) {
-  const longPressTimer = { current: null as ReturnType<typeof setTimeout> | null };
-
-  const handleTouchStart = () => {
-    longPressTimer.current = setTimeout(() => {
-      onLongPress();
-    }, 500);
-  };
-
-  const handleTouchEnd = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-  };
-
-  const handleClick = () => {
-    if (isEditing) {
-      onToggleSelect();
-    } else {
-      onClick();
-    }
-  };
-
-  const renderThumbnail = () => {
-    const imgs = collection.images;
-    if (imgs.length >= 4) {
-      return (
-        <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-[1px]">
-          {imgs.slice(0, 4).map((img, i) => (
-            <img key={i} src={img} alt="" className="w-full h-full object-cover" />
-          ))}
-        </div>
-      );
-    }
-    if (imgs.length >= 2) {
-      return (
-        <div className="w-full h-full grid grid-cols-2 gap-[1px]">
-          {imgs.slice(0, 2).map((img, i) => (
-            <img key={i} src={img} alt="" className="w-full h-full object-cover" />
-          ))}
-        </div>
-      );
-    }
-    if (imgs.length === 1) {
-      return <img src={imgs[0]} alt={collection.title} className="w-full h-full object-cover" />;
-    }
-    return (
-      <div className="w-full h-full bg-[#F2F2F2] flex items-center justify-center">
-        <Icon name={collection.isFavorites ? "favorite" : "bookmark"} size={32} className="text-muted-foreground/25" />
-      </div>
-    );
-  };
-
-  return (
-    <button
-      onClick={handleClick}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      onTouchCancel={handleTouchEnd}
-      className="w-full text-left active:scale-[0.97] transition-transform duration-150 relative"
-    >
-      {/* Image area — rounded top only */}
-      <div className="relative w-full aspect-[4/3] rounded-t-[16px] overflow-hidden">
-        {renderThumbnail()}
-
-        {/* Edit mode check */}
-        {isEditing && (
-          <div className="absolute top-2.5 left-2.5">
-            <div className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-primary border-primary' : 'border-white bg-black/30'
-              }`}>
-              {isSelected && <Icon name="check" size={16} className="text-primary-foreground" />}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Content area — solid background, no overlay */}
-      <div className="bg-card rounded-b-[16px] border border-t-0 border-border/50 px-3 py-2.5">
-        <div className="flex items-start justify-between gap-1">
-          <h3 className="font-bold text-[14px] text-foreground leading-tight line-clamp-1">
-            {collection.title}
-          </h3>
-          {collection.isPrivate && (
-            <Icon name="lock" size={14} className="text-muted-foreground flex-shrink-0 mt-0.5" />
-          )}
-        </div>
-        <div className="flex items-center justify-between mt-1">
-          <p className="text-[12px] font-medium text-muted-foreground">
-            {collection.itemCount} itens
-          </p>
-          {collection.participants.length > 0 && (
-            <div className="flex -space-x-1.5">
-              {collection.participants.slice(0, 3).map((avatar, i) => (
-                <img key={i} src={avatar} alt="" className="w-5 h-5 rounded-full border-[1.5px] border-card object-cover" />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </button>
-  );
-}
-
 export function TripsScreen({
   onItineraryClick,
   onPrivateItineraryClick,
   onUserItineraryClick,
   onUserPublicItineraryClick,
-  onCollectionClick,
   onCreateItinerary,
-  onBecomeCreator,
-  onExplore,
-  onUpgrade,
-  itineraryUsedCount,
-  itineraryLimit,
-  defaultTab = 'private'
+  onOpenCreateSheet,
+  defaultTab = 'private',
+  onDeleteSuccess,
+  onLeaveSuccess,
 }: TripsScreenProps) {
-  const [activeTab, setActiveTab] = useState<TabType>(defaultTab);
-  const [isEditingCollections, setIsEditingCollections] = useState(false);
-  const [selectedCollections, setSelectedCollections] = useState<Set<number>>(new Set());
-  const [showCreateCollection, setShowCreateCollection] = useState(false);
-  const [sortBy, setSortBy] = useState<SortOption>('az');
+  const [activeTab, setActiveTab] = useState<'private' | 'public'>(
+    defaultTab === 'public' ? 'public' : 'private'
+  );
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<SortOption>('recent');
   const [originFilter, setOriginFilter] = useState<OriginFilter>('all');
   const [showSortSheet, setShowSortSheet] = useState(false);
-  const [showCreateSheet, setShowCreateSheet] = useState(false);
-  const { favorites: favoriteItems, removeFavorite } = useFavorites();
-
-  const tabs = [{
-    id: 'private' as TabType,
-    label: 'Meus roteiros'
-  }, {
-    id: 'public' as TabType,
-    label: 'À venda'
-  }, {
-    id: 'favorites' as TabType,
-    label: 'Favoritos'
-  }, {
-    id: 'collections' as TabType,
-    label: 'Coleções'
-  }];
 
   const { user: authUser } = useAuth();
-  const [userCollections, setUserCollections] = useState<UserCollection[]>(() => getUserCollections());
-  const { itineraries: userItineraries, loading: itinerariesLoading, remove: removeItinerary, refetch: refetchItineraries } = useMyItineraries();
-  const [salesByItinerary, setSalesByItinerary] = useState<Record<string, number>>({});
-  const [purchasedItineraryIds, setPurchasedItineraryIds] = useState<Set<string>>(new Set());
-  const [purchasesVersion, setPurchasesVersion] = useState(0);
+  const {
+    itineraries: userItineraries,
+    loading: itinerariesLoading,
+    remove: removeItinerary,
+  } = useMyItineraries();
 
-  // Recarrega vendas/compras quando uma nova compra é registrada em qualquer tela.
+  const queryClient = useQueryClient();
+  const userId = authUser?.id ?? null;
+
+  // Vendas (como vendedor) e compras (como comprador) numa única consulta.
+  const { data: salesData } = useQuery({
+    queryKey: ['trips-sales', userId],
+    enabled: !!userId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('itinerary_sales')
+        .select('itinerary_id, seller_id, buyer_id')
+        .or(`seller_id.eq.${userId},buyer_id.eq.${userId}`);
+      if (error) throw error;
+      const counts: Record<string, number> = {};
+      const purchased = new Set<string>();
+      for (const row of (data ?? []) as { itinerary_id: string; seller_id: string; buyer_id: string }[]) {
+        if (row.seller_id === userId) counts[row.itinerary_id] = (counts[row.itinerary_id] ?? 0) + 1;
+        if (row.buyer_id === userId) purchased.add(row.itinerary_id);
+      }
+      return { counts, purchased };
+    },
+  });
+  const salesByItinerary = salesData?.counts ?? EMPTY_SALES_COUNTS;
+  const purchasedItineraryIds = salesData?.purchased ?? EMPTY_PURCHASED_IDS;
+
   useEffect(() => {
-    const handler = () => setPurchasesVersion((v) => v + 1);
+    const handler = () => queryClient.invalidateQueries({ queryKey: ['trips-sales'] });
     window.addEventListener(PURCHASES_CHANGED_EVENT, handler);
     return () => window.removeEventListener(PURCHASES_CHANGED_EVENT, handler);
-  }, []);
+  }, [queryClient]);
 
-  // Recarrega coleções sempre que o usuário ativo muda (login / logout / troca).
-  useEffect(() => {
-    setUserCollections(getUserCollections());
-  }, [authUser?.id]);
-
-  // Carrega contagem de vendas por roteiro (para a aba "À venda").
-  useEffect(() => {
-    if (!authUser?.id) {
-      setSalesByItinerary({});
-      return;
-    }
-    let cancelled = false;
-    (async () => {
+  // Listings da loja do próprio vendedor. Roteiros pessoais publicados na loja
+  // continuam com is_personal = true; o que os identifica é o listing.
+  const { data: listingsData } = useQuery({
+    queryKey: ['trips-listings', userId],
+    enabled: !!userId,
+    queryFn: async () => {
       const { data, error } = await supabase
-        .from('itinerary_sales')
-        .select('itinerary_id')
-        .eq('seller_id', authUser.id);
-      if (cancelled || error || !data) return;
-      const counts: Record<string, number> = {};
-      for (const row of data as { itinerary_id: string }[]) {
-        counts[row.itinerary_id] = (counts[row.itinerary_id] ?? 0) + 1;
+        .from('itinerary_store_listing')
+        .select('itinerary_id, status, price_cents, listed_title')
+        .eq('seller_id', userId!);
+      if (error) throw error;
+      const map: Record<string, { status: string; priceCents: number | null; title: string | null }> = {};
+      for (const row of (data ?? []) as any[]) {
+        map[row.itinerary_id] = {
+          status: row.status,
+          priceCents: row.price_cents ?? null,
+          title: row.listed_title ?? null,
+        };
       }
-      setSalesByItinerary(counts);
-    })();
-    return () => { cancelled = true; };
-  }, [authUser?.id, userItineraries.length, purchasesVersion]);
+      return map;
+    },
+  });
+  const listingsByItinerary = listingsData ?? EMPTY_LISTINGS;
 
-  // Carrega quais roteiros do usuário foram comprados (buyer_id = user).
+  // Agrupa rajadas de eventos (cada save do planner emite um) num único refetch.
   useEffect(() => {
-    if (!authUser?.id) {
-      setPurchasedItineraryIds(new Set());
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      const { data, error } = await supabase
-        .from('itinerary_sales')
-        .select('itinerary_id')
-        .eq('buyer_id', authUser.id);
-      if (cancelled || error || !data) return;
-      setPurchasedItineraryIds(new Set((data as { itinerary_id: string }[]).map(r => r.itinerary_id)));
-    })();
-    return () => { cancelled = true; };
-  }, [authUser?.id, userItineraries.length, purchasesVersion]);
-  // Avatares reais (dono + membros aceitos) por roteiro — usados nos cards.
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const handler = () => {
+      if (timer) return;
+      timer = setTimeout(() => {
+        timer = null;
+        queryClient.invalidateQueries({ queryKey: ['trips-listings'] });
+      }, 300);
+    };
+    window.addEventListener(ITINERARIES_CHANGED_EVENT, handler);
+    return () => {
+      window.removeEventListener(ITINERARIES_CHANGED_EVENT, handler);
+      if (timer) clearTimeout(timer);
+    };
+  }, [queryClient]);
+
+  // Avatares reais por roteiro
   const [memberAvatarsByItin, setMemberAvatarsByItin] = useState<Record<string, string[]>>(() => cachedMemberAvatars);
   const [visualsReady, setVisualsReady] = useState(false);
 
@@ -623,755 +227,806 @@ export function TripsScreen({
         } catch {
           /* silencioso */
         }
-      } else {
-        if (Object.keys(cachedMemberAvatars).length > 0) {
-          cachedMemberAvatars = {};
-          setMemberAvatarsByItin({});
-        }
       }
-
-      // Preload images logic
-      if (userItineraries.length > 0) {
-        const imageUrlsToPreload: string[] = [];
-        userItineraries.forEach(itin => {
-          if (itin.images && itin.images.length > 0) {
-            imageUrlsToPreload.push(...itin.images);
-          } else {
-            const covers = resolveTripThumbnailImages(itin.destinations);
-            imageUrlsToPreload.push(...covers);
-          }
-          const participants = map[itin.id as string] || itin.participants || [];
-          imageUrlsToPreload.push(...participants);
-        });
-
-        const { preloadImages } = await import('@/lib/preloadImages');
-        await preloadImages(imageUrlsToPreload);
-      }
-
       if (!cancelled) {
         setVisualsReady(true);
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [userItineraries]);
 
-  const allCollections = useMemo(() => [...userCollections], [userCollections]);
-
-  const isTripsScreenLoading = itinerariesLoading || !visualsReady;
-
+  // Minhas viagens (inclui criados como pessoais e os híbridos publicados depois)
   const mergedPrivateItineraries = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    // Apenas roteiros privados ficam nesta aba; cópias à venda ficam em "Públicos".
-    const userCards = userItineraries.filter(ui => !ui.isPublic).map(ui => {
-      const start = parseLocalDate(ui.startDate) ?? new Date();
-      const end = parseLocalDate(ui.endDate) ?? new Date();
-      const isFlexible = ui.tags?.includes('_FLEXIBLE_DATES_') || false;
-      const durationDays = differenceInDays(end, start) + 1;
-      const daysRemaining = Math.max(0, differenceInDays(start, new Date()));
-      const dateRange = isFlexible ? `Duração: ${durationDays} ${durationDays === 1 ? 'dia' : 'dias'}` : `${format(start, "d 'de' MMM", { locale: ptBR })} - ${format(end, "d 'de' MMM", { locale: ptBR })}`;
-      const validImages = ui.images.filter((image) => image && !image.startsWith('blob:'));
-      const images = validImages.length > 0 ? validImages : resolveTripThumbnailImages(ui.destinations);
-      return {
-        id: ui.id as string | number,
-        title: ui.title,
-        dateRange,
-        places: ui.places,
-        daysRemaining,
-        isPast: !isFlexible && end < today,
-        isFlexible,
-        images,
-        participants: (typeof ui.id === 'string' && (memberAvatarsByItin[ui.id]?.length ?? 0) > 0)
-          ? memberAvatarsByItin[ui.id]
-          : ui.participants,
-        isPurchased: (typeof ui.id === 'string' && purchasedItineraryIds.has(ui.id)) || (ui.sourceDatasetId != null && !ui.isPublic),
-        // "Compartilhado" = sou membro mas não sou dono do roteiro.
-        isShared: !!authUser?.id && ui.userId !== authUser.id,
-        _userItinerary: ui,
-      };
-    });
-    userCards.sort((a, b) => (parseLocalDate(a._userItinerary.startDate)?.getTime() ?? 0) - (parseLocalDate(b._userItinerary.startDate)?.getTime() ?? 0));
+
+    const userCards = userItineraries
+      .filter((ui) => ui.isPersonal !== false && !ui.deletedAt)
+      .map((ui) => {
+        const parsedStart = parseLocalDate(ui.startDate);
+        const parsedEnd = parseLocalDate(ui.endDate);
+        const isFlexible = ui.isFlexible || false;
+        const isCancelled = ui.status === 'suspended' || false;
+
+        const start = parsedStart ? new Date(parsedStart) : (parsedEnd ? new Date(parsedEnd) : new Date(today));
+        const end = parsedEnd ? new Date(parsedEnd) : (parsedStart ? new Date(parsedStart) : new Date(today));
+        start.setHours(0, 0, 0, 0);
+        end.setHours(0, 0, 0, 0);
+
+        const durationDays = isFlexible && ui.durationDays ? ui.durationDays : Math.max(1, differenceInDays(end, start) + 1);
+        const daysRemaining = parsedStart ? differenceInCalendarDays(start, today) : 999999;
+        const isPast = !isCancelled && !isFlexible && !!parsedEnd && end < today;
+        const isInProgress = !isCancelled && !isFlexible && !isPast && !!parsedStart && today >= start && today <= end;
+        const formatShortDate = (d: Date) => {
+          const day = format(d, 'd');
+          const monthMap: Record<number, string> = {
+            0: 'Jan', 1: 'Fev', 2: 'Mar', 3: 'Abr', 4: 'Mai', 5: 'Jun',
+            6: 'Jul', 7: 'Ago', 8: 'Set', 9: 'Out', 10: 'Nov', 11: 'Dez'
+          };
+          return `${day} ${monthMap[d.getMonth()]}`;
+        };
+        const dateRange = isFlexible || !parsedStart
+          ? `${durationDays} ${durationDays === 1 ? 'dia' : 'dias'}`
+          : `${formatShortDate(start)} - ${formatShortDate(end)} (${durationDays} ${durationDays === 1 ? 'dia' : 'dias'})`;
+        const validImages = ui.images.filter((image) => image && !image.startsWith('blob:'));
+        const images = validImages.length > 0 ? validImages : resolveTripThumbnailImages(ui.destinations);
+
+        const isPurchased =
+          (typeof ui.id === 'string' && purchasedItineraryIds.has(ui.id)) ||
+          (ui.sourceDatasetId != null && !ui.isPublic);
+        const isShared = !!authUser?.id && ui.userId !== authUser.id;
+
+        // Subtítulo do card
+        let subtitle = 'Criado por você';
+        if (isPurchased) {
+          subtitle = 'Roteiro comprado';
+        } else if (isShared) {
+          subtitle = 'Compartilhado com você';
+        }
+
+        return {
+          id: ui.id as string | number,
+          title: ui.title,
+          subtitle,
+          dateRange,
+          places: ui.places,
+          daysRemaining,
+          isPast,
+          isInProgress,
+          isCancelled,
+          isFlexible,
+          startDateObj: parsedStart ? start : null,
+          endDateObj: parsedEnd ? end : null,
+          images,
+          participants:
+            typeof ui.id === 'string' && (memberAvatarsByItin[ui.id]?.length ?? 0) > 0
+              ? memberAvatarsByItin[ui.id]
+              : ui.participants,
+          isPurchased,
+          isShared,
+          _userItinerary: ui,
+        };
+      });
+
     return userCards;
   }, [userItineraries, purchasedItineraryIds, authUser?.id, memberAvatarsByItin]);
 
+  // Roteiros publicados ou rascunhos de venda (apenas roteiros do próprio autor logado)
   const mergedPublicItineraries = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const userPublicCards = userItineraries.filter(ui => ui.isPublic).map(ui => {
-      const start = parseLocalDate(ui.startDate) ?? new Date();
-      const end = parseLocalDate(ui.endDate) ?? new Date();
-      const isFlexible = ui.tags?.includes('_FLEXIBLE_DATES_') || false;
-      const durationDays = differenceInDays(end, start) + 1;
-      const daysRemaining = Math.max(0, differenceInDays(start, new Date()));
-      const dateRange = isFlexible ? `Duração: ${durationDays} ${durationDays === 1 ? 'dia' : 'dias'}` : `${format(start, "d 'de' MMM", { locale: ptBR })} - ${format(end, "d 'de' MMM", { locale: ptBR })}`;
-      const validImages = ui.images.filter((image) => image && !image.startsWith('blob:'));
-      const images = validImages.length > 0 ? validImages : resolveTripThumbnailImages(ui.destinations);
-      return {
-        id: ui.id as string | number,
-        title: ui.title,
-        dateRange,
-        places: ui.places,
-        daysRemaining,
-        isPast: !isFlexible && end < today,
-        isFlexible,
-        images,
-        participants: ui.participants,
-        priceCents: ui.priceCents ?? null,
-        salesCount: salesByItinerary[ui.id] ?? 0,
-        _userItinerary: ui,
-      };
-    });
-    userPublicCards.sort((a, b) => (parseLocalDate(a._userItinerary.startDate)?.getTime() ?? 0) - (parseLocalDate(b._userItinerary.startDate)?.getTime() ?? 0));
+    const userPublicCards = userItineraries
+      .filter(
+        (ui) =>
+          ui.userId === authUser?.id &&
+          !ui.deletedAt &&
+          (ui.isPersonal === false || !!listingsByItinerary[ui.id]),
+      )
+      .map((ui) => {
+        const validImages = ui.images.filter((image) => image && !image.startsWith('blob:'));
+        const images = validImages.length > 0 ? validImages : resolveTripThumbnailImages(ui.destinations);
+        const salesCount = salesByItinerary[ui.id] ?? 0;
+        const listing = listingsByItinerary[ui.id];
+
+        let status: 'Ativo' | 'Rascunho' | 'Pausado' = 'Ativo';
+        if (ui.status === 'suspended' || ui.isPaused || (listing && listing.status !== 'active')) {
+          status = 'Pausado';
+        } else if (ui.status === 'draft' && !listing) {
+          status = 'Rascunho';
+        }
+
+        return {
+          id: ui.id as string | number,
+          title: listing?.title || ui.title,
+          images,
+          priceCents: listing?.priceCents ?? ui.priceCents,
+          salesCount,
+          rating: 0,
+          likesCount: 0,
+          status,
+          _userItinerary: ui,
+        };
+      });
+
     return userPublicCards;
-  }, [userItineraries, salesByItinerary]);
+  }, [userItineraries, salesByItinerary, listingsByItinerary, authUser?.id]);
 
-  const currentItineraries = activeTab === 'private'
-    ? mergedPrivateItineraries
-    : mergedPublicItineraries;
+  // Filtro e busca
+  const filteredPersonalList = useMemo(() => {
+    let list = mergedPrivateItineraries;
 
-  const filteredItineraries = useMemo(() => {
-    if (activeTab !== 'private' || originFilter === 'all') return currentItineraries;
-    return currentItineraries.filter((i: any) => {
-      if (originFilter === 'mine') return !i.isShared && !i.isPurchased;
-      if (originFilter === 'shared') return !!i.isShared;
-      if (originFilter === 'purchased') return !!i.isPurchased;
-      return true;
-    });
-  }, [currentItineraries, originFilter, activeTab]);
+    if (originFilter !== 'all') {
+      list = list.filter((item) => {
+        if (originFilter === 'mine') return !item.isShared && !item.isPurchased;
+        if (originFilter === 'shared') return item.isShared;
+        if (originFilter === 'purchased') return item.isPurchased;
+        return true;
+      });
+    }
 
-  const sortedItineraries = useMemo(() => {
-    const sorted = [...filteredItineraries];
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter(
+        (item) =>
+          item.title?.toLowerCase().includes(q) ||
+          item._userItinerary?.destinations?.some((d: string) => d.toLowerCase().includes(q))
+      );
+    }
+
+    const sorted = [...list];
     switch (sortBy) {
-      case 'az': sorted.sort((a, b) => a.title.localeCompare(b.title)); break;
-      case 'za': sorted.sort((a, b) => b.title.localeCompare(a.title)); break;
-      case 'days-asc': sorted.sort((a, b) => a.daysRemaining - b.daysRemaining); break;
-      case 'days-desc': sorted.sort((a, b) => b.daysRemaining - a.daysRemaining); break;
-      case 'recent': sorted.sort((a, b) => String(b.id).localeCompare(String(a.id))); break;
-      case 'oldest': sorted.sort((a, b) => String(a.id).localeCompare(String(b.id))); break;
+      case 'az':
+        sorted.sort((a, b) => a.title.localeCompare(b.title));
+        break;
+      case 'za':
+        sorted.sort((a, b) => b.title.localeCompare(a.title));
+        break;
+      case 'days-asc':
+        sorted.sort((a, b) => {
+          if (a.isInProgress && !b.isInProgress) return -1;
+          if (!a.isInProgress && b.isInProgress) return 1;
+          if (a.isPast && !b.isPast) return 1;
+          if (!a.isPast && b.isPast) return -1;
+          return a.daysRemaining - b.daysRemaining;
+        });
+        break;
+      case 'days-desc':
+        sorted.sort((a, b) => {
+          if (a.isInProgress && !b.isInProgress) return -1;
+          if (!a.isInProgress && b.isInProgress) return 1;
+          if (a.isPast && !b.isPast) return 1;
+          if (!a.isPast && b.isPast) return -1;
+          return b.daysRemaining - a.daysRemaining;
+        });
+        break;
+      case 'recent':
+        sorted.sort((a, b) => {
+          // 1. Roteiros em viagem (em andamento) sempre no topo
+          if (a.isInProgress && !b.isInProgress) return -1;
+          if (!a.isInProgress && b.isInProgress) return 1;
+
+          // 2. Roteiros com data de concluído sempre por último
+          if (a.isPast && !b.isPast) return 1;
+          if (!a.isPast && b.isPast) return -1;
+
+          // Se ambos estão em andamento: início mais próximo no topo
+          if (a.isInProgress && b.isInProgress) {
+            const timeA = a.startDateObj ? a.startDateObj.getTime() : 0;
+            const timeB = b.startDateObj ? b.startDateObj.getTime() : 0;
+            if (timeA !== timeB) return timeA - timeB;
+            const endA = a.endDateObj ? a.endDateObj.getTime() : 0;
+            const endB = b.endDateObj ? b.endDateObj.getTime() : 0;
+            return endA - endB;
+          }
+
+          // Se ambos estão concluídos: mais recentemente concluído no topo dos concluídos
+          if (a.isPast && b.isPast) {
+            const endA = a.endDateObj ? a.endDateObj.getTime() : 0;
+            const endB = b.endDateObj ? b.endDateObj.getTime() : 0;
+            if (endA !== endB) return endB - endA;
+            const timeA = a.startDateObj ? a.startDateObj.getTime() : 0;
+            const timeB = b.startDateObj ? b.startDateObj.getTime() : 0;
+            return timeB - timeA;
+          }
+
+          // 3. Roteiros futuros: data mais próxima em cima dos de data mais distante
+          const timeA = !a.isFlexible && a.startDateObj ? a.startDateObj.getTime() : Infinity;
+          const timeB = !b.isFlexible && b.startDateObj ? b.startDateObj.getTime() : Infinity;
+          if (timeA !== timeB) return timeA - timeB;
+
+          // Desempate por data de criação mais recente
+          const createdA = a._userItinerary?.createdAt ? new Date(a._userItinerary.createdAt).getTime() : 0;
+          const createdB = b._userItinerary?.createdAt ? new Date(b._userItinerary.createdAt).getTime() : 0;
+          return createdB - createdA;
+        });
+        break;
+      case 'oldest':
+        sorted.sort((a, b) => {
+          if (a.isPast && !b.isPast) return 1;
+          if (!a.isPast && b.isPast) return -1;
+
+          const timeA = a._userItinerary?.createdAt
+            ? new Date(a._userItinerary.createdAt).getTime()
+            : 0;
+          const timeB = b._userItinerary?.createdAt
+            ? new Date(b._userItinerary.createdAt).getTime()
+            : 0;
+          return timeA - timeB;
+        });
+        break;
     }
+
     return sorted;
-  }, [filteredItineraries, sortBy]);
+  }, [mergedPrivateItineraries, originFilter, searchQuery, sortBy]);
 
-  // Refresh collections from localStorage on tab change. Itineraries auto-sync via realtime.
-  useEffect(() => {
-    if (activeTab === 'collections') {
-      setUserCollections(getUserCollections());
-    }
-    if (activeTab === 'private') {
-      refetchItineraries();
-    }
-  }, [activeTab, refetchItineraries]);
+  const filteredPublicList = useMemo(() => {
+    let list = mergedPublicItineraries;
 
-  const itemCount = activeTab === 'collections' ? allCollections.length : currentItineraries.length;
-  const itemLabel = activeTab === 'collections' ? 'coleções' : 'roteiros';
-  const activeSort = sortOptions.find(o => o.id === sortBy)!;
-
-  const getDaysRemainingStyle = (days: number) => {
-    if (days <= 7) {
-      return 'bg-[#2563EB] text-white';
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter(
+        (item) =>
+          item.title?.toLowerCase().includes(q) ||
+          item._userItinerary?.destinations?.some((d: string) => d.toLowerCase().includes(q))
+      );
     }
-    return 'bg-[#F2F2F2] text-[#8E8E93]';
+
+    return list;
+  }, [mergedPublicItineraries, searchQuery]);
+
+  // Swipe & Exclusão
+  const [swipedItemId, setSwipedItemId] = useState<string | number | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<{
+    id: string | number;
+    title: string;
+    isUser: boolean;
+    isShared?: boolean;
+  } | null>(null);
+
+  const handleDelete = useCallback(
+    async (id: string | number, isUser: boolean, isShared?: boolean) => {
+      if (isShared && typeof id === 'string') {
+        await leaveItinerary(id);
+        if (onLeaveSuccess) {
+          onLeaveSuccess();
+        } else {
+          toast.success('Você saiu do roteiro.');
+        }
+      } else if (isUser && typeof id === 'string') {
+        await removeItinerary(id);
+        if (onDeleteSuccess) {
+          onDeleteSuccess();
+        } else {
+          toast.success('Roteiro excluído com sucesso.');
+        }
+      }
+      setShowDeleteConfirm(null);
+      setSwipedItemId(null);
+    },
+    [removeItinerary, onDeleteSuccess, onLeaveSuccess]
+  );
+
+  // Regra de cores para tag de contagem regressiva (Figma: height 24px, padding 4px 12px, border-radius 9px)
+  const renderCountdownTag = (daysRemaining: number, isPast: boolean, isInProgress?: boolean, isFlexible?: boolean) => {
+    if (isFlexible) return null;
+    if (isPast || (daysRemaining < 0 && !isInProgress)) {
+      return (
+        <span className="inline-flex items-center justify-center h-[24px] px-[12px] py-[4px] rounded-[9px] border border-[#3C8622] text-[#3C8622] bg-white text-[12px] font-medium leading-[14px]">
+          Concluído
+        </span>
+      );
+    }
+    if (isInProgress || daysRemaining === 0) {
+      return (
+        <span className="inline-flex items-center justify-center h-[24px] px-[12px] py-[4px] rounded-[9px] border border-[#3587F2] text-[#2865B6] bg-white text-[12px] font-medium leading-[14px]">
+          Em viagem
+        </span>
+      );
+    }
+    if (daysRemaining === 1) {
+      return (
+        <span className="inline-flex items-center justify-center h-[24px] px-[12px] py-[4px] rounded-[9px] border border-[#F59E0B] text-[#D97706] bg-white text-[12px] font-medium leading-[14px]">
+          Em 1 dia
+        </span>
+      );
+    }
+    if (daysRemaining <= 4) {
+      return (
+        <span className="inline-flex items-center justify-center h-[24px] px-[12px] py-[4px] rounded-[9px] border border-[#F59E0B] text-[#D97706] bg-white text-[12px] font-medium leading-[14px]">
+          Em {daysRemaining} dias
+        </span>
+      );
+    }
+    if (daysRemaining <= 20) {
+      return (
+        <span className="inline-flex items-center justify-center h-[24px] px-[12px] py-[4px] rounded-[9px] border border-[#F59E0B] text-[#D97706] bg-white text-[12px] font-medium leading-[14px]">
+          Em {daysRemaining} dias
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center justify-center h-[24px] px-[12px] py-[4px] rounded-[9px] border border-[#555555] text-[#555555] bg-white text-[12px] font-medium leading-[14px]">
+        Em {daysRemaining} dias
+      </span>
+    );
   };
 
-  const [swipedItemId, setSwipedItemId] = useState<string | number | null>(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ id: string | number; title: string; isUser: boolean; isPurchased?: boolean; isShared?: boolean } | null>(null);
+  const isTripsScreenLoading = itinerariesLoading || !visualsReady;
 
-  const handleDeleteItinerary = useCallback(async (id: string | number, isUser: boolean, isShared?: boolean) => {
-    if (isShared && typeof id === 'string') {
-      await leaveItinerary(id);
-      toast.success('Você saiu do roteiro.');
-    } else if (isUser && typeof id === 'string') {
-      await removeItinerary(id);
-    }
-    // For static itineraries we just hide them (could store deleted IDs)
-    setShowDeleteConfirm(null);
-    setSwipedItemId(null);
-  }, [removeItinerary]);
-
-
-  const toggleSelectCollection = useCallback((id: number) => {
-    setSelectedCollections(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
-  const enterEditMode = useCallback(() => {
-    setIsEditingCollections(true);
-    setSelectedCollections(new Set());
-  }, []);
-
-  const exitEditMode = useCallback(() => {
-    setIsEditingCollections(false);
-    setSelectedCollections(new Set());
-  }, []);
-
-  // Vídeos importados recentemente — agregados de todas as coleções do usuário,
-  // ordenados do mais recente para o mais antigo. A seção só aparece quando há
-  // pelo menos 1 vídeo importado em qualquer coleção.
-  const [videosTick, setVideosTick] = useState(0);
-  useEffect(() => {
-    const handler = () => setVideosTick(t => t + 1);
-    window.addEventListener('collection:updated', handler);
-    return () => window.removeEventListener('collection:updated', handler);
-  }, []);
-  const recentImportedVideos = useMemo<Array<{
-    id: number;
-    collectionId: number;
-    title: string;
-    author: string;
-    cover: string;
-    source: string;
-    sourceIcon: string;
-    link?: string;
-  }>>(() => {
-    const dataKey = collectionsDataKey();
-    if (!dataKey) return [];
-    const all = readJSON<Record<number, { videos?: Array<any> }>>(dataKey, {});
-    const collected: Array<any> = [];
-    for (const [cid, payload] of Object.entries(all)) {
-      const vids = payload?.videos ?? [];
-      for (const v of vids) {
-        collected.push({
-          id: v.id,
-          collectionId: Number(cid),
-          title: v.title,
-          author: v.sourceLabel ?? '',
-          cover: v.thumbnail,
-          source: v.sourceLabel ?? 'Vídeo',
-          sourceIcon: v.sourceIcon ?? 'videocam',
-          link: v.link,
-        });
-      }
-    }
-    return collected.sort((a, b) => (b.id ?? 0) - (a.id ?? 0)).slice(0, 12);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [videosTick, userCollections]);
-  return <div className="min-h-screen pb-24 bg-[#F2F2F2]">
-    {/* Header — fixed title */}
-    <header className="px-6 pt-safe-top pb-4">
-      <div className="flex items-center justify-between gap-3 mb-2">
-        <h1 className="text-[22px] font-bold text-foreground">Roteiros e coleções</h1>
+  return (
+    <div className="min-h-[100dvh] pb-28 bg-[#FFFFFF] font-sans">
+      {/* Top Header */}
+      <header 
+        className="px-6 pb-8 flex items-center justify-between"
+        style={{ paddingTop: 'calc(max(24px, env(safe-area-inset-top) + 16px))' }}
+      >
+        <h1 className="text-[26px] font-bold text-[#1A1C40] tracking-tight">Roteiros</h1>
         <button
-          onClick={() => setShowCreateSheet(true)}
-          aria-label="Criar"
-          className="w-9 h-9 flex items-center justify-center rounded-full bg-primary text-primary-foreground hover:opacity-90 transition-opacity flex-shrink-0"
+          onClick={() => onOpenCreateSheet ? onOpenCreateSheet() : onCreateItinerary?.()}
+          aria-label="Criar novo roteiro"
+          className="w-10 h-10 rounded-full flex items-center justify-center bg-[#9ecc3b] text-[#1A1C40] hover:opacity-90 active:scale-95 transition-all shadow-sm flex-shrink-0"
         >
-          <Icon name="add" size={20} className="text-primary-foreground" />
+          <Plus className="w-6 h-6 stroke-[2.5]" />
         </button>
-      </div>
-    </header>
+      </header>
 
-    {/* Tabs */}
-    <div className="border-b border-border">
-      <div className="flex gap-5 px-6 overflow-x-auto no-scrollbar">
-        {tabs.map(tab => <button key={tab.id} onClick={() => { setActiveTab(tab.id); if (tab.id !== 'collections') exitEditMode(); }} className={`pb-3 text-sm font-medium transition-colors relative whitespace-nowrap flex-shrink-0 ${activeTab === tab.id ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
-          {tab.label}
-          {activeTab === tab.id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground rounded-full" />}
-        </button>)}
-      </div>
-    </div>
-
-    {/* Content */}
-    <main className={activeTab === 'collections' ? 'px-6 pt-5' : 'px-5 pt-4'}>
-      {(activeTab === 'private' || activeTab === 'public') && itemCount > 0 && (() => {
-        const limit = itineraryLimit ?? 0;
-        const used = itineraryUsedCount ?? 0;
-        const remaining = Math.max(limit - used, 0);
-        const showLimitChip = activeTab === 'private' && limit > 0;
-        const isReached = remaining === 0;
-        const isWarning = remaining === 1;
-        const chipText = isReached
-          ? 'Limite atingido'
-          : `Restam ${remaining} ${remaining === 1 ? 'roteiro' : 'roteiros'}`;
-        const chipStyle = isReached
-          ? { background: 'rgba(220, 38, 38, 0.1)', color: '#B91C1C', borderColor: 'rgba(220, 38, 38, 0.25)' }
-          : isWarning
-            ? { background: 'rgba(234, 88, 12, 0.1)', color: '#C2410C', borderColor: 'rgba(234, 88, 12, 0.25)' }
-            : { background: '#F2F2F2', color: '#6B7280', borderColor: 'transparent' };
-        return (
-          <div className="flex items-center justify-between mb-4 gap-2">
-            <span className="text-sm text-muted-foreground whitespace-nowrap">
-              {itemCount} {itemLabel}
-            </span>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {showLimitChip && (
-                <button
-                  type="button"
-                  onClick={() => onUpgrade?.()}
-                  aria-label={`${chipText}. Toque para ver planos.`}
-                  className="inline-flex items-center h-7 px-3 rounded-full border text-xs font-semibold transition-transform active:scale-95"
-                  style={chipStyle}
-                >
-                  {chipText}
-                </button>
-              )}
-              <button
-                onClick={() => setShowSortSheet(true)}
-                className="relative w-9 h-9 flex items-center justify-center border border-border rounded-full hover:bg-muted/50 transition-colors flex-shrink-0"
-              >
-                <Icon name="tune" size={18} className="text-foreground" />
-                {(sortBy !== 'az' || (activeTab === 'private' && originFilter !== 'all')) && (
-                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border-2 border-background" />
-                )}
-              </button>
-            </div>
-          </div>
-        );
-      })()}
-
-
-      {/* Private / Public Itineraries List */}
-      {(activeTab === 'private' || activeTab === 'public') && (() => {
-        const upcoming = activeTab === 'private'
-          ? sortedItineraries.filter((i: any) => !i.isPast)
-          : sortedItineraries;
-        const past = activeTab === 'private'
-          ? sortedItineraries.filter((i: any) => i.isPast)
-          : [];
-
-        const renderCard = (item: any) => {
-          const handleClick = () => {
-            if (activeTab === 'public' && item._userItinerary && onUserPublicItineraryClick) {
-              onUserPublicItineraryClick(item._userItinerary);
-            } else if (activeTab === 'private' && item._userItinerary && onUserItineraryClick) {
-              onUserItineraryClick(item._userItinerary);
-            } else if (activeTab === 'private' && onPrivateItineraryClick) {
-              onPrivateItineraryClick(item.id);
-            } else {
-              onItineraryClick(item.id);
-            }
-          };
-          const isShared = !!(item._userItinerary && authUser?.id && item._userItinerary.userId && item._userItinerary.userId !== authUser.id);
-          return (
-            <SwipeableItineraryCard
-              key={item.id}
-              item={item}
-              isPrivate={activeTab === 'private'}
-              isShared={isShared}
-              isSwiped={swipedItemId === item.id}
-              onSwipeOpen={() => setSwipedItemId(item.id)}
-              onSwipeClose={() => setSwipedItemId(null)}
-              onClick={handleClick}
-              onDelete={() => setShowDeleteConfirm({ id: item.id, title: item.title, isUser: !!item._userItinerary, isPurchased: !!item.isPurchased, isShared })}
-              getDaysRemainingStyle={getDaysRemainingStyle}
-            />
-          );
-        };
-
-        const isEmpty = upcoming.length === 0 && past.length === 0;
-
-        if (isTripsScreenLoading) {
-          return <ItineraryListSkeleton count={3} />;
-        }
-
-        if (isEmpty) {
-          if (activeTab === 'private') {
-            return (
-              <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-5">
-                  <Icon name="luggage" size={28} className="text-muted-foreground text-xs" />
-                </div>
-                <h3 className="text-lg font-bold text-foreground mb-2">
-                  Nenhum roteiro ainda
-                </h3>
-                <p className="text-sm text-muted-foreground mb-6 max-w-[280px]">
-                  Crie seu primeiro roteiro e organize sua próxima viagem do seu jeito.
-                </p>
-                <button
-                  onClick={() => onCreateItinerary?.()}
-                  className="px-6 py-3 bg-primary text-primary-foreground rounded-full text-sm font-semibold active:scale-95 transition-transform"
-                >
-                  Criar roteiro
-                </button>
-              </div>
-            );
-          }
-          return (
-            <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-5">
-                <Icon name="search" size={28} className="text-muted-foreground text-xs" />
-              </div>
-              <h3 className="text-lg font-bold text-foreground mb-2">
-                Você ainda não publicou roteiros
-              </h3>
-              <p className="text-sm text-muted-foreground mb-6 max-w-[280px]">
-                Torne-se um criador, publique seus roteiros no marketplace e ganhe com suas viagens.
-              </p>
-              <button
-                onClick={() => onBecomeCreator?.()}
-                className="px-6 py-3 bg-primary text-primary-foreground rounded-full text-sm font-semibold active:scale-95 transition-transform"
-              >
-                Quero ser criador
-              </button>
-            </div>
-          );
-        }
-
-        return (
-          <div className="flex flex-col gap-6">
-            {activeTab === 'private' && upcoming.length > 0 && (
-              <SectionHeader
-                icon="flight_takeoff"
-                label="Próximas viagens"
-                count={upcoming.length}
-                variant="upcoming"
+      {/* Tabs */}
+      <div className="border-b border-[#F0F0F0]">
+        <div className="flex w-full px-6">
+          <button
+            onClick={() => {
+              setActiveTab('private');
+              setSearchQuery('');
+            }}
+            className={`flex-1 pb-3 text-center text-[15px] transition-all relative whitespace-nowrap ${activeTab === 'private' ? 'font-semibold text-[#1A1C40]' : 'font-medium text-[#8E8E93] hover:text-[#1A1C40]'
+              }`}
+          >
+            Minhas viagens
+            {activeTab === 'private' && (
+              <motion.div
+                layoutId="activeTabUnderline"
+                className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-[#1A1C40] rounded-full"
               />
             )}
-            {upcoming.length > 0 && (
-              <div className="flex flex-col gap-4">
-                {upcoming.map(renderCard)}
-              </div>
-            )}
+          </button>
 
-            {activeTab === 'private' && past.length > 0 && (
-              <>
-                <SectionHeader
-                  icon="check_circle"
-                  label="Viagens passadas"
-                  count={past.length}
-                  variant="past"
+          <button
+            onClick={() => {
+              setActiveTab('public');
+              setSearchQuery('');
+            }}
+            className={`flex-1 pb-3 text-center text-[15px] transition-all relative whitespace-nowrap ${activeTab === 'public' ? 'font-semibold text-[#1A1C40]' : 'font-medium text-[#8E8E93] hover:text-[#1A1C40]'
+              }`}
+          >
+            Minha loja
+            {activeTab === 'public' && (
+              <motion.div
+                layoutId="activeTabUnderline"
+                className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-[#1A1C40] rounded-full"
+              />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Search and Filters Bar */}
+      {(
+        (activeTab === 'private' ? mergedPrivateItineraries.length > 0 : mergedPublicItineraries.length > 0) ||
+        searchQuery ||
+        originFilter !== 'all'
+      ) && (
+          <div className="px-6 pt-5 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="flex-1 flex items-center bg-field border border-transparent rounded-[10px] px-3.5 py-2.5 transition-colors focus-within:border-primary">
+                <Icon name="search" size={18} className="text-[#8E8E93] mr-2.5 flex-shrink-0" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Busque por um roteiro..."
+                  className="flex-1 bg-transparent text-[14px] text-[#1A1C40] placeholder:text-[#8E8E93] focus:outline-none"
                 />
-                <div className="flex flex-col gap-4">
-                  {past.map(renderCard)}
-                </div>
-              </>
-            )}
-          </div>
-        );
-      })()}
-
-      {/* Favorites Tab */}
-      {activeTab === 'favorites' && (
-        <>
-          {favoriteItems.length === 0 ? (
-            /* Empty State */
-            <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-5">
-                <Icon name="favorite" size={28} className="text-muted-foreground text-xs" />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="p-1 text-[#8E8E93] hover:text-[#1A1C40]"
+                  >
+                    <Icon name="close" size={16} />
+                  </button>
+                )}
               </div>
-              <h3 className="text-lg font-bold text-foreground mb-2">Você ainda não salvou roteiros</h3>
-              <p className="text-sm text-muted-foreground mb-6 max-w-[260px]">
-                Salve roteiros públicos para comparar e comprar depois.
-              </p>
+
               <button
-                onClick={() => onExplore?.()}
-                className="px-6 py-3 bg-primary text-primary-foreground rounded-full text-sm font-semibold active:scale-95 transition-transform"
+                onClick={() => setShowSortSheet(true)}
+                aria-label="Filtros e ordenação"
+                className="w-11 h-11 rounded-2xl bg-[#F4F4F5] flex items-center justify-center text-[#1A1C40] hover:bg-[#ECECED] active:scale-95 transition-all flex-shrink-0 relative"
               >
-                Explorar roteiros
+                <SlidersHorizontal className="w-4 h-4" />
+                {(sortBy !== 'recent' || originFilter !== 'all') && (
+                  <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-[#9ecc3b]" />
+                )}
               </button>
             </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              {favoriteItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => onItineraryClick(item.id)}
-                  className="text-left bg-card rounded-2xl overflow-hidden border border-border/50 active:scale-[0.97] transition-transform duration-150 flex flex-col"
-                  style={{ height: 260 }}
-                >
-                  {/* Image — fixed height */}
-                  <div className="relative w-full overflow-hidden flex-shrink-0" style={{ height: 120 }}>
-                    <img src={item.image} alt={item.title} className="w-full h-full object-cover block" />
-                    {item.rating && (
-                      <div className="absolute top-2.5 left-2.5 flex items-center gap-1 bg-white/70 backdrop-blur-sm rounded-full px-2 py-1">
-                        <Icon name="star" size={12} filled className="text-amber-500" />
-                        <span className="text-[11px] font-bold text-foreground">{item.rating}</span>
-                      </div>
-                    )}
+          </div>
+        )}
+
+      {/* Main Content */}
+      <main className="px-6 pt-2">
+        {isTripsScreenLoading ? (
+          <ItineraryListSkeleton count={3} />
+        ) : activeTab === 'private' ? (
+          /* Aba: Minhas viagens */
+          filteredPersonalList.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              {searchQuery ? (
+                <>
+                  <div className="w-16 h-16 rounded-full bg-[#F4F4F5] flex items-center justify-center mb-3 text-[#8E8E93]">
+                    <Icon name="map" size={28} />
+                  </div>
+                  <h3 className="text-[16px] font-bold text-[#1A1C40] mb-1">
+                    Nenhum roteiro encontrado
+                  </h3>
+                  <p className="text-[13px] text-[#8E8E93] max-w-xs mb-5">
+                    Tente buscar por outro termo ou limpe os filtros.
+                  </p>
+                </>
+              ) : (
+                <div className="flex flex-col items-center gap-6 mt-6">
+                  {/* Image container */}
+                  <div className="flex items-center justify-center">
+                    <img src="/empty-store.png" alt="Nenhum roteiro" className="w-[126px] h-[168px] object-contain" />
+                  </div>
+
+                  {/* Text & Button Group */}
+                  <div className="flex flex-col items-center gap-4">
+                    {/* Texts */}
+                    <div className="flex flex-col items-center gap-2">
+                      <h3 className="text-[18px] font-semibold text-[#141530] leading-[22px]">
+                        Você ainda não tem roteiros
+                      </h3>
+                      <p className="text-[14px] font-medium text-[#7F7F7F] max-w-[260px] text-center leading-[16px]">
+                        Crie seu próximo roteiro e organize sua viagem do seu jeito.
+                      </p>
+                    </div>
+
+                    {/* Button */}
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeFavorite(item.id);
-                      }}
-                      className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-white/70 backdrop-blur-sm flex items-center justify-center active:scale-90 transition-transform"
+                      onClick={() => onCreateItinerary?.('personal')}
+                      className="flex flex-row justify-center items-center px-4 py-3 gap-2 min-w-[141px] h-[48px] rounded-[12px] border border-[#141530] text-[#141530] text-[16px] font-bold leading-[19px] hover:bg-[#141530]/5 active:scale-95 transition-all shadow-none"
                     >
-                      <Icon name="favorite" size={18} filled style={{ color: '#DA501F' }} />
+                      Criar viagem pessoal
                     </button>
                   </div>
-
-                  {/* Content — fixed height, fixed gaps */}
-                  <div className="px-3 pt-2 pb-2.5 flex flex-col flex-1 min-h-0">
-                    {/* Title — reserved for 2 lines */}
-                    <h4
-                      className="font-semibold text-[13px] text-foreground leading-[1.25] line-clamp-2"
-                      style={{ height: 32 }}
-                    >
-                      {item.title}
-                    </h4>
-
-                    {/* Creator — fixed line */}
-                    <div className="flex items-center gap-1.5 mt-1.5" style={{ height: 20 }}>
-                      <img
-                        src={item.creatorImage || 'https://api.dicebear.com/7.x/initials/svg?seed=' + encodeURIComponent(item.creator || '?')}
-                        alt={item.creator}
-                        className="w-5 h-5 rounded-full object-cover flex-shrink-0 border border-border/50"
-                      />
-                      <span className="text-[12px] font-medium text-foreground/60 truncate">
-                        {item.creator}
-                      </span>
-                    </div>
-
-                    {/* Metadata — fixed line */}
-                    <div className="flex items-center gap-1.5 text-[12px] font-medium flex-nowrap mt-1.5 truncate" style={{ height: 18 }}>
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <Icon name="schedule" size={13} className="text-foreground/50" />
-                        <span className="text-foreground/60">{item.days}d</span>
-                      </div>
-                      <span className="text-foreground/30 text-[14px]">·</span>
-                      <div className="flex items-center gap-1 flex-shrink-0 truncate">
-                        <Icon name="location_on" size={13} className="text-foreground/50" />
-                        <span className="text-foreground/60 truncate">{item.places} lugares</span>
-                      </div>
-                    </div>
-
-                    {/* Price — pinned to bottom */}
-                    <span className="mt-auto text-[15px] font-bold leading-none" style={{ color: '#1a1c40' }}>
-                      R$ {item.price.toFixed(2).replace('.', ',')}
-                    </span>
-                  </div>
-                </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {filteredPersonalList.map((item) => (
+                <PersonalItineraryCard
+                  key={item.id}
+                  item={item}
+                  isSwiped={swipedItemId === item.id}
+                  onSwipeOpen={() => setSwipedItemId(item.id)}
+                  onSwipeClose={() => setSwipedItemId(null)}
+                  onClick={() => {
+                    if (item._userItinerary && onUserItineraryClick) {
+                      onUserItineraryClick(item._userItinerary);
+                    } else if (onPrivateItineraryClick) {
+                      onPrivateItineraryClick(Number(item.id));
+                    } else {
+                      onItineraryClick(Number(item.id));
+                    }
+                  }}
+                  onDelete={() =>
+                    setShowDeleteConfirm({
+                      id: item.id,
+                      title: item.title,
+                      isUser: !!item._userItinerary,
+                      isShared: !!item.isShared,
+                    })
+                  }
+                  renderCountdownTag={renderCountdownTag}
+                />
               ))}
             </div>
-          )}
-        </>
-      )}
+          )
+        ) : (
+          /* Aba: Roteiros Publicados */
+          filteredPublicList.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              {searchQuery ? (
+                <>
+                  <div className="w-16 h-16 rounded-full bg-[#F4F4F5] flex items-center justify-center mb-3 text-[#8E8E93]">
+                    <ShoppingBag className="w-7 h-7" />
+                  </div>
+                  <h3 className="text-[16px] font-bold text-[#1A1C40] mb-1">
+                    Nenhum roteiro encontrado
+                  </h3>
+                  <p className="text-[13px] text-[#8E8E93] max-w-xs mb-5">
+                    Tente buscar por outro termo ou limpe os filtros.
+                  </p>
+                </>
+              ) : (
+                <div className="flex flex-col items-center gap-6 mt-6">
+                  {/* Image container */}
+                  <div className="flex items-center justify-center">
+                    <img src="/empty-store.png" alt="Nenhum roteiro" className="w-[126px] h-[168px] object-contain scale-x-[-1]" />
+                  </div>
 
-      {/* Collections Tab */}
-      {activeTab === 'collections' && (
-        <div className="-mx-6">
-          {/* Collections section */}
-          <section className="px-6">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-[15px] font-bold text-foreground">
-                Coleções <span className="text-muted-foreground font-medium">{allCollections.length}</span>
-              </h2>
-            </div>
-            {allCollections.length === 0 ? (
-              /* Empty state — segue o padrão da aba Favoritos */
-              <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-5">
-                  <Icon name="folder" size={28} className="text-muted-foreground text-xs" />
-                </div>
-                <h3 className="text-lg font-bold text-foreground mb-2">Você ainda não tem coleções</h3>
-                <p className="text-sm text-muted-foreground mb-6 max-w-[260px]">
-                  Crie coleções para organizar lugares que você quer visitar.
-                </p>
-                <button
-                  onClick={() => setShowCreateCollection(true)}
-                  className="px-6 py-3 bg-primary text-primary-foreground rounded-full text-sm font-semibold active:scale-95 transition-transform"
-                >
-                  Criar coleção
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-4">
-                {allCollections.map(collection => (
-                  <CollectionCard
-                    key={collection.id}
-                    collection={collection}
-                    onClick={() => onCollectionClick(collection.id)}
-                    isEditing={isEditingCollections}
-                    isSelected={selectedCollections.has(collection.id)}
-                    onToggleSelect={() => toggleSelectCollection(collection.id)}
-                    onLongPress={enterEditMode}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-
-          {/* Importados recentemente removido a pedido do usuário */}
-        </div>
-      )}
-    </main>
-
-    {/* Create collection sheet (triggered from "+ Nova" inline button) */}
-    <CreateCollectionSheet
-      isOpen={showCreateCollection}
-      onClose={() => setShowCreateCollection(false)}
-      onSubmit={(name) => {
-        const newCollection: UserCollection = {
-          id: Date.now(),
-          title: name,
-          itemCount: 0,
-          isFavorites: false,
-          isPrivate: false,
-          images: [],
-          participants: [],
-        };
-        saveUserCollection(newCollection);
-        setUserCollections(getUserCollections());
-        setShowCreateCollection(false);
-      }}
-    />
-
-    {/* Create action sheet — Novo roteiro / Nova coleção */}
-    <BottomSheet
-      open={showCreateSheet}
-      onClose={() => setShowCreateSheet(false)}
-      bodyClassName="px-6 pb-2"
-    >
-      <div className="space-y-2 py-2">
-        <button
-          onClick={() => {
-            setShowCreateSheet(false);
-            onCreateItinerary?.();
-          }}
-          className="w-full flex items-center gap-4 p-4 rounded-2xl border border-border hover:bg-muted/50 transition-colors text-left"
-        >
-          <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
-            <Icon name="map" size={24} className="text-foreground" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-sm font-semibold text-foreground">Novo roteiro</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Planeje uma nova viagem do zero</p>
-          </div>
-        </button>
-        <button
-          onClick={() => {
-            setShowCreateSheet(false);
-            setShowCreateCollection(true);
-          }}
-          className="w-full flex items-center gap-4 p-4 rounded-2xl border border-border hover:bg-muted/50 transition-colors text-left"
-        >
-          <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
-            <Icon name="folder" size={24} className="text-foreground" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-sm font-semibold text-foreground">Nova coleção</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Organize lugares e ideias em uma pasta</p>
-          </div>
-        </button>
-      </div>
-    </BottomSheet>
-
-    {/* Sort Bottom Sheet — inline to respect 430px container */}
-    {showSortSheet && (
-      <div className="absolute inset-0 z-50 overflow-hidden">
-        {/* Backdrop */}
-        <div
-          className="absolute inset-0 bg-black/40 animate-in fade-in duration-200"
-          onClick={() => setShowSortSheet(false)}
-        />
-        {/* Panel */}
-        <div className="absolute bottom-0 left-0 right-0 bg-background rounded-t-[24px] animate-in slide-in-from-bottom duration-300 pb-6 max-h-[85vh] overflow-y-auto">
-          {/* Drag handle */}
-          <div className="flex justify-center pt-3 pb-1">
-            <div className="w-10 h-1 rounded-full bg-[#E0E0E0]" />
-          </div>
-
-          {/* Header */}
-          <div className="flex justify-center py-4">
-            <h2 className="text-[17px] font-bold text-foreground">
-              {activeTab === 'private' ? 'Filtros' : 'Ordenar por'}
-            </h2>
-          </div>
-
-          {/* Origin filter — apenas na aba "Meus roteiros" */}
-          {activeTab === 'private' && (
-            <div className="px-6">
-              <h3 className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide mb-1 mt-2">Mostrar</h3>
-              <div className="flex flex-col">
-                {originOptions.map((option, index) => (
-                  <button
-                    key={option.id}
-                    onClick={() => { setOriginFilter(option.id); setShowSortSheet(false); }}
-                    className={`flex items-center justify-between min-h-[48px] py-4 ${index < originOptions.length - 1 ? 'border-b border-[#EAEAEA]' : ''
-                      }`}
-                  >
-                    <span className="text-[15px] font-normal text-foreground">{option.label}</span>
-                    <div className={`w-[22px] h-[22px] rounded-full border-2 flex items-center justify-center flex-shrink-0 ${originFilter === option.id ? 'border-foreground' : 'border-muted-foreground/40'
-                      }`}>
-                      {originFilter === option.id && (
-                        <div className="w-[12px] h-[12px] rounded-full bg-foreground" />
-                      )}
+                  {/* Text & Button Group */}
+                  <div className="flex flex-col items-center gap-4">
+                    {/* Texts */}
+                    <div className="flex flex-col items-center gap-2">
+                      <h3 className="text-[18px] font-semibold text-[#141530] leading-[22px]">
+                        Você ainda não tem roteiros à venda
+                      </h3>
+                      <p className="text-[14px] font-medium text-[#7F7F7F] max-w-[249px] text-center leading-[16px]">
+                        Crie um roteiro para sua loja e publique quando estiver pronto para vender.
+                      </p>
                     </div>
-                  </button>
-                ))}
-              </div>
-              <h3 className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide mb-1 mt-5">Ordenar por</h3>
-            </div>
-          )}
 
-          {/* Options */}
-          <div className="flex flex-col px-6">
-            {sortOptions.map((option, index) => (
-              <button
-                key={option.id}
-                onClick={() => { setSortBy(option.id); setShowSortSheet(false); }}
-                className={`flex items-center justify-between min-h-[48px] py-4 ${index < sortOptions.length - 1 ? 'border-b border-[#EAEAEA]' : ''
-                  }`}
-              >
-                <span className="text-[15px] font-normal text-foreground">
-                  {option.label}
-                </span>
-                {/* Instagram-style radio button */}
-                <div className={`w-[22px] h-[22px] rounded-full border-2 flex items-center justify-center flex-shrink-0 ${sortBy === option.id ? 'border-foreground' : 'border-muted-foreground/40'
-                  }`}>
-                  {sortBy === option.id && (
-                    <div className="w-[12px] h-[12px] rounded-full bg-foreground" />
-                  )}
+                    {/* Button */}
+                    <button
+                      onClick={() => onCreateItinerary?.('seller')}
+                      className="flex flex-row justify-center items-center px-4 py-3 gap-2 min-w-[141px] h-[48px] rounded-[12px] border border-[#141530] text-[#141530] text-[16px] font-bold leading-[19px] hover:bg-[#141530]/5 active:scale-95 transition-all shadow-none"
+                    >
+                      Criar roteiro pra venda
+                    </button>
+                  </div>
                 </div>
-              </button>
-            ))}
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {filteredPublicList.map((item) => (
+                <PublishedItineraryCard
+                  key={item.id}
+                  item={item}
+                  onClick={() => {
+                    if (!item._userItinerary) return;
+                    if (item._userItinerary.status === 'draft') {
+                      if (onUserItineraryClick) {
+                        onUserItineraryClick(item._userItinerary);
+                      }
+                    } else {
+                      if (onUserPublicItineraryClick) {
+                        onUserPublicItineraryClick(item._userItinerary);
+                      } else if (onUserItineraryClick) {
+                        onUserItineraryClick(item._userItinerary);
+                      }
+                    }
+                  }}
+                />
+              ))}
+            </div>
+          )
+        )}
+      </main>
+
+      {/* Delete Confirmation Sheet */}
+      <DeleteConfirmSheet
+        isOpen={!!showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(null)}
+        title={showDeleteConfirm?.title}
+        isShared={showDeleteConfirm?.isShared}
+        onConfirm={() => {
+          if (!showDeleteConfirm) return;
+          handleDelete(
+            showDeleteConfirm.id,
+            showDeleteConfirm.isUser,
+            showDeleteConfirm.isShared
+          );
+        }}
+      />
+
+      {/* Sort & Filter Screen */}
+      {showSortSheet && (
+        <TripsFilterScreen
+          onClose={() => setShowSortSheet(false)}
+          activeTab={activeTab}
+          initialSortBy={sortBy}
+          initialOriginFilter={originFilter}
+          onApply={(newSortBy, newOriginFilter) => {
+            setSortBy(newSortBy);
+            setOriginFilter(newOriginFilter);
+            setShowSortSheet(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Card do Roteiro Pessoal (Figma: Frame 1321316171 / 1321316194)
+function PersonalItineraryCard({
+  item,
+  isSwiped,
+  onSwipeOpen,
+  onSwipeClose,
+  onClick,
+  onDelete,
+  renderCountdownTag,
+}: {
+  item: any;
+  isSwiped: boolean;
+  onSwipeOpen: () => void;
+  onSwipeClose: () => void;
+  onClick: () => void;
+  onDelete: () => void;
+  renderCountdownTag: (daysRemaining: number, isPast: boolean, isInProgress?: boolean, isFlexible?: boolean) => React.ReactNode;
+}) {
+  const x = useMotionValue(0);
+  // Garante que o botão vermelho só tenha opacidade quando o card começar a se mover para a esquerda
+  const deleteOpacity = useTransform(x, [-12, -2, 0], [1, 1, 0]);
+  const DELETE_WIDTH = 84;
+  const dragThreshold = 30;
+
+  const handleDragEnd = (_: any, info: PanInfo) => {
+    // Sensibilidade imediata: arrasto além de 30px ou flick rápido
+    const shouldOpen = info.offset.x < -dragThreshold || (info.velocity.x < -200 && info.offset.x < -5);
+    if (shouldOpen) {
+      animate(x, -DELETE_WIDTH, { type: 'spring', stiffness: 500, damping: 35, mass: 0.8 });
+      onSwipeOpen();
+    } else {
+      animate(x, 0, { type: 'spring', stiffness: 500, damping: 35, mass: 0.8 });
+      onSwipeClose();
+    }
+  };
+
+  useEffect(() => {
+    if (!isSwiped) {
+      animate(x, 0, { type: 'spring', stiffness: 500, damping: 35, mass: 0.8 });
+    } else {
+      animate(x, -DELETE_WIDTH, { type: 'spring', stiffness: 500, damping: 35, mass: 0.8 });
+    }
+  }, [isSwiped, x]);
+
+  return (
+    <div className="relative pb-[24px] border-b border-[#F2F2F2] last:border-b-0 overflow-hidden select-none">
+      {/* Botão de Excluir / Sair atrás (opacidade controlada para nunca vazar bordas quando parado) */}
+      <motion.div
+        style={{ opacity: deleteOpacity }}
+        className="absolute right-0 top-0 h-[117px] w-[84px] flex items-center justify-center bg-[#DC2626] rounded-2xl z-0 pointer-events-auto"
+      >
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          className="w-full h-full flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform"
+          aria-label={item.isShared ? 'Sair do roteiro' : 'Excluir roteiro'}
+        >
+          <Icon
+            name={item.isShared ? 'logout' : 'delete'}
+            size={22}
+            className="text-white"
+          />
+          <span className="text-[12px] font-semibold text-white">
+            {item.isShared ? 'Sair' : 'Excluir'}
+          </span>
+        </button>
+      </motion.div>
+
+      <motion.div
+        style={{ x }}
+        drag="x"
+        dragDirectionLock
+        dragConstraints={{ left: -DELETE_WIDTH, right: 0 }}
+        dragElastic={0.08}
+        onDragEnd={handleDragEnd}
+        onClick={() => {
+          if (!isSwiped) onClick();
+          else onSwipeClose();
+        }}
+        className="flex gap-[15px] items-center bg-white cursor-pointer relative z-10 w-full min-h-[117px]"
+      >
+        <TripThumbnail images={item.images} />
+
+        <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch h-[117px] py-0">
+          <div className="flex flex-col gap-[4px]">
+            <h3 className="font-semibold text-[16px] leading-[19px] text-[#1A1C40] truncate">
+              {item.title}
+            </h3>
+            <p className="font-medium text-[14px] leading-[17px] text-[#555555] truncate">
+              {item.subtitle}
+            </p>
           </div>
+
+          <div className="flex flex-col gap-[12px]">
+            <p className="font-medium text-[14px] leading-[17px] text-[#7F7F7F] truncate">
+              {item.dateRange}
+            </p>
+
+            <div className="flex items-center gap-[16px] h-[32px]">
+              <AvatarStack participants={item.participants} />
+              {renderCountdownTag(item.daysRemaining, item.isPast, item.isInProgress, item.isFlexible)}
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+// Card do Roteiro Publicado (Figma)
+function PublishedItineraryCard({
+  item,
+  onClick,
+}: {
+  item: any;
+  onClick: () => void;
+}) {
+  const getStatusBadge = (status: 'Ativo' | 'Rascunho' | 'Pausado') => {
+    switch (status) {
+      case 'Ativo':
+        return (
+          <span className="inline-flex items-center justify-center h-[24px] px-[12px] py-[4px] rounded-[9px] border border-[#3C8622] text-[#3C8622] bg-white text-[12px] font-medium leading-[14px]">
+            Ativo
+          </span>
+        );
+      case 'Rascunho':
+        return (
+          <span className="inline-flex items-center justify-center h-[24px] px-[12px] py-[4px] rounded-[9px] border border-[#646464] text-[#646464] bg-white text-[12px] font-medium leading-[14px]">
+            Rascunho
+          </span>
+        );
+      case 'Pausado':
+        return (
+          <span className="inline-flex items-center justify-center h-[24px] px-[12px] py-[4px] rounded-[9px] border border-[#D8911E] text-[#D8911E] bg-white text-[12px] font-medium leading-[14px]">
+            Pausado
+          </span>
+        );
+    }
+  };
+
+  const salesStr = (item.salesCount === 0 || item.salesCount == null) ? '-' : `${item.salesCount} vendas`;
+  const ratingStr = (item.rating === 0 || item.rating == null) ? '-' : String(item.rating).replace('.', ',');
+  const likesStr = (item.likesCount === 0 || item.likesCount == null) ? '-' : item.likesCount;
+
+  const formattedPrice = item.priceCents
+    ? `R$ ${(item.priceCents / 100).toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`
+    : '-';
+
+  return (
+    <div
+      onClick={onClick}
+      className="flex gap-[16px] items-center bg-white pb-[24px] border-b border-[#F2F2F2] last:border-b-0 active:scale-[0.99] transition-transform cursor-pointer w-full"
+    >
+      <TripThumbnail images={item.images} className="w-[95px] h-[94px] min-w-[95px] min-h-[94px]" />
+
+      <div className="flex-1 min-w-0 flex flex-col justify-center h-[94px] gap-[16px]">
+        <div className="flex flex-col gap-[12px]">
+          <h3 className="font-semibold text-[16px] leading-[19px] text-[#1A1C40] truncate">
+            {item.title}
+          </h3>
+
+          <div className="flex items-center gap-[16px]">
+            <div className="flex items-center gap-1">
+              <Star className="w-[17px] h-[17px] text-[#FDAC2A] stroke-[1.5]" />
+              <span className="text-[14px] font-medium text-[#646464] leading-[17px] font-['Urbanist',sans-serif]">{ratingStr}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Heart className="w-[17px] h-[17px] text-[#DA501F] stroke-[1.5]" />
+              <span className="text-[14px] font-medium text-[#646464] leading-[17px] font-['Urbanist',sans-serif]">{likesStr}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <ShoppingBag className="w-[16px] h-[16px] text-[#141530] stroke-[1.5]" />
+              <span className="text-[14px] font-medium text-[#646464] leading-[17px] font-['Urbanist',sans-serif]">{salesStr}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-[12px]">
+          <span className="text-[14px] font-medium text-[#141530] font-['Urbanist',sans-serif]">{formattedPrice}</span>
+          {getStatusBadge(item.status)}
         </div>
       </div>
-    )}
-
-    {/* Delete Confirmation Sheet */}
-    {showDeleteConfirm && (
-      <>
-        <div className="fixed inset-0 bg-black/40 z-[100]" onClick={() => setShowDeleteConfirm(null)} />
-        <div className="fixed bottom-0 left-0 right-0 z-[101] flex justify-center">
-          <div className="bg-background rounded-t-3xl w-full w-full animate-in slide-in-from-bottom duration-300">
-            <div className="flex justify-center py-3">
-              <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
-            </div>
-            <div className="px-6 pb-8 text-center">
-              <div className="w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
-                <Icon name={showDeleteConfirm.isShared ? 'logout' : 'delete'} size={28} className="text-destructive" />
-              </div>
-              <h3 className="text-lg font-bold text-foreground mb-2">
-                {showDeleteConfirm.isShared ? 'Sair deste roteiro?' : 'Excluir roteiro?'}
-              </h3>
-              <p className="text-sm text-muted-foreground mb-6">
-                {showDeleteConfirm.isShared ? (
-                  <>
-                    Você deixará de participar deste roteiro e perderá acesso às futuras atualizações feitas pelo organizador. Essa ação não excluirá o roteiro para os demais participantes.
-                  </>
-                ) : showDeleteConfirm.isPurchased ? (
-                  <>
-                    O roteiro "<span className="font-medium">{showDeleteConfirm.title}</span>" será removido da sua lista, mas como você o comprou, ele ficará sempre disponível para resgate em <span className="font-medium text-foreground">Configurações › Compras</span>.
-                  </>
-                ) : (
-                  <>
-                    O roteiro "<span className="font-medium">{showDeleteConfirm.title}</span>" será removido permanentemente.
-                  </>
-                )}
-              </p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowDeleteConfirm(null)}
-                  className="flex-1 py-3.5 rounded-2xl text-sm font-semibold border border-border text-foreground"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={() => handleDeleteItinerary(showDeleteConfirm.id, showDeleteConfirm.isUser, showDeleteConfirm.isShared)}
-                  className="flex-1 py-3.5 rounded-2xl text-sm font-semibold bg-destructive text-destructive-foreground"
-                >
-                  {showDeleteConfirm.isShared ? 'Sair do roteiro' : 'Excluir'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </>
-    )}
-  </div>;
+    </div>
+  );
 }

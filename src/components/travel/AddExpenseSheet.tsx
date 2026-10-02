@@ -53,15 +53,23 @@ export function AddExpenseSheet({ open, onClose, onSave, dayNumber }: AddExpense
         {/* Handle */}
         <div className="w-10 h-1 rounded-full bg-muted mx-auto mt-3 mb-2" />
 
-        {/* Header */}
-        <div className="px-5 pb-4 flex items-center justify-between">
-          <div>
-            <h2 className="text-[17px] font-bold text-foreground">Adicionar gasto</h2>
-            <span className="text-[12px] text-muted-foreground">Dia {dayNumber}</span>
-          </div>
-          <button onClick={onClose} className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#F2F2F2' }}>
+        {/* Top Bar with Close Button */}
+        <div className="px-5 pt-1 pb-2 flex items-center justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-10 h-10 rounded-full flex items-center justify-center -mr-1"
+            style={{ background: '#F2F2F2' }}
+            aria-label="Fechar"
+          >
             <Icon name="close" size={20} className="text-foreground" />
           </button>
+        </div>
+
+        {/* Title */}
+        <div className="px-5 pb-3">
+          <h2 className="text-[20px] font-bold text-foreground">Adicionar gasto</h2>
+          <span className="text-[12px] text-muted-foreground">Dia {dayNumber}</span>
         </div>
 
         {/* Content */}
@@ -71,7 +79,7 @@ export function AddExpenseSheet({ open, onClose, onSave, dayNumber }: AddExpense
             <label className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
               Descrição do gasto
             </label>
-            <div className="flex items-center gap-2 rounded-xl px-4 py-3" style={{ background: '#F2F2F2' }}>
+            <div className="flex items-center gap-2 rounded-[10px] px-4 py-3" style={{ background: '#F2F2F2' }}>
               <input
                 type="text"
                 placeholder="Ex: Jantar no restaurante"
@@ -89,7 +97,7 @@ export function AddExpenseSheet({ open, onClose, onSave, dayNumber }: AddExpense
               <label className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
                 Valor
               </label>
-              <div className="flex items-center gap-2 rounded-xl px-4 py-3" style={{ background: '#F2F2F2' }}>
+              <div className="flex items-center gap-2 rounded-[10px] px-4 py-3" style={{ background: '#F2F2F2' }}>
                 <input
                   type="text"
                   placeholder="0,00"

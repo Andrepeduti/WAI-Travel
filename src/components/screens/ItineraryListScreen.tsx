@@ -48,7 +48,7 @@ export function ItineraryListScreen({ title, items, onBack, onItineraryClick, on
   };
 
   return (
-    <div className="min-h-screen flex flex-col pb-8" style={{ backgroundColor: '#F2F2F2' }}>
+    <div className="min-h-[100dvh] flex flex-col pb-8" style={{ backgroundColor: '#F2F2F2' }}>
       <header className="sticky top-0 z-20 px-4 pb-3" style={{ backgroundColor: '#F2F2F2' }}>
         <div className="flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />
@@ -103,7 +103,7 @@ export function ItineraryListScreen({ title, items, onBack, onItineraryClick, on
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-1">
                     <Icon name="star" size={14} className="text-[#F2B90C]" />
-                    <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{item.rating}</span>
+                    <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{item.rating > 0 ? (typeof item.rating === 'number' && Number.isInteger(item.rating) ? item.rating : item.rating.toFixed(1)) : '-'}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Icon name="location_on" size={14} style={{ color: '#1E293B' }} />

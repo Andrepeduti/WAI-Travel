@@ -131,7 +131,7 @@ export function ItineraryDetailScreen({ itineraryId, onBack, onOpenChat }: Itine
     if (onOpenChat) {
       onOpenChat(itineraryData.author, itineraryData.authorImage);
     } else {
-      toast(`Abrindo conversa com ${itineraryData.author}…`);
+      toast.success(`Abrindo conversa com ${itineraryData.author}…`);
     }
   }, [onOpenChat]);
 
@@ -157,7 +157,7 @@ export function ItineraryDetailScreen({ itineraryId, onBack, onOpenChat }: Itine
   };
 
   return (
-    <div className="min-h-screen bg-background pb-32">
+    <div className="min-h-[100dvh] bg-background pb-32">
       {/* Hero image */}
       <div className="relative h-[280px]">
         <img 
@@ -222,7 +222,7 @@ export function ItineraryDetailScreen({ itineraryId, onBack, onOpenChat }: Itine
         <div className="flex items-center gap-4 mb-5 flex-wrap">
           <div className="flex items-center gap-1">
             <Icon name="star" size={16} filled className="text-[#F2B90C]" />
-            <span className="text-[15px] font-semibold">{itineraryData.rating}</span>
+            <span className="text-[15px] font-semibold">{itineraryData.rating > 0 ? itineraryData.rating : '-'}</span>
           </div>
 
           <div className="w-px h-4 bg-border" />

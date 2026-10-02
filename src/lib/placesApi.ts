@@ -84,11 +84,24 @@ function getOsmCategory(tags: Record<string, string>) {
   return defaultCategory;
 }
 
-// ─── Cache ───────────────────────────────────────────────────────────────────
+function getCityCache(key: string): CityPlace[] | null {
+  try {
+    const cached = localStorage.getItem(`wai-city-cache-${key}`);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) {
+        return parsed.places;
+      }
+    }
+  } catch (e) {}
+  return null;
+}
 
-const cityCache = new Map<string, { places: CityPlace[]; timestamp: number }>();
-const CACHE_DURATION = 30 * 60 * 1000; // 30 min
-
+function setCityCache(key: string, places: CityPlace[]) {
+  try {
+    localStorage.setItem(`wai-city-cache-${key}`, JSON.stringify({ places, timestamp: Date.now() }));
+  } catch (e) {}
+}
 // ─── Priority for sorting ────────────────────────────────────────────────────
 
 const priorityOrder: Record<string, number> = {
@@ -519,26 +532,46 @@ async function fetchWikipediaNearby(
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
-export async function fetchPlacesForCity(cityName: string): Promise<CityPlace[]> {
+export async function fetchPlacesForCity(cityName: string, interests?: string[]): Promise<CityPlace[]> {
   const cacheKey = cityName.toLowerCase().trim().split(',')[0].trim();
-  const cached = cityCache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    return cached.places;
+  const cached = getCityCache(cacheKey);
+  if (cached) {
+    return cached;
   }
 
   try {
     // Run Wikipedia (monuments/attractions) and AI curation
     // (restaurants/experiences/nightlife/events) in parallel.
-    const aiPromise = fetchAiPlacesForCity(cityName).catch(() => [] as CityPlace[]);
+    const aiPromise = fetchAiPlacesForCity(cityName, interests).catch(() => [] as CityPlace[]);
 
     // Geocode city for Wikipedia geosearch using Google Places API
-    const googlePredictions = await searchGooglePlacesAutocomplete(cityName, ['(cities)']);
     let cityLat, cityLng;
+    const { getPlaceByGoogleId, upsertPlace } = await import('@/lib/placesCache');
+    
+    const googlePredictions = await searchGooglePlacesAutocomplete(cityName, ['(cities)']);
     if (googlePredictions.length > 0) {
-      const details = await getGooglePlaceDetails(googlePredictions[0].placeId);
-      if (details) {
-        cityLat = details.lat;
-        cityLng = details.lng;
+      const placeId = googlePredictions[0].placeId;
+      const cachedCityPlace = await getPlaceByGoogleId(placeId);
+      
+      if (cachedCityPlace?.latitude && cachedCityPlace?.longitude) {
+        cityLat = cachedCityPlace.latitude;
+        cityLng = cachedCityPlace.longitude;
+      } else {
+        const details = await getGooglePlaceDetails(placeId);
+        if (details) {
+          cityLat = details.lat;
+          cityLng = details.lng;
+          try {
+            await upsertPlace({
+              name: cityName.toLowerCase().trim().split(',')[0].trim(),
+              google_place_id: placeId,
+              latitude: details.lat,
+              longitude: details.lng,
+              formatted_address: details.formattedAddress,
+              enrichment_level: 'basic'
+            });
+          } catch {}
+        }
       }
     }
 
@@ -555,14 +588,14 @@ export async function fetchPlacesForCity(cityName: string): Promise<CityPlace[]>
     const interleaved = interleaveByCategory(merged);
 
     if (interleaved.length > 0) {
-      cityCache.set(cacheKey, { places: interleaved, timestamp: Date.now() });
+      setCityCache(cacheKey, interleaved);
     }
     return interleaved;
   } catch (error) {
     console.error('Error fetching places:', error);
     // Fallback: try AI alone (it may be cached locally even without geocoding).
     try {
-      return await fetchAiPlacesForCity(cityName);
+      return await fetchAiPlacesForCity(cityName, interests);
     } catch {
       return [];
     }
@@ -711,11 +744,39 @@ export function mergePlaces(staticPlaces: CityPlace[], apiPlaces: CityPlace[]): 
 import { searchGooglePlacesText } from './googlePlacesApi';
 
 const googleCategoryMap: Record<string, { category: string; categoryColor: string; image: string }> = {
-  tourist_attraction: { category: 'Ponto Turístico', categoryColor: '#10B981', image: 'https://images.unsplash.com/photo-1503220317375-aaad61436b1b?w=300' },
-  museum:             { category: 'Museu',       categoryColor: '#10B981', image: 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=300' },
-  park:               { category: 'Parque',           categoryColor: '#22C55E', image: 'https://images.unsplash.com/photo-1534430480872-3498386e7856?w=300' },
-  restaurant:         { category: 'Restaurante',            categoryColor: '#F59E0B', image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=300' },
-  default:            { category: 'Local',           categoryColor: '#6B7280', image: 'https://images.unsplash.com/photo-1503220317375-aaad61436b1b?w=300' },
+  tourist_attraction:   { category: 'Ponto Turístico', categoryColor: '#10B981', image: 'https://images.unsplash.com/photo-1503220317375-aaad61436b1b?w=300' },
+  historical_landmark:  { category: 'Monumento',       categoryColor: '#10B981', image: 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=300' },
+  monument:             { category: 'Monumento',       categoryColor: '#10B981', image: 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=300' },
+  museum:               { category: 'Museu',           categoryColor: '#6366F1', image: 'https://images.unsplash.com/photo-1554907984-15263bfd63bd?w=300' },
+  art_gallery:          { category: 'Galeria',         categoryColor: '#6366F1', image: 'https://images.unsplash.com/photo-1531243269054-5ebf6f34081e?w=300' },
+  park:                 { category: 'Parque',          categoryColor: '#22C55E', image: 'https://images.unsplash.com/photo-1534430480872-3498386e7856?w=300' },
+  national_park:        { category: 'Parque',          categoryColor: '#22C55E', image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=300' },
+  beach:                { category: 'Praia',           categoryColor: '#0EA5E9', image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=300' },
+  restaurant:           { category: 'Restaurante',     categoryColor: '#F59E0B', image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=300' },
+  italian_restaurant:   { category: 'Restaurante',     categoryColor: '#F59E0B', image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=300' },
+  pizza_restaurant:     { category: 'Restaurante',     categoryColor: '#F59E0B', image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=300' },
+  cafe:                 { category: 'Cafeteria',       categoryColor: '#92400E', image: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=300' },
+  coffee_shop:          { category: 'Cafeteria',       categoryColor: '#92400E', image: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=300' },
+  bakery:               { category: 'Padaria',         categoryColor: '#F59E0B', image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300' },
+  bar:                  { category: 'Bar',             categoryColor: '#7C3AED', image: 'https://images.unsplash.com/photo-1470337458703-46ad1756a187?w=300' },
+  pub:                  { category: 'Pub',             categoryColor: '#7C3AED', image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=300' },
+  night_club:           { category: 'Balada',          categoryColor: '#8B5CF6', image: 'https://images.unsplash.com/photo-1566737236500-c8ac43014a67?w=300' },
+  church:               { category: 'Igreja',          categoryColor: '#8B5CF6', image: 'https://images.unsplash.com/photo-1529655683826-aba9b3e77383?w=300' },
+  cathedral:            { category: 'Catedral',        categoryColor: '#8B5CF6', image: 'https://images.unsplash.com/photo-1529655683826-aba9b3e77383?w=300' },
+  place_of_worship:     { category: 'Local de Culto',  categoryColor: '#F97316', image: 'https://images.unsplash.com/photo-1548585744-5be19c3fd653?w=300' },
+  shopping_mall:        { category: 'Shopping',        categoryColor: '#F59E0B', image: 'https://images.unsplash.com/photo-1555992643-0ab5a39ab10a?w=300' },
+  store:                { category: 'Loja',            categoryColor: '#F59E0B', image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=300' },
+  market:               { category: 'Mercado',         categoryColor: '#F59E0B', image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=300' },
+  supermarket:          { category: 'Mercado',         categoryColor: '#F59E0B', image: 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=300' },
+  amusement_park:       { category: 'Parque Temático', categoryColor: '#EC4899', image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=300' },
+  aquarium:             { category: 'Aquário',        categoryColor: '#0EA5E9', image: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=300' },
+  zoo:                  { category: 'Zoológico',      categoryColor: '#22C55E', image: 'https://images.unsplash.com/photo-1534567153574-2b12153a87f0?w=300' },
+  stadium:              { category: 'Estádio',         categoryColor: '#EF4444', image: 'https://images.unsplash.com/photo-1459865264687-595d652de67e?w=300' },
+  lodging:              { category: 'Hospedagem',      categoryColor: '#3B82F6', image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=300' },
+  hotel:                { category: 'Hotel',           categoryColor: '#3B82F6', image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=300' },
+  neighborhood:         { category: 'Bairro',          categoryColor: '#0EA5E9', image: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=300' },
+  locality:             { category: 'Cidade',          categoryColor: '#0EA5E9', image: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=300' },
+  default:              { category: 'Local',           categoryColor: '#6B7280', image: 'https://images.unsplash.com/photo-1503220317375-aaad61436b1b?w=300' },
 };
 
 const googleSearchCache = new Map<string, CityPlace[]>();
@@ -732,20 +793,54 @@ export async function searchGoogleFallback(query: string, city: string): Promise
   if (cached) return cached;
 
   try {
-    const results = await searchGooglePlacesText(q, city);
+    const results = await searchGooglePlacesText(q, city, { persist: true });
 
     const places: CityPlace[] = results.map(r => {
       const type = r.primaryType || 'default';
       const meta = googleCategoryMap[type] || googleCategoryMap.default;
 
+      // Normalize strings to ignore accents and case
+      const normalize = (s: string) => (s || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const normReqCity = normalize(city);
+      const normResCity = normalize(r.city || '');
+      const normAddress = normalize(r.address || '');
+
+      let finalCity = r.city || city;
+
+      // Map of common pt-BR city names to their English/local equivalents that Google might return
+      const cityAliases: Record<string, string[]> = {
+        'londres': ['london', 'greater london'],
+        'nova york': ['new york', 'nyc'],
+        'amsterda': ['amsterdam'],
+        'roma': ['rome'],
+        'milao': ['milan'],
+        'veneza': ['venice'],
+        'florenca': ['florence', 'firenze'],
+        'atenas': ['athens'],
+        'miami': ['miami beach', 'greater miami'],
+      };
+
+      const aliases = cityAliases[normReqCity] || [];
+
+      // If the result city/address contains the requested city, OR matches a known alias, it's the same city.
+      const isSameCity = 
+        normResCity.includes(normReqCity) || 
+        normReqCity.includes(normResCity) ||
+        normAddress.includes(normReqCity) ||
+        aliases.some(alias => normResCity.includes(alias) || normAddress.includes(alias));
+
+      if (isSameCity) {
+        finalCity = city; // use the exact string requested by the app (e.g. 'Londres') to group correctly
+      }
+
       return {
         // Generate a random stable-ish ID
         id: Math.floor(Math.random() * 1000000) + 900000,
         name: r.name,
-        city: city.toLowerCase(),
+        city: finalCity.toLowerCase(),
         category: meta.category,
         categoryColor: meta.categoryColor,
-        image: meta.image,
+        image: r.photoUrl || meta.image,
         rating: 0,
         price: estimatedPriceFor(r.name, city),
         openHours: '',

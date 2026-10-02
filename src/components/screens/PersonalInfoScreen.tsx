@@ -37,7 +37,7 @@ export function PersonalInfoScreen({ onBack }: PersonalInfoScreenProps) {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-8">
+    <div className="min-h-[100dvh] bg-background pb-8">
       {/* Header */}
       <div className="sticky top-0 z-20 bg-background">
         <div className="flex items-center gap-3 px-4" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
@@ -57,7 +57,7 @@ export function PersonalInfoScreen({ onBack }: PersonalInfoScreenProps) {
               alt="Foto de perfil"
               className="w-24 h-24 rounded-full object-cover"
             />
-            <button className="absolute bottom-0 right-0 w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'hsl(var(--primary))' }}>
+            <button className="absolute bottom-0 right-0 w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'hsl(var(--primary))' }}>
               <Icon name="photo_camera" size={16} style={{ color: 'hsl(var(--secondary))' }} />
             </button>
           </div>

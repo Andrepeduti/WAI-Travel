@@ -27,7 +27,7 @@ export function AIScreen() {
   const [message, setMessage] = useState('');
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-[100dvh] bg-background pb-24">
       {/* Header */}
       <header className="sticky top-0 z-20 bg-background px-5 pt-safe-top pb-4">
         <div className="flex items-center gap-3">
@@ -111,7 +111,7 @@ export function AIScreen() {
 
       {/* Input Bar */}
       <div className="fixed bottom-20 left-0 right-0 px-5 pb-4 bg-gradient-to-t from-background via-background to-transparent pt-8">
-        <div className="w-full mx-auto flex items-center gap-2 p-2 bg-card rounded-2xl border border-border shadow-lg">
+        <div className="w-full mx-auto flex items-center gap-2 p-2 bg-field focus-within:border-primary transition-colors rounded-[10px] border border-border shadow-lg">
           <input
             type="text"
             value={message}
@@ -120,7 +120,7 @@ export function AIScreen() {
             className="flex-1 px-3 py-2 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
           />
           <button 
-            className="w-12 h-12 rounded-full flex items-center justify-center disabled:bg-[#E7E7EE]"
+            className="w-10 h-10 rounded-full flex items-center justify-center disabled:bg-[#E7E7EE]"
             style={{ background: message.trim() ? 'hsl(var(--primary))' : undefined }}
             disabled={!message.trim()}
           >

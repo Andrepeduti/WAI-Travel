@@ -5,6 +5,8 @@ import {
   type CoverImageResult,
 } from '@/lib/coverImageResolver';
 import { searchGooglePlacesText } from '@/lib/googlePlacesApi';
+import { canCallApi, incrementApiCounter } from '@/lib/placesCache';
+import { getCityByName, upsertCity } from '@/lib/citiesCache';
 
 const wikiCache = new Map<string, string>();
 
@@ -39,9 +41,11 @@ async function fetchWikipediaImage(query: string, signal: AbortSignal): Promise<
 
 /**
  * Hook que resolve a capa do roteiro com base nos destinos.
- * - Usa primeiro o mapa local de imagens (cidades/países conhecidos).
- * - Se cair no placeholder genérico, busca dinamicamente na Wikipedia
- *   a imagem da cidade escolhida (qualquer cidade do mundo).
+ * Prioridade otimizada para custos:
+ *   1. Mapa local de imagens (cidades/países conhecidos) — gratuito
+ *   2. Cache no banco de dados (tabela places) — gratuito
+ *   3. Wikipedia — gratuito
+ *   4. Google Places — último recurso (caro)
  */
 export function useDestinationCover(destinations: string[]): CoverImageResult {
   const initial = resolveCoverImage(destinations);
@@ -49,7 +53,6 @@ export function useDestinationCover(destinations: string[]): CoverImageResult {
 
   useEffect(() => {
     const local = resolveCoverImage(destinations);
-    setCover(local);
 
     // Só busca remoto se caiu no placeholder genérico e existe destino
     if (
@@ -57,8 +60,12 @@ export function useDestinationCover(destinations: string[]): CoverImageResult {
       !destinations ||
       destinations.length === 0
     ) {
+      setCover(local);
       return;
     }
+
+    // Set loading state initially for the placeholder
+    setCover({ ...local, isLoading: true });
 
     const ctrl = new AbortController();
     const first = destinations[0];
@@ -73,25 +80,34 @@ export function useDestinationCover(destinations: string[]): CoverImageResult {
       ].filter(Boolean) as string[];
 
       for (const candidate of candidates) {
-        // Tenta Google Places primeiro para fotos mais turísticas e bonitas
+        // 1. Checa banco de dados primeiro (gratuito)
         try {
-          const places = await searchGooglePlacesText(`${candidate} tourist destination`);
-          if (places && places.length > 0 && places[0].photoUrl) {
+          const cached = await getCityByName(candidate);
+          if (cached?.cover_photo_url) {
             if (ctrl.signal.aborted) return;
-            setCover({ url: places[0].photoUrl, isAutoSelected: true });
+            setCover({ url: cached.cover_photo_url, isAutoSelected: true });
             return;
           }
-        } catch (err) {
-          // Fallback silencioso
+        } catch {
+          // continue to next source
         }
 
-        // Fallback para Wikipedia se Google Places falhar
-        const img = await fetchWikipediaImage(candidate, ctrl.signal);
+        // 2. Tenta Wikipedia (gratuito)
+        const wikiImg = await fetchWikipediaImage(candidate, ctrl.signal);
         if (ctrl.signal.aborted) return;
-        if (img) {
-          setCover({ url: img, isAutoSelected: true });
+        if (wikiImg) {
+          setCover({ url: wikiImg, isAutoSelected: true });
+          // Nunca armazenar foto do wikipedia no banco, apenas usar em tela.
           return;
         }
+
+        // 3. Removido fallback do Google Places para economizar custos.
+        // Se o Wikipedia não achar a foto, cai no fallback silencioso final (imagem padrão genérica).
+      }
+      
+      // If it gets here, all attempts failed (Wikipedia didn't find anything)
+      if (!ctrl.signal.aborted) {
+        setCover(prev => ({ ...prev, isLoading: false }));
       }
     })();
 

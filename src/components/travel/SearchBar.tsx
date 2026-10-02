@@ -22,7 +22,7 @@ export function SearchBar({
 }: SearchBarProps) {
   return (
     <div 
-      className={cn("flex items-center gap-3 p-4 bg-secondary rounded-2xl cursor-text", className)}
+      className={cn("flex items-center gap-3 p-4 bg-field border border-transparent focus-within:border-primary transition-colors rounded-2xl cursor-text", className)}
       onClick={onFocus}
     >
       <Icon name="search" size={20} className="text-muted-foreground flex-shrink-0" />

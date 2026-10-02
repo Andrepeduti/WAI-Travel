@@ -69,9 +69,15 @@ export function EditItineraryDataScreen({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    setCoverPreview(url);
-    setCoverImage(url);
+    
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result || '');
+      if (!dataUrl) return;
+      setCoverPreview(dataUrl);
+      setCoverImage(dataUrl);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSave = () => {
@@ -89,7 +95,7 @@ export function EditItineraryDataScreen({
   const selectedCurrency = CURRENCIES.find(c => c.code === currency) || CURRENCIES[0];
 
   return (
-    <div className="min-h-screen pb-28 bg-background" style={{ fontFamily: 'var(--font-family-primary)' }}>
+    <div className="min-h-[100dvh] pb-28 bg-background" style={{ fontFamily: 'var(--font-family-primary)' }}>
       {/* Header */}
       <div className="px-4 pb-4 flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
         <BackButton onClick={onBack} />
@@ -144,7 +150,7 @@ export function EditItineraryDataScreen({
           onChange={e => setDescription(e.target.value)}
           placeholder="Descreva brevemente sua viagem..."
           rows={3}
-          className="w-full px-4 py-3 rounded-xl border border-border bg-background text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
+          className="w-full px-4 py-3 rounded-xl border border-border bg-field text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none"
         />
       </div>
 
@@ -162,7 +168,12 @@ export function EditItineraryDataScreen({
               <Icon name="calendar_today" size={18} className="text-muted-foreground" />
             </button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="center">
+          <PopoverContent
+            className="w-auto p-0 z-[200] max-w-[calc(100vw-32px)]"
+            align="center"
+            sideOffset={8}
+            collisionPadding={{ top: 20, bottom: 85, left: 16, right: 16 }}
+          >
             <Calendar
               mode="range"
               selected={dateRange}

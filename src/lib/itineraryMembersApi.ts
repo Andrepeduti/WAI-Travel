@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { touchItinerary } from '@/lib/itinerariesApi';
 
 export type ItineraryRole = 'owner' | 'editor' | 'viewer';
 
@@ -27,6 +28,47 @@ export interface ItineraryInvite {
   inviterAvatar?: string;
 }
 
+// ─── Memória Cache ─────────────────────────────────────────────────────────────
+export interface ItineraryOwnerProfile {
+  userId: string;
+  name: string;
+  avatar?: string;
+  username?: string;
+}
+
+const ownerProfileCache = new Map<string, ItineraryOwnerProfile>();
+const itineraryMembersCache = new Map<string, ItineraryMember[]>();
+
+export function getCachedOwnerProfile(itineraryId: string): ItineraryOwnerProfile | null {
+  return ownerProfileCache.get(itineraryId) || null;
+}
+
+export function getCachedItineraryMembers(itineraryId: string): ItineraryMember[] | null {
+  return itineraryMembersCache.get(itineraryId) || null;
+}
+
+const itineraryPendingInvitesCache = new Map<string, ItineraryInvite[]>();
+
+export function getCachedPendingInvites(itineraryId: string): ItineraryInvite[] | null {
+  return itineraryPendingInvitesCache.get(itineraryId) || null;
+}
+
+export function setCachedPendingInvites(itineraryId: string, invites: ItineraryInvite[]) {
+  itineraryPendingInvitesCache.set(itineraryId, invites);
+}
+
+export function setCachedOwnerProfile(itineraryId: string, owner: ItineraryOwnerProfile | null) {
+  if (owner) {
+    ownerProfileCache.set(itineraryId, owner);
+  } else {
+    ownerProfileCache.delete(itineraryId);
+  }
+}
+
+export function setCachedItineraryMembers(itineraryId: string, members: ItineraryMember[]) {
+  itineraryMembersCache.set(itineraryId, members);
+}
+
 /** Lista membros aceitos de um roteiro, com perfil enriquecido. */
 export async function listItineraryMembers(itineraryId: string): Promise<ItineraryMember[]> {
   const { data, error } = await supabase
@@ -34,14 +76,17 @@ export async function listItineraryMembers(itineraryId: string): Promise<Itinera
     .select('id, itinerary_id, user_id, role, accepted_at')
     .eq('itinerary_id', itineraryId);
   if (error) throw error;
-  if (!data || data.length === 0) return [];
+  if (!data || data.length === 0) {
+    setCachedItineraryMembers(itineraryId, []);
+    return [];
+  }
   const userIds = data.map((m) => m.user_id);
   const { data: profiles } = await supabase
     .from('profiles_public')
     .select('user_id, name, username, avatar_url')
     .in('user_id', userIds);
   const profileMap = new Map((profiles || []).map((p) => [p.user_id, p]));
-  return data.map((m) => {
+  const result: ItineraryMember[] = data.map((m) => {
     const p = profileMap.get(m.user_id);
     return {
       id: m.id,
@@ -54,6 +99,8 @@ export async function listItineraryMembers(itineraryId: string): Promise<Itinera
       acceptedAt: m.accepted_at,
     };
   });
+  setCachedItineraryMembers(itineraryId, result);
+  return result;
 }
 
 /** Cria um convite direto para um usuário (gera notificação automaticamente). */
@@ -144,7 +191,10 @@ export async function listPendingInvitesForItinerary(itineraryId: string): Promi
     .eq('itinerary_id', itineraryId)
     .eq('status', 'pending');
   if (error) throw error;
-  if (!data || data.length === 0) return [];
+  if (!data || data.length === 0) {
+    setCachedPendingInvites(itineraryId, []);
+    return [];
+  }
   const inviteeIds = data.map((i) => i.invitee_user_id).filter(Boolean) as string[];
   const profMap = new Map<string, any>();
   if (inviteeIds.length > 0) {
@@ -154,7 +204,7 @@ export async function listPendingInvitesForItinerary(itineraryId: string): Promi
       .in('user_id', inviteeIds);
     (profiles || []).forEach((p) => profMap.set(p.user_id, p));
   }
-  return data.map((i) => {
+  const result = data.map((i) => {
     const prof = i.invitee_user_id ? profMap.get(i.invitee_user_id) : null;
     return {
       id: i.id,
@@ -170,6 +220,8 @@ export async function listPendingInvitesForItinerary(itineraryId: string): Promi
       inviterAvatar: prof?.avatar_url || undefined,
     };
   });
+  setCachedPendingInvites(itineraryId, result);
+  return result;
 }
 
 /** Cancela (revoga) um convite pendente — apenas dono. */
@@ -207,6 +259,8 @@ export async function acceptInvite(inviteId: string, userId: string) {
     .update({ status: 'accepted' })
     .eq('id', inviteId);
   if (e3) throw e3;
+
+  await touchItinerary(invite.itinerary_id);
   return invite.itinerary_id;
 }
 
@@ -286,12 +340,7 @@ export async function listSharedItineraries(userId: string) {
 }
 
 /** Retorna o perfil do dono de um roteiro (para exibir em listas de participantes). */
-export async function getItineraryOwnerProfile(itineraryId: string): Promise<{
-  userId: string;
-  name: string;
-  avatar?: string;
-  username?: string;
-} | null> {
+export async function getItineraryOwnerProfile(itineraryId: string): Promise<ItineraryOwnerProfile | null> {
   const { data: itin, error } = await supabase
     .from('itineraries')
     .select('user_id')
@@ -303,11 +352,14 @@ export async function getItineraryOwnerProfile(itineraryId: string): Promise<{
     .select('user_id, name, username, avatar_url')
     .eq('user_id', itin.user_id)
     .maybeSingle();
-  if (!prof) return { userId: itin.user_id, name: 'Dono' };
-  return {
-    userId: prof.user_id,
-    name: prof.name || prof.username || 'Dono',
-    avatar: prof.avatar_url || undefined,
-    username: prof.username || undefined,
-  };
+  const res: ItineraryOwnerProfile = !prof
+    ? { userId: itin.user_id, name: 'Dono' }
+    : {
+        userId: prof.user_id,
+        name: prof.name || prof.username || 'Dono',
+        avatar: prof.avatar_url || undefined,
+        username: prof.username || undefined,
+      };
+  setCachedOwnerProfile(itineraryId, res);
+  return res;
 }

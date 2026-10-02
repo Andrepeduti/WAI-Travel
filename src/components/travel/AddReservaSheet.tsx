@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { TimePickerSheet } from '@/components/travel/TimePickerSheet';
 import { cn } from '@/lib/utils';
 import { searchGooglePlacesAutocomplete } from '@/lib/googlePlacesApi';
+import { getCurrencySymbol } from '@/lib/currencyUtils';
 
 type ReservaTipo = 'hospedagem' | 'atividade';
 
@@ -42,11 +43,12 @@ interface AddReservaSheetProps {
   onAdd: (reserva: Reserva) => void;
   editingReserva?: Reserva | null;
   initialTipo?: ReservaTipo;
+  currency?: string;
 }
 
 type TimePickerTarget = 'checkIn' | 'checkOut' | 'atividade' | null;
 
-export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva, initialTipo }: AddReservaSheetProps) {
+export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva, initialTipo, currency = 'BRL' }: AddReservaSheetProps) {
   const [tipo, setTipo] = useState<ReservaTipo>(editingReserva?.tipo || initialTipo || 'hospedagem');
   const [isLoading, setIsLoading] = useState(false);
   const [nome, setNome] = useState(editingReserva?.nome || '');
@@ -215,7 +217,7 @@ export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva, initia
     return { hora: '14', minuto: '00' };
   };
 
-  const inputClass = "w-full px-4 py-3 rounded-xl border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary-official transition-colors";
+  const inputClass = "w-full px-4 py-3 rounded-xl border border-border bg-field text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors";
   const timeButtonClass = "px-4 py-3 rounded-xl border border-border bg-background text-sm text-foreground flex items-center gap-2 transition-colors hover:border-muted-foreground";
   const { hora: tpHora, minuto: tpMinuto } = getTimePickerInitial();
 
@@ -279,14 +281,23 @@ export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva, initia
             <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
           </div>
 
+          {/* Top Bar with Close Button */}
+          <div className="flex justify-end items-center px-6 pt-1 pb-2">
+            <button
+              onClick={onClose}
+              className="w-10 h-10 flex items-center justify-center -mr-1"
+              aria-label="Fechar"
+            >
+              <Icon name="close" size={20} className="text-muted-foreground" />
+            </button>
+          </div>
+
           <div className="px-6">
-            <div className="flex justify-between items-center mb-6">
+            {/* Title */}
+            <div className="mb-6">
               <h3 className="text-xl font-bold text-foreground">
                 {editingReserva ? 'Editar reserva' : `Adicionar ${tipo === 'hospedagem' ? 'Hospedagem' : 'Atividade'}`}
               </h3>
-              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center">
-                <Icon name="close" size={20} className="text-muted-foreground" />
-              </button>
             </div>
 
             {tipo === 'hospedagem' ? (
@@ -347,10 +358,22 @@ export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva, initia
                         <Calendar mode="single" selected={checkInDate} onSelect={(date) => { setCheckInDate(date); setIsCheckInCalendarOpen(false); }} initialFocus className="p-3 pointer-events-auto" />
                       </PopoverContent>
                     </Popover>
-                    <button onClick={() => setTimePickerTarget('checkIn')} className={timeButtonClass}>
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      {checkInHora}:{checkInMinuto}
-                    </button>
+                    <div className={cn(timeButtonClass, "relative overflow-hidden cursor-pointer")}>
+                      <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <input
+                        type="time"
+                        value={`${checkInHora}:${checkInMinuto}`}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val) {
+                            const [h, m] = val.split(':');
+                            setCheckInHora(h);
+                            setCheckInMinuto(m);
+                          }
+                        }}
+                        className="text-[14px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-[45px] text-center"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -368,10 +391,22 @@ export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva, initia
                         <Calendar mode="single" selected={checkOutDate} onSelect={(date) => { setCheckOutDate(date); setIsCheckOutCalendarOpen(false); }} initialFocus className="p-3 pointer-events-auto" />
                       </PopoverContent>
                     </Popover>
-                    <button onClick={() => setTimePickerTarget('checkOut')} className={timeButtonClass}>
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      {checkOutHora}:{checkOutMinuto}
-                    </button>
+                    <div className={cn(timeButtonClass, "relative overflow-hidden cursor-pointer")}>
+                      <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <input
+                        type="time"
+                        value={`${checkOutHora}:${checkOutMinuto}`}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val) {
+                            const [h, m] = val.split(':');
+                            setCheckOutHora(h);
+                            setCheckOutMinuto(m);
+                          }
+                        }}
+                        className="text-[14px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-[45px] text-center"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -450,10 +485,22 @@ export function AddReservaSheet({ isOpen, onClose, onAdd, editingReserva, initia
 
                 <div className="mb-4">
                   <label className="text-sm font-medium text-foreground mb-1.5 block">Horário</label>
-                  <button onClick={() => setTimePickerTarget('atividade')} className={cn(timeButtonClass, 'w-full')}>
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    {atividadeHora}:{atividadeMinuto}
-                  </button>
+                  <div className={cn(timeButtonClass, "w-full relative overflow-hidden cursor-pointer")}>
+                    <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <input
+                      type="time"
+                      value={`${atividadeHora}:${atividadeMinuto}`}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val) {
+                          const [h, m] = val.split(':');
+                          setAtividadeHora(h);
+                          setAtividadeMinuto(m);
+                        }
+                      }}
+                      className="flex-1 text-[14px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-full"
+                    />
+                  </div>
                 </div>
 
                 <label className="text-sm font-medium text-foreground mb-1.5 block">

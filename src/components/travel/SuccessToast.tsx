@@ -1,40 +1,60 @@
 import { useState, useEffect } from 'react';
+import { CheckCircle2, X } from 'lucide-react';
 
 interface SuccessToastProps {
   isVisible: boolean;
   onClose: () => void;
   title?: string;
-  description?: string;
   duration?: number;
   actionLabel?: string;
   onAction?: () => void;
+  /** 'above-nav' fica logo acima da BottomNavigation (usa --toast-bottom-offset). */
+  /** 'screen-bottom' fica colado ao rodapé da tela (sem navbar nem FAB). */
+  position?: 'top' | 'bottom' | 'above-nav' | 'screen-bottom';
 }
 
-export function SuccessToast({ 
-  isVisible, 
-  onClose, 
+export function SuccessToast({
+  isVisible,
+  onClose,
   title = 'Roteiro criado com sucesso!',
-  description = 'Sua próxima viagem começa agora ✈️',
-  duration = 3000,
+  duration = 5000,
   actionLabel,
-  onAction
+  onAction,
+  position = 'top'
 }: SuccessToastProps) {
   const [isExiting, setIsExiting] = useState(false);
   const [showCheck, setShowCheck] = useState(false);
+  const [progress, setProgress] = useState(1);
+  const [timeLeft, setTimeLeft] = useState(Math.ceil(duration / 1000));
 
   useEffect(() => {
     if (isVisible) {
       setIsExiting(false);
       setShowCheck(false);
+      setProgress(1);
+      setTimeLeft(Math.ceil(duration / 1000));
+
       // Trigger check animation after card appears
       const checkTimer = setTimeout(() => setShowCheck(true), 200);
+
+      // Smooth countdown progress update (50ms interval)
+      const startTime = Date.now();
+      const timerInterval = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, duration - elapsed);
+        setProgress(remaining / duration);
+        setTimeLeft(Math.ceil(remaining / 1000));
+      }, 50);
+
       // Auto dismiss
       const dismissTimer = setTimeout(() => {
         handleClose();
       }, duration);
+
       return () => {
         clearTimeout(checkTimer);
         clearTimeout(dismissTimer);
+        clearInterval(timerInterval);
       };
     }
   }, [isVisible, duration]);
@@ -50,73 +70,58 @@ export function SuccessToast({
 
   if (!isVisible && !isExiting) return null;
 
-  return (
-    <div className="fixed top-0 left-0 right-0 z-[200] flex justify-center pointer-events-none px-3 pt-3 safe-top sm:px-4 sm:pt-4">
-      <div className="w-full w-full flex justify-center">
-      <div
-        className={`pointer-events-auto w-full max-w-[380px] rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.08)] border border-[#9DCC36]/30 ${
-          isExiting ? 'animate-toast-exit' : 'animate-toast-enter'
-        }`}
-        style={{ background: '#F4FAE6' }}
-      >
-        <div className="flex items-start gap-3">
-          {/* Animated Check Icon */}
-          <div 
-            className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center"
-            style={{ background: '#E8F5C8' }}
-          >
-            <svg 
-              width="20" 
-              height="20" 
-              viewBox="0 0 24 24" 
-              fill="none"
-              className="overflow-visible"
-            >
-              <path
-                d="M5 13l4 4L19 7"
-                stroke="#7AB51D"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className={showCheck ? 'animate-draw-check' : ''}
-                style={{
-                  strokeDasharray: 24,
-                  strokeDashoffset: showCheck ? 0 : 24,
-                }}
-              />
-            </svg>
-          </div>
+  const circumference = 2 * Math.PI * 16; // r=16 -> 100.53
+  const strokeDashoffset = circumference * (1 - progress);
 
-          {/* Text */}
-          <div className="flex-1 min-w-0 pt-0.5">
-            <p className="text-sm font-bold" style={{ color: '#141530' }}>
+  return (
+    <div
+      className={`fixed inset-x-0 z-[200] flex justify-center pointer-events-none px-4 ${position === 'top' ? 'top-0' : ''}`}
+      style={position === 'top'
+        ? { paddingTop: 'calc(max(15px, env(safe-area-inset-top)))' }
+        : position === 'above-nav'
+          ? { bottom: 'calc(var(--toast-bottom-offset, 0px) + 12px)' }
+          : position === 'screen-bottom'
+            ? { bottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)' }
+            : { bottom: 'calc(env(safe-area-inset-bottom, 0px) + 100px)' }}
+    >
+      <div
+        className={`pointer-events-auto flex flex-row items-center justify-between px-4 gap-6 relative shadow-lg w-full ${isExiting ? 'animate-toast-exit' : 'animate-toast-enter'
+          }`}
+        style={{
+          minHeight: '49px',
+          background: '#3C8622',
+          borderRadius: '16px',
+        }}
+      >
+        {/* Left icon + Text Section */}
+        <div className="flex-1 flex flex-row items-center justify-start min-w-0 py-2 gap-2">
+          <CheckCircle2 size={16} strokeWidth={2} className="text-white flex-shrink-0" />
+          <div className="flex flex-col">
+            <p className="text-[14px] font-medium text-white leading-tight font-['Urbanist']">
               {title}
             </p>
-            <p className="text-sm mt-0.5" style={{ color: '#141530', opacity: 0.6 }}>
-              {description}
-            </p>
-            {actionLabel && onAction && (
-              <button
-                onClick={() => { onAction(); handleClose(); }}
-                className="text-sm font-semibold mt-1.5"
-                style={{ color: '#7AB51D' }}
-              >
-                {actionLabel} →
-              </button>
-            )}
           </div>
-
-          {/* Close */}
-          <button
-            onClick={handleClose}
-            className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-colors hover:bg-black/5"
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M10.5 3.5L3.5 10.5M3.5 3.5l7 7" stroke="#141530" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </button>
         </div>
-      </div>
+
+        {/* Right Section: Undo button or Close */}
+        <div className="flex flex-row items-center justify-end flex-shrink-0">
+          {actionLabel && onAction ? (
+            <button
+              onClick={() => { onAction(); handleClose(); }}
+              className="text-sm font-bold text-white hover:text-white/80 active:scale-95 transition-all"
+            >
+              {actionLabel}
+            </button>
+          ) : null}
+          {!actionLabel && (
+            <button
+              onClick={handleClose}
+              className="w-8 h-8 flex items-center justify-center text-white/80 hover:text-white active:scale-95 transition-colors"
+            >
+              <X size={16} strokeWidth={2} />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

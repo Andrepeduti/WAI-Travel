@@ -101,13 +101,13 @@ export function CardPaymentScreen({ onBack, onSave, onDelete, initialData }: Car
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-[100dvh] bg-background flex flex-col">
       {/* Header */}
  <header className="sticky top-0 z-20 bg-background px-5 pb-3 border-b border-border">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
             <BackButton onClick={onBack} />
-            <h1 className="text-xl font-bold text-foreground my-0 mt-[24px]">{initialData ? 'Editar cartão' : 'Adicionar cartão'}</h1>
+            <h1 className="text-xl font-bold text-foreground my-0">{initialData ? 'Editar cartão' : 'Adicionar cartão'}</h1>
           </div>
           {initialData && onDelete && (
             <button

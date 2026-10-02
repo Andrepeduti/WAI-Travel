@@ -106,10 +106,15 @@ export interface FriendProfileData {
   following: number;
   followers: string;
   countries: CountryVisit[];
+  dreamTrips?: any[];
+  highlightTrip?: string | null;
+  interests?: string[];
 }
 
+import { UserItinerary } from '@/lib/itinerariesApi';
+
 interface PublicItinerary {
-  id: number;
+  id: string | number;
   title: string;
   destination: string;
   image: string;
@@ -123,6 +128,7 @@ interface PublicItinerary {
   places: number;
   comments: { user: string; text: string; avatar: string }[];
   theme?: { emoji: string; label: string };
+  userItinerary?: UserItinerary;
 }
 
 // Tema da viagem por roteiro (cultural, romântico, gastronômico, etc.)
@@ -144,8 +150,8 @@ interface FriendProfileScreenProps {
   friend: FriendProfileData;
   onBack: () => void;
   onChat?: () => void;
-  onItineraryClick?: (id: number) => void;
-  onDuplicateItinerary?: (id: number) => void;
+  onItineraryClick?: (id: string | number, userItinerary?: UserItinerary) => void;
+  onDuplicateItinerary?: (id: string | number) => void;
   /**
    * 'self'  → meu próprio perfil (botão Editar, ícone Configurações no header)
    * 'other' → perfil de outra pessoa (botões Chat + Seguir, menu de 3 pontinhos no header)
@@ -328,9 +334,21 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
   const [reportSheetOpen, setReportSheetOpen] = useState(false);
   const [highlightPickerOpen, setHighlightPickerOpen] = useState(false);
   const [selectedHighlightId, setSelectedHighlightId] = useState<string>(() => {
+    if (!isSelf) return friend.highlightTrip || AVAILABLE_HIGHLIGHTS[0].id;
+    if (currentUser?.highlightTrip) return currentUser.highlightTrip;
     if (typeof window === 'undefined') return AVAILABLE_HIGHLIGHTS[0].id;
-    return localStorage.getItem(HIGHLIGHT_STORAGE_KEY) || AVAILABLE_HIGHLIGHTS[0].id;
+    return localStorage.getItem('wai-travel-highlight-trip') || AVAILABLE_HIGHLIGHTS[0].id;
   });
+  
+  useEffect(() => {
+    if (isSelf && currentUser?.highlightTrip) {
+      setSelectedHighlightId(currentUser.highlightTrip);
+      try { localStorage.setItem('wai-travel-highlight-trip', currentUser.highlightTrip); } catch { }
+    } else if (!isSelf) {
+      setSelectedHighlightId(friend.highlightTrip || AVAILABLE_HIGHLIGHTS[0].id);
+    }
+  }, [isSelf, currentUser?.highlightTrip, friend.highlightTrip]);
+  
   const selectedHighlight =
     AVAILABLE_HIGHLIGHTS.find(h => h.id === selectedHighlightId) || AVAILABLE_HIGHLIGHTS[0];
 
@@ -432,65 +450,39 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
     return () => { active = false; };
   }, [friend.userId, isSelf]);
 
-  // Interests — only what the user picked at onboarding (self) until they edit it here.
-  // We persist to localStorage ONLY after an explicit edit, so onboarding values from
-  // Supabase remain the source of truth for fresh profiles.
   const [interests, setInterests] = useState<Interest[]>(() => {
-    if (typeof window === 'undefined' || !isSelf) return [];
+    if (!isSelf) return mapOnboardingInterests(friend.interests);
+    if (currentUser?.interests) return mapOnboardingInterests(currentUser.interests);
+    if (typeof window === 'undefined') return [];
     try {
-      const stored = localStorage.getItem(INTERESTS_STORAGE_KEY);
+      const stored = localStorage.getItem('wai-travel-interests');
       return stored ? (JSON.parse(stored) as Interest[]) : [];
     } catch {
       return [];
     }
   });
-  // Seed self interests from onboarding (profiles.interests) when localStorage is empty.
+  
   useEffect(() => {
-    if (!isSelf || typeof window === 'undefined') return;
-    if (!authUser?.id) return;
-    if (localStorage.getItem(INTERESTS_STORAGE_KEY)) return;
-    let cancelled = false;
-    supabase
-      .from('profiles')
-      .select('interests')
-      .eq('user_id', authUser.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) { console.error('[FriendProfile] interests fetch failed', error); return; }
-        const mapped = mapOnboardingInterests((data as { interests?: unknown } | null)?.interests);
-        if (mapped.length > 0) setInterests(mapped);
-      });
-    return () => { cancelled = true; };
-  }, [isSelf, authUser?.id]);
-  // Carrega interesses do AMIGO (perfil de outra pessoa) para exibir publicamente.
-  useEffect(() => {
-    if (isSelf || !friend.userId) return;
-    let cancelled = false;
-    supabase
-      .from('profiles_public')
-      .select('interests')
-      .eq('user_id', friend.userId)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) { console.error('[FriendProfile] friend interests fetch failed', error); return; }
-        const mapped = mapOnboardingInterests((data as { interests?: unknown } | null)?.interests);
-        setInterests(mapped);
-        setFriendInterests(mapped.map(m => m.label));
-      });
-    return () => { cancelled = true; };
-  }, [isSelf, friend.userId]);
+    if (isSelf && currentUser?.interests) {
+      const mapped = mapOnboardingInterests(currentUser.interests);
+      setInterests(mapped);
+      try { localStorage.setItem('wai-travel-interests', JSON.stringify(mapped)); } catch { }
+    } else if (!isSelf) {
+      setInterests(mapOnboardingInterests(friend.interests));
+      setFriendInterests(friend.interests ?? []);
+    }
+  }, [isSelf, currentUser?.interests, friend.interests]);
 
-  const persistInterests = (next: Interest[]) => {
+  const persistInterests = async (next: Interest[]) => {
     setInterests(next);
-    if (typeof window !== 'undefined' && isSelf) {
-      localStorage.setItem(INTERESTS_STORAGE_KEY, JSON.stringify(next));
+    if (isSelf) {
+      try { localStorage.setItem('wai-travel-interests', JSON.stringify(next)); } catch { }
+      await update({ interests: next.map(i => i.label) }).catch(e => console.error('Failed to update interests', e));
     }
   };
   const [editInterestsOpen, setEditInterestsOpen] = useState(false);
 
-  const [duplicatedIds, setDuplicatedIds] = useState<Set<number>>(new Set());
+  const [duplicatedIds, setDuplicatedIds] = useState<Set<string | number>>(new Set());
 
   // Roteiros públicos REAIS de outro usuário (vindos do banco). Só
   // entram em ação quando o perfil tem userId real (perfil do banco).
@@ -508,13 +500,36 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
     (async () => {
       const rows = await getPublicItinerariesByUserId(friend.userId!);
       if (cancelled) return;
-      const mapped: PublicItinerary[] = rows.map((r, idx) => {
-        const days = r.start_date && r.end_date
-          ? Math.max(1, differenceInDays(new Date(r.end_date), new Date(r.start_date)) + 1)
-          : 1;
+      const mapped: PublicItinerary[] = rows.map((r) => {
+        const days = r.is_flexible && r.duration_days
+          ? r.duration_days
+          : r.start_date && r.end_date
+            ? Math.max(1, differenceInDays(new Date(r.end_date), new Date(r.start_date)) + 1)
+            : 1;
         const uniqueCities = new Set((r.destinations || []).map(d => d.split(',')[0].trim()));
+        
+        const userItinerary: UserItinerary = {
+          id: r.id,
+          title: r.title || 'Roteiro',
+          destinations: r.destinations || [],
+          startDate: r.start_date || '',
+          endDate: r.end_date || '',
+          images: r.images || [],
+          participants: [],
+          places: r.places_count ?? 0,
+          sourceDatasetId: null,
+          isPublic: true,
+          priceCents: r.price_cents,
+          description: r.description || '',
+          status: r.status || 'published',
+          isFlexible: r.is_flexible || false,
+          durationDays: r.duration_days,
+          travelMonth: r.travel_month,
+          userId: friend.userId!,
+        };
+
         return {
-          id: idx + 1, // id local apenas para keys (entidade real é por uuid)
+          id: r.id,
           title: r.title || 'Roteiro',
           destination: r.destinations?.[0] || '',
           image: r.images?.[0] || '',
@@ -527,7 +542,8 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
           cities: uniqueCities.size,
           places: r.places_count ?? 0,
           comments: [],
-          theme: r.main_tag ? { emoji: '✈️', label: r.main_tag } : undefined,
+          theme: undefined,
+          userItinerary,
         };
       });
       setRealPublicItineraries(mapped);
@@ -547,8 +563,8 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
   // Roteiros públicos reais do próprio usuário (vindos do banco)
   const { itineraries: myItineraries, loading: myItinerariesLoading } = useMyItineraries();
   const myPublicItineraries = useMemo(
-    () => (isSelf ? myItineraries.filter(it => it.isPublic) : []),
-    [isSelf, myItineraries],
+    () => (isSelf ? myItineraries.filter(it => it.isPublic && it.userId === authUser?.id && !it.deletedAt) : []),
+    [isSelf, myItineraries, authUser?.id],
   );
 
   // Roteiros do próprio usuário publicados À VENDA (priceCents > 0).
@@ -595,19 +611,26 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
     setShowSalesSummary(true);
   }, [salesSeenKey]);
 
-  // Dream trips (próximas viagens futuras)
-  // - Self: persistido no localStorage; começa vazio até o usuário adicionar.
-  // - Outros perfis REAIS (com userId): vazio (sem dados ainda no banco).
-  // - Perfis legacy (sem userId): lista mockada para demonstração da feature.
   const [dreamTrips, setDreamTrips] = useState<DreamTrip[]>(() => {
-    if (!isSelf) return friend.userId ? [] : DEFAULT_DREAM_TRIPS;
+    if (!isSelf) return friend.dreamTrips ?? (friend.userId ? [] : DEFAULT_DREAM_TRIPS);
+    if (currentUser?.dreamTrips) return currentUser.dreamTrips;
     if (typeof window === 'undefined') return [];
-    const stored = localStorage.getItem(DREAM_TRIPS_STORAGE_KEY);
-    if (stored) {
-      try { return JSON.parse(stored) as DreamTrip[]; } catch { /* fallthrough */ }
+    try {
+      const stored = localStorage.getItem('wai-travel-dream-trips');
+      return stored ? (JSON.parse(stored) as DreamTrip[]) : [];
+    } catch {
+      return [];
     }
-    return [];
   });
+  
+  useEffect(() => {
+    if (isSelf && currentUser) {
+      setDreamTrips(currentUser.dreamTrips ?? []);
+      try { localStorage.setItem('wai-travel-dream-trips', JSON.stringify(currentUser.dreamTrips ?? [])); } catch { }
+    } else if (!isSelf) {
+      setDreamTrips(friend.dreamTrips ?? (friend.userId ? [] : DEFAULT_DREAM_TRIPS));
+    }
+  }, [isSelf, currentUser?.dreamTrips, friend.dreamTrips, friend.userId]);
   const [dreamTripSheetOpen, setDreamTripSheetOpen] = useState(false);
   const [dreamTripToRemove, setDreamTripToRemove] = useState<DreamTrip | null>(null);
   const [newDreamDest, setNewDreamDest] = useState('');
@@ -622,10 +645,13 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
   const [vibePickerOpen, setVibePickerOpen] = useState(false);
   const [isAddingDreamTrip, setIsAddingDreamTrip] = useState(false);
 
-  const persistDreamTrips = (trips: DreamTrip[]) => {
+  const { update } = useCurrentUser();
+  
+  const persistDreamTrips = async (trips: DreamTrip[]) => {
     setDreamTrips(trips);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(DREAM_TRIPS_STORAGE_KEY, JSON.stringify(trips));
+    if (isSelf) {
+      try { localStorage.setItem('wai-travel-dream-trips', JSON.stringify(trips)); } catch { }
+      await update({ dreamTrips: trips }).catch(e => console.error('Failed to update dream trips', e));
     }
   };
 
@@ -638,12 +664,27 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
     let placeImage = resolveCoverImage([destination]).url; // fallback
 
     try {
-      // Usa Google Places diretamente para buscar a melhor foto do lugar escolhido
-      const places = await searchGooglePlacesText(`${destination} tourist destination`);
-      if (places && places.length > 0 && places[0].photoUrl) {
-        placeImage = places[0].photoUrl;
-      } else {
-        // Fallback para a function caso o Places não retorne nada (raro)
+      // Usa Wikipedia (gratuito) para buscar foto do destino
+      const langs = ['pt', 'en'];
+      for (const lang of langs) {
+        try {
+          const wikiUrl = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(destination)}`;
+          const wikiRes = await fetch(wikiUrl, { headers: { Accept: 'application/json' } });
+          if (wikiRes.ok) {
+            const wikiData = await wikiRes.json();
+            const wikiImg = wikiData?.originalimage?.source || wikiData?.thumbnail?.source;
+            if (wikiImg) {
+              placeImage = wikiImg;
+              break;
+            }
+          }
+        } catch {
+          // continue to next language
+        }
+      }
+
+      // Fallback para a function caso a Wikipedia não retorne nada
+      if (placeImage === resolveCoverImage([destination]).url) {
         const { data, error } = await supabase.functions.invoke('google-image-search', {
           body: { query: `turismo ${destination} landmark travel` }
         });
@@ -834,9 +875,9 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
         itineraries={publicItineraries}
         acquiredIds={duplicatedIds}
         onBack={() => setShowAllItineraries(false)}
-        onItineraryClick={(id) => {
+        onItineraryClick={(id, userItinerary) => {
           setShowAllItineraries(false);
-          onItineraryClick?.(id);
+          onItineraryClick?.(id, userItinerary);
         }}
       />
     );
@@ -881,7 +922,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
     if (settingsScreen === 'help-center') return <HelpCenterScreen onBack={closeSub} />;
 
     return (
-      <div className="min-h-screen bg-white pb-12">
+      <div className="min-h-[100dvh] bg-white pb-12">
         {/* Header */}
         <div className="sticky top-0 z-20 bg-white">
           <div className="flex items-center gap-3 px-4 pt-safe-top pb-3">
@@ -971,7 +1012,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
 
   if (isScreenLoading) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] pb-24 animate-pulse">
+      <div className="min-h-[100dvh] bg-[#F2F2F2] pb-24 animate-pulse">
         {/* Header */}
         <div className="relative flex items-center justify-between px-4 pb-2" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <div className="flex items-center">
@@ -1018,7 +1059,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
   }
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] pb-24">
+    <div className="min-h-[100dvh] bg-[#F2F2F2] pb-24">
       {/* Header */}
       <div className="relative flex items-center justify-between px-4 pb-2" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
         <div className="flex items-center">
@@ -1032,7 +1073,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
             {hasItinerariesForSale && (
               <button
                 onClick={handleOpenSalesSummary}
-                className="relative w-11 h-11 rounded-full bg-white flex items-center justify-center shadow-sm active:scale-95 active:opacity-80 transition-all"
+                className="relative w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm active:scale-95 active:opacity-80 transition-all"
                 aria-label="Resumo de vendas"
               >
                 <Icon name="account_balance_wallet" size={22} style={{ color: '#1A1C40' }} />
@@ -1358,7 +1399,9 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
                     key={h.id}
                     onClick={() => {
                       setSelectedHighlightId(h.id);
-                      try { localStorage.setItem(HIGHLIGHT_STORAGE_KEY, h.id); } catch { }
+                      if (isSelf) {
+                        update({ highlightTrip: h.id }).catch(e => console.error('Failed to update highlight', e));
+                      }
                       setHighlightPickerOpen(false);
                     }}
                     className="w-full flex items-center gap-3 px-3 py-3 rounded-xl mb-1 active:opacity-70"
@@ -1440,16 +1483,18 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
                   const cover = resolveTripThumbnailImages(it.destinations || [], customCover)[0];
                   const primaryDest = (it.destinations?.[0] || '').split(',')[0];
                   const cities = (it.destinations || []).length;
-                  const days = it.startDate && it.endDate
-                    ? Math.max(1, differenceInDays(new Date(it.endDate), new Date(it.startDate)) + 1)
-                    : null;
+                  const days = it.isFlexible && it.durationDays
+                    ? it.durationDays
+                    : it.startDate && it.endDate
+                      ? Math.max(1, differenceInDays(new Date(it.endDate), new Date(it.startDate)) + 1)
+                      : null;
                   const priceReais = it.priceCents != null ? it.priceCents / 100 : null;
                   return (
                     <button
                       key={it.id}
                       onClick={() => {
                         if (isSelf) {
-                          navigate('/home', { state: { openCreatorDashboardItinerary: it } });
+                          navigate('/home', { state: { openCreatorDashboardItinerary: it, fromStandaloneProfile: true } });
                         } else {
                           navigate(`/itinerary/${it.id}`);
                         }
@@ -1539,7 +1584,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
                   return (
                     <button
                       key={it.id}
-                      onClick={() => onItineraryClick?.(it.id)}
+                      onClick={() => onItineraryClick?.(it.id, it.userItinerary)}
                       className="w-[240px] flex flex-col text-left bg-card rounded-2xl overflow-hidden"
                       style={{ boxShadow: '0 2px 16px rgba(0, 0, 0, 0.07)' }}
                     >
@@ -1556,7 +1601,7 @@ export function FriendProfileScreen({ friend, onBack, onChat, onItineraryClick, 
                         <h3 className="font-bold text-[15px] text-foreground leading-tight line-clamp-1">{it.title}</h3>
                         <div className="flex items-center gap-1.5">
                           <Icon name="star" size={14} filled className="text-[#F2B90C]" />
-                          <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{it.rating}</span>
+                          <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{it.rating > 0 ? (typeof it.rating === 'number' && Number.isInteger(it.rating) ? it.rating : it.rating.toFixed(1)) : '-'}</span>
                           <Icon name="location_on" size={14} style={{ color: '#1E293B' }} className="ml-2" />
                           <span className="text-[12px] font-medium" style={{ color: '#171F2C' }}>{it.cities} cidades</span>
                           <Icon name="schedule" size={14} style={{ color: '#1E293B' }} className="ml-2" />

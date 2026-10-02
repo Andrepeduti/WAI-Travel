@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Icon } from '@/components/ui/Icon';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { useCurrentUser } from '@/hooks/use-current-user';
 
 interface ContactUsSheetProps {
@@ -36,10 +36,7 @@ export function ContactUsSheet({ isOpen, onClose }: ContactUsSheetProps) {
 
   const handleSubmit = () => {
     if (!canSubmit) return;
-    toast({
-      title: 'Mensagem enviada!',
-      description: 'Recebemos sua mensagem e responderemos em breve.',
-    });
+    toast.success('Mensagem enviada!');
     setMessage('');
     setType('');
     onClose();
@@ -47,7 +44,7 @@ export function ContactUsSheet({ isOpen, onClose }: ContactUsSheetProps) {
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent side="bottom" className="rounded-t-[20px] px-5 pb-8 pt-3 max-h-[90vh] overflow-y-auto">
+      <SheetContent side="bottom" className="rounded-t-[20px] px-5 pb-[34px] pt-3 max-h-[90vh] overflow-y-auto">
         {/* Handle */}
         <div className="flex justify-center mb-4">
           <div className="w-10 h-1 rounded-full" style={{ background: 'hsl(var(--divider))' }} />
@@ -115,7 +112,7 @@ export function ContactUsSheet({ isOpen, onClose }: ContactUsSheetProps) {
               value={message} onChange={(e) => setMessage(e.target.value)}
               rows={4}
               placeholder="Descreva sua dúvida ou sugestão..."
-              className="w-full rounded-xl border border-border bg-background px-4 py-3 text-foreground outline-none focus:border-primary transition-colors resize-none"
+              className="w-full rounded-xl border border-border bg-field px-4 py-3 text-foreground outline-none focus:border-primary transition-colors resize-none"
               style={{ fontSize: 'var(--text-base)' }}
             />
           </div>

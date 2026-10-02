@@ -27,7 +27,7 @@ export async function getMarketplaceItinerary(id: string): Promise<MarketplaceIt
     .from('itineraries')
     .select('*')
     .eq('id', id)
-    .eq('is_public', true)
+    .is('deleted_at', null)
     .maybeSingle();
 
   if (error || !data) {
@@ -41,6 +41,12 @@ export async function getMarketplaceItinerary(id: string): Promise<MarketplaceIt
     .eq('user_id', data.user_id)
     .maybeSingle();
 
+  const { data: listing } = await supabase
+    .from('itinerary_store_listing')
+    .select('listed_description')
+    .eq('itinerary_id', id)
+    .maybeSingle();
+
   return {
     id: data.id,
     title: data.title ?? '',
@@ -50,11 +56,11 @@ export async function getMarketplaceItinerary(id: string): Promise<MarketplaceIt
     images: data.images ?? [],
     participants: data.participants ?? [],
     places: data.places_count ?? 0,
-    sourceDatasetId: data.source_dataset_id ?? null,
-    isPublic: data.is_public ?? false,
-    priceCents: data.price_cents ?? null,
-    description: data.description ?? '',
-    tags: data.tags ?? [],
+    sourceDatasetId: null,
+    isPublic: false,
+    priceCents: null,
+    description: listing?.listed_description ?? '',
+    tags: [],
     userId: data.user_id,
     authorName: profile?.name || profile?.username || 'Viajante',
     authorUsername: profile?.username || '',

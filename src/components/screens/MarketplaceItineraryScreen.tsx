@@ -5,7 +5,6 @@ import { shareItinerary } from '@/lib/shareItinerary';
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useCart } from '@/contexts/CartContext';
 import { useFavorites } from '@/contexts/FavoritesContext';
-import { SaveToCollectionSheet, SavePlaceData } from '@/components/travel/SaveToCollectionSheet';
 import { CheckoutScreen } from '@/components/screens/CheckoutScreen';
 import { PurchaseRulesScreen } from '@/components/travel/PurchaseRulesScreen';
 import { PurchaseSuccessScreen } from '@/components/screens/PurchaseSuccessScreen';
@@ -17,7 +16,6 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { BackButton } from '@/components/ui/BackButton';
-import { OwnerPublishedSheet } from '@/components/travel/OwnerPublishedSheet';
 import { recordPurchase } from '@/lib/purchasesApi';
 import { getInterestIcon } from '@/lib/interestIcons';
 import { ReportSheet } from '@/components/social/ReportSheet';
@@ -90,7 +88,7 @@ export interface MarketplaceItineraryScreenProps {
   itineraryId: number | string;
   onBack: () => void;
   onViewPurchasedItinerary?: (itineraryId: number | string, newStartDate?: Date, newEndDate?: Date) => void;
-  onViewCreator?: (author: string, authorImage: string) => void;
+  onViewCreator?: (author: string, authorImage: string, authorUserId?: string, authorUsername?: string) => void;
   authorOverride?: string;
   authorImageOverride?: string;
   /** Optional dataset injected from outside (e.g. a user-published itinerary not in the static catalog). */
@@ -101,7 +99,6 @@ export interface MarketplaceItineraryScreenProps {
   onManageItinerary?: () => void;
   onViewSalesDashboard?: () => void;
   onUnpublish?: () => void;
-  onDownloadPdf?: () => void;
   onDeleteItinerary?: () => void;
   /** Abre o chat com o autor do roteiro (deep-link para a tela de Mensagens). */
   onOpenChat?: (
@@ -128,7 +125,7 @@ export interface MarketplaceItineraryScreenProps {
  * Exibe: criador, avaliações, curtidas, descrição, tags, dia-a-dia com lock,
  * locais incluídos, reviews e botão de compra.
  */
-export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchasedItinerary, onViewCreator, authorOverride, authorImageOverride, datasetOverride, isOwner = false, onManageItinerary, onViewSalesDashboard, onUnpublish, onDownloadPdf, onDeleteItinerary, onOpenChat, autoOpenCheckout }: MarketplaceItineraryScreenProps) {
+export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchasedItinerary, onViewCreator, authorOverride, authorImageOverride, datasetOverride, isOwner = false, onManageItinerary, onViewSalesDashboard, onUnpublish, onDeleteItinerary, onOpenChat, autoOpenCheckout }: MarketplaceItineraryScreenProps) {
 
   const idStr = String(itineraryId);
 
@@ -202,7 +199,9 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
 
     // We only have startDate and endDate strings in marketplaceData
     let totalDays = 3;
-    if (marketplaceData.startDate && marketplaceData.endDate) {
+    if (marketplaceData.isFlexible && marketplaceData.durationDays) {
+      totalDays = marketplaceData.durationDays;
+    } else if (marketplaceData.startDate && marketplaceData.endDate) {
       try {
         totalDays = Math.max(1, differenceInDays(parseISO(marketplaceData.endDate), parseISO(marketplaceData.startDate)) + 1);
       } catch (e) { }
@@ -223,6 +222,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
       author: authorOverride || marketplaceData.authorName || 'Autor',
       authorImage: authorImageOverride || marketplaceData.authorAvatar || '',
       authorUsername: marketplaceData.authorUsername || (authorOverride || marketplaceData.authorName || 'Autor'),
+      authorUserId: marketplaceData.userId,
       authorVerified: true, // Assuming published means verified enough for this UI
       duration: `${totalDays} dias`,
       cities: uniqueCities.size || 1,
@@ -230,8 +230,10 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
       description: marketplaceData.description ?? '',
       tags: marketplaceData.tags ?? [],
       destinations: marketplaceData.destinations ?? [],
-      startDate: marketplaceData.startDate ? parseISO(marketplaceData.startDate) : new Date(),
-      endDate: marketplaceData.endDate ? parseISO(marketplaceData.endDate) : addDays(new Date(), totalDays - 1),
+      isFlexible: marketplaceData.isFlexible,
+      durationDays: marketplaceData.durationDays,
+      startDate: marketplaceData.startDate ? parseISO(marketplaceData.startDate) : undefined,
+      endDate: marketplaceData.endDate ? parseISO(marketplaceData.endDate) : undefined,
       salesCount: (marketplaceData as any).salesCount || 0,
       createdAt: marketplaceData.createdAt,
     };
@@ -275,12 +277,12 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
   }, [plannerData]);
 
   const seasonLabel = useMemo(() => {
-    if (!itineraryData) return '';
+    if (!itineraryData?.startDate) return '';
     return getSeasonForDate(itineraryData.startDate, itineraryData.destinations);
   }, [itineraryData]);
 
   const suggestedDateLabel = useMemo(() => {
-    if (!itineraryData) return '';
+    if (!itineraryData?.startDate || !itineraryData?.endDate) return '';
     return `${format(itineraryData.startDate, "dd MMM", { locale: ptBR })} — ${format(itineraryData.endDate, "dd MMM yyyy", { locale: ptBR })}`;
   }, [itineraryData]);
 
@@ -289,12 +291,9 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
   const { toggleFavorite, isFavorite } = useFavorites();
   const isFavorited = itineraryData ? isFavorite(itineraryData.id) : false;
   const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set([1]));
-  const [savedPlaces, setSavedPlaces] = useState<Set<number>>(new Set());
   const [showOwnerSheet, setShowOwnerSheet] = useState(false);
   const [showAllReviews, setShowAllReviews] = useState(false);
   const [showAllDays, setShowAllDays] = useState(false);
-  const [saveSheetOpen, setSaveSheetOpen] = useState(false);
-  const [savingPlace, setSavingPlace] = useState<SavePlaceData | null>(null);
   const [showCheckout, setShowCheckout] = useState(false);
   const [showPurchaseRules, setShowPurchaseRules] = useState(false);
   const [showPurchaseSuccess, setShowPurchaseSuccess] = useState(false);
@@ -322,7 +321,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
   const handleOpenChat = useCallback(async () => {
     if (!itineraryData) return;
     if (!onOpenChat) {
-      toast(`Abrindo conversa com ${itineraryData.author}…`);
+      toast.success(`Abrindo conversa com ${itineraryData.author}…`);
       return;
     }
     const destination = itineraryData?.destinations?.[0];
@@ -373,6 +372,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
   }, [addToCart, itineraryId, itineraryData]);
 
   const totalDaysCount = useMemo(() => {
+    if (itineraryData?.isFlexible && itineraryData?.durationDays) return itineraryData.durationDays;
     if (!itineraryData?.startDate || !itineraryData?.endDate) return 3;
     return differenceInDays(itineraryData.endDate, itineraryData.startDate);
   }, [itineraryData]);
@@ -399,27 +399,6 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
       newExpanded.add(day);
     }
     setExpandedDays(newExpanded);
-  };
-
-  const handleSavePlaceClick = (place: SavePlaceData, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (savedPlaces.has(place.id)) {
-      const newSaved = new Set(savedPlaces);
-      newSaved.delete(place.id);
-      setSavedPlaces(newSaved);
-    } else {
-      setSavingPlace(place);
-      setSaveSheetOpen(true);
-    }
-  };
-
-  const handlePlaceSaved = (_collectionTitle: string) => {
-    if (savingPlace) {
-      const newSaved = new Set(savedPlaces);
-      newSaved.add(savingPlace.id);
-      setSavedPlaces(newSaved);
-    }
-    setSavingPlace(null);
   };
 
   const [visualsReady, setVisualsReady] = useState(false);
@@ -504,7 +483,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
     );
   }
 
-  if (showAllReviews) {
+  if (showAllReviews && reviewsData && reviewsData.length > 0) {
     const rData = reviewsData ?? [];
     const avg = rData.length > 0
       ? rData.reduce((s, r) => s + r.rating, 0) / rData.length
@@ -542,7 +521,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
   }
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] pb-32">
+    <div className="min-h-[100dvh] bg-[#F2F2F2] pb-32">
       {/* Hero image */}
       <div className="relative h-[230px]">
         <img
@@ -620,7 +599,12 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
         <div className="flex items-center justify-between mb-4">
           <button
             className="flex items-center gap-3"
-            onClick={() => onViewCreator?.(itineraryData.author, itineraryData.authorImage)}
+            onClick={() => onViewCreator?.(
+              itineraryData.author,
+              itineraryData.authorImage,
+              itineraryData.authorUserId,
+              itineraryData.authorUsername
+            )}
           >
             <img
               src={itineraryData.authorImage}
@@ -709,7 +693,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
             <div className="flex items-center gap-2 mb-4 text-[13px] text-[#1A1C40]">
               <Icon name="calendar_month" size={16} className="text-[#1A1C40]" />
               <span>
-                {itineraryData.tags?.includes('_FLEXIBLE_DATES_') ? (
+                {itineraryData.isFlexible || itineraryData.tags?.includes('_FLEXIBLE_DATES_') ? (
                   <span className="font-semibold">Datas flexíveis</span>
                 ) : (
                   <>
@@ -867,56 +851,77 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
 
         {/* Reviews section */}
         <section className="mb-10 -mx-5">
-          <button
-            onClick={() => setShowAllReviews(true)}
-            className="flex items-center gap-1 mb-4 px-5 active:opacity-70"
-          >
-            <h2 className="section-title">Avaliações</h2>
-            <Icon name="chevron_right" size={18} style={{ color: '#1A1C40' }} />
-          </button>
+          {reviewsData && reviewsData.length > 0 ? (
+            <>
+              <button
+                onClick={() => setShowAllReviews(true)}
+                className="flex items-center gap-1 mb-4 px-5 active:opacity-70"
+              >
+                <h2 className="section-title">Avaliações</h2>
+                <Icon name="chevron_right" size={18} style={{ color: '#1A1C40' }} />
+              </button>
 
-
-
-          {/* Individual reviews carousel */}
-          <div className="pl-5">
-            <HorizontalCarousel showDots={false} itemClassName="w-[260px]">
-              {(reviewsData || []).map((review) => (
-                <div key={review.id} className="card-base p-3.5 w-full h-full">
-                  <div className="flex items-start gap-3">
-                    <img
-                      src={review.userImage}
-                      alt={review.userName}
-                      className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-foreground" style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-semibold)' }}>
-                          {review.userName}
-                        </span>
-                        <div className="flex items-center gap-0.5">
-                          {Array.from({ length: 5 }).map((_, i) => (
-                            <Icon
-                              key={i}
-                              name="star"
-                              size={9}
-                              filled
-                              style={{ color: i < review.rating ? '#F2B90C' : '#E5E7EB' }}
-                            />
-                          ))}
+              {/* Individual reviews carousel */}
+              <div className="pl-5">
+                <HorizontalCarousel showDots={false} itemClassName="w-[260px]">
+                  {reviewsData.map((review) => (
+                    <div key={review.id} className="card-base p-3.5 w-full h-full">
+                      <div className="flex items-start gap-3">
+                        <img
+                          src={review.userImage}
+                          alt={review.userName}
+                          className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className="text-foreground" style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-semibold)' }}>
+                              {review.userName}
+                            </span>
+                            <div className="flex items-center gap-0.5">
+                              {Array.from({ length: 5 }).map((_, i) => (
+                                <Icon
+                                  key={i}
+                                  name="star"
+                                  size={9}
+                                  filled
+                                  style={{ color: i < review.rating ? '#F2B90C' : '#E5E7EB' }}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <p className="text-muted-foreground mb-1" style={{ fontSize: '11px' }}>
+                            {review.date}
+                          </p>
+                          <p className="text-foreground" style={{ fontSize: 'var(--text-sm)', lineHeight: '1.4' }}>
+                            "{review.comment}"
+                          </p>
                         </div>
                       </div>
-                      <p className="text-muted-foreground mb-1" style={{ fontSize: '11px' }}>
-                        {review.date}
-                      </p>
-                      <p className="text-foreground" style={{ fontSize: 'var(--text-sm)', lineHeight: '1.4' }}>
-                        "{review.comment}"
-                      </p>
                     </div>
+                  ))}
+                </HorizontalCarousel>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-1 mb-4 px-5">
+                <h2 className="section-title">Avaliações</h2>
+              </div>
+              <div className="px-5">
+                <div className="card-base border-0 shadow-none p-6 flex flex-col items-center justify-center text-center">
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3" style={{ background: '#F2F2F2' }}>
+                    <Icon name="star" size={22} className="text-muted-foreground" />
                   </div>
+                  <h4 className="text-foreground font-semibold text-sm mb-1">
+                    Este roteiro ainda não recebeu avaliações
+                  </h4>
+                  <p className="text-muted-foreground text-xs leading-relaxed max-w-[280px]">
+                    Quando os viajantes avaliarem este roteiro, elas aparecerão aqui
+                  </p>
                 </div>
-              ))}
-            </HorizontalCarousel>
-          </div>
+              </div>
+            </>
+          )}
         </section>
       </div>
 
@@ -943,13 +948,6 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
           </button>
         </div>
       </div>
-
-      <SaveToCollectionSheet
-        open={saveSheetOpen}
-        onClose={() => { setSaveSheetOpen(false); setSavingPlace(null); }}
-        place={savingPlace}
-        onSaved={handlePlaceSaved}
-      />
 
       {/* Date choice bottom sheet - overlays on top */}
       {showDateChoice && (
@@ -995,7 +993,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
                 <div className="text-left">
                   <p className="text-sm font-semibold text-foreground">Manter datas originais</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {dataset ? `${format(dataset.startDate, "dd MMM", { locale: ptBR })} — ${format(dataset.endDate, "dd MMM yyyy", { locale: ptBR })}` : ''}
+                    {dataset?.startDate && dataset?.endDate ? `${format(dataset.startDate, "dd MMM", { locale: ptBR })} — ${format(dataset.endDate, "dd MMM yyyy", { locale: ptBR })}` : ''}
                   </p>
                 </div>
               </button>

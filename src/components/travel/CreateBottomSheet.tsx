@@ -9,22 +9,16 @@ interface CreateOption {
 
 const createOptions: CreateOption[] = [
   {
-    id: 'itinerary',
+    id: 'personal',
     icon: 'edit',
-    title: 'Criar roteiro do zero',
+    title: 'Criar viagem pessoal',
     description: 'Planeje dia a dia manualmente'
   },
   {
-    id: 'video',
-    icon: 'video_call',
-    title: 'Extrair de vídeo',
-    description: 'Transforme vídeos em roteiros ou coleções'
-  },
-  {
-    id: 'collection',
-    icon: 'add_box',
-    title: 'Criar coleção',
-    description: 'Organize seus itens favoritos'
+    id: 'seller',
+    icon: 'storefront',
+    title: 'Criar roteiro pra venda',
+    description: 'Crie um roteiro incrível para vender na loja'
   },
 ];
 
@@ -40,13 +34,13 @@ export function CreateBottomSheet({ isOpen, onClose, onOptionSelect }: CreateBot
   return (
     <>
       {/* Backdrop */}
-      <div 
+      <div
         className="fixed inset-0 bg-black/40 z-40 transition-opacity"
         onClick={onClose}
       />
-      
+
       {/* Bottom Sheet */}
-      <div 
+      <div
         className="fixed bottom-0 left-0 right-0 z-50 flex justify-center"
         style={{ fontFamily: 'var(--font-family-primary)' }}
       >
@@ -55,7 +49,7 @@ export function CreateBottomSheet({ isOpen, onClose, onOptionSelect }: CreateBot
           <div className="flex justify-center py-3">
             <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
           </div>
-          
+
           {/* Options */}
           <div className="px-6 space-y-2">
             {createOptions.map((option) => (

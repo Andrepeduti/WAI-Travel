@@ -7,6 +7,7 @@ import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { TimePickerSheet } from '@/components/travel/TimePickerSheet';
+import { getCurrencySymbol } from '@/lib/currencyUtils';
 import { AirportSelect } from '@/components/travel/AirportSelect';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -140,6 +141,7 @@ interface AddDocumentoSheetProps {
   editingReserva?: Reserva | null;
   preSelectedType?: DocType;
   splitPeople?: SplitPerson[];
+  currency?: string;
 }
 
 const transportSubs: { tipo: TransportSub; label: string; icon: typeof Plane }[] = [
@@ -160,6 +162,7 @@ export function AddDocumentoSheet({
   editingReserva,
   preSelectedType,
   splitPeople,
+  currency = 'BRL',
 }: AddDocumentoSheetProps) {
   const peopleList: SplitPerson[] = (splitPeople && splitPeople.length > 0) ? splitPeople : fallbackSplitPeople;
   const isEditing = !!(editingTransporte || editingReserva);
@@ -685,20 +688,31 @@ export function AddDocumentoSheet({
 
             {/* Transport sub-type */}
             {docType === 'transporte' && (
-              <div className="flex gap-2 mb-5">
+              <div className="flex gap-2 mb-5 overflow-x-auto scrollbar-hide">
                 {transportSubs.map(ts => {
                   const TsIcon = ts.icon;
                   const active = transportSub === ts.tipo;
                   return (
                     <button
                       key={ts.tipo}
+                      type="button"
                       onClick={() => setTransportSub(ts.tipo)}
-                      className={cn(
-                        "flex items-center gap-1.5 px-3 h-8 rounded-full text-[12px] font-medium transition-colors",
-                        active ? "border-2 border-foreground" : "border border-border"
-                      )}
+                      className="h-9 px-4 rounded-full text-[13px] font-semibold transition-all whitespace-nowrap flex-shrink-0 active:scale-[0.97] border inline-flex items-center gap-1.5"
+                      style={
+                        active
+                          ? {
+                              backgroundColor: '#1A1C40',
+                              color: '#FFFFFF',
+                              borderColor: 'transparent',
+                            }
+                          : {
+                              background: 'hsl(var(--card))',
+                              color: 'hsl(var(--foreground))',
+                              borderColor: 'hsl(var(--border))',
+                            }
+                      }
                     >
-                      <TsIcon size={14} strokeWidth={1.8} />
+                      <TsIcon size={14} strokeWidth={2} className={active ? 'text-white' : ''} />
                       {ts.label}
                     </button>
                   );
@@ -830,15 +844,22 @@ export function AddDocumentoSheet({
                           <Calendar mode="single" selected={partidaDate} onSelect={(date) => { setPartidaDate(date); setIsPartidaCalendarOpen(false); }} locale={ptBR} className="p-3 pointer-events-auto" />
                         </PopoverContent>
                       </Popover>
-                      <button
-                        onClick={() => setTimePickerTarget('partida')}
-                        className="w-full h-12 rounded-xl border border-border bg-card px-4 text-left text-[14px] flex items-center gap-2"
-                      >
-                        <Icon name="schedule" size={16} className="text-muted-foreground" />
-                        <span className={partidaHora && partidaMinuto ? 'text-foreground' : 'text-muted-foreground/50'}>
-                          {partidaHora && partidaMinuto ? `${partidaHora}:${partidaMinuto}` : 'Horário'}
-                        </span>
-                      </button>
+                      <div className="w-full h-12 rounded-[10px] border border-border bg-card px-4 text-left text-[14px] flex items-center gap-2 relative overflow-hidden cursor-pointer">
+                        <Icon name="schedule" size={16} className="text-muted-foreground flex-shrink-0" />
+                        <input
+                          type="time"
+                          value={partidaHora && partidaMinuto ? `${partidaHora}:${partidaMinuto}` : ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val) {
+                              const [h, m] = val.split(':');
+                              setPartidaHora(h);
+                              setPartidaMinuto(m);
+                            }
+                          }}
+                          className="flex-1 text-[14px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-full"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -848,9 +869,9 @@ export function AddDocumentoSheet({
                       type="button"
                       onClick={() => setShowChegada(true)}
                       className="flex items-center gap-1.5 text-[13px] font-semibold transition-colors"
-                      style={{ color: '#9DCC36' }}
+                      style={{ color: '#1A1C40' }}
                     >
-                      <Icon name="add" size={16} />
+                      <Icon name="add" size={16} style={{ color: '#1A1C40' }} />
                       Adicionar chegada
                     </button>
                   ) : (
@@ -884,15 +905,22 @@ export function AddDocumentoSheet({
                             <Calendar mode="single" selected={chegadaDate} onSelect={(date) => { setChegadaDate(date); setIsChegadaCalendarOpen(false); }} locale={ptBR} className="p-3 pointer-events-auto" />
                           </PopoverContent>
                         </Popover>
-                        <button
-                          onClick={() => setTimePickerTarget('chegada')}
-                          className="w-full h-12 rounded-xl border border-border bg-card px-4 text-left text-[14px] flex items-center gap-2"
-                        >
-                          <Icon name="schedule" size={16} className="text-muted-foreground" />
-                          <span className={chegadaHora && chegadaMinuto ? 'text-foreground' : 'text-muted-foreground/50'}>
-                            {chegadaHora && chegadaMinuto ? `${chegadaHora}:${chegadaMinuto}` : 'Horário'}
-                          </span>
-                        </button>
+                        <div className="w-full h-12 rounded-[10px] border border-border bg-card px-4 text-left text-[14px] flex items-center gap-2 relative overflow-hidden cursor-pointer">
+                          <Icon name="schedule" size={16} className="text-muted-foreground flex-shrink-0" />
+                          <input
+                            type="time"
+                            value={chegadaHora && chegadaMinuto ? `${chegadaHora}:${chegadaMinuto}` : ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val) {
+                                const [h, m] = val.split(':');
+                                setChegadaHora(h);
+                                setChegadaMinuto(m);
+                              }
+                            }}
+                            className="flex-1 text-[14px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-full"
+                          />
+                        </div>
                       </div>
                     </div>
                   )}
@@ -994,15 +1022,22 @@ export function AddDocumentoSheet({
                     </div>
                     <div>
                       <label className="text-[12px] font-semibold text-muted-foreground mb-1 block">Horário</label>
-                      <button
-                        onClick={() => setTimePickerTarget('atividade')}
-                        className="w-full h-12 rounded-xl border border-border bg-card px-4 text-left text-[14px] flex items-center gap-2"
-                      >
-                        <Icon name="schedule" size={16} className="text-muted-foreground" />
-                        <span className={atividadeHora && atividadeMinuto ? 'text-foreground' : 'text-muted-foreground/50'}>
-                          {atividadeHora && atividadeMinuto ? `${atividadeHora}:${atividadeMinuto}` : 'Horário'}
-                        </span>
-                      </button>
+                      <div className="w-full h-12 rounded-[10px] border border-border bg-card px-4 text-left text-[14px] flex items-center gap-2 relative overflow-hidden cursor-pointer">
+                        <Icon name="schedule" size={16} className="text-muted-foreground flex-shrink-0" />
+                        <input
+                          type="time"
+                          value={atividadeHora && atividadeMinuto ? `${atividadeHora}:${atividadeMinuto}` : ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val) {
+                              const [h, m] = val.split(':');
+                              setAtividadeHora(h);
+                              setAtividadeMinuto(m);
+                            }
+                          }}
+                          className="flex-1 text-[14px] font-medium text-foreground bg-transparent border-none p-0 m-0 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10 w-full"
+                        />
+                      </div>
                     </div>
                   </div>
                 </>
@@ -1012,9 +1047,9 @@ export function AddDocumentoSheet({
               <div>
                 <label className="text-[12px] font-semibold text-muted-foreground mb-1 block">Valor</label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[14px] text-muted-foreground pointer-events-none">R$</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[14px] text-muted-foreground pointer-events-none">{getCurrencySymbol(currency)}</span>
                   <input
-                    value={valor.replace(/^R\$\s?/, '')}
+                    value={valor.replace(/^R\$\s?/, '').replace(new RegExp(`^${getCurrencySymbol(currency)}\\s?`), '')}
                     onChange={(e) => {
                       const digits = e.target.value.replace(/\D/g, '');
                       if (!digits) { setValor(''); return; }

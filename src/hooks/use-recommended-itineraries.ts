@@ -74,15 +74,6 @@ function destKeywords(destinations: string[]): string[] {
     return kws;
 }
 
-/** Lê dream trips do localStorage */
-function readDreamDestinations(): string[] {
-    try {
-        const raw = localStorage.getItem('wai-travel-dream-trips');
-        if (!raw) return [];
-        const trips = JSON.parse(raw) as { destination?: string }[];
-        return trips.map(t => norm(t.destination || '')).filter(Boolean);
-    } catch { return []; }
-}
 
 /** Lê pesquisas recentes do localStorage */
 function readRecentSearches(): string[] {
@@ -159,7 +150,7 @@ export function useRecommendedItineraries(limit = 10) {
                     userId
                         ? supabase
                             .from('favorites')
-                            .select('itinerary_id, legacy_id, snapshot')
+                            .select('itinerary_id, legacy_id')
                             .eq('user_id', userId)
                             .then(({ data }) => data ?? [])
                         : Promise.resolve([]),
@@ -186,7 +177,7 @@ export function useRecommendedItineraries(limit = 10) {
                     userId
                         ? supabase
                             .from('profiles')
-                            .select('interests')
+                            .select('interests, dream_trips')
                             .eq('user_id', userId)
                             .maybeSingle()
                             .then(({ data }) => data)
@@ -194,9 +185,8 @@ export function useRecommendedItineraries(limit = 10) {
 
                     // Contagem de roteiros por criador (para reputação)
                     supabase
-                        .from('itineraries')
-                        .select('user_id, id')
-                        .eq('is_public', true)
+                        .from('itinerary_store_listing')
+                        .select('seller_id, itinerary_id')
                         .then(({ data }) => data ?? []),
                 ]);
 
@@ -243,8 +233,8 @@ export function useRecommendedItineraries(limit = 10) {
 
                 // Creator itinerary count (para reputação: ≥ 2 roteiros publicados)
                 const creatorItinCount = new Map<string, number>();
-                for (const row of creatorItinCountRows as { user_id: string }[]) {
-                    creatorItinCount.set(row.user_id, (creatorItinCount.get(row.user_id) ?? 0) + 1);
+                for (const row of creatorItinCountRows as { seller_id: string }[]) {
+                    creatorItinCount.set(row.seller_id, (creatorItinCount.get(row.seller_id) ?? 0) + 1);
                 }
 
                 // Avaliação média por criador (media das avaliações de TODOS os roteiros dele)
@@ -271,8 +261,10 @@ export function useRecommendedItineraries(limit = 10) {
                     if (snap.creator) favCreators.add(norm(snap.creator as string));
                 }
 
-                // Sinais de localStorage
-                const dreamDests = readDreamDestinations();
+                // Sinais
+                const dreamDests = Array.isArray(profileRow?.dream_trips)
+                    ? (profileRow!.dream_trips as any[]).map(t => norm(t.destination || '')).filter(Boolean)
+                    : [];
                 const recentSearches = readRecentSearches();
 
                 // ── 3. Scoring ───────────────────────────────────────────────────────

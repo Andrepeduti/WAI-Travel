@@ -240,7 +240,7 @@ export function VibeCheckSheet({
         {/* Close */}
         <button
           onClick={onClose}
-          className="absolute top-3 right-4 w-8 h-8 rounded-full flex items-center justify-center active:bg-secondary/60 z-10"
+          className="absolute top-3 right-4 w-10 h-10 rounded-full flex items-center justify-center active:bg-secondary/60 z-10"
           aria-label="Fechar"
         >
           <Icon name="close" size={18} className="text-foreground" />

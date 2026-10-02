@@ -3,7 +3,6 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Icon } from '@/components/ui/Icon';
 import { BackButton } from '@/components/ui/BackButton';
-import { searchGooglePlacesText } from '@/lib/googlePlacesApi';
 
 interface MapPlace {
   id: number;
@@ -58,10 +57,48 @@ function createPinIcon(color: string = '#9DCC36', selected = false) {
 async function geocode(name: string, address?: string): Promise<{ lat: number; lng: number } | null> {
   const query = [name, address].filter(Boolean).join(', ');
   if (!query) return null;
+
   try {
-    const results = await searchGooglePlacesText(query);
-    if (results && results.length > 0) {
-      return { lat: results[0].lat, lng: results[0].lng };
+    // 1. Pega o ID oficial do Google via Autocomplete (muito barato)
+    const { searchGooglePlacesAutocomplete } = await import('@/lib/googlePlacesApi');
+    const predictions = await searchGooglePlacesAutocomplete(query);
+    if (predictions && predictions.length > 0) {
+      const placeId = predictions[0].placeId;
+
+      // 2. Busca no nosso banco pelo ID exato
+      const { getPlaceByGoogleId, upsertPlace } = await import('@/lib/placesCache');
+      const cached = await getPlaceByGoogleId(placeId);
+      
+      if (cached?.latitude && cached?.longitude) {
+        return { lat: cached.latitude, lng: cached.longitude };
+      }
+
+      // 3. Se não tem no banco, usa Geocoding API passando o place_id ($5/1000)
+      const apiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY || '';
+      if (!apiKey) return null;
+      
+      const res = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?place_id=${placeId}&key=${apiKey}&language=pt-BR`
+      );
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data.results && data.results.length > 0) {
+        const result = data.results[0];
+        const loc = result.geometry?.location;
+        if (loc) {
+          try {
+            await upsertPlace({
+              name: name,
+              google_place_id: placeId,
+              latitude: loc.lat,
+              longitude: loc.lng,
+              formatted_address: result.formatted_address,
+              enrichment_level: 'basic'
+            });
+          } catch { /* ignore */ }
+          return { lat: loc.lat, lng: loc.lng };
+        }
+      }
     }
   } catch {
     // ignore

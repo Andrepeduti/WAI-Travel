@@ -9,7 +9,6 @@ import {
   countActiveFilters,
   type DestinationFilters,
 } from '@/components/travel/DestinationFiltersSheet';
-import { useMyItineraries } from '@/hooks/use-my-itineraries';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useQuery } from '@tanstack/react-query';
 import { listPublicItineraries } from '@/lib/itinerariesApi';
@@ -102,7 +101,7 @@ export function DestinationItinerariesScreen({
       .map<DisplayItinerary>((it) => {
         const start = new Date(it.startDate);
         const end = new Date(it.endDate);
-        const days = Math.max(1, differenceInDays(end, start) + 1);
+        const days = it.isFlexible && it.durationDays ? it.durationDays : Math.max(1, differenceInDays(end, start) + 1);
 
         let itCover = it.images?.[0];
         if (!itCover || itCover.includes('placeholder')) {
@@ -183,7 +182,7 @@ export function DestinationItinerariesScreen({
   };
 
   return (
-    <div className="min-h-screen pb-8" style={{ backgroundColor: '#F2F2F2' }}>
+    <div className="min-h-[100dvh] pb-8" style={{ backgroundColor: '#F2F2F2' }}>
       {/* Hero */}
       <div className="relative h-[200px] w-full overflow-hidden">
         {coverImage && (

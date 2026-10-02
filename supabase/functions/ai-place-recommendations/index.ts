@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => null) as
-      | { city?: string; country?: string }
+      | { city?: string; country?: string; interests?: string[] }
       | null;
 
     const city = body?.city?.trim();
@@ -59,7 +59,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    const userPrompt = `Cidade: ${city}${body?.country ? `, ${body.country}` : ''}.\nListe as melhores e mais procuradas opções para um viajante.`;
+    const interests = body?.interests || [];
+    const interestsText = interests.length > 0 
+      ? `\nConsidere fortemente os seguintes interesses do usuário para priorizar as recomendações e encontrar o match perfeito: ${interests.join(', ')}.` 
+      : '';
+
+    const userPrompt = `Cidade: ${city}${body?.country ? `, ${body.country}` : ''}.${interestsText}\nListe as melhores e mais procuradas opções para um viajante, focando em lugares realmente famosos e interessantes que deem match com o perfil.`;
 
     const upstream = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
       method: 'POST',

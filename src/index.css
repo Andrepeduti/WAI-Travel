@@ -138,7 +138,12 @@
     /* Neutral/Clouds_Normal divider in lists (#F2F2F2) */
     --divider: 0 0% 95%;
     --input: var(--cloud-normal);
+    /* Background of every form field (#F6F6F6) */
+    --field: 0 0% 96.47%;
     --ring: var(--sicilia-official);
+
+    /* Layout Variables */
+    --toast-bottom-offset: 0px;
 
     /* Star Rating */
     --star-gold: var(--sun-normal);
@@ -268,6 +273,30 @@
     min-height: 100%;
     display: flex;
     flex-direction: column;
+  }
+
+  /* Buttons and links never show a focus outline/border when clicked */
+  button:focus,
+  button:focus-visible,
+  [role="button"]:focus,
+  [role="button"]:focus-visible,
+  a:focus,
+  a:focus-visible {
+    outline: none;
+  }
+
+  /* Global form fields: #F6F6F6 background + green border on focus.
+     Covers raw <input>/<textarea>/<select> that don't use the ui/* components. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="color"]):not([type="image"]),
+  textarea,
+  select {
+    background-color: hsl(var(--field));
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="color"]):not([type="image"]):focus,
+  textarea:focus,
+  select:focus {
+    border-color: hsl(var(--primary));
   }
 }
 
@@ -430,7 +459,7 @@
   }
 
   .pt-safe-top {
-    padding-top: calc(env(safe-area-inset-top, 24px) + 16px);
+    padding-top: max(56px, calc(env(safe-area-inset-top, 44px) + 16px));
   }
 
   /* Star Rating */
@@ -520,7 +549,7 @@
 
   /* Form Input */
   .form-input {
-    @apply w-full px-4 py-3 rounded-xl border border-border bg-card;
+    @apply w-full px-4 py-3 rounded-xl border border-border bg-field;
     font-size: var(--text-base);
   }
 
@@ -626,4 +655,9 @@ input, select, textarea {
   font-size: 9px;
   opacity: 0.85;
   text-shadow: 0 1px 1px rgba(255,255,255,0.5);
+}
+
+/* Hide close button on success toasts when there is an action button */
+li[data-type="success"]:has([data-button="true"]) [data-close-button] {
+  display: none !important;
 }

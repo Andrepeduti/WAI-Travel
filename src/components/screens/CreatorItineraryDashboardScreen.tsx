@@ -1,19 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
-import { format, subDays, startOfDay } from 'date-fns';
+import { format, subDays, startOfDay, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { toast } from 'sonner';
 
-import { BackButton } from '@/components/ui/BackButton';
 import { Icon } from '@/components/ui/Icon';
 import { type ItineraryCardData } from '@/components/travel/ItineraryCard';
 import { EditPublishSheet } from '@/components/travel/EditPublishSheet';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { resolveTripThumbnailImages } from '@/lib/coverImageResolver';
-import { updateItinerary } from '@/lib/itinerariesApi';
+import { updateItinerary, updateStoreListing, duplicateItinerary } from '@/lib/itinerariesApi';
+import { shareItinerary } from '@/lib/shareItinerary';
 import type { UserItinerary } from '@/lib/itinerariesApi';
-import { isItineraryPaused, setItineraryPaused } from '@/lib/itineraryPauseState';
+import { BottomSheet } from '@/components/ui/BottomSheet';
+import { DeleteConfirmSheet } from '@/components/travel/DeleteConfirmSheet';
+import { UnpublishConfirmSheet } from '@/components/travel/UnpublishConfirmSheet';
+import { useNavigate } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 
 interface SaleRow {
   id: string;
@@ -34,9 +38,11 @@ interface CreatorItineraryDashboardScreenProps {
   itinerary: UserItinerary;
   onBack: () => void;
   onPreview: () => void;
+  onViewAd?: () => void;
   onEdit?: (itinerary: UserItinerary) => void;
   onItineraryUpdated?: (patch: Partial<UserItinerary>) => void;
   onUnpublished?: () => void;
+  onDelete?: () => void;
 }
 
 const formatBRL = (cents: number) =>
@@ -49,15 +55,24 @@ export function CreatorItineraryDashboardScreen({
   itinerary,
   onBack,
   onPreview,
+  onViewAd,
   onEdit,
   onItineraryUpdated,
   onUnpublished,
+  onDelete,
 }: CreatorItineraryDashboardScreenProps) {
   const { user } = useAuth();
   const [sales, setSales] = useState<SaleRow[]>([]);
   const [buyers, setBuyers] = useState<Record<string, BuyerProfile>>({});
   const [loading, setLoading] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
+  const [timeRange, setTimeRange] = useState<number>(30);
+  const [showOptionsSheet, setShowOptionsSheet] = useState(false);
+  const [showDuplicateSheet, setShowDuplicateSheet] = useState(false);
+  const [duplicateType, setDuplicateType] = useState<'personal' | 'store'>('personal');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showUnpublishConfirm, setShowUnpublishConfirm] = useState(false);
+  const navigate = useNavigate();
 
   // Local copy to refresh card after edits without round-tripping the parent
   const [localItinerary, setLocalItinerary] = useState(itinerary);
@@ -119,32 +134,44 @@ export function CreatorItineraryDashboardScreen({
     };
   }, [itinerary.id]);
 
+  const filteredSales = useMemo(() => {
+    if (timeRange === 1) {
+      const cutoff = startOfDay(new Date());
+      return sales.filter(s => new Date(s.created_at) >= cutoff);
+    } else {
+      const cutoff = startOfDay(subDays(new Date(), timeRange - 1));
+      return sales.filter(s => new Date(s.created_at) >= cutoff);
+    }
+  }, [sales, timeRange]);
+
   // KPIs
   const totals = useMemo(() => {
-    const count = sales.length;
-    const gross = sales.reduce((s, r) => s + (r.gross_cents ?? 0), 0);
-    const fee = sales.reduce((s, r) => s + (r.fee_cents ?? 0), 0);
-    const net = sales.reduce((s, r) => s + (r.net_cents ?? 0), 0);
+    const count = filteredSales.length;
+    const gross = filteredSales.reduce((s, r) => s + (r.gross_cents ?? 0), 0);
+    const fee = filteredSales.reduce((s, r) => s + (r.fee_cents ?? 0), 0);
+    const net = filteredSales.reduce((s, r) => s + (r.net_cents ?? 0), 0);
     return { count, gross, fee, net };
-  }, [sales]);
+  }, [filteredSales]);
 
-  // Last 30 days chart data
+  // Chart data
   const chartData = useMemo(() => {
     const today = startOfDay(new Date());
     const buckets: { date: Date; key: string; label: string; count: number; revenue: number }[] = [];
-    for (let i = 29; i >= 0; i -= 1) {
+    const days = timeRange === 1 ? 1 : timeRange;
+    
+    for (let i = days - 1; i >= 0; i -= 1) {
       const d = subDays(today, i);
       buckets.push({
         date: d,
         key: format(d, 'yyyy-MM-dd'),
-        label: format(d, 'dd/MM'),
+        label: timeRange === 1 ? 'Hoje' : format(d, 'dd/MM'),
         count: 0,
         revenue: 0,
       });
     }
     const index: Record<string, (typeof buckets)[number]> = {};
     for (const b of buckets) index[b.key] = b;
-    for (const s of sales) {
+    for (const s of filteredSales) {
       const key = format(startOfDay(new Date(s.created_at)), 'yyyy-MM-dd');
       const b = index[key];
       if (b) {
@@ -153,12 +180,7 @@ export function CreatorItineraryDashboardScreen({
       }
     }
     return buckets;
-  }, [sales]);
-
-  const last30Total = useMemo(
-    () => chartData.reduce((sum, b) => sum + b.count, 0),
-    [chartData],
-  );
+  }, [filteredSales, timeRange]);
 
   // ItineraryCardData (Home pattern)
   const cardData: ItineraryCardData = useMemo(() => {
@@ -194,13 +216,20 @@ export function CreatorItineraryDashboardScreen({
       updates.images = nextImages;
     }
     await updateItinerary(localItinerary.id, updates);
+    // Preço, descrição e tags pertencem ao listing da loja.
+    await updateStoreListing(localItinerary.id, {
+      listedTitle: rest.title,
+      listedDescription: rest.description,
+      tags: rest.tags,
+      priceCents: rest.priceCents,
+    });
     const next = { ...localItinerary, ...updates };
     setLocalItinerary(next);
     onItineraryUpdated?.(updates);
   };
 
-  const [isPaused, setIsPaused] = useState(() => isItineraryPaused(itinerary.id));
-  useEffect(() => setIsPaused(isItineraryPaused(itinerary.id)), [itinerary.id]);
+  const [isPaused, setIsPaused] = useState(itinerary.isPaused ?? false);
+  useEffect(() => setIsPaused(itinerary.isPaused ?? false), [itinerary.isPaused]);
 
   const handleUnpublish = async () => {
     await updateItinerary(localItinerary.id, { isPublic: false });
@@ -208,237 +237,336 @@ export function CreatorItineraryDashboardScreen({
     onUnpublished?.();
   };
 
-  const handleTogglePause = (next: boolean) => {
+  const handleTogglePause = async (next: boolean) => {
     setIsPaused(next);
-    setItineraryPaused(localItinerary.id, next);
+    await handleSave({ ...localItinerary, isPaused: next } as any);
+  };
+
+  const computedDays = useMemo(() => {
+    if (itinerary.isFlexible) {
+      return itinerary.durationDays || 'Vários';
+    }
+    if (itinerary.startDate && itinerary.endDate) {
+      // Usar startOfDay para normalizar as datas e evitar diferenças de fuso
+      const diff = differenceInDays(
+        startOfDay(new Date(itinerary.endDate)),
+        startOfDay(new Date(itinerary.startDate))
+      );
+      // Se start == end, diff = 0. Normalmente em turismo a diária conta como +1 ou apenas diff. 
+      // O usuário deu exemplo: 03 a 10 de maio = 07 dias (diff exato).
+      return diff > 0 ? diff : 1; 
+    }
+    return itinerary.durationDays || 'Vários';
+  }, [itinerary]);
+
+  const handleDuplicate = async (asPublic: boolean) => {
+    setShowDuplicateSheet(false);
+    try {
+      const duplicated = await duplicateItinerary(localItinerary, asPublic);
+      if (duplicated) {
+        toast.success(asPublic ? 'Roteiro duplicado para sua loja!' : 'Roteiro duplicado para suas viagens!');
+        navigate(`/trips/${duplicated.id}`);
+      }
+    } catch (err) {
+      toast.error('Erro ao duplicar roteiro.');
+    }
+  };
+
+  const handleShare = () => {
+    setShowOptionsSheet(false);
+    shareItinerary({
+      title: localItinerary.title,
+      description: localItinerary.description,
+      datasetId: localItinerary.sourceDatasetId ?? undefined,
+    });
   };
 
   return (
-    <div className="min-h-screen" style={{ background: '#F2F2F2' }}>
-      {/* Sticky header */}
-      <div className="sticky top-0 z-20" style={{ background: '#F2F2F2' }}>
-        <div className="flex items-center gap-3 px-4 pb-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
-          <BackButton onClick={onBack} />
-          <h1
-            className="text-foreground"
-            style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-weight-bold)' }}
-          >
-            Painel de vendas
-          </h1>
-        </div>
-      </div>
+    <div className="min-h-[100dvh] bg-[#F6F6F6]">
+      {/* Imagem de Capa e Header Overlay */}
+      <div className="relative w-full h-[294px]">
+        <img
+          src={cardData.image}
+          alt={cardData.title}
+          className="w-full h-full object-cover"
+        />
+        {/* Overlay Escuro conforme o Figma */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'linear-gradient(180deg, rgba(0, 0, 0, 0.26) 0%, rgba(0, 0, 0, 0.8) 65.98%)',
+          }}
+        />
 
-      <div className="px-5 pt-5 pb-10 flex flex-col gap-5">
-        {/* Itinerary card */}
-        <div>
-          <p className="text-muted-foreground text-xs font-medium mb-2 uppercase tracking-wide">
-            Seu roteiro publicado
-          </p>
+        {/* Top Navigation */}
+        <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 pt-12">
           <button
-            onClick={onPreview}
-            className="relative w-full h-[220px] rounded-2xl overflow-hidden text-left group"
-            style={{ boxShadow: '0 12px 32px -8px rgba(20, 21, 48, 0.35)' }}
+            onClick={onBack}
+            className="w-10 h-10 bg-[#FEFEFE] rounded-full flex items-center justify-center active:scale-95 transition-transform shadow-[0px_4px_20px_rgba(0,0,0,0.1)]"
           >
-            <img
-              src={cardData.image}
-              alt={cardData.title}
-              className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-            />
-            {/* Strong readability gradient */}
-            <div
-              className="absolute inset-0"
-              style={{
-                background:
-                  'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.05) 35%, rgba(0,0,0,0.55) 70%, rgba(0,0,0,0.85) 100%)',
-              }}
-            />
-            {/* Status + price chips */}
-            <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
-              <span
-                className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold bg-[#F2F2F2]"
-                style={{ color: isPaused ? '#8A6D00' : '#3F7A0F' }}
-              >
-                <span className="w-1.5 h-1.5 rounded-full" style={{ background: isPaused ? '#E0B400' : '#3F7A0F' }} />
-                {isPaused ? 'Pausado' : 'Ativo'}
-              </span>
-              <div className="bg-white/95 backdrop-blur-sm rounded-full px-3 py-1">
-                <span className="text-[12px] font-bold text-foreground">
-                  R$ {cardData.price.toFixed(2).replace('.', ',')}
-                </span>
-              </div>
-            </div>
-            <div
-              className="absolute inset-0 p-5 flex flex-col justify-end text-white"
-              style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}
-            >
-              <div className="flex items-center gap-2 mb-3">
-                {cardData.authorImage ? (
-                  <img
-                    src={cardData.authorImage}
-                    alt={cardData.author}
-                    className="w-7 h-7 rounded-full object-cover border-2 border-white/40"
-                  />
-                ) : (
-                  <div className="w-7 h-7 rounded-full bg-white/20 border-2 border-white/40 flex items-center justify-center">
-                    <span className="text-[11px] font-semibold text-white">
-                      {(cardData.author || '?').slice(0, 1).toUpperCase()}
-                    </span>
-                  </div>
-                )}
-                <span className="text-sm font-medium text-white/95">{cardData.author}</span>
-              </div>
-              <h3 className="text-xl font-bold mb-2 leading-tight line-clamp-2">
-                {cardData.title}
-              </h3>
-              <div className="flex items-center gap-3 text-sm text-white/90">
-                <div className="flex items-center gap-1">
-                  <Icon name="location_on" size={16} className="text-white/90" />
-                  <span>
-                    {cardData.cities} {cardData.cities === 1 ? 'cidade' : 'cidades'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Icon name="visibility" size={16} className="text-white/90" />
-                  <span>Toque para visualizar</span>
-                </div>
-              </div>
-            </div>
+            <Icon name="arrow_back" size={24} className="text-[#141530]" />
+          </button>
+          <button
+            onClick={() => setShowOptionsSheet(true)}
+            className="w-10 h-10 bg-[#FEFEFE] rounded-full flex items-center justify-center active:scale-95 transition-transform shadow-[0px_4px_20px_rgba(0,0,0,0.1)]"
+          >
+            <Icon name="more_horiz" size={24} className="text-[#141530]" />
           </button>
         </div>
 
-        {/* Edit button */}
-        <button
-          onClick={() => setEditOpen(true)}
-          className="w-full h-12 rounded-2xl font-semibold text-[14px] flex items-center justify-center gap-2 active:scale-[0.99] transition-transform"
-          style={{ background: '#9DCC36', color: '#141530' }}
-        >
-          <Icon name="edit" size={18} />
-          Editar publicação
-        </button>
-
-        {/* KPIs */}
-        <div>
-          <p className="text-muted-foreground text-xs font-medium mb-2 uppercase tracking-wide">
-            Resumo
+        {/* Informações do Roteiro */}
+        <div className="absolute bottom-10 left-4 right-4 flex flex-col gap-3 text-[#F2F2F2]">
+          <h1 className="font-['Urbanist'] font-bold text-[24px] leading-[29px]" style={{ filter: 'drop-shadow(0px 4px 4px rgba(0, 0, 0, 0.25))' }}>
+            {cardData.title}
+          </h1>
+          <p className="font-['Urbanist'] font-semibold text-[14px] leading-[17px] text-[#E7E7EE] flex items-center gap-2">
+            {cardData.cities} {cardData.cities === 1 ? 'local' : 'locais'}
+            <span className="font-medium text-[16px] leading-[19px] text-[#FEFEFE]">|</span>
+            Duração: {computedDays} {computedDays === 1 ? 'dia' : 'dias'}
           </p>
-          <div className="grid grid-cols-2 gap-3">
-            <KpiCard
-              icon="shopping_bag"
-              label="Vendas"
-              value={totals.count.toLocaleString('pt-BR')}
-              tint="#9DCC36"
-            />
+          <div className="flex items-center gap-4 mt-1">
+            <span className="font-['Urbanist'] font-bold text-[16px] leading-[19px] text-[#FEFEFE]">
+              R$ {cardData.price.toFixed(2).replace('.', ',')}
+            </span>
+            <div className="flex gap-2">
+              <span
+                className="px-3 py-1 rounded-[9px] text-[12px] font-medium text-[#FEFEFE] flex items-center justify-center"
+                style={{
+                  backgroundColor: isPaused ? '#E0B400' : '#3C8622',
+                  border: `1px solid ${isPaused ? '#E0B400' : '#3C8622'}`,
+                }}
+              >
+                {isPaused ? 'Pausado' : 'Ativo'}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-8 pb-10 bg-[#F6F6F6]">
+        {/* Ações (Carrossel) */}
+        <div className="flex flex-col gap-4 pt-6 px-4">
+          <h2 className="font-['Urbanist'] font-semibold text-[18px] leading-[22px] text-[#171F2C]">
+            O que você deseja fazer?
+          </h2>
+          <div className="flex gap-4 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
+            <button
+              onClick={() => setEditOpen(true)}
+              className="flex-shrink-0 w-[151px] h-[118px] bg-white rounded-[16px] p-4 flex flex-col justify-between items-start active:scale-[0.98] transition-transform shadow-sm"
+            >
+              <div className="w-6 h-6 flex items-center justify-center">
+                <Icon name="edit" size={24} className="text-[#141530]" />
+              </div>
+              <span className="font-['Urbanist'] font-semibold text-[16px] leading-[120%] text-[#141530] text-left">
+                Editar publicação
+              </span>
+            </button>
+            <button
+              onClick={onViewAd}
+              className="flex-shrink-0 w-[151px] h-[118px] bg-white rounded-[16px] p-4 flex flex-col justify-between items-start active:scale-[0.98] transition-transform shadow-sm"
+            >
+              <div className="w-6 h-6 flex items-center justify-center">
+                <Icon name="visibility" size={24} className="text-[#141530]" />
+              </div>
+              <span className="font-['Urbanist'] font-semibold text-[16px] leading-[120%] text-[#141530] text-left">
+                Visualizar anúncio
+              </span>
+            </button>
+            <button
+              onClick={onPreview}
+              className="flex-shrink-0 w-[151px] h-[118px] bg-white rounded-[16px] p-4 flex flex-col justify-between items-start active:scale-[0.98] transition-transform shadow-sm"
+            >
+              <div className="w-6 h-6 flex items-center justify-center">
+                <Icon name="map" size={24} className="text-[#141530]" />
+              </div>
+              <span className="font-['Urbanist'] font-semibold text-[16px] leading-[120%] text-[#141530] text-left">
+                Exibir itinerário
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Analytics Group */}
+        <div className="flex flex-col gap-4">
+          {/* KPIs e Desempenho */}
+          <div className="flex flex-col gap-4 px-4">
+          <div className="flex flex-col gap-4">
+            <h2 className="font-['Urbanist'] font-semibold text-[18px] leading-[22px] text-[#171F2C]">
+              Desempenho do roteiro
+            </h2>
+            
+            {/* Time Filter Select */}
+            <div className="relative">
+              <select
+                className="w-full h-[46px] bg-field border border-[#B6B6B6] focus:border-primary focus:outline-none rounded-[8px] px-3 font-['Urbanist'] font-semibold text-[14px] text-[#1A1C40] appearance-none"
+                value={timeRange}
+                onChange={(e) => setTimeRange(Number(e.target.value))}
+              >
+                <option value={1}>Hoje</option>
+                <option value={5}>Últimos 5 dias</option>
+                <option value={15}>Últimos 15 dias</option>
+                <option value={30}>Últimos 30 dias</option>
+              </select>
+              <div className="absolute right-3 top-0 bottom-0 flex items-center pointer-events-none">
+                <Icon name="chevron_right" size={20} className="rotate-90 text-[#1A1C40]" />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mt-2">
             <KpiCard
               icon="payments"
+              label="Receita bruta"
+              value={formatBRL(totals.gross)}
+              trend="+0%"
+              trendDays={timeRange}
+            />
+            <KpiCard
+              icon="account_balance_wallet"
               label="Receita líquida"
               value={formatBRL(totals.net)}
-              tint="#1A1C40"
+              trend="+0%"
+              trendDays={timeRange}
+            />
+            <KpiCard
+              icon="shopping_bag"
+              label="Roteiros vendidos"
+              value={totals.count.toLocaleString('pt-BR')}
+              trend="+0%"
+              trendDays={timeRange}
+            />
+            <KpiCard
+              icon="favorite"
+              label="Favoritados"
+              value="0" // Mocked
+              trend="+0%"
+              trendDays={timeRange}
+            />
+            <KpiCard
+              icon="share"
+              label="Compartilhamentos"
+              value="0" // Mocked
+              trend="+0%"
+              trendDays={timeRange}
+            />
+            <KpiCard
+              icon="visibility"
+              label="Visualização"
+              value="0" // Mocked
+              trend="+0%"
+              trendDays={timeRange}
             />
           </div>
         </div>
 
         {/* Chart */}
-        <div className="rounded-2xl bg-card p-4" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h3 className="text-[14px] font-bold text-foreground">Vendas — últimos 30 dias</h3>
-              <p className="text-muted-foreground text-xs font-medium">
-                {last30Total} {last30Total === 1 ? 'venda no período' : 'vendas no período'}
-              </p>
+        <div className="px-4">
+          <div className="bg-transparent border border-[#CACAD0] rounded-[16px] p-4 flex flex-col gap-3 h-[231px]">
+            <h3 className="font-['Urbanist'] font-medium text-[14px] leading-[17px] text-[#141530]">
+              Evolução da receita bruta
+            </h3>
+            
+            <div className="flex-1 w-full relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 10, fill: '#141530', fontWeight: 500, fontFamily: 'Urbanist' }}
+                    interval="preserveStartEnd"
+                    axisLine={false}
+                    tickLine={false}
+                    dy={10}
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fontSize: 10, fill: '#141530', fontWeight: 600, fontFamily: 'Urbanist' }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={30}
+                    tickFormatter={(val) => val > 0 ? (val / 1000 >= 1 ? `${val / 1000}k` : val) : '0'}
+                  />
+                  <Tooltip
+                    cursor={{ fill: 'rgba(121, 135, 255, 0.12)' }}
+                    contentStyle={{
+                      borderRadius: 12,
+                      border: 'none',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                      fontSize: 12,
+                    }}
+                    formatter={(value: any) => [formatBRL(value), '']}
+                    labelFormatter={(label: any) => timeRange === 1 ? label : `Dia ${label}`}
+                  />
+                  <Bar dataKey="revenue" fill="#7987FF" radius={[100, 100, 100, 100]} barSize={8} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-          </div>
-          <div className="w-full" style={{ height: 180 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                <XAxis
-                  dataKey="label"
-                  tick={{ fontSize: 10, fill: '#8E8E93' }}
-                  interval={4}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  allowDecimals={false}
-                  tick={{ fontSize: 10, fill: '#8E8E93' }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={28}
-                />
-                <Tooltip
-                  cursor={{ fill: 'rgba(157,204,54,0.12)' }}
-                  contentStyle={{
-                    borderRadius: 12,
-                    border: 'none',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                    fontSize: 12,
-                  }}
-                  formatter={(value: any) => [`${value} vendas`, '']}
-                  labelFormatter={(label: any) => `Dia ${label}`}
-                />
-                <Bar dataKey="count" fill="#9DCC36" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
           </div>
         </div>
 
         {/* Recent sales */}
-        <div className="rounded-2xl bg-card p-4" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-          <h3 className="text-[14px] font-bold text-foreground mb-3">Vendas recentes</h3>
-          {loading ? (
-            <p className="text-muted-foreground text-xs">Carregando…</p>
-          ) : sales.length === 0 ? (
-            <div className="flex flex-col items-center text-center py-8">
-              <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-3">
-                <Icon name="shopping_bag" size={24} className="text-muted-foreground text-xs" />
+        <div className="px-4">
+          <div className="bg-transparent border border-[#CACAD0] rounded-[16px] p-4">
+            <h3 className="font-['Urbanist'] font-medium text-[14px] leading-[17px] text-[#141530] mb-4">
+              Vendas recentes
+            </h3>
+            {loading ? (
+              <p className="text-muted-foreground text-xs">Carregando…</p>
+            ) : filteredSales.length === 0 ? (
+              <div className="flex flex-col items-center text-center py-8">
+                <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-3">
+                  <Icon name="shopping_bag" size={24} className="text-muted-foreground text-xs" />
+                </div>
+                <p className="text-foreground font-semibold text-[13px] mb-1">
+                  Você ainda não teve vendas no período
+                </p>
+                <p className="text-muted-foreground text-xs max-w-[240px]">
+                  Quando alguém comprar este roteiro, a venda aparecerá aqui.
+                </p>
               </div>
-              <p className="text-foreground font-semibold text-[13px] mb-1">
-                Você ainda não teve vendas
-              </p>
-              <p className="text-muted-foreground text-xs max-w-[240px]">
-                Quando alguém comprar este roteiro, a venda aparecerá aqui.
-              </p>
-            </div>
-          ) : (
-            <ul className="flex flex-col gap-3">
-              {sales.slice(0, 10).map(s => {
-                const buyer = buyers[s.buyer_id];
-                const initials = (buyer?.name || '?')
-                  .split(' ')
-                  .map(p => p[0])
-                  .slice(0, 2)
-                  .join('')
-                  .toUpperCase();
-                return (
-                  <li key={s.id} className="flex items-center gap-3">
-                    {buyer?.avatar_url ? (
-                      <img
-                        src={buyer.avatar_url}
-                        alt={buyer?.name ?? ''}
-                        className="w-9 h-9 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
-                        <span className="text-[12px] font-semibold text-muted-foreground">
-                          {initials}
-                        </span>
+            ) : (
+              <ul className="flex flex-col gap-4">
+                {filteredSales.slice(0, 10).map(s => {
+                  const buyer = buyers[s.buyer_id];
+                  const initials = (buyer?.name || '?')
+                    .split(' ')
+                    .map(p => p[0])
+                    .slice(0, 2)
+                    .join('')
+                    .toUpperCase();
+                  return (
+                    <li key={s.id} className="flex items-center gap-3">
+                      {buyer?.avatar_url ? (
+                        <img
+                          src={buyer.avatar_url}
+                          alt={buyer?.name ?? ''}
+                          className="w-10 h-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-[#F3F3F3] flex items-center justify-center">
+                          <span className="text-[14px] font-semibold text-[#141530]">
+                            {initials}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[14px] font-semibold text-[#141530] truncate">
+                          {buyer?.name || 'Comprador'}
+                        </p>
+                        <p className="text-[#7F7F7F] text-[12px] font-medium">
+                          {format(new Date(s.created_at), "d 'de' MMM, HH:mm", { locale: ptBR })}
+                        </p>
                       </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-foreground truncate">
-                        {buyer?.name || 'Comprador'}
-                      </p>
-                      <p className="text-muted-foreground text-xs">
-                        {format(new Date(s.created_at), "d 'de' MMM, HH:mm", { locale: ptBR })}
-                      </p>
-                    </div>
-                    <span className="text-[13px] font-bold text-foreground">
-                      {formatBRL(s.gross_cents)}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+                      <span className="text-[14px] font-semibold text-[#141530]">
+                        {formatBRL(s.gross_cents)}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
         </div>
       </div>
 
@@ -462,7 +590,248 @@ export function CreatorItineraryDashboardScreen({
           setEditOpen(false);
           onEdit?.(localItinerary);
         }}
+        onDelete={onDelete}
       />
+
+      <BottomSheet
+        isOpen={showOptionsSheet}
+        onClose={() => setShowOptionsSheet(false)}
+        title={null}
+        bodyClassName="p-0"
+      >
+        <div className="flex flex-col items-start px-4 w-full bg-white">
+          <div className="flex flex-col items-start gap-[32px] w-full">
+            <h2 className="font-['Urbanist'] font-bold text-[24px] leading-[29px] text-[#171F2C]">
+              Configurações da publicação
+            </h2>
+            
+            {/* Item 1 */}
+            <button
+              className="w-full flex flex-col items-start gap-4 active:opacity-70 transition-opacity"
+              onClick={() => setShowOptionsSheet(false)}
+            >
+              <div className="w-full flex justify-between items-center h-[24px]">
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-6 flex items-center justify-center shrink-0">
+                    <Icon name="star" size={24} className="text-[#141530]" />
+                  </div>
+                  <span className="font-['Urbanist'] font-medium text-[16px] leading-[19px] text-[#141530]">
+                    Destacar
+                  </span>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="flex flex-row justify-center items-center py-1 px-3 gap-1 h-[24px] bg-[#141530] rounded-[9px]">
+                    <Icon name="star" size={12} className="text-white" />
+                    <span className="font-['Urbanist'] font-medium text-[12px] leading-[14px] text-white">
+                      Pro
+                    </span>
+                  </div>
+                  <div className="w-5 h-5 flex items-center justify-center">
+                    <Icon name="chevron_right" size={20} className="text-[#7F7F7F]" />
+                  </div>
+                </div>
+              </div>
+              <div className="w-full border-t border-[#F2F2F2]" />
+            </button>
+            
+            {/* Item 2 */}
+            <button
+              className="w-full flex flex-col items-start gap-4 active:opacity-70 transition-opacity"
+              onClick={() => {
+                setShowOptionsSheet(false);
+                setShowDuplicateSheet(true);
+              }}
+            >
+              <div className="w-full flex justify-between items-center h-[24px]">
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-6 flex items-center justify-center shrink-0">
+                    <Icon name="content_copy" size={24} className="text-[#141530]" />
+                  </div>
+                  <span className="font-['Urbanist'] font-medium text-[16px] leading-[19px] text-[#141530]">
+                    Duplicar roteiro
+                  </span>
+                </div>
+                <div className="w-5 h-5 flex items-center justify-center">
+                  <Icon name="chevron_right" size={20} className="text-[#7F7F7F]" />
+                </div>
+              </div>
+              <div className="w-full border-t border-[#F2F2F2]" />
+            </button>
+
+            {/* Item 3 */}
+            <button
+              className="w-full flex flex-col items-start gap-4 active:opacity-70 transition-opacity"
+              onClick={handleShare}
+            >
+              <div className="w-full flex justify-between items-center h-[24px]">
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-6 flex items-center justify-center shrink-0">
+                    <Icon name="share" size={24} className="text-[#141530]" />
+                  </div>
+                  <span className="font-['Urbanist'] font-medium text-[16px] leading-[19px] text-[#141530]">
+                    Compartilhar
+                  </span>
+                </div>
+                <div className="w-5 h-5 flex items-center justify-center">
+                  <Icon name="chevron_right" size={20} className="text-[#7F7F7F]" />
+                </div>
+              </div>
+              <div className="w-full border-t border-[#F2F2F2]" />
+            </button>
+
+            {/* Item 4 */}
+            <button
+              className="w-full flex flex-col items-start gap-4 active:opacity-70 transition-opacity"
+              onClick={() => {
+                setShowOptionsSheet(false);
+                setShowUnpublishConfirm(true);
+              }}
+            >
+              <div className="w-full flex justify-between items-center h-[24px]">
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-6 flex items-center justify-center shrink-0">
+                    <Icon name="delete" size={24} className="text-[#D00004]" />
+                  </div>
+                  <span className="font-['Urbanist'] font-medium text-[16px] leading-[19px] text-[#D00004]">
+                    Excluir
+                  </span>
+                </div>
+                <div className="w-5 h-5 flex items-center justify-center">
+                  <Icon name="chevron_right" size={20} className="text-[#D00004]" />
+                </div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </BottomSheet>
+
+      <BottomSheet
+        isOpen={showDuplicateSheet}
+        onClose={() => setShowDuplicateSheet(false)}
+        title={null}
+        bodyClassName="p-0"
+      >
+        <div className="flex flex-col items-start px-4 pt-4 gap-6 w-full bg-white">
+          <div className="flex flex-col gap-6 w-full">
+            <div className="flex flex-col gap-2 w-full">
+              <h2 className="font-['Urbanist'] font-semibold text-[24px] leading-[28px] text-[#141530]">
+                Como você quer usar o roteiro?
+              </h2>
+              <p className="font-['Urbanist'] font-medium text-[14px] leading-[18px] text-[#7F7F7F]">
+                Escolha como usar uma cópia deste roteiro.
+              </p>
+            </div>
+            
+            <div className="flex flex-col gap-4 w-full">
+              {/* Selection Card 1 */}
+              <button
+                onClick={() => setDuplicateType('personal')}
+                className={cn(
+                  "flex flex-col items-start p-4 w-full rounded-[16px] transition-colors",
+                  duplicateType === 'personal'
+                    ? "bg-[#F4FDDF] border border-[#9DCC36]"
+                    : "bg-white border border-[#EBEBEB]"
+                )}
+              >
+                <div className="flex flex-row items-center gap-4 w-full">
+                  <div className="flex flex-row gap-3 flex-1 items-start h-full">
+                    <div className="w-6 h-6 flex items-center justify-center shrink-0">
+                      <Icon name="person" size={24} className="text-[#141530]" />
+                    </div>
+                    <div className="flex flex-col gap-1 items-start justify-center flex-1 h-full">
+                      <span className="font-['Urbanist'] font-semibold text-[16px] leading-[19px] text-[#1A1C40]">
+                        Viagem pessoal
+                      </span>
+                      <span className="font-['Urbanist'] font-medium text-[14px] leading-[16px] text-[#676767] text-left">
+                        Para planejar sua própria viagem.
+                      </span>
+                    </div>
+                  </div>
+                  {/* Radio Button */}
+                  <div className="w-8 h-8 flex items-center justify-center p-[6.4px] shrink-0">
+                    <div className={cn(
+                      "w-[20px] h-[20px] rounded-full flex items-center justify-center bg-transparent",
+                      duplicateType === 'personal' ? "border-2 border-[#9DCC36]" : "border-2 border-[#9E9E9E]"
+                    )}>
+                      {duplicateType === 'personal' && <div className="w-[10px] h-[10px] bg-[#9DCC36] rounded-full" />}
+                    </div>
+                  </div>
+                </div>
+              </button>
+
+              {/* Selection Card 2 */}
+              <button
+                onClick={() => setDuplicateType('store')}
+                className={cn(
+                  "flex flex-col items-start p-4 w-full rounded-[16px] transition-colors",
+                  duplicateType === 'store'
+                    ? "bg-[#F4FDDF] border border-[#9DCC36]"
+                    : "bg-white border border-[#EBEBEB]"
+                )}
+              >
+                <div className="flex flex-row items-center gap-4 w-full">
+                  <div className="flex flex-row gap-3 flex-1 items-start h-full">
+                    <div className="w-6 h-6 flex items-center justify-center shrink-0">
+                      <Icon name="storefront" size={24} className="text-[#141530]" />
+                    </div>
+                    <div className="flex flex-col gap-1 items-start justify-center flex-1 h-full">
+                      <span className="font-['Urbanist'] font-semibold text-[16px] leading-[19px] text-[#1A1C40]">
+                        Novo anúncio (rascunho)
+                      </span>
+                      <span className="font-['Urbanist'] font-medium text-[14px] leading-[17px] text-[#676767] text-left">
+                        Cópia em rascunho para editar e publicar depois.
+                      </span>
+                    </div>
+                  </div>
+                  {/* Radio Button */}
+                  <div className="w-8 h-8 flex items-center justify-center p-[6.4px] shrink-0">
+                    <div className={cn(
+                      "w-[20px] h-[20px] rounded-full flex items-center justify-center bg-transparent",
+                      duplicateType === 'store' ? "border-2 border-[#9DCC36]" : "border-2 border-[#9E9E9E]"
+                    )}>
+                      {duplicateType === 'store' && <div className="w-[10px] h-[10px] bg-[#9DCC36] rounded-full" />}
+                    </div>
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+          
+          <button
+            onClick={() => {
+              setShowDuplicateSheet(false);
+              handleDuplicate(duplicateType === 'store');
+            }}
+            className="flex flex-row justify-center items-center py-3 px-4 w-full h-[48px] bg-[#9DCC36] rounded-[16px] active:scale-[0.99] transition-transform"
+          >
+            <span className="font-['Urbanist'] font-bold text-[16px] leading-[19px] text-[#141530]">
+              Confirmar
+            </span>
+          </button>
+        </div>
+      </BottomSheet>
+
+      <UnpublishConfirmSheet
+        isOpen={showUnpublishConfirm}
+        onClose={() => setShowUnpublishConfirm(false)}
+        onConfirm={() => {
+          setShowUnpublishConfirm(false);
+          handleUnpublish();
+        }}
+      />
+
+      {onDelete && (
+        <DeleteConfirmSheet
+          isOpen={showDeleteConfirm}
+          onClose={() => setShowDeleteConfirm(false)}
+          title="Excluir roteiro?"
+          description="Tem certeza que deseja excluir este roteiro da sua loja? Esta ação não poderá ser desfeita."
+          onConfirm={() => {
+            setShowDeleteConfirm(false);
+            onDelete();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -471,26 +840,39 @@ function KpiCard({
   icon,
   label,
   value,
-  tint,
+  trend,
+  trendDays
 }: {
   icon: string;
   label: string;
   value: string;
-  tint: string;
+  trend?: string;
+  trendDays?: number;
 }) {
   return (
-    <div
-      className="rounded-2xl bg-card p-3 flex flex-col gap-1.5"
-      style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}
-    >
-      <div
-        className="w-8 h-8 rounded-full flex items-center justify-center"
-        style={{ background: `${tint}1A` }}
-      >
-        <Icon name={icon} size={16} style={{ color: tint }} />
+    <div className="bg-transparent border border-[#B6B6B6] rounded-[16px] p-4 flex flex-col justify-between h-[129px]">
+      <div className="flex flex-col gap-2">
+        <div className="w-[17px] h-[17px] flex items-center justify-center text-[#141530]">
+          <Icon name={icon} size={17} />
+        </div>
+        <p className="font-['Urbanist'] font-medium text-[14px] leading-[17px] text-[#141530]">
+          {label}
+        </p>
       </div>
-      <p className="text-muted-foreground text-xs font-medium">{label}</p>
-      <p className="text-foreground font-bold text-[15px] leading-tight">{value}</p>
+      
+      <div className="flex flex-col gap-2">
+        <span className="font-['Urbanist'] font-semibold text-[16px] leading-[19px] text-[#141530]">
+          {value}
+        </span>
+        <div className="flex items-center gap-1">
+          <span className="font-['Urbanist'] font-semibold text-[12px] leading-[14px] text-[#389222]">
+            {trend}
+          </span>
+          <span className="font-['Urbanist'] font-medium text-[12px] leading-[14px] text-[#7F7F7F]">
+            vs {trendDays === 1 ? 'hoje' : `${trendDays} dias`}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

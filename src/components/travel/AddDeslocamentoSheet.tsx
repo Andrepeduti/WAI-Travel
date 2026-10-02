@@ -174,12 +174,22 @@ export function AddDeslocamentoSheet({ open, onClose, onSave, totalDays, startDa
       >
         <div className="w-10 h-1 rounded-full bg-muted mx-auto mt-3 mb-2" />
 
-        {/* Header */}
-        <div className="px-5 pb-3 flex items-center justify-between">
-          <h2 className="text-[17px] font-bold text-foreground">Adicionar deslocamento</h2>
-          <button onClick={handleClose} className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#F2F2F2' }}>
+        {/* Top Bar with Close Button */}
+        <div className="px-5 pt-1 pb-2 flex items-center justify-end">
+          <button
+            type="button"
+            onClick={handleClose}
+            className="w-10 h-10 rounded-full flex items-center justify-center -mr-1"
+            style={{ background: '#F2F2F2' }}
+            aria-label="Fechar"
+          >
             <Icon name="close" size={20} className="text-foreground" />
           </button>
+        </div>
+
+        {/* Title */}
+        <div className="px-5 pb-3">
+          <h2 className="text-[20px] font-bold text-foreground">Adicionar deslocamento</h2>
         </div>
 
         {/* Content */}
@@ -236,20 +246,30 @@ export function AddDeslocamentoSheet({ open, onClose, onSave, totalDays, startDa
           {positionIndex !== null && (
             <div>
               <label className="text-[13px] font-medium text-muted-foreground mb-2 block">Tipo de locomoção</label>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex gap-2 overflow-x-auto scrollbar-hide">
                 {transportTypes.map(t => {
-                  const isSelected = type === t.id;
+                  const active = type === t.id;
                   return (
                     <button
                       key={t.id}
+                      type="button"
                       onClick={() => setType(t.id)}
-                      className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[13px] font-medium transition-colors border ${
-                        isSelected
-                          ? 'bg-foreground text-background border-foreground'
-                          : 'bg-transparent text-foreground border-border'
-                      }`}
+                      className="h-9 px-4 rounded-full text-[13px] font-semibold transition-all whitespace-nowrap flex-shrink-0 active:scale-[0.97] border inline-flex items-center gap-1.5"
+                      style={
+                        active
+                          ? {
+                              backgroundColor: '#1A1C40',
+                              color: '#FFFFFF',
+                              borderColor: 'transparent',
+                            }
+                          : {
+                              background: 'hsl(var(--card))',
+                              color: 'hsl(var(--foreground))',
+                              borderColor: 'hsl(var(--border))',
+                            }
+                      }
                     >
-                      <Icon name={t.icon} size={16} className="text-current" />
+                      <Icon name={t.icon} size={14} className={active ? 'text-white' : ''} />
                       {t.label}
                     </button>
                   );

@@ -31,7 +31,7 @@ export function buildImportedVideoFromLink(
   const ytMatch = trimmed.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
   if (ytMatch) {
     return {
-      id: Date.now(),
+      id: Date.now() + Math.floor(Math.random() * 1000000),
       link: trimmed,
       platform: 'youtube',
       title: fallbackTitle,
@@ -43,7 +43,7 @@ export function buildImportedVideoFromLink(
   }
   if (trimmed.includes('tiktok.com')) {
     return {
-      id: Date.now(),
+      id: Date.now() + Math.floor(Math.random() * 1000000),
       link: trimmed,
       platform: 'tiktok',
       title: fallbackTitle,
@@ -55,7 +55,7 @@ export function buildImportedVideoFromLink(
   }
   if (trimmed.includes('instagram.com')) {
     return {
-      id: Date.now(),
+      id: Date.now() + Math.floor(Math.random() * 1000000),
       link: trimmed,
       platform: 'instagram',
       title: fallbackTitle,
@@ -66,7 +66,7 @@ export function buildImportedVideoFromLink(
     };
   }
   return {
-    id: Date.now(),
+    id: Date.now() + Math.floor(Math.random() * 1000000),
     link: trimmed,
     platform: 'other',
     title: fallbackTitle,

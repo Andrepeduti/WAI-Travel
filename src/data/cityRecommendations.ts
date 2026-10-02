@@ -22,6 +22,10 @@ export interface CityPlace {
   description?: string;
   /** Optional full address (street, postal code, city) for search results */
   address?: string;
+  /** Optional Google Place ID for hydration and deduplication */
+  googlePlaceId?: string;
+  /** Country of the place */
+  country?: string;
 }
 
 // ─── City Places Database ────────────────────────────────────────────────────

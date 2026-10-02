@@ -7,9 +7,10 @@ interface DaySelectorProps {
   totalDays: number;
   onChange: (day: number) => void;
   startDate?: Date;
+  transparent?: boolean;
 }
 
-export function DaySelector({ selectedDay, totalDays, onChange, startDate }: DaySelectorProps) {
+export function DaySelector({ selectedDay, totalDays, onChange, startDate, transparent }: DaySelectorProps) {
   const formatDayLabel = (day: number) => {
     const padded = String(day).padStart(2, '0');
     if (startDate) {
@@ -27,8 +28,8 @@ export function DaySelector({ selectedDay, totalDays, onChange, startDate }: Day
         <select
           value={selectedDay}
           onChange={e => onChange(Number(e.target.value))}
-          className="w-full appearance-none rounded-xl px-4 py-3 text-[14px] font-medium text-foreground outline-none pr-10 cursor-pointer"
-          style={{ background: '#F2F2F2' }}
+          className={`w-full appearance-none ${transparent ? 'bg-transparent px-0 py-0' : 'rounded-xl px-4 py-3'} text-[14px] font-medium text-foreground outline-none pr-6 cursor-pointer`}
+          style={transparent ? undefined : { background: '#F2F2F2' }}
         >
           {Array.from({ length: totalDays }, (_, i) => i + 1).map(day => (
             <option key={day} value={day}>
@@ -36,8 +37,8 @@ export function DaySelector({ selectedDay, totalDays, onChange, startDate }: Day
             </option>
           ))}
         </select>
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-          <Icon name="expand_more" size={20} className="text-muted-foreground" />
+        <div className={`absolute ${transparent ? 'right-0 -mt-[2px]' : 'right-3'} top-1/2 -translate-y-1/2 pointer-events-none`}>
+          <Icon name="expand_more" size={20} className="text-[#141530]" />
         </div>
       </div>
     </div>

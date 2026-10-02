@@ -273,12 +273,12 @@ export function TripTipsScreen({ onBack, destination = 'Amsterdam' }: TripTipsSc
   }, [filteredTips]);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-[100dvh] bg-background flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-20 bg-background px-4 pt-5 pb-3">
         <div className="flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
           <BackButton onClick={onBack} />
-          <h1 className="text-xl font-bold text-foreground my-0 mt-[24px] flex-1">Dicas de viagem</h1>
+          <h1 className="text-xl font-bold text-foreground my-0 flex-1">Dicas de viagem</h1>
         </div>
       </header>
 
@@ -534,7 +534,7 @@ export function TripTipsScreen({ onBack, destination = 'Amsterdam' }: TripTipsSc
                   onChange={e => setFormDescription(e.target.value)}
                   placeholder="Detalhes ou contexto sobre a dica..."
                   rows={3}
-                  className="w-full px-4 py-3 rounded-xl border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground outline-none resize-none focus:ring-2 focus:ring-primary/20 transition-shadow"
+                  className="w-full px-4 py-3 rounded-xl border border-border bg-field text-sm text-foreground placeholder:text-muted-foreground outline-none resize-none focus:border-primary transition-colors"
                 />
               </div>
 
