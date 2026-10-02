@@ -119,7 +119,7 @@ export async function getPublicItinerariesByUserId(
   if (!userId) return [];
   const { data, error } = await supabase
     .from('itineraries')
-    .select('id, title, destinations, images, start_date, end_date, places_count, price_cents, description, status, is_flexible, duration_days, travel_month')
+    .select('id, title, destinations, images, start_date, end_date, places_count, price_cents, status, is_flexible, duration_days, travel_month')
     .eq('user_id', userId)
     .eq('is_public', true)
     .is('deleted_at', null)

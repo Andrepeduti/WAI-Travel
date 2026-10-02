@@ -68,7 +68,6 @@ export interface CreateItineraryInput {
   isPersonal?: boolean;
   isPublic?: boolean;
   priceCents?: number | null;
-  description?: string;
   status?: 'draft' | 'published' | 'suspended';
   isFlexible?: boolean;
   durationDays?: number;
@@ -88,7 +87,6 @@ export interface UpdateItineraryInput {
   isPersonal?: boolean;
   isPublic?: boolean;
   priceCents?: number | null;
-  description?: string;
   status?: 'draft' | 'published' | 'suspended';
   isFlexible?: boolean;
   durationDays?: number;
@@ -114,7 +112,6 @@ function rowToItinerary(row: any, myRole?: 'owner' | 'editor' | 'viewer'): UserI
     isPersonal: row.is_personal ?? true,
     isPublic: row.is_public ?? false,
     priceCents: row.price_cents ?? null,
-    description: row.description,
     status: row.status ?? 'draft',
     isFlexible: row.is_flexible ?? false,
     durationDays: row.duration_days ?? undefined,
@@ -297,13 +294,11 @@ export async function getUserItineraryById(id: string): Promise<UserItinerary | 
     data.tags = sanitizeListingTags(storeData.tags);
     data.price_cents = storeData.price_cents;
     data.seasons = storeData.seasons;
-    // We only override description if it's missing or if we prefer listed_description
-    if (storeData.listed_description) {
-      data.description = storeData.listed_description;
-    }
   }
 
-  return rowToItinerary(data);
+  const itinerary = rowToItinerary(data);
+  if (storeData?.listed_description) itinerary.description = storeData.listed_description;
+  return itinerary;
 }
 
 export async function createItinerary(input: CreateItineraryInput): Promise<UserItinerary | null> {
@@ -324,7 +319,6 @@ export async function createItinerary(input: CreateItineraryInput): Promise<User
     places_count: input.places ?? 0,
     is_personal: isPersonal,
     source_itinerary_id: input.sourceItineraryId ?? null,
-    description: input.description ?? '',
     status: input.status ?? 'draft',
     is_flexible: input.isFlexible ?? false,
     duration_days: input.durationDays ?? null,
@@ -370,7 +364,6 @@ export async function updateItinerary(id: string, patch: UpdateItineraryInput): 
   if (patch.images !== undefined) updates.cover_image_url = patch.images && patch.images.length > 0 ? patch.images[0] : null;
   if (patch.places !== undefined) updates.places_count = patch.places;
   if (patch.isPersonal !== undefined) updates.is_personal = patch.isPersonal;
-  if (patch.description !== undefined) updates.description = patch.description;
   if (patch.status !== undefined) updates.status = patch.status;
   if (patch.isFlexible !== undefined) updates.is_flexible = patch.isFlexible;
   if (patch.durationDays !== undefined) updates.duration_days = patch.durationDays;
@@ -737,7 +730,6 @@ export async function publishItineraryAsCopy(
     sourceDatasetId: source.sourceDatasetId ?? null,
     isPublic: true,
     priceCents: publishData.priceCents,
-    description: publishData.description,
     status: 'published'
   });
   if (!created) return null;
@@ -776,7 +768,6 @@ export async function duplicateItinerary(
     isPersonal: !asPublic,
     isPublic: false, // Mesmo para loja, começa como rascunho privado até o usuário publicar
     priceCents: asPublic ? (source.priceCents ?? null) : null,
-    description: source.description,
     status: 'draft',
     isFlexible: source.isFlexible,
     durationDays: source.durationDays,

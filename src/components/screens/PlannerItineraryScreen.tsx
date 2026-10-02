@@ -545,7 +545,6 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     if (typeof itineraryId === 'string' && !itineraryId.startsWith('pending-itinerary-')) {
       await updateItineraryRow(itineraryId, {
         status: next ? 'published' : 'draft',
-        ...(extras?.description !== undefined ? { description: extras.description } : {}),
         ...(extras?.title !== undefined ? { title: extras.title } : {}),
       });
 
@@ -875,7 +874,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
     if (isViewer) return;
     const root = document.documentElement;
     const previous = root.style.getPropertyValue('--toast-bottom-offset');
-    root.style.setProperty('--toast-bottom-offset', creatorEditMode ? '148px' : '80px');
+    root.style.setProperty('--toast-bottom-offset', `calc(env(safe-area-inset-bottom, 0px) + ${creatorEditMode ? 148 : 80}px)`);
     return () => {
       if (previous) root.style.setProperty('--toast-bottom-offset', previous);
       else root.style.removeProperty('--toast-bottom-offset');
@@ -2360,7 +2359,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
 
     toast.success(
       placesArray.length === 1
-        ? `${placesArray[0].name} adicionado ao Dia ${day}`
+        ? `Atividade adicionada ao Dia ${day}`
         : `${placesArray.length} lugares adicionados ao Dia ${day}`
     );
   };
@@ -3923,7 +3922,6 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
                   isPublic: false,
                   sourceItineraryId: itineraryId as string,
                   priceCents: extras.priceCents,
-                  description: extras.description,
                   tags: extras.tags,
                   mainTag: extras.mainTag,
                   status: 'published',

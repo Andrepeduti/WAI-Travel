@@ -2,7 +2,14 @@
  * Centralized Google Places API (New) utilities for the application.
  * Uses the modern places.googleapis.com/v1 endpoints which support CORS natively.
  */
-import { canCallApi, incrementApiCounter } from '@/lib/placesCache';
+import {
+  canCallApi,
+  incrementApiCounter,
+  normalizeSearchKey,
+  getCachedSearch,
+  saveSearchResults,
+  type PlaceRecord,
+} from '@/lib/placesCache';
 
 export interface GoogleAutocompleteSuggestion {
   placeId: string;
@@ -26,6 +33,7 @@ export interface GooglePlaceResult {
   lng: number;
   primaryType: string;
   photoUrl?: string;
+  photoName?: string;
   city?: string;
   country?: string;
 }
@@ -236,25 +244,62 @@ export async function getGooglePlaceFullDetails(placeId: string): Promise<Google
   }
 }
 
+export interface TextSearchOptions {
+  /** Save results in `places` + `place_search_cache` and serve repeated searches from the DB. */
+  persist?: boolean;
+  /** Limits the Google response (pageSize, 1-20). */
+  maxResults?: number;
+}
+
+function buildPhotoUrl(photoName: string, apiKey: string, size = 600): string {
+  return `https://places.googleapis.com/v1/${photoName}/media?maxHeightPx=${size}&maxWidthPx=${size}&key=${apiKey}`;
+}
+
+function placeRecordToResult(r: PlaceRecord, apiKey: string): GooglePlaceResult {
+  return {
+    id: r.google_place_id || '',
+    name: r.name,
+    address: r.formatted_address || '',
+    lat: r.latitude || 0,
+    lng: r.longitude || 0,
+    primaryType: r.category || '',
+    // Storage URL when already persisted, otherwise rebuilt from the Google photo name
+    photoUrl: r.cover_photo_url || (r.google_photo_name ? buildPhotoUrl(r.google_photo_name, apiKey) : undefined),
+    photoName: r.google_photo_name || undefined,
+    city: r.city || '',
+    country: r.country || '',
+  };
+}
+
 /**
  * Text Search for POIs (Points of Interest).
  */
 export async function searchGooglePlacesText(
   query: string,
   city?: string,
-  restrictTo?: { lat: number; lng: number; radiusDeg?: number }
+  options: TextSearchOptions = {}
 ): Promise<GooglePlaceResult[]> {
   const apiKey = getApiKey();
   if (!apiKey || query.trim().length < 2) return [];
 
-  const restrictKey = restrictTo ? `_${restrictTo.lat.toFixed(2)},${restrictTo.lng.toFixed(2)}` : '';
-  const cacheKey = `gplaces_text_${query.trim().toLowerCase()}_${city?.toLowerCase() || ''}${restrictKey}`;
+  const cacheKey = `gplaces_text_${query.trim().toLowerCase()}_${city?.toLowerCase() || ''}`;
   
   const sessionData = getSessionCache<GooglePlaceResult[]>(cacheKey);
   if (sessionData) return sessionData;
 
   if (textSearchCache.has(cacheKey)) {
     return textSearchCache.get(cacheKey)!;
+  }
+
+  const searchKey = options.persist ? normalizeSearchKey(query, city) : '';
+  if (searchKey) {
+    const saved = await getCachedSearch(searchKey);
+    if (saved) {
+      const fromDb = saved.map((r) => placeRecordToResult(r, apiKey));
+      textSearchCache.set(cacheKey, fromDb);
+      setSessionCache(cacheKey, fromDb);
+      return fromDb;
+    }
   }
 
   if (!(await canCallApi('google_places'))) {
@@ -274,30 +319,19 @@ export async function searchGooglePlacesText(
       body: JSON.stringify({
         textQuery: fullQuery,
         languageCode: 'pt-BR',
-        ...(restrictTo && {
-          locationRestriction: {
-            rectangle: {
-              low: {
-                latitude: restrictTo.lat - (restrictTo.radiusDeg ?? 0.25),
-                longitude: restrictTo.lng - (restrictTo.radiusDeg ?? 0.25),
-              },
-              high: {
-                latitude: restrictTo.lat + (restrictTo.radiusDeg ?? 0.25),
-                longitude: restrictTo.lng + (restrictTo.radiusDeg ?? 0.25),
-              },
-            },
-          },
-        }),
+        ...(options.maxResults ? { pageSize: options.maxResults } : {}),
       }),
     });
 
     if (!res.ok) return [];
     const data = await res.json();
     
-    const results = (data.places || []).map((p: any) => {
+    const results: GooglePlaceResult[] = (data.places || []).map((p: any) => {
       let photoUrl: string | undefined;
+      let photoName: string | undefined;
       if (p.photos && p.photos.length > 0) {
-        photoUrl = `https://places.googleapis.com/v1/${p.photos[0].name}/media?maxHeightPx=600&maxWidthPx=600&key=${apiKey}`;
+        photoName = p.photos[0].name;
+        photoUrl = buildPhotoUrl(p.photos[0].name, apiKey);
       }
       
       let city = '';
@@ -329,6 +363,7 @@ export async function searchGooglePlacesText(
         lng: p.location?.longitude || 0,
         primaryType: formatGooglePlaceType(p.primaryType || ''),
         photoUrl,
+        photoName,
         city,
         country,
       };
@@ -337,6 +372,7 @@ export async function searchGooglePlacesText(
     textSearchCache.set(cacheKey, results);
     setSessionCache(cacheKey, results);
     incrementApiCounter('google_places', 1).catch(() => {});
+    if (searchKey) void saveSearchResults(searchKey, results);
     return results;
   } catch (error) {
     console.error('Google Text Search error:', error);
@@ -391,6 +427,7 @@ export interface GooglePlaceFullDetails {
   userRatingCount?: number;
   website?: string;
   photos: string[];
+  photoNames: string[];
   weekdayDescriptions: string[];
   openNow?: boolean;
   editorialSummary?: string;
@@ -468,6 +505,10 @@ export async function fetchGooglePlaceDetailsFull(
         )
       : [];
 
+    const photoNames: string[] = Array.isArray(place.photos)
+      ? place.photos.slice(0, 6).map((photo: any) => photo.name).filter(Boolean)
+      : [];
+
     const weekdayDescriptions: string[] =
       place.regularOpeningHours?.weekdayDescriptions ||
       place.currentOpeningHours?.weekdayDescriptions ||
@@ -484,6 +525,7 @@ export async function fetchGooglePlaceDetailsFull(
       userRatingCount: typeof place.userRatingCount === 'number' ? place.userRatingCount : undefined,
       website: place.websiteUri || undefined,
       photos,
+      photoNames,
       weekdayDescriptions,
       openNow: place.currentOpeningHours?.openNow ?? place.regularOpeningHours?.openNow,
       editorialSummary: place.editorialSummary?.text,

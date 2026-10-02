@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, useMotionValue, useTransform, PanInfo, animate } from 'framer-motion';
 import { Icon } from '../ui/Icon';
 import { ShoppingBag, Star, Heart, Mic, SlidersHorizontal, Plus, Trash2, LogOut } from 'lucide-react';
@@ -25,6 +26,11 @@ type OriginFilter = 'all' | 'mine' | 'shared' | 'purchased';
 
 
 let cachedMemberAvatars: Record<string, any[]> = {};
+
+// Referências estáveis para quando as consultas ainda não retornaram.
+const EMPTY_SALES_COUNTS: Record<string, number> = {};
+const EMPTY_PURCHASED_IDS: Set<string> = new Set();
+const EMPTY_LISTINGS: Record<string, { status: string; priceCents: number | null; title: string | null }> = {};
 
 interface TripsScreenProps {
   onItineraryClick: (id: number) => void;
@@ -127,102 +133,79 @@ export function TripsScreen({
     itineraries: userItineraries,
     loading: itinerariesLoading,
     remove: removeItinerary,
-    refetch: refetchItineraries,
   } = useMyItineraries();
 
-  const [salesByItinerary, setSalesByItinerary] = useState<Record<string, number>>({});
-  const [purchasedItineraryIds, setPurchasedItineraryIds] = useState<Set<string>>(new Set());
-  const [purchasesVersion, setPurchasesVersion] = useState(0);
+  const queryClient = useQueryClient();
+  const userId = authUser?.id ?? null;
 
-  useEffect(() => {
-    const handler = () => setPurchasesVersion((v) => v + 1);
-    window.addEventListener(PURCHASES_CHANGED_EVENT, handler);
-    return () => window.removeEventListener(PURCHASES_CHANGED_EVENT, handler);
-  }, []);
-
-  // Carrega contagem de vendas por roteiro
-  useEffect(() => {
-    if (!authUser?.id) {
-      setSalesByItinerary({});
-      return;
-    }
-    let cancelled = false;
-    (async () => {
+  // Vendas (como vendedor) e compras (como comprador) numa única consulta.
+  const { data: salesData } = useQuery({
+    queryKey: ['trips-sales', userId],
+    enabled: !!userId,
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('itinerary_sales')
-        .select('itinerary_id')
-        .eq('seller_id', authUser.id);
-      if (cancelled || error || !data) return;
+        .select('itinerary_id, seller_id, buyer_id')
+        .or(`seller_id.eq.${userId},buyer_id.eq.${userId}`);
+      if (error) throw error;
       const counts: Record<string, number> = {};
-      for (const row of data as { itinerary_id: string }[]) {
-        counts[row.itinerary_id] = (counts[row.itinerary_id] ?? 0) + 1;
+      const purchased = new Set<string>();
+      for (const row of (data ?? []) as { itinerary_id: string; seller_id: string; buyer_id: string }[]) {
+        if (row.seller_id === userId) counts[row.itinerary_id] = (counts[row.itinerary_id] ?? 0) + 1;
+        if (row.buyer_id === userId) purchased.add(row.itinerary_id);
       }
-      setSalesByItinerary(counts);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [authUser?.id, userItineraries.length, purchasesVersion]);
+      return { counts, purchased };
+    },
+  });
+  const salesByItinerary = salesData?.counts ?? EMPTY_SALES_COUNTS;
+  const purchasedItineraryIds = salesData?.purchased ?? EMPTY_PURCHASED_IDS;
+
+  useEffect(() => {
+    const handler = () => queryClient.invalidateQueries({ queryKey: ['trips-sales'] });
+    window.addEventListener(PURCHASES_CHANGED_EVENT, handler);
+    return () => window.removeEventListener(PURCHASES_CHANGED_EVENT, handler);
+  }, [queryClient]);
 
   // Listings da loja do próprio vendedor. Roteiros pessoais publicados na loja
   // continuam com is_personal = true; o que os identifica é o listing.
-  const [listingsByItinerary, setListingsByItinerary] = useState<
-    Record<string, { status: string; priceCents: number | null; title: string | null }>
-  >({});
-  const [listingsVersion, setListingsVersion] = useState(0);
-
-  useEffect(() => {
-    const handler = () => setListingsVersion((v) => v + 1);
-    window.addEventListener(ITINERARIES_CHANGED_EVENT, handler);
-    return () => window.removeEventListener(ITINERARIES_CHANGED_EVENT, handler);
-  }, []);
-
-  useEffect(() => {
-    if (!authUser?.id) {
-      setListingsByItinerary({});
-      return;
-    }
-    let cancelled = false;
-    (async () => {
+  const { data: listingsData } = useQuery({
+    queryKey: ['trips-listings', userId],
+    enabled: !!userId,
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('itinerary_store_listing')
         .select('itinerary_id, status, price_cents, listed_title')
-        .eq('seller_id', authUser.id);
-      if (cancelled || error || !data) return;
+        .eq('seller_id', userId!);
+      if (error) throw error;
       const map: Record<string, { status: string; priceCents: number | null; title: string | null }> = {};
-      for (const row of data as any[]) {
+      for (const row of (data ?? []) as any[]) {
         map[row.itinerary_id] = {
           status: row.status,
           priceCents: row.price_cents ?? null,
           title: row.listed_title ?? null,
         };
       }
-      setListingsByItinerary(map);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [authUser?.id, userItineraries.length, listingsVersion]);
+      return map;
+    },
+  });
+  const listingsByItinerary = listingsData ?? EMPTY_LISTINGS;
 
-  // Carrega quais roteiros do usuário foram comprados
+  // Agrupa rajadas de eventos (cada save do planner emite um) num único refetch.
   useEffect(() => {
-    if (!authUser?.id) {
-      setPurchasedItineraryIds(new Set());
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      const { data, error } = await supabase
-        .from('itinerary_sales')
-        .select('itinerary_id')
-        .eq('buyer_id', authUser.id);
-      if (cancelled || error || !data) return;
-      setPurchasedItineraryIds(new Set((data as { itinerary_id: string }[]).map((r) => r.itinerary_id)));
-    })();
-    return () => {
-      cancelled = true;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const handler = () => {
+      if (timer) return;
+      timer = setTimeout(() => {
+        timer = null;
+        queryClient.invalidateQueries({ queryKey: ['trips-listings'] });
+      }, 300);
     };
-  }, [authUser?.id, userItineraries.length, purchasesVersion]);
+    window.addEventListener(ITINERARIES_CHANGED_EVENT, handler);
+    return () => {
+      window.removeEventListener(ITINERARIES_CHANGED_EVENT, handler);
+      if (timer) clearTimeout(timer);
+    };
+  }, [queryClient]);
 
   // Avatares reais por roteiro
   const [memberAvatarsByItin, setMemberAvatarsByItin] = useState<Record<string, string[]>>(() => cachedMemberAvatars);

@@ -793,7 +793,7 @@ export async function searchGoogleFallback(query: string, city: string): Promise
   if (cached) return cached;
 
   try {
-    const results = await searchGooglePlacesText(q, city);
+    const results = await searchGooglePlacesText(q, city, { persist: true });
 
     const places: CityPlace[] = results.map(r => {
       const type = r.primaryType || 'default';

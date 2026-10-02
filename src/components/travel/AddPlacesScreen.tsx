@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { DaySelector } from './DaySelector';
-import { type CityPlace } from '@/data/cityRecommendations';
+import { getDestinationForDay, type CityPlace } from '@/data/cityRecommendations';
 import { searchPlaces } from '@/data/cityRecommendations';
 import { fetchPlacesForCity, mergePlaces } from '@/lib/placesApi';
 export interface PlaceResult {
@@ -81,7 +81,6 @@ export function AddPlacesScreen({
       setSelectedPlacesMap(new Map());
       setSearch('');
       setSubmittedSearch('');
-      setSelectedCity('');
       setGoogleResults([]);
       setApiResults([]);
       document.body.style.overflow = 'hidden';
@@ -94,10 +93,12 @@ export function AddPlacesScreen({
     };
   }, [open, dayNumber]);
 
-  // City the user is searching in (defaults to the first destination of the itinerary)
-  const [selectedCity, setSelectedCity] = useState('');
-  const searchDestination = destinations.includes(selectedCity) ? selectedCity : destinations[0] || '';
-  const dayCity = searchDestination.split(',')[0].trim();
+  const dayDestination = useMemo(() => {
+    if (destinations.length <= 1) return destinations[0] || '';
+    return getDestinationForDay(destinations, selectedDay, totalDays);
+  }, [destinations, selectedDay, totalDays]);
+
+  const dayCity = dayDestination.split(',')[0].trim();
 
   // We only fetch API places when user searches, unlike the old sheet which fetched on mount.
   const [apiResults, setApiResults] = useState<CityPlace[]>([]);
@@ -121,18 +122,12 @@ export function AddPlacesScreen({
     const fetchGooglePlaces = async () => {
       try {
         const { searchGooglePlacesText } = await import('@/lib/googlePlacesApi');
-        const { incrementApiCounter } = await import('@/lib/placesCache');
-
-        const { resolveDestinationCoordinates } = await import('@/lib/cityCoordinates');
 
         const q = submittedSearch.trim();
+        const searchQuery = dayCity ? `${q} ${dayCity}` : q;
 
-        // Single call, restricted to the city chosen by the user
-        const cityName = searchDestination.split(',')[0].trim();
-        const coords = searchDestination ? await resolveDestinationCoordinates(searchDestination) : null;
-        if (cancelled) return;
-        const suggestions = await searchGooglePlacesText(q, cityName, coords ?? undefined);
-        incrementApiCounter('google_places', 1).catch(() => {});
+        // Counter is incremented inside searchGooglePlacesText only when Google is actually called
+        const suggestions = await searchGooglePlacesText(searchQuery, dayCity, { persist: true, maxResults: 5 });
 
         if (cancelled || suggestions.length === 0) {
           if (!cancelled) setLoadingApi(false);
@@ -179,7 +174,7 @@ export function AddPlacesScreen({
     return () => {
       cancelled = true;
     };
-  }, [submittedSearch, searchDestination, dayCity]);
+  }, [submittedSearch, dayDestination, dayCity]);
 
   // Combine static and Google results based on the search term
   const displayResults = useMemo(() => {
@@ -188,19 +183,23 @@ export function AddPlacesScreen({
     }
     
     // Search in static data
-    const { local: staticLocal } = searchPlaces(submittedSearch, searchDestination ? [searchDestination] : destinations);
+    const { local: staticLocal } = searchPlaces(submittedSearch, destinations);
     
     // googleResults already contains the hydrated autocomplete results
     let merged = mergePlaces(staticLocal, googleResults);
     
     // Return max 5 items
     return merged.slice(0, 5);
-  }, [submittedSearch, destinations, searchDestination, googleResults]);
+  }, [submittedSearch, destinations, googleResults]);
 
   if (!open) return null;
 
   const togglePlaceItem = (place: CityPlace) => {
     const placeResult = cityPlaceToResult(place);
+    if (place.googlePlaceId && !selectedIds.has(placeResult.id)) {
+      // Picked by the user: move the cover from Google to our Storage
+      import('@/lib/placesCache').then(({ persistPlaceCoverById }) => persistPlaceCoverById(place.googlePlaceId!));
+    }
     setSelectedIds(prev => {
       const next = new Set(prev);
       if (next.has(placeResult.id)) next.delete(placeResult.id);
@@ -263,27 +262,6 @@ export function AddPlacesScreen({
               </div>
             </div>
           </div>
-
-          {/* City Selector (only when the itinerary has more than one destination) */}
-          {destinations.length > 1 && (
-            <div className="flex flex-row gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1">
-              {destinations.map((dest) => {
-                const active = dest === searchDestination;
-                return (
-                  <button
-                    key={dest}
-                    type="button"
-                    onClick={() => setSelectedCity(dest)}
-                    className={`shrink-0 px-4 h-[36px] rounded-full border text-[14px] font-semibold font-urbanist text-[#141530] bg-white transition-colors ${
-                      active ? 'border-black' : 'border-[#E5E5E5]'
-                    }`}
-                  >
-                    {dest.split(',')[0].trim()}
-                  </button>
-                );
-              })}
-            </div>
-          )}
 
           {/* Search Input */}
           <form 

@@ -11,6 +11,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import type { GooglePlaceResult } from '@/lib/googlePlacesApi';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -35,6 +36,7 @@ export interface PlaceRecord {
   phone: string | null;
   opening_hours: any | null;
   cover_photo_url: string | null;
+  google_photo_name: string | null;
   photos: string[] | null;
   ai_tips: string[];
   ai_full_description: string | null;
@@ -108,13 +110,98 @@ export async function getPlaceByName(name: string, city?: string): Promise<Place
       query = query.ilike('city', city.split(',')[0].trim());
     }
 
-    const { data, error } = await query.maybeSingle();
-    if (error || !data) return null;
+    // limit() instead of maybeSingle(): duplicates must not turn into a cache miss
+    const { data, error } = await query.limit(5);
+    if (error || !data || data.length === 0) return null;
 
-    const record = data as unknown as PlaceRecord;
+    const rows = data as unknown as PlaceRecord[];
+    const record = rows.reduce((best, r) =>
+      ENRICHMENT_RANK[r.enrichment_level] > ENRICHMENT_RANK[best.enrichment_level] ? r : best
+    );
     memoryCache.set(key, record);
     return record;
   } catch {
+    return null;
+  }
+}
+
+/**
+ * Look up a fully enriched place near the given coordinates (~60m).
+ * Fallback for when the name shown in the app differs from Google's name.
+ */
+export async function getFullPlaceByCoords(lat: number, lng: number): Promise<PlaceRecord | null> {
+  if (!lat || !lng) return null;
+  const delta = 0.0005;
+
+  try {
+    const { data, error } = await supabase
+      .from('places')
+      .select('*')
+      .eq('enrichment_level', 'full')
+      .gte('latitude', lat - delta)
+      .lte('latitude', lat + delta)
+      .gte('longitude', lng - delta)
+      .lte('longitude', lng + delta)
+      .limit(1);
+
+    if (error || !data || data.length === 0) return null;
+
+    const record = data[0] as unknown as PlaceRecord;
+    memoryCache.set(cacheKey(record.name, record.city), record);
+    return record;
+  } catch {
+    return null;
+  }
+}
+
+// ── Photo persistence (Google → Supabase Storage) ────────────────────────────
+
+const GOOGLE_PHOTO_NAME_RE = /places\.googleapis\.com\/v1\/(places\/[^/]+\/photos\/[^/]+)\/media/;
+
+/** Extracts the Google photo resource name from a Places media URL. */
+export function extractGooglePhotoName(url?: string | null): string | null {
+  return url?.match(GOOGLE_PHOTO_NAME_RE)?.[1] ?? null;
+}
+
+// Ids already attempted this session (success or failure) — avoids retry loops on every open
+const photoSaveInFlight = new Set<string>();
+
+/**
+ * Downloads Google photos server-side (edge function `save-place-photos`),
+ * stores them in the `place-photos` bucket and REPLACES the Google URLs in
+ * `places.photos` / `cover_photo_url` with permanent Storage URLs.
+ */
+export async function persistPlacePhotos(googlePlaceId: string, photoNames: string[]): Promise<string[] | null> {
+  if (!googlePlaceId || photoNames.length === 0) return null;
+  const attemptKey = `${googlePlaceId}:${photoNames.length}`;
+  if (photoSaveInFlight.has(attemptKey)) return null;
+  photoSaveInFlight.add(attemptKey);
+
+  try {
+    const { data, error } = await supabase.functions.invoke('save-place-photos', {
+      body: { googlePlaceId, photoNames },
+    });
+    const urls: string[] = Array.isArray(data?.urls) ? data.urls : [];
+    if (error || urls.length === 0) {
+      console.warn('[placesCache] persistPlacePhotos failed:', error);
+      return null;
+    }
+
+    const { error: updateError } = await supabase
+      .from('places')
+      .update({ photos: urls, cover_photo_url: urls[0] })
+      .eq('google_place_id', googlePlaceId);
+    if (updateError) {
+      console.warn('[placesCache] persistPlacePhotos update error:', updateError);
+      return null;
+    }
+
+    for (const [k, v] of memoryCache.entries()) {
+      if (v.google_place_id === googlePlaceId) memoryCache.set(k, { ...v, photos: urls, cover_photo_url: urls[0] });
+    }
+    return urls;
+  } catch (err) {
+    console.warn('[placesCache] persistPlacePhotos error:', err);
     return null;
   }
 }
@@ -295,6 +382,116 @@ export async function uploadPhotoToStorage(
   } catch (err) {
     console.warn('[placesCache] uploadPhotoToStorage error:', err);
     return null;
+  }
+}
+
+/**
+ * Persists the cover photo of a place saved by a search (only knows the photo name).
+ * Called when the user picks the place, so unselected results never cost a photo download.
+ */
+export async function persistPlaceCoverById(googlePlaceId: string): Promise<void> {
+  if (!googlePlaceId) return;
+  try {
+    const { data } = await supabase
+      .from('places')
+      .select('google_photo_name, cover_photo_url')
+      .eq('google_place_id', googlePlaceId)
+      .maybeSingle();
+    if (!data) return;
+    const alreadyStored = data.cover_photo_url && !extractGooglePhotoName(data.cover_photo_url);
+    if (alreadyStored || !data.google_photo_name) return;
+    await persistPlacePhotos(googlePlaceId, [data.google_photo_name]);
+  } catch (err) {
+    console.warn('[placesCache] persistPlaceCoverById error:', err);
+  }
+}
+
+// ── Search cache (Text Search → places) ──────────────────────────────────────
+
+const SEARCH_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const SEARCH_STOPWORDS = new Set(['de', 'da', 'do', 'das', 'dos', 'di', 'del', 'la', 'le', 'el', 'the', 'of', 'em', 'in', 'e', 'and']);
+
+/**
+ * Order- and accent-insensitive key: "Coliseu, Itália" and "italia coliseu" collide on purpose.
+ * The city is just more tokens, so callers that already append it don't change the key.
+ */
+export function normalizeSearchKey(query: string, city?: string): string {
+  const tokens = `${query} ${city ?? ''}`
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t && !SEARCH_STOPWORDS.has(t));
+  return [...new Set(tokens)].sort().join(' ');
+}
+
+/**
+ * Returns the places of a previously saved search, or null on miss/expiry/incomplete data.
+ */
+export async function getCachedSearch(queryKey: string): Promise<PlaceRecord[] | null> {
+  if (!queryKey) return null;
+  try {
+    const { data: entry } = await supabase
+      .from('place_search_cache')
+      .select('google_place_ids, created_at')
+      .eq('query_key', queryKey)
+      .maybeSingle();
+    if (!entry || !entry.google_place_ids?.length) return null;
+    if (Date.now() - new Date(entry.created_at).getTime() > SEARCH_CACHE_TTL_MS) return null;
+
+    const { data: rows, error } = await supabase
+      .from('places')
+      .select('*')
+      .in('google_place_id', entry.google_place_ids);
+    if (error || !rows) return null;
+
+    const byId = new Map((rows as unknown as PlaceRecord[]).map((r) => [r.google_place_id, r]));
+    const ordered = entry.google_place_ids.map((id: string) => byId.get(id));
+    // Any missing/incomplete place → miss, so we never show a partial result list
+    if (ordered.some((r) => !r || !r.latitude || !r.longitude)) return null;
+    return ordered as PlaceRecord[];
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Saves search results as `photos`-level places (existing rows are left untouched,
+ * so a search never overwrites richer data) and records the query → ids mapping.
+ */
+export async function saveSearchResults(queryKey: string, results: GooglePlaceResult[]): Promise<void> {
+  const valid = results.filter((r) => r.id && r.lat && r.lng);
+  if (!queryKey || valid.length === 0) return;
+
+  try {
+    const rows = valid.map((r) => ({
+      google_place_id: r.id,
+      name: r.name,
+      city: r.city || null,
+      country: r.country || null,
+      category: r.primaryType || null,
+      latitude: r.lat,
+      longitude: r.lng,
+      formatted_address: r.address || null,
+      google_photo_name: r.photoName || null,
+      enrichment_level: 'photos' as const,
+    }));
+
+    const { error } = await supabase
+      .from('places')
+      .upsert(rows, { onConflict: 'google_place_id', ignoreDuplicates: true });
+    if (error) {
+      console.warn('[placesCache] saveSearchResults places error:', error);
+      return;
+    }
+
+    await supabase.from('place_search_cache').upsert({
+      query_key: queryKey,
+      google_place_ids: valid.map((r) => r.id),
+      created_at: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.warn('[placesCache] saveSearchResults error:', err);
   }
 }
 

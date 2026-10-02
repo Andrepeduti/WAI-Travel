@@ -447,8 +447,11 @@ export function ActivityDetailScreen({ activity, onBack, onOpenMap }: ActivityDe
     activity.image ||
     'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1000';
 
-  const categoryName = details?.category || activity.category || 'Atração';
-  const cityName = details?.city || activity.city || (activity.location ? activity.location.split(',')[0] : '');
+  const isGenericLabel = (v?: string | null) => !v || !v.trim() || v.trim().toLowerCase() === 'local';
+  const rawCategory = details?.category || activity.category;
+  const categoryName = isGenericLabel(rawCategory) ? '' : rawCategory!.trim();
+  const rawCity = details?.city || activity.city || (activity.location ? activity.location.split(',')[0] : '');
+  const cityName = isGenericLabel(rawCity) ? '' : rawCity.trim();
   const titleDisplay = activity.name || 'Lugar';
 
   return (
@@ -475,7 +478,7 @@ export function ActivityDetailScreen({ activity, onBack, onOpenMap }: ActivityDe
           {/* Top Bar (Frame 1321316149) */}
           <div
             className="w-full px-6 flex items-center justify-between"
-            style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 8px)' }}
+            style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 20px)' }}
           >
             {/* Back Button */}
             <button
@@ -507,17 +510,25 @@ export function ActivityDetailScreen({ activity, onBack, onOpenMap }: ActivityDe
               </h1>
 
               {/* Subtitle: Category | City */}
-              <div className="flex items-center gap-1">
-                <span className="font-['Urbanist',sans-serif] font-semibold text-[14px] leading-[17px] text-[#E7E7EE]">
-                  {categoryName}
-                </span>
-                <span className="font-['Urbanist',sans-serif] font-medium text-[16px] leading-[19px] text-[#FEFEFE] px-0.5">
-                  |
-                </span>
-                <span className="font-['Urbanist',sans-serif] font-semibold text-[14px] leading-[17px] text-[#E7E7EE]">
-                  {cityName}
-                </span>
-              </div>
+              {(categoryName || cityName) && (
+                <div className="flex items-center gap-1">
+                  {categoryName && (
+                    <span className="font-['Urbanist',sans-serif] font-semibold text-[14px] leading-[17px] text-[#E7E7EE]">
+                      {categoryName}
+                    </span>
+                  )}
+                  {categoryName && cityName && (
+                    <span className="font-['Urbanist',sans-serif] font-medium text-[16px] leading-[19px] text-[#FEFEFE] px-0.5">
+                      |
+                    </span>
+                  )}
+                  {cityName && (
+                    <span className="font-['Urbanist',sans-serif] font-semibold text-[14px] leading-[17px] text-[#E7E7EE]">
+                      {cityName}
+                    </span>
+                  )}
+                </div>
+              )}
               
               {/* Rating */}
               {isLoading && !details?.rating && !activity.rating ? (

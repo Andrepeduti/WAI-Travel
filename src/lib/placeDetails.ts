@@ -8,7 +8,14 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { fetchGooglePlaceDetailsFull, GooglePlaceFullDetails } from './googlePlacesApi';
-import { getPlaceByName, upsertPlace, canCallApi, incrementApiCounter } from './placesCache';
+import {
+  getPlaceByName,
+  getFullPlaceByCoords,
+  upsertPlace,
+  incrementApiCounter,
+  persistPlacePhotos,
+  extractGooglePhotoName,
+} from './placesCache';
 
 export interface PlaceOpeningHours {
   todayHours?: string;
@@ -211,7 +218,12 @@ export async function getPlaceFullDetails(params: {
 
   // 2. Check centralized `places` table
   try {
-    const cachedPlace = await getPlaceByName(name, city);
+    let cachedPlace = await getPlaceByName(name, city);
+
+    // Name shown in the app may differ from Google's name: fall back to coordinates
+    if ((!cachedPlace || cachedPlace.enrichment_level !== 'full') && lat && lng) {
+      cachedPlace = (await getFullPlaceByCoords(lat, lng)) ?? cachedPlace;
+    }
 
     if (cachedPlace && cachedPlace.enrichment_level === 'full') {
       const parsedHours: PlaceOpeningHours = cachedPlace.opening_hours || {
@@ -244,6 +256,17 @@ export async function getPlaceFullDetails(params: {
       };
 
       memoryCache.set(key, result);
+
+      // Lazy migration: legacy rows still hold Google photo URLs (billed on every view)
+      if (cachedPlace.google_place_id) {
+        const legacyNames = cachedPhotos
+          .map(extractGooglePhotoName)
+          .filter((n): n is string => !!n);
+        if (legacyNames.length > 0) {
+          void persistPlacePhotos(cachedPlace.google_place_id, legacyNames);
+        }
+      }
+
       return result;
     }
   } catch (err) {
@@ -343,7 +366,11 @@ export async function getPlaceFullDetails(params: {
 
   memoryCache.set(key, result);
 
-  // 4. Salva na tabela centralizada `places` de forma assíncrona
+  // 4. Salva na tabela centralizada `places` de forma assíncrona.
+  // Sem resposta do Google não persistimos: o fallback tem horários inventados
+  // e marcá-lo como 'full' impediria novas tentativas.
+  if (!googlePlace) return result;
+
   void (async () => {
     try {
       incrementApiCounter('google_places', 1).catch(() => {});
@@ -365,9 +392,14 @@ export async function getPlaceFullDetails(params: {
         rating: result.rating || undefined,
         user_ratings_total: result.userRatingCount || undefined,
         website: result.website || undefined,
-        google_place_id: googlePlace?.id || undefined,
+        google_place_id: googlePlace.id || undefined,
         enrichment_level: 'full',
       });
+
+      // Troca as URLs do Google por fotos permanentes no Storage
+      if (googlePlace.id && googlePlace.photoNames.length > 0) {
+        await persistPlacePhotos(googlePlace.id, googlePlace.photoNames);
+      }
     } catch (e) {
       console.warn('[placeDetails] Failed to persist to places table:', e);
     }

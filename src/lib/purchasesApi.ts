@@ -92,7 +92,6 @@ export async function recordPurchase({ datasetId, priceBRL, snapshot }: RecordPu
       source_dataset_id: datasetId,
       is_public: false,
       price_cents: null,
-      description: snapshot.description ?? '',
       status: 'draft'
     });
   };

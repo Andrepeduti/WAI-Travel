@@ -9,7 +9,6 @@ import {
   countActiveFilters,
   type DestinationFilters,
 } from '@/components/travel/DestinationFiltersSheet';
-import { useMyItineraries } from '@/hooks/use-my-itineraries';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useQuery } from '@tanstack/react-query';
 import { listPublicItineraries } from '@/lib/itinerariesApi';

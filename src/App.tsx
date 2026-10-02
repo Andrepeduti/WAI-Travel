@@ -1,7 +1,8 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "./lib/queryClient";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import { CartProvider } from "./contexts/CartContext";
@@ -20,17 +21,6 @@ const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
 const InvitePage = lazy(() => import("./pages/InvitePage"));
 const SharedItineraryPage = lazy(() => import("./pages/SharedItineraryPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30_000,
-      gcTime: 5 * 60_000,
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
-  },
-});
 
 import { Loader2 } from "lucide-react";
 
