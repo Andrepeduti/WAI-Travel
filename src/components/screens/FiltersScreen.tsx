@@ -3,32 +3,21 @@ import { Icon } from '@/components/ui/Icon';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { BackButton } from '@/components/ui/BackButton';
-import { ALL_COUNTRIES } from '@/data/countriesCatalog';
 
 export interface ExploreFilters {
-  searchType: 'roteiros' | 'pessoas' | 'lugares' | null;
   regions: string[];
-  countries: string[];
   tripTypes: string[];
   seasons: string[];
   priceRange: [number, number];
   durationRange: [number, number];
-  minRating: number;
-  language: string;
-  creatorType: string[];
 }
 
 export const DEFAULT_FILTERS: ExploreFilters = {
-  searchType: null,
   regions: [],
-  countries: [],
   tripTypes: [],
   seasons: [],
   priceRange: [0, 1000],
   durationRange: [1, 30],
-  minRating: 0,
-  language: 'todos',
-  creatorType: [],
 };
 
 const REGIONS = [
@@ -75,12 +64,6 @@ const SEASONS = [
   { id: 'feriados', label: 'Feriados', emoji: '🎉' },
 ];
 
-const SEARCH_TYPES: { id: ExploreFilters['searchType']; label: string; icon?: string }[] = [
-  { id: 'roteiros', label: 'Roteiros' },
-  { id: 'lugares', label: 'Lugares' },
-  { id: 'pessoas', label: 'Pessoas' },
-];
-
 interface FiltersScreenProps {
   onClose: () => void;
   initial?: ExploreFilters;
@@ -92,56 +75,19 @@ const formatBRL = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 
 export function FiltersScreen({ onClose, initial = DEFAULT_FILTERS, onApply, countResults }: FiltersScreenProps) {
-  const [filters, setFilters] = useState<ExploreFilters>(() => {
-    return initial.searchType === null ? { ...initial, searchType: 'roteiros' } : initial;
-  });
+  const [filters, setFilters] = useState<ExploreFilters>(initial);
 
   const toggleArr = <T extends string>(arr: T[], value: T): T[] =>
     arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];
 
-  const handleSearchTypeChange = (type: ExploreFilters['searchType']) => {
-    setFilters((f) => {
-      return {
-        ...f,
-        searchType: type,
-        regions: [],
-        countries: [],
-        tripTypes: [],
-        seasons: [],
-        priceRange: [0, 1000],
-        durationRange: [1, 30],
-      };
-    });
-  };
-
-  const handleClear = () => setFilters((f) => ({ ...DEFAULT_FILTERS, searchType: f.searchType }));
+  const handleClear = () => setFilters(DEFAULT_FILTERS);
 
   const handleApply = () => {
     onApply(filters);
     onClose();
   };
 
-  // Count active filters (excl. defaults)
-  const activeCount =
-    (filters.searchType !== null ? 1 : 0) +
-    filters.regions.length +
-    filters.countries.length +
-    filters.tripTypes.length +
-    filters.seasons.length +
-    (filters.priceRange[0] !== 0 || filters.priceRange[1] !== 1000 ? 1 : 0) +
-    (filters.durationRange[0] !== 1 || filters.durationRange[1] !== 30 ? 1 : 0);
-
-  const isPeople = filters.searchType === 'pessoas';
-  const isLugares = filters.searchType === 'lugares';
-  const isRoteiros = filters.searchType === 'roteiros';
-
-  const showContinents = isLugares || isRoteiros;
-  const showTripTypes = isRoteiros;
-  const showSeasons = isRoteiros;
-  const showPriceAndDuration = isRoteiros;
-  const showCountries = isPeople;
-
-  const isUnchanged = JSON.stringify(filters) === JSON.stringify(initial.searchType === null ? { ...initial, searchType: 'roteiros' } : initial);
+  const isUnchanged = JSON.stringify(filters) === JSON.stringify(initial);
 
   return (
     <div
@@ -160,120 +106,76 @@ export function FiltersScreen({ onClose, initial = DEFAULT_FILTERS, onApply, cou
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-5 pb-32">
-        {/* Tipo de busca */}
-        <Section title="O que você procura?">
-          <div className="flex items-center bg-[#F2F2F2] rounded-full p-1 h-12">
-            {SEARCH_TYPES.map((t) => {
-              const active = filters.searchType === t.id;
+        {/* Continente */}
+        <Section title="Continente">
+          <div className="flex flex-wrap gap-2">
+            {REGIONS.map((r) => {
+              const active = filters.regions.includes(r.id);
               return (
                 <button
-                  key={t.id}
-                  onClick={() => handleSearchTypeChange(t.id)}
+                  key={r.id}
+                  onClick={() => setFilters((f) => ({ ...f, regions: toggleArr(f.regions, r.id) }))}
                   className={cn(
-                    'flex-1 h-full rounded-full text-[12px] font-semibold transition-all flex items-center justify-center',
+                    'h-10 px-4 rounded-full text-[13px] font-medium transition-colors border flex items-center justify-center',
                     active
-                      ? 'bg-white shadow-[0_1px_3px_rgba(0,0,0,0.1)] text-[#1A1C40]'
-                      : 'text-muted-foreground hover:text-foreground'
+                      ? 'bg-[#1A1C40] text-white border-[#1A1C40]'
+                      : 'bg-white text-foreground border-border/60 hover:border-[#9DCC36]'
                   )}
                 >
-                  <span className="hidden sm:inline lg:inline whitespace-nowrap overflow-hidden text-ellipsis px-1">{t.label}</span>
-                  <span className="inline sm:hidden lg:hidden">{t.label.split(' ')[0]}</span>
+                  {r.label}
                 </button>
               );
             })}
           </div>
         </Section>
 
-        {/* Continente */}
-        {showContinents && (
-          <Section title="Continente">
-            <div className="flex flex-wrap gap-2">
-              {REGIONS.map((r) => {
-                const active = filters.regions.includes(r.id);
-                return (
-                  <button
-                    key={r.id}
-                    onClick={() => setFilters((f) => ({ ...f, regions: toggleArr(f.regions, r.id) }))}
-                    className={cn(
-                      'h-10 px-4 rounded-full text-[13px] font-medium transition-colors border flex items-center justify-center',
-                      active
-                        ? 'bg-[#1A1C40] text-white border-[#1A1C40]'
-                        : 'bg-white text-foreground border-border/60 hover:border-[#9DCC36]'
-                    )}
-                  >
-                    {r.label}
-                  </button>
-                );
-              })}
-            </div>
-          </Section>
-        )}
-
-        {/* Países (Para pessoas) */}
-        {showCountries && (
-          <Section title="Países">
-            <CountrySearchList
-              selected={filters.countries}
-              onToggle={(c) => setFilters((f) => ({ ...f, countries: toggleArr(f.countries, c) }))}
-            />
-          </Section>
-        )}
-
         {/* Tipo de viagem */}
-        {showTripTypes && (
-          <Section title="Tipo de viagem">
-            <ExpandableChipList
-              items={TRIP_TYPES}
-              selected={filters.tripTypes}
-              onToggle={(id) => setFilters((f) => ({ ...f, tripTypes: toggleArr(f.tripTypes, id) }))}
-            />
-          </Section>
-        )}
+        <Section title="Tipo de viagem">
+          <ExpandableChipList
+            items={TRIP_TYPES}
+            selected={filters.tripTypes}
+            onToggle={(id) => setFilters((f) => ({ ...f, tripTypes: toggleArr(f.tripTypes, id) }))}
+          />
+        </Section>
 
         {/* Temporada da viagem */}
-        {showSeasons && (
-          <Section title="Melhor época">
-            <ChipGrid
-              items={SEASONS}
-              selected={filters.seasons}
-              onToggle={(id) => setFilters((f) => ({ ...f, seasons: toggleArr(f.seasons, id) }))}
-            />
-          </Section>
-        )}
+        <Section title="Melhor época">
+          <ChipGrid
+            items={SEASONS}
+            selected={filters.seasons}
+            onToggle={(id) => setFilters((f) => ({ ...f, seasons: toggleArr(f.seasons, id) }))}
+          />
+        </Section>
 
         {/* Faixa de preço */}
-        {showPriceAndDuration && (
-          <Section title="Faixa de preço">
-            <RangeSliderWithInputs
-              min={0}
-              max={1000}
-              step={10}
-              value={filters.priceRange}
-              onValueChange={(v) => setFilters((f) => ({ ...f, priceRange: v }))}
-              labelMin="Mínimo"
-              labelMax="Máximo"
-              prefix="R$ "
-              maxSuffix="+"
-            />
-          </Section>
-        )}
+        <Section title="Faixa de preço">
+          <RangeSliderWithInputs
+            min={0}
+            max={1000}
+            step={10}
+            value={filters.priceRange}
+            onValueChange={(v) => setFilters((f) => ({ ...f, priceRange: v }))}
+            labelMin="Mínimo"
+            labelMax="Máximo"
+            prefix="R$ "
+            maxSuffix="+"
+          />
+        </Section>
 
         {/* Duração */}
-        {showPriceAndDuration && (
-          <Section title="Duração da viagem">
-            <RangeSliderWithInputs
-              min={1}
-              max={30}
-              step={1}
-              value={filters.durationRange}
-              onValueChange={(v) => setFilters((f) => ({ ...f, durationRange: v }))}
-              labelMin="Mínimo"
-              labelMax="Máximo"
-              suffix=" dias"
-              maxSuffix="+"
-            />
-          </Section>
-        )}
+        <Section title="Duração da viagem">
+          <RangeSliderWithInputs
+            min={1}
+            max={30}
+            step={1}
+            value={filters.durationRange}
+            onValueChange={(v) => setFilters((f) => ({ ...f, durationRange: v }))}
+            labelMin="Mínimo"
+            labelMax="Máximo"
+            suffix=" dias"
+            maxSuffix="+"
+          />
+        </Section>
       </div>
 
       {/* Footer */}
@@ -365,45 +267,6 @@ function ExpandableChipList({ items, selected, onToggle, initialCount = 10 }: { 
       <ChipGrid items={displayed} selected={selected} onToggle={onToggle} />
       {items.length > initialCount && (
         <button onClick={() => setExpanded(!expanded)} className="mt-3 text-[13px] font-bold text-[#1A1C40] flex items-center gap-1">
-          {expanded ? 'Mostrar menos' : 'Mostrar mais'}
-          <Icon name={expanded ? 'expand_less' : 'expand_more'} size={16} />
-        </button>
-      )}
-    </div>
-  );
-}
-
-function CountrySearchList({ selected, onToggle }: { selected: string[]; onToggle: (id: string) => void; }) {
-  const [query, setQuery] = useState('');
-  const [expanded, setExpanded] = useState(false);
-
-  const filtered = ALL_COUNTRIES.filter(c => c.name.toLowerCase().includes(query.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name));
-  const displayed = expanded || query ? filtered : filtered.slice(0, 5);
-
-  return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-2 px-3 h-10 bg-field border border-border/60 rounded-[10px] mb-2 focus-within:border-primary transition-colors">
-        <Icon name="search" size={18} className="text-muted-foreground" />
-        <input
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          placeholder="Buscar país"
-          className="flex-1 text-[14px] bg-transparent focus:outline-none placeholder:text-muted-foreground"
-        />
-      </div>
-      <div className="flex flex-col">
-        {displayed.map(c => (
-          <button key={c.iso3} onClick={() => onToggle(c.name)} className="flex items-center justify-between py-3 border-b border-border/40 last:border-0 hover:bg-black/5 px-2 -mx-2 rounded-lg transition-colors">
-            <div className="flex items-center gap-3 text-[14px] font-semibold text-foreground">
-              <span className="text-[18px]">{c.flag}</span>
-              <span>{c.name}</span>
-            </div>
-            {selected.includes(c.name) ? <Icon name="check" size={18} className="text-[#9DCC36]" /> : <Icon name="chevron_right" size={18} className="text-muted-foreground" />}
-          </button>
-        ))}
-      </div>
-      {!query && filtered.length > 5 && (
-        <button onClick={() => setExpanded(!expanded)} className="mt-2 text-[13px] font-bold text-[#1A1C40] flex items-center gap-1 w-fit">
           {expanded ? 'Mostrar menos' : 'Mostrar mais'}
           <Icon name={expanded ? 'expand_less' : 'expand_more'} size={16} />
         </button>

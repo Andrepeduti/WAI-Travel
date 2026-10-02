@@ -4,7 +4,12 @@ import { useCurrentUser } from '@/hooks/use-current-user';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { BottomNavigation, TabType } from '@/components/travel/BottomNavigation';
-import { HomeScreen, type TopCreator } from '@/components/screens/HomeScreen';
+import { HomeScreen } from '@/components/screens/HomeScreen';
+import type { RecommendedItinerary } from '@/hooks/use-recommended-itineraries';
+import type { ExploreFilters } from '@/components/screens/FiltersScreen';
+import { getItineraryBadge } from '@/lib/itineraryBadge';
+import { tripCover, tripLength } from '@/lib/tripDisplay';
+import type { PublicItinerarySearchRow } from '@/lib/itinerariesApi';
 import { CreateBottomSheet } from '@/components/travel/CreateBottomSheet';
 import { SuccessToast } from '@/components/travel/SuccessToast';
 
@@ -16,7 +21,6 @@ import type { CreatorProfileData } from '@/components/screens/CreatorProfileScre
 import type { ItineraryListItem } from '@/components/screens/ItineraryListScreen';
 
 // Heavy/secondary screens — loaded on demand to keep the initial bundle small.
-const ExploreScreen = lazy(() => import('@/components/screens/ExploreScreen').then(m => ({ default: m.ExploreScreen })));
 const TripsScreen = lazy(() => import('@/components/screens/TripsScreen').then(m => ({ default: m.TripsScreen })));
 const AIAssistantScreen = lazy(() => import('@/components/screens/AIAssistantScreen').then(m => ({ default: m.AIAssistantScreen })));
 const AIHistoryScreen = lazy(() => import('@/components/screens/AIHistoryScreen').then(m => ({ default: m.AIHistoryScreen })));
@@ -144,14 +148,6 @@ const Index = () => {
     return () => window.removeEventListener('wai:plan-limit-reached', handler);
   }, []);
 
-  // Restore SearchScreen when navigating back from a profile.
-  useEffect(() => {
-    if (sessionStorage.getItem('wai_returnToSearch')) {
-      sessionStorage.removeItem('wai_returnToSearch');
-      setShowSearch(true);
-    }
-  }, []);
-
   /**
    * Opens the create itinerary sheet, but if the user is on the free plan
    * and already has the maximum number of itineraries, shows the upgrade
@@ -234,10 +230,12 @@ const Index = () => {
   const [activeUserItineraryDataset, setActiveUserItineraryDataset] = useState<ItineraryDataset | null>(null);
   const [activeUserItineraryRole, setActiveUserItineraryRole] = useState<'owner' | 'editor' | 'viewer' | null>(null);
   const [activeUserItineraryReadOnlyMode, setActiveUserItineraryReadOnlyMode] = useState(false);
+  /** Dia em que o planner abre (ex.: "Ver mais" da viagem em andamento → dia de hoje). */
+  const [plannerInitialDay, setPlannerInitialDay] = useState<number | undefined>();
   const [activeUserItineraryIsPurchased, setActiveUserItineraryIsPurchased] = useState(false);
   const [autoOpenPublishFlow, setAutoOpenPublishFlow] = useState(false);
   const [selectedItinerary, setSelectedItinerary] = useState<ItineraryDataset | null>(null);
-  const [resumeCheckoutId, setResumeCheckoutId] = useState<number | null>(null);
+  const [resumeCheckoutId, setResumeCheckoutId] = useState<number | string | null>(null);
   /** Marker that selectedItinerary came from a user-published itinerary (uuid) — render via datasetOverride. */
   const [injectedMarketplaceDataset, setInjectedMarketplaceDataset] = useState<ItineraryDataset | null>(null);
   /** When set, the marketplace view is showing the current user's own published itinerary. */
@@ -247,6 +245,8 @@ const Index = () => {
   /** When set, the planner is shown in "creator edit" mode for this published itinerary. */
   const [creatorEditingItinerary, setCreatorEditingItinerary] = useState<UserItinerary | null>(null);
   const [showSearch, setShowSearch] = useState(false);
+  const [searchInitialFilters, setSearchInitialFilters] = useState<Partial<ExploreFilters> | undefined>();
+  const [searchInitialQuery, setSearchInitialQuery] = useState('');
   const [destinationList, setDestinationList] = useState<{ country: string; continent: string; image: string } | null>(null);
   const [selectedExperienceId, setSelectedExperienceId] = useState<number | null>(null);
   const [profileSubScreen, setProfileSubScreen] = useState<ProfileSubScreen>('main');
@@ -443,7 +443,7 @@ const Index = () => {
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as TabType | undefined;
-      if (detail === 'home' || detail === 'explore' || detail === 'trips') {
+      if (detail === 'home' || detail === 'trips') {
         setActiveTab(detail);
       }
     };
@@ -563,7 +563,8 @@ const Index = () => {
     setActiveUserItineraryId(created.id);
   };
 
-  const handleUserItineraryClick = (userItinerary: UserItinerary, readOnlyMode: boolean = false) => {
+  const handleUserItineraryClick = (userItinerary: UserItinerary, readOnlyMode: boolean = false, initialDay?: number) => {
+    setPlannerInitialDay(initialDay);
     const formData: ItineraryFormData = {
       destinations: userItinerary.destinations,
       startDate: parseLocalDate(userItinerary.startDate),
@@ -830,12 +831,91 @@ const Index = () => {
     setOwnedPublicUserItinerary(null);
   };
 
-  const handleSearchOpen = () => {
+  const handleSearchOpen = (initialFilters?: Partial<ExploreFilters>, initialQuery = '') => {
+    setSearchInitialFilters(initialFilters);
+    setSearchInitialQuery(initialQuery);
     setShowSearch(true);
   };
 
   const handleSearchClose = () => {
     setShowSearch(false);
+    setSearchInitialFilters(undefined);
+    setSearchInitialQuery('');
+  };
+
+  const openFriendProfile = (person: { userId: string; name: string; username?: string; location?: string; avatar?: string }) => {
+    setSelectedFriend({
+      userId: person.userId,
+      name: person.name,
+      username: person.username || person.name.toLowerCase().replace(/\s+/g, ''),
+      location: person.location || '',
+      avatar: person.avatar || '',
+      following: 0,
+      followers: '0',
+      countries: [],
+    });
+    setProfileSubScreen('friend');
+  };
+
+  /** Abre a tela de marketplace de um roteiro do banco (UUID) a partir dos dados do card. */
+  const openSyntheticMarketplace = (itineraryId: string, card: {
+    title: string; image: string; rating: number; places: number; days: number;
+    author: string; authorImage: string; price: number; category?: string; destinations: string[];
+  }) => {
+    const synthetic = buildSyntheticMarketplaceDataset({
+      id: 0, // não usado no fluxo injected
+      ...card,
+      reviewCount: 0,
+    } as any);
+    const dataset = { ...synthetic, id: itineraryId, type: 'marketplace' as const };
+    setInjectedMarketplaceDataset(dataset);
+    setOwnedPublicUserItinerary(null);
+    setSelectedItinerary(dataset);
+    window.scrollTo(0, 0);
+  };
+
+  const openRecommendedItinerary = (item: RecommendedItinerary) => {
+    // Roteiro baseado em dataset estático: fluxo normal do marketplace
+    if (item.sourceDatasetId != null) {
+      handleMarketplaceItineraryClick(item.sourceDatasetId);
+      return;
+    }
+    openSyntheticMarketplace(item.itineraryId, item);
+  };
+
+  /** Roteiro à venda vindo dos módulos da Home (Continue comprando / Vistos recentemente). */
+  const openListedItinerary = (row: PublicItinerarySearchRow, options?: { resumeCheckout?: boolean }) => {
+    setResumeCheckoutId(options?.resumeCheckout ? row.id : null);
+    openSyntheticMarketplace(row.id, {
+      title: row.title,
+      image: tripCover(row) ?? '',
+      rating: 0,
+      places: row.places,
+      days: tripLength(row),
+      author: row.authorName,
+      authorImage: row.authorAvatar,
+      price: (row.priceCents ?? 0) / 100,
+      category: row.tags?.find((t) => t !== '_FLEXIBLE_DATES_'),
+      destinations: row.destinations,
+    });
+  };
+
+  const toItineraryListItem = (item: RecommendedItinerary): ItineraryListItem => {
+    const badge = getItineraryBadge(item);
+    return {
+      id: item.sourceDatasetId ?? 0,
+      itineraryUuid: item.itineraryId,
+      sourceDatasetId: item.sourceDatasetId,
+      title: item.title,
+      image: item.image,
+      rating: item.rating,
+      places: item.places,
+      days: item.days,
+      author: item.author,
+      authorImage: item.authorImage,
+      price: item.price,
+      category: badge === 'destaque' ? 'Destaque' : badge === 'novo' ? 'Novo roteiro' : undefined,
+    };
   };
 
   // Show Creator Profile
@@ -1194,6 +1274,7 @@ const Index = () => {
             itineraryDataset={activeUserItineraryDataset ?? undefined}
             itineraryId={activeUserItineraryId ?? undefined}
             initialRole={activeUserItineraryRole ?? undefined}
+            initialDay={plannerInitialDay}
             isPurchased={activeUserItineraryIsPurchased}
             readOnlyMode={activeUserItineraryReadOnlyMode}
             creatorEditMode={!!creatorEditingItinerary}
@@ -1424,7 +1505,7 @@ const Index = () => {
               setSelectedItinerary(dataset);
               window.scrollTo(0, 0);
             }}
-            onGoToExplore={() => { setItineraryList(null); setActiveTab('explore'); }}
+            onGoToExplore={() => { setItineraryList(null); setActiveTab('home'); handleSearchOpen(); }}
           />
         </div>
       </div>
@@ -1460,10 +1541,11 @@ const Index = () => {
       <div className="min-h-screen bg-background w-full">
         <div className="w-full bg-background min-h-screen overflow-x-clip">
           <SearchScreen
+            initialFilters={searchInitialFilters}
+            initialQuery={searchInitialQuery}
             onClose={handleSearchClose}
             onItineraryClick={handleItineraryClick}
             onPublicUserItineraryClick={(it) => { setShowSearch(false); handleUserPublicItineraryClick(it); }}
-            onPlaceClick={(place) => { setShowSearch(false); setDestinationList(place); }}
           />
         </div>
       </div>
@@ -1599,7 +1681,7 @@ const Index = () => {
           <div className="w-full bg-background min-h-screen overflow-x-clip">
             <TopCreatorsScreen
               onBack={wrapBack(() => setProfileSubScreen('main'))}
-              onViewProfile={() => navigate('/profile')}
+              onViewProfile={(creator) => openFriendProfile(creator)}
             />
           </div>
         </div>
@@ -1642,97 +1724,27 @@ const Index = () => {
     <div className="min-h-screen bg-background w-full relative overflow-x-clip">
       {activeTab === 'home' && (
         <HomeScreen
-          onItineraryClick={handleMarketplaceItineraryClick}
-          onPublicItineraryClick={(itineraryId, sourceDatasetId, item) => {
-            // Se tem sourceDatasetId (roteiro baseado em dataset estático), usa o fluxo normal
-            if (sourceDatasetId != null) {
-              handleMarketplaceItineraryClick(sourceDatasetId);
-              return;
-            }
-            // Roteiro purely do banco — constroi um dataset sintético de marketplace
-            const synthetic = buildSyntheticMarketplaceDataset({
-              id: 0, // não usado no fluxo injected
-              title: item.title,
-              image: item.image,
-              rating: item.rating,
-              places: item.places,
-              days: item.days,
-              author: item.author,
-              authorImage: item.authorImage,
-              price: item.price,
-              reviewCount: 0,
-              category: item.category,
-              destinations: item.destinations,
-            } as any);
-            const dataset = { ...synthetic, id: itineraryId, type: 'marketplace' as const };
-            setInjectedMarketplaceDataset(dataset);
-            setOwnedPublicUserItinerary(null);
-            setSelectedItinerary(dataset);
-            window.scrollTo(0, 0);
-          }}
-          onExperienceClick={(id) => setSelectedExperienceId(id)}
-          onSearchClick={handleSearchOpen}
-          onProfileClick={() => navigate('/user')}
-          onCreatorClick={() => navigate('/profile')}
-          onChatClick={() => setShowChat(true)}
+          onRecommendedItineraryClick={openRecommendedItinerary}
+          onSeeAllItineraries={(title, items) => setItineraryList({ title, items: items.map(toItineraryListItem) })}
+          onSearchSubmit={(query) => handleSearchOpen(undefined, query)}
+          onCategoryClick={(tagId) => handleSearchOpen({ tripTypes: [tagId] })}
           onNotificationsClick={() => setShowNotifications(true)}
-          onCartClick={() => setShowCart(true)}
-          onFindPeopleClick={() => setShowSimilarTravelers(true)}
-          onTravelerClick={(traveler) => {
-            setSelectedFriend({
-              userId: traveler.userId,
-              name: traveler.name,
-              username: traveler.username || traveler.name.toLowerCase().replace(/\s+/g, ''),
-              location: traveler.city || '',
-              avatar: traveler.avatar || '',
-              following: 0,
-              followers: '0',
-              countries: [],
-            });
-            setProfileSubScreen('friend');
+          onDestinationClick={(d) => setDestinationList({ country: d.country, continent: d.continent, image: d.image })}
+          onTravelerClick={(traveler) => openFriendProfile({ ...traveler, location: traveler.city })}
+          onSeeAllTravelers={() => setShowSimilarTravelers(true)}
+          onCreatorClick={(creator) => openFriendProfile(creator)}
+          onSeeAllCreators={() => setProfileSubScreen('top-creators')}
+          onOpenTrip={(it, day) => handleUserItineraryClick(it, false, day)}
+          onOpenListedItinerary={openListedItinerary}
+          onSeeAllPurchases={() => setProfileSubScreen('purchases')}
+          onMySalesListingClick={(id) => {
+            const owned = myItinerariesForLimit.find((it) => it.id === id);
+            if (owned) setCreatorDashboardItinerary(owned);
           }}
-          onSeeAllItineraries={(title, items) => setItineraryList({ title, items })}
-          onContinuePlanning={(it) => handleUserItineraryClick(it)}
-
-          onInsightAction={(insight) => {
-            const action = insight.action;
-            if (!action) return;
-            switch (action.type) {
-              case 'open-itinerary': {
-                const target = myItinerariesForLimit.find((it) => String(it.id) === action.itineraryId);
-                if (target) {
-                  handleUserItineraryClick(target);
-                } else {
-                  setActiveTab('trips');
-                }
-                break;
-              }
-              case 'open-trips':
-                setActiveTab('trips');
-                break;
-              case 'open-explore':
-                setActiveTab('explore');
-                break;
-              case 'open-edit-profile':
-                navigate('/user');
-                setProfileSubScreen('edit');
-                break;
-              case 'create-itinerary':
-                setShowItinerarySheet(true);
-                break;
-            }
-          }}
+          onSeeAllMySales={() => { setReturnToPublic(true); setActiveTab('trips'); }}
+          // TODO: fluxo de impulsionamento ainda não existe — conectar aqui (recebe o roteiro centralizado).
+          onBoostListing={undefined}
         />
-      )}
-      {activeTab === 'explore' && (
-        <Suspense fallback={<ScreenFallback />}>
-          <ExploreScreen
-            onItineraryClick={handleMarketplaceItineraryClick}
-            onSearchClick={handleSearchOpen}
-            onProfileClick={() => navigate('/profile')}
-            onSeeDestinationItineraries={(d) => setDestinationList(d)}
-          />
-        </Suspense>
       )}
       {activeTab === 'trips' && (
         <Suspense fallback={<ScreenFallback />}>
@@ -1745,7 +1757,6 @@ const Index = () => {
             onCreateItinerary={(type) => tryOpenItinerarySheet(type)}
             onOpenCreateSheet={() => tryOpenItinerarySheet()}
             onBecomeCreator={() => { setCreatorProgramOrigin('trips'); setActiveTab('home'); setProfileSubScreen('creator-program'); }}
-            onExplore={() => setActiveTab('explore')}
             onUpgrade={() => { setSubscriptionOrigin('trips'); setActiveTab('home'); setProfileSubScreen('subscription'); }}
             itineraryUsedCount={ownCreatedCount}
             itineraryLimit={FREE_PLAN_ITINERARY_LIMIT}

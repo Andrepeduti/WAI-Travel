@@ -73,6 +73,63 @@ function extractDestinationKeys(destinations: any): string[] {
   return keys.filter(Boolean);
 }
 
+/**
+ * Busca no banco (por nome ou username) perfis que não estão na lista carregada.
+ * Usado pelo campo de busca da tela "Viajantes com o mesmo interesse" para trazer "outros" viajantes.
+ */
+export async function searchTravelersByQuery(
+  query: string,
+  excludeIds: string[] = [],
+  limit = 20,
+): Promise<SimilarTraveler[]> {
+  // Remove caracteres que quebram o filtro .or() / ilike (vírgula, parênteses, curingas)
+  const term = query.trim().replace(/^@/, '').replace(/[,()%_\\]/g, ' ').trim();
+  if (term.length < 2) return [];
+
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const myId = authUser?.id;
+
+  let myInterests: string[] = [];
+  if (myId) {
+    const { data: myProfile } = await supabase
+      .from('profiles')
+      .select('interests')
+      .eq('user_id', myId)
+      .maybeSingle();
+    myInterests = Array.isArray(myProfile?.interests) ? (myProfile!.interests as string[]) : [];
+  }
+
+  const { data, error } = await supabase
+    .from('profiles_public')
+    .select('user_id, name, username, location, avatar_url, interests')
+    .or(`name.ilike.%${term}%,username.ilike.%${term}%`)
+    .limit(limit + excludeIds.length + 1);
+  if (error || !data) return [];
+
+  const skip = new Set(excludeIds);
+  if (myId) skip.add(myId);
+
+  return data
+    .filter((r: any) => r.user_id && !skip.has(r.user_id) && (r.name || r.username))
+    .slice(0, limit)
+    .map((r: any) => {
+      const interests: string[] = Array.isArray(r.interests) ? r.interests : [];
+      const shared = computeShared(myInterests, interests);
+      const name = r.name || r.username || 'Viajante';
+      return {
+        userId: r.user_id,
+        name,
+        username: r.username || slugifyUsername(name, r.user_id),
+        city: r.location || '',
+        avatar: r.avatar_url || '',
+        interests,
+        sharedInterests: shared,
+        compatibility: computeCompatibility(myInterests, interests, shared),
+        sharedTripsCount: 0,
+      };
+    });
+}
+
 export async function fetchSimilarTravelers(minResults = 6): Promise<SimilarTraveler[]> {
   const { data: { user: authUser } } = await supabase.auth.getUser();
   const myId = authUser?.id;

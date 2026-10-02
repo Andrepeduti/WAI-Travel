@@ -93,7 +93,10 @@ function transportRowToObject(row: any): PlannerTransport {
  * Carrega activities + transports do backend para um roteiro.
  * Retorna `null` quando o id não é um uuid válido (ainda não salvo no backend).
  */
-export async function loadPlannerData(itineraryId: string): Promise<PlannerData | null> {
+export async function loadPlannerData(
+  itineraryId: string,
+  { strict = false }: { strict?: boolean } = {},
+): Promise<PlannerData | null> {
   if (!isUuid(itineraryId)) return null;
 
   const [activitiesRes, transportsRes] = await Promise.all([
@@ -116,6 +119,11 @@ export async function loadPlannerData(itineraryId: string): Promise<PlannerData 
   }
   if (transportsRes.error) {
     console.error('[plannerApi] loadPlannerData transports failed', transportsRes.error);
+  }
+  // Modo estrito: quem vai GRAVAR a partir desta leitura (ex.: clonar) não pode
+  // tratar falha como "roteiro vazio".
+  if (strict && (activitiesRes.error || transportsRes.error)) {
+    throw activitiesRes.error ?? transportsRes.error;
   }
 
   const activities: Record<number, PlannerActivity[]> = {};
@@ -228,11 +236,12 @@ export async function savePlannerData(
   if (delAct.error) console.error('[plannerApi] delete activities failed', delAct.error);
   if (delTrans.error) console.error('[plannerApi] delete transports failed', delTrans.error);
 
-  if (activityRows.length > 0) {
+  // Só re-insere o que foi apagado: se o delete falhou, inserir duplicaria as linhas.
+  if (activityRows.length > 0 && !delAct.error) {
     const { error } = await supabase.from('itinerary_activities').insert(activityRows);
     if (error) console.error('[plannerApi] insert activities failed', error);
   }
-  if (transportRows.length > 0) {
+  if (transportRows.length > 0 && !delTrans.error) {
     const { error } = await supabase.from('itinerary_transports').insert(transportRows);
     if (error) console.error('[plannerApi] insert transports failed', error);
   }
@@ -311,7 +320,8 @@ export async function cloneItineraryContent(
 ): Promise<void> {
   if (!isUuid(sourceId) || !isUuid(targetId)) return;
 
-  const data = await loadPlannerData(sourceId);
+  // strict: falha na leitura aborta a publicação em vez de gerar uma cópia vazia.
+  const data = await loadPlannerData(sourceId, { strict: true });
   if (!data) return;
 
   await savePlannerData(targetId, data);

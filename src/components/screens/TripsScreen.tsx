@@ -41,7 +41,6 @@ interface TripsScreenProps {
   /** Triggered from the empty state or + button */
   onCreateItinerary?: (type?: 'personal' | 'seller') => void;
   onBecomeCreator?: () => void;
-  onExplore?: () => void;
   onUpgrade?: () => void;
   itineraryUsedCount?: number;
   itineraryLimit?: number;

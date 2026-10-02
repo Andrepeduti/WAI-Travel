@@ -638,6 +638,12 @@ export interface PublicItinerarySearchRow extends UserItinerary {
   authorAvatar: string;
   /** ISO timestamp da última atualização do roteiro */
   updatedAt: string | null;
+  /** ISO timestamp de quando o roteiro foi colocado à venda */
+  publishedAt: string | null;
+  /** ISO timestamp até quando o roteiro está impulsionado ("Destaque") */
+  boostedUntil: string | null;
+  /** Total de vendas concluídas (mantido por trigger em itinerary_store_listing) */
+  salesCount: number;
 }
 
 
@@ -682,11 +688,15 @@ export async function listPublicItineraries(limit = 200): Promise<PublicItinerar
     const profile = profileById.get(row.seller_id);
     return {
       ...base,
+      // O join com itineraries pode vir nulo: garante arrays para os consumidores.
+      destinations: base.destinations ?? [],
+      images: base.images ?? [],
+      participants: base.participants ?? [],
       id: row.itinerary_id,
       title: row.listed_title,
       description: row.listed_description,
       priceCents: row.price_cents,
-      tags: row.tags,
+      tags: row.tags ?? [],
       isFlexible: row.is_flexible_dates,
       durationDays: row.duration_days,
       travelMonth: row.travel_month,
@@ -694,6 +704,9 @@ export async function listPublicItineraries(limit = 200): Promise<PublicItinerar
       authorUsername: profile?.username || '',
       authorAvatar: profile?.avatar_url || '',
       updatedAt: row.updated_at ? String(row.updated_at) : null,
+      publishedAt: row.published_at ? String(row.published_at) : null,
+      boostedUntil: row.boosted_until ? String(row.boosted_until) : null,
+      salesCount: row.sales_count ?? 0,
     };
   });
 }

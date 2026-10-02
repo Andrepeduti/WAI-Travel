@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { motion, LayoutGroup } from 'framer-motion';
 
-export type TabType = 'home' | 'explore' | 'create' | 'trips' | 'ai' | 'profile';
+export type TabType = 'home' | 'create' | 'trips' | 'ai' | 'profile';
 
 interface BottomNavigationProps {
   activeTab: TabType;
@@ -27,27 +27,6 @@ const navItems: {
         strokeLinejoin="round"
       >
         <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1V9.5z" />
-      </svg>
-    ),
-  },
-  {
-    id: 'explore',
-    label: 'Explorar',
-    renderIcon: (isActive) => (
-      <svg
-        className="w-[22px] h-[22px] flex-shrink-0"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={isActive ? '2.3' : '1.8'}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <circle cx="12" cy="12" r="9" />
-        <polygon
-          points="16 8 13.5 13.5 8 16 10.5 10.5 16 8"
-          fill={isActive ? 'currentColor' : 'none'}
-        />
       </svg>
     ),
   },

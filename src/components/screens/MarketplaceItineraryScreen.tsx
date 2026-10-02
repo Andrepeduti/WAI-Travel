@@ -24,6 +24,9 @@ import { useQuery } from '@tanstack/react-query';
 import { getMarketplaceItinerary, getItineraryReviews } from '@/lib/marketplaceApi';
 import { loadPlannerData } from '@/lib/plannerApi';
 import { Loader2 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { recordRecentlyViewed } from '@/lib/recentlyViewed';
+import { startCheckoutSession, completeCheckoutSession } from '@/lib/homeModulesApi';
 
 // ─── Season helpers ──────────────────────────────────────────────────────────
 const SOUTHERN_HEMISPHERE_KEYWORDS = [
@@ -128,6 +131,12 @@ export interface MarketplaceItineraryScreenProps {
 export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchasedItinerary, onViewCreator, authorOverride, authorImageOverride, datasetOverride, isOwner = false, onManageItinerary, onViewSalesDashboard, onUnpublish, onDeleteItinerary, onOpenChat, autoOpenCheckout }: MarketplaceItineraryScreenProps) {
 
   const idStr = String(itineraryId);
+  const { user } = useAuth();
+
+  // "Vistos recentemente" da Home: abrir o detalhe de um roteiro à venda (de outra pessoa).
+  useEffect(() => {
+    if (user?.id && !isOwner) recordRecentlyViewed(user.id, idStr);
+  }, [user?.id, idStr, isOwner]);
 
   const { data: marketplaceData, isLoading: isLoadingItinerary } = useQuery({
     queryKey: ['marketplace-itinerary', idStr],
@@ -310,6 +319,11 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
     }
   }, [autoOpenCheckout]);
 
+  // "Continue comprando" da Home: abrir o checkout inicia/retoma a compra (reinicia os 7 dias).
+  useEffect(() => {
+    if (showCheckout) void startCheckoutSession(idStr);
+  }, [showCheckout, idStr]);
+
   const handleToggleFollow = useCallback(() => {
     setIsFollowing(prev => {
       const next = !prev;
@@ -454,6 +468,7 @@ export function MarketplaceItineraryScreen({ itineraryId, onBack, onViewPurchase
           setShowCheckout(false);
           setShowPurchaseSuccess(true);
           removeFromCart(itineraryId);
+          void completeCheckoutSession(idStr);
           // Persiste a compra no Lovable Cloud (silencioso se for dataset estático).
           const result = await recordPurchase({
             datasetId: itineraryId,

@@ -1,6 +1,7 @@
 import { cn } from '@/lib/utils';
 
-const defaultAvatarUrl = '/__l5e/assets-v1/9cb2fe10-a285-4f17-bbef-f67389a96b37/wai-logo.png';
+/** Imagem usada quando o usuário não tem foto (exibir sobre fundo #E2EECE). */
+export const DEFAULT_AVATAR_URL = '/__l5e/assets-v1/9cb2fe10-a285-4f17-bbef-f67389a96b37/wai-logo.png';
 
 interface UserAvatarProps {
   /** URL da foto. Quando vazio/undefined, exibe o ícone genérico de usuário. */
@@ -32,7 +33,7 @@ export function UserAvatar({ src, alt = 'Avatar', size = 48, className }: UserAv
 
   return (
     <img
-      src={defaultAvatarUrl}
+      src={DEFAULT_AVATAR_URL}
       alt={alt}
       style={dimension}
       className={cn('rounded-full object-cover bg-[#E2EECE]', className)}

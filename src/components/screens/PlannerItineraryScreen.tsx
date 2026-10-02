@@ -144,6 +144,8 @@ export interface PlannerItineraryScreenProps {
   onUpgrade?: () => void;
   onNavigateToFAQ?: () => void;
   initialRole?: 'owner' | 'editor' | 'viewer';
+  /** Dia aberto ao montar (ex.: "Ver mais" da viagem em andamento abre o dia de hoje). */
+  initialDay?: number;
 }
 
 // ─── Persistence helpers ─────────────────────────────────────────────────────
@@ -425,7 +427,7 @@ async function getRouteInfo(
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, isPurchased, creatorEditMode, readOnlyMode, autoOpenPublishFlow, onBack, onDelete, onUpdate, onNavigateToAI, onSaveCreatorEdit, onNavigateToSales, onOpenItinerary, onDuplicateSuccess, onNavigateToFAQ, initialRole }: PlannerItineraryScreenProps) {
+export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, isPurchased, creatorEditMode, readOnlyMode, autoOpenPublishFlow, onBack, onDelete, onUpdate, onNavigateToAI, onSaveCreatorEdit, onNavigateToSales, onOpenItinerary, onDuplicateSuccess, onNavigateToFAQ, initialRole, initialDay }: PlannerItineraryScreenProps) {
   const { user: currentUser } = useCurrentUser();
   const { session } = useAuth();
   const ownerAvatar = currentUser.avatar || '';
@@ -474,7 +476,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
 
   const fallbackSuggestions = itineraryDataset?.suggestions ?? suggestions;
 
-  const [selectedDay, setSelectedDay] = useState(1);
+  const [selectedDay, setSelectedDay] = useState(initialDay && initialDay > 0 ? initialDay : 1);
   type RecCategory = 'all' | 'food' | 'experience' | 'attraction' | 'night' | 'event';
   const [recFilterByDay, setRecFilterByDay] = useState<Record<number, RecCategory>>({});
   const [compactView, setCompactView] = useState(false);
@@ -774,6 +776,9 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   const isUuidId = typeof itineraryId === 'string'
     && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(itineraryId);
   const hasHydratedRef = useRef(false);
+  // Só salva depois de ler o servidor: senão um cache local vazio/antigo
+  // sobrescreveria (apagaria) as atividades do banco.
+  const [isHydrated, setIsHydrated] = useState(false);
   const lastSaveTimeRef = useRef(0);
 
   const reloadPlanner = useCallback(async () => {
@@ -785,7 +790,14 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       return;
     }
 
-    const remote = await loadPlannerData(itineraryId);
+    let remote: Awaited<ReturnType<typeof loadPlannerData>>;
+    try {
+      // strict: falha de leitura NÃO pode virar "roteiro vazio" no estado,
+      // senão o save seguinte apagaria tudo no banco.
+      remote = await loadPlannerData(itineraryId, { strict: true });
+    } catch {
+      return;
+    }
     if (!remote) return;
     const hasRemoteActivities = Object.values(remote.activities).some((arr) => arr.length > 0);
     const hasRemoteTransports = Object.values(remote.transports).some((arr) => arr.length > 0);
@@ -802,6 +814,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
         setDayTransports(remote.transports as Record<number, TransportBetween[]>);
       }
       hasHydratedRef.current = true;
+      setIsHydrated(true);
     }
   }, [isUuidId, itineraryId]);
 
@@ -812,6 +825,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
   // Debounced save no backend a cada mudança de activities/transports.
   useEffect(() => {
     if (!isUuidId || typeof itineraryId !== 'string') return;
+    if (!isHydrated) return;
     const handle = setTimeout(() => {
       // Atualiza o timer para sinalizar que os próximos eventos Realtime são nossos
       lastSaveTimeRef.current = Date.now();
@@ -821,7 +835,7 @@ export function PlannerItineraryScreen({ data, itineraryDataset, itineraryId, is
       });
     }, 600);
     return () => clearTimeout(handle);
-  }, [isUuidId, itineraryId, dayActivities, dayTransports]);
+  }, [isUuidId, itineraryId, dayActivities, dayTransports, isHydrated]);
 
   // ─── Membros compartilhados (Lovable Cloud) ─────────────────────────────
   const [sharedMembers, setSharedMembers] = useState<ItineraryMember[]>(() => {

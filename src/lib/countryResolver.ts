@@ -4,7 +4,7 @@
  * to standard Portuguese country names.
  */
 
-import { ALL_COUNTRIES } from '@/data/countriesCatalog';
+import { ALL_COUNTRIES, type CountryInfo } from '@/data/countriesCatalog';
 
 function normalizeText(text: string): string {
   return (text || '')
@@ -1093,6 +1093,25 @@ export function resolveCountryFromText(text?: string | null): string | undefined
   }
 
   return undefined;
+}
+
+/**
+ * Todos os países (com continente, sem repetição) de um roteiro a partir dos
+ * destinos — que normalmente são só o nome da cidade ("Paris", "Londres").
+ * Um roteiro França + Inglaterra pertence às duas coleções.
+ */
+export function resolveCountriesForDestinations(destinations?: string[] | null): CountryInfo[] {
+  const countries = new Map<string, CountryInfo>();
+  for (const destination of destinations ?? []) {
+    const countryName = resolveCountryFromText(destination);
+    if (!countryName) continue;
+    const norm = normalizeText(countryName);
+    const match = ALL_COUNTRIES.find((c) =>
+      normalizeText(c.name) === norm || (c.aliases || []).some((a) => normalizeText(a) === norm),
+    );
+    if (match) countries.set(match.iso3, match);
+  }
+  return Array.from(countries.values());
 }
 
 export interface ActivityLocationTarget {

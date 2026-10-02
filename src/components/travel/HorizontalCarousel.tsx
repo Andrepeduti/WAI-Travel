@@ -6,13 +6,19 @@ interface HorizontalCarouselProps {
   className?: string;
   itemClassName?: string;
   dotsClassName?: string;
+  /** Espaço entre os itens em px. Default 12. */
+  gap?: number;
+  /** Chamado quando o item mais próximo do centro do carrossel muda (inclui o inicial: 0). */
+  onActiveIndexChange?: (index: number) => void;
 }
 export function HorizontalCarousel({
   children,
   showDots = true,
   className,
   itemClassName,
-  dotsClassName
+  dotsClassName,
+  gap = 12,
+  onActiveIndexChange
 }: HorizontalCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -20,21 +26,36 @@ export function HorizontalCarousel({
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const itemCount = children.length;
+  /** Item cujo centro está mais próximo do centro visível do carrossel. */
   const handleScroll = useCallback(() => {
     if (!scrollRef.current || isDragging) return;
     const container = scrollRef.current;
-    const currentScrollLeft = container.scrollLeft;
-    const itemWidth = container.firstElementChild?.clientWidth || 280;
-    const gap = 12; // gap-3 = 12px
-
-    const index = Math.round(currentScrollLeft / (itemWidth + gap));
-    setActiveIndex(Math.min(Math.max(0, index), itemCount - 1));
+    const viewportCenter = container.scrollLeft + container.clientWidth / 2;
+    let closest = 0;
+    let closestDistance = Infinity;
+    Array.from(container.children).forEach((child, index) => {
+      const el = child as HTMLElement;
+      const distance = Math.abs(el.offsetLeft - container.offsetLeft + el.offsetWidth / 2 - viewportCenter);
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closest = index;
+      }
+    });
+    setActiveIndex(Math.min(Math.max(0, closest), itemCount - 1));
   }, [itemCount, isDragging]);
+
+  // Lista mudou (ex.: item removido): recalcula o item ativo.
+  useEffect(() => {
+    handleScroll();
+  }, [handleScroll]);
+
+  useEffect(() => {
+    onActiveIndexChange?.(activeIndex);
+  }, [activeIndex, onActiveIndexChange]);
   const scrollToIndex = (index: number) => {
     if (!scrollRef.current) return;
     const container = scrollRef.current;
     const itemWidth = container.firstElementChild?.clientWidth || 280;
-    const gap = 12;
     container.scrollTo({
       left: index * (itemWidth + gap),
       behavior: 'smooth'
@@ -82,7 +103,7 @@ export function HorizontalCarousel({
   return <div className="relative min-w-0 w-full overflow-hidden">
       {/* Scrollable Container - bleeds right */}
       <div ref={scrollRef} className={cn("w-full min-w-0 flex overflow-x-auto overflow-y-hidden scrollbar-hide snap-x snap-mandatory cursor-grab", className)} style={{ WebkitOverflowScrolling: 'touch' } as any} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseLeave}>
-        {children.map((child, index) => <div key={index} className={cn('snap-start flex-shrink-0', itemClassName)} style={{ marginRight: index < children.length - 1 ? 12 : 16 }}>
+        {children.map((child, index) => <div key={index} className={cn('snap-start flex-shrink-0', itemClassName)} style={{ marginRight: index < children.length - 1 ? gap : 16 }}>
             {child}
           </div>)}
       </div>

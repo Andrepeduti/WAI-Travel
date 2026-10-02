@@ -8,7 +8,7 @@ export interface TourStep {
   body: string;
   placement?: TourPlacement;
   /** Optional tab to switch to before showing the step. */
-  ensureTab?: 'home' | 'explore' | 'trips';
+  ensureTab?: 'home' | 'trips';
 }
 
 export const TOUR_STEPS: TourStep[] = [
@@ -19,11 +19,11 @@ export const TOUR_STEPS: TourStep[] = [
     placement: 'center',
   },
   {
-    id: 'explore',
-    target: '[data-tour-id="nav-explore"]',
-    title: 'Explorar',
+    id: 'search',
+    target: '[data-tour-id="home-search"]',
+    title: 'Buscar',
     body: 'Descubra destinos e roteiros prontos feitos por outros viajantes.',
-    placement: 'top',
+    placement: 'bottom',
     ensureTab: 'home',
   },
   {
