@@ -32,6 +32,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { listPublicItineraries, type PublicItinerarySearchRow } from '@/lib/itinerariesApi';
 import { resolveCoverImage } from '@/lib/coverImageResolver';
+import { getRecentSearches } from '@/lib/recentSearches';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,6 +57,8 @@ export interface RecommendedItinerary {
     /** Quantas compras o roteiro tem */
     salesCount: number;
     destinations: string[];
+    publishedAt: string | null;
+    boostedUntil: string | null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -74,21 +77,6 @@ function destKeywords(destinations: string[]): string[] {
     return kws;
 }
 
-
-/** Lê pesquisas recentes do localStorage */
-function readRecentSearches(): string[] {
-    try {
-        // Tenta as duas chaves mais comuns de histórico de busca
-        const raw = localStorage.getItem('wai-travel-recent-searches')
-            ?? localStorage.getItem('wai-search-history');
-        if (!raw) return [];
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-            return parsed.map((s: unknown) => norm(typeof s === 'string' ? s : (s as any)?.query || '')).filter(Boolean);
-        }
-        return [];
-    } catch { return []; }
-}
 
 /** Normaliza pontuação de popularidade para intervalo 0–maxPts */
 function normalizeCount(count: number, maxCount: number, maxPts: number): number {
@@ -123,7 +111,6 @@ export function useRecommendedItineraries(limit = 10) {
 
                 const [
                     publicItineraries,
-                    salesRows,
                     favoritesCountRows,
                     userFavoritesRows,
                     reviewsRows,
@@ -133,12 +120,6 @@ export function useRecommendedItineraries(limit = 10) {
                 ] = await Promise.all([
                     // Lista base de roteiros públicos (inclui updated_at via cast any)
                     listPublicItineraries(500),
-
-                    // Contagem de vendas por roteiro
-                    supabase
-                        .from('itinerary_sales')
-                        .select('itinerary_id')
-                        .then(({ data }) => data ?? []),
 
                     // Contagem de salvamentos por roteiro (todos os usuários)
                     supabase
@@ -194,12 +175,9 @@ export function useRecommendedItineraries(limit = 10) {
 
                 // ── 2. Preparar mapas de lookup ──────────────────────────────────────
 
-                // Vendas por roteiro
-                const salesByItinerary = new Map<string, number>();
-                for (const row of salesRows as { itinerary_id: string }[]) {
-                    salesByItinerary.set(row.itinerary_id, (salesByItinerary.get(row.itinerary_id) ?? 0) + 1);
-                }
-                const maxSales = Math.max(0, ...salesByItinerary.values());
+                // Vendas por roteiro (sales_count público da listagem — o RLS de
+                // itinerary_sales só expõe as vendas do próprio usuário)
+                const maxSales = Math.max(0, ...publicItineraries.map(it => it.salesCount));
 
                 // Salvamentos por roteiro
                 const savesByItinerary = new Map<string, number>();
@@ -265,7 +243,7 @@ export function useRecommendedItineraries(limit = 10) {
                 const dreamDests = Array.isArray(profileRow?.dream_trips)
                     ? (profileRow!.dream_trips as any[]).map(t => norm(t.destination || '')).filter(Boolean)
                     : [];
-                const recentSearches = readRecentSearches();
+                const recentSearches = getRecentSearches().map(norm).filter(Boolean);
 
                 // ── 3. Scoring ───────────────────────────────────────────────────────
 
@@ -280,7 +258,7 @@ export function useRecommendedItineraries(limit = 10) {
                     const itinDests = destKeywords(itin.destinations ?? []);
                     const itinAuthorNorm = norm(itin.authorName ?? '');
                     const avgRating = avgRatingFor(itinId);
-                    const salesCount = salesByItinerary.get(itinId) ?? 0;
+                    const salesCount = itin.salesCount;
                     const savesCount = savesByItinerary.get(itinId) ?? 0;
 
                     let score = 0;
@@ -372,7 +350,7 @@ export function useRecommendedItineraries(limit = 10) {
                         image: coverImage,
                         rating: avgRatingFor(itin.id),
                         places: itin.places ?? 0,
-                        days: calcDays(itin.startDate, itin.endDate),
+                        days: calcDays(itin.startDate, itin.endDate) || (itin.durationDays ?? 0),
                         author: itin.authorName || 'WAI',
                         authorImage: itin.authorAvatar || waiLogo,
                         price: itin.priceCents != null ? itin.priceCents / 100 : 0,
@@ -380,6 +358,8 @@ export function useRecommendedItineraries(limit = 10) {
                         score,
                         salesCount,
                         destinations: itin.destinations ?? [],
+                        publishedAt: itin.publishedAt,
+                        boostedUntil: itin.boostedUntil,
                     };
                 });
 

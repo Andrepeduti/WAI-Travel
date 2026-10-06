@@ -245,6 +245,13 @@ export function ManageItineraryScreen({
     onBack();
   };
 
+  // Salva a alteração e mostra o snackbar padrão da tela de gerenciar roteiro.
+  const saveAndNotify = (data: any) => {
+    if (onSave) onSave(data);
+    setToastMessage('Alterações salvas com sucesso.');
+    setToastVisible(true);
+  };
+
   const handleSave = () => {
     if (onSave) {
       onSave({
@@ -752,7 +759,7 @@ export function ManageItineraryScreen({
             onClick={() => {
               setTripName(tempTripName);
               setShowTitlePicker(false);
-              if (onSave) onSave({ tripName: tempTripName, coverImage: coverPreview || initialCoverImage, currency, startDate, endDate, destinations });
+              saveAndNotify({ tripName: tempTripName, coverImage: coverPreview || initialCoverImage, currency, startDate, endDate, destinations });
             }}
             disabled={tempTripName === tripName}
             className={cn(
@@ -796,7 +803,7 @@ export function ManageItineraryScreen({
             onClick={() => {
               setCurrency(tempCurrency);
               setShowCurrencyPicker(false);
-              if (onSave) onSave({ tripName, coverImage: coverPreview || initialCoverImage, currency: tempCurrency, startDate, endDate, destinations });
+              saveAndNotify({ tripName, coverImage: coverPreview || initialCoverImage, currency: tempCurrency, startDate, endDate, destinations });
             }}
             disabled={tempCurrency === currency}
             className={cn(
@@ -903,7 +910,7 @@ export function ManageItineraryScreen({
                 setDurationDays(tempDuration);
                 setDateMode(tempDateMode);
                 setShowPeriodPicker(false);
-                if (onSave) onSave({ tripName, coverImage: coverPreview || initialCoverImage, currency, startDate: tempStartDate, endDate: tempEndDate, destinations, isFlexible: tempDateMode === 'flexible', durationDays: tempDuration });
+                saveAndNotify({ tripName, coverImage: coverPreview || initialCoverImage, currency, startDate: tempStartDate, endDate: tempEndDate, destinations, isFlexible: tempDateMode === 'flexible', durationDays: tempDuration });
               }}
               disabled={
                 tempStartDate?.getTime() === startDate?.getTime() && 
@@ -986,7 +993,7 @@ export function ManageItineraryScreen({
             onClick={() => {
               setDestinations(tempDestinations);
               setShowDestinationsPicker(false);
-              if (onSave) onSave({ tripName, coverImage: coverPreview || initialCoverImage, currency, startDate, endDate, destinations: tempDestinations });
+              saveAndNotify({ tripName, coverImage: coverPreview || initialCoverImage, currency, startDate, endDate, destinations: tempDestinations });
             }}
             disabled={JSON.stringify(tempDestinations) === JSON.stringify(destinations)}
             className={cn(
@@ -1257,6 +1264,7 @@ export function ManageItineraryScreen({
         onClose={() => setToastVisible(false)}
         title={toastMessage}
         description=""
+        position="screen-bottom"
       />
     </div>
   );

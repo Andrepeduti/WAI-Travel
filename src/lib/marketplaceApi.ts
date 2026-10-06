@@ -115,6 +115,29 @@ export async function getItineraryReviews(itineraryId: string): Promise<Review[]
 }
 
 /**
+ * Média das avaliações de vários roteiros numa única query.
+ * Roteiros sem avaliação ficam fora do mapa.
+ */
+export async function getAverageRatings(itineraryIds: string[]): Promise<Record<string, number>> {
+  if (itineraryIds.length === 0) return {};
+  const { data, error } = await supabase
+    .from('itinerary_reviews')
+    .select('itinerary_id, rating')
+    .in('itinerary_id', itineraryIds);
+  if (error) {
+    console.error('[marketplaceApi] getAverageRatings error', error);
+    return {};
+  }
+  const totals: Record<string, { sum: number; count: number }> = {};
+  for (const row of data ?? []) {
+    const t = (totals[row.itinerary_id] ??= { sum: 0, count: 0 });
+    t.sum += Number(row.rating);
+    t.count += 1;
+  }
+  return Object.fromEntries(Object.entries(totals).map(([id, t]) => [id, t.sum / t.count]));
+}
+
+/**
  * Envia uma nova avaliação para um roteiro.
  */
 export async function submitItineraryReview(itineraryId: string, rating: number, comment: string): Promise<boolean> {

@@ -82,6 +82,7 @@ import {
   ArrowPathIcon,
   ExclamationCircleIcon,
   HandThumbUpIcon,
+  HandThumbDownIcon,
   RocketLaunchIcon,
   CommandLineIcon,
   NewspaperIcon,
@@ -319,6 +320,7 @@ const iconMap: Record<string, [React.ComponentType<React.SVGProps<SVGSVGElement>
   error: [ExclamationCircleIcon],
   cancel: [XCircleIcon],
   thumb_up: [HandThumbUpIcon],
+  thumb_down: [HandThumbDownIcon],
   terminal: [CommandLineIcon],
   article: [NewspaperIcon],
 
