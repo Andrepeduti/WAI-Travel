@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useBackHandler } from '@/lib/backStack';
 import {
   Plus,
   Trash2,
@@ -273,6 +274,8 @@ export function TripChecklistScreen({
   onChecklistChange,
   readOnlyMode,
 }: TripChecklistScreenProps) {
+  // Arrastar da borda esquerda executa o mesmo que a seta de voltar.
+  useBackHandler(onBack);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [categories, setCategories] = useState<ChecklistCategory[]>(() => {
     if (itineraryId) {

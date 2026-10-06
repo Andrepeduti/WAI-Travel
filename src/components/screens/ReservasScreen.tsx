@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useBackHandler } from '@/lib/backStack';
 import { ChevronLeft } from 'lucide-react';
 import { SuccessToast } from '@/components/travel/SuccessToast';
 import { LuggageIllustration } from '@/components/travel/reservas/LuggageIllustration';
@@ -36,6 +37,8 @@ export function ReservasScreen({
   splitPeople,
   readOnlyMode,
 }: ReservasScreenProps) {
+  // Arrastar da borda esquerda executa o mesmo que a seta de voltar.
+  useBackHandler(onBack);
   // Internal fallback state if not externally managed
   const [internalReservas, setInternalReservas] = useState<Reserva[]>([]);
   const [internalTransportes, setInternalTransportes] = useState<Transporte[]>([]);

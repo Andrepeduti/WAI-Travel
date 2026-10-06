@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useBackHandler } from '@/lib/backStack';
 import { ChevronLeft, ChevronRight, X, GripVertical, CheckCircle2 } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { LuggageIllustration } from '@/components/ui/LuggageIllustration';
@@ -87,6 +88,8 @@ const NoteItemComponent = ({ note, currentUser, onClick }: { note: TripNote, cur
 };
 
 export function TripNotesScreen({ onBack, notes: externalNotes, onNotesChange, readOnlyMode }: TripNotesScreenProps) {
+  // Arrastar da borda esquerda executa o mesmo que a seta de voltar.
+  useBackHandler(onBack);
   const { user: currentUser } = useCurrentUser();
   const [internalNotes, setInternalNotes] = useState<TripNote[]>([]);
   const notes = externalNotes ?? internalNotes;

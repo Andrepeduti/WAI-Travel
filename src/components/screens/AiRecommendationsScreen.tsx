@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useBackHandler } from '@/lib/backStack';
 import { ChevronLeft, ChevronDown, Sparkles, Plus, Check, MapPin, Calendar, Tag } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -40,6 +41,8 @@ export function AiRecommendationsScreen({
   onBack,
   onAddPlace,
 }: AiRecommendationsScreenProps) {
+  // Arrastar da borda esquerda executa o mesmo que a seta de voltar.
+  useBackHandler(onBack);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState(initialDay);
   const [selectedDestination, setSelectedDestination] = useState(

@@ -5,7 +5,6 @@ import { PassportStamps } from '@/components/travel/PassportStamps';
 import { CountryDetailSheet } from '@/components/travel/CountryDetailSheet';
 import { TravelRetrospective } from '@/components/travel/TravelRetrospective';
 import { CountryVisit, getUniqueCountinents } from '@/data/visitedCountries';
-import { ContactUsSheet } from '@/components/travel/ContactUsSheet';
 import { BackButton } from '@/components/ui/BackButton';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { useCurrentUser } from '@/hooks/use-current-user';
@@ -18,36 +17,18 @@ interface UserProfileScreenProps {
   onBack: () => void;
   onEditProfile: () => void;
   onViewCreatorProgram: () => void;
-  onSettings?: () => void;
+  onSettings: () => void;
   onFindPeople?: () => void;
-  onNavigateToSetting?: (setting: string) => void;
   onChatClick: () => void;
   onPublicItineraryClick?: (itinerary: UserItinerary) => void;
 }
-
-const walletItems = [
-  { icon: 'workspace_premium', label: 'Assinatura', key: 'subscription' },
-  { icon: 'shopping_bag', label: 'Compras', key: 'purchases' },
-  { icon: 'credit_card', label: 'Forma de recebimento', key: 'payment-settings' },
-];
-
-const accountItems = [
-  { icon: 'lock', label: 'Login e segurança', key: 'login-security' },
-  { icon: 'notifications', label: 'Notificações', key: 'notification-settings' },
-  { icon: 'dark_mode', label: 'Tema', key: 'theme', isToggle: true },
-];
-
-const supportItems = [
-  { icon: 'info', label: 'Central de ajuda (FAQ)', key: 'help-center' },
-  { icon: 'chat_bubble_outline', label: 'Fale conosco', key: 'contact-us' },
-];
 
 export function UserProfileScreen({
   onBack,
   onEditProfile,
   onViewCreatorProgram,
+  onSettings,
   onFindPeople,
-  onNavigateToSetting,
   onChatClick,
   onPublicItineraryClick,
 }: UserProfileScreenProps) {
@@ -62,8 +43,6 @@ export function UserProfileScreen({
   const [selectedCountry, setSelectedCountry] = useState<CountryVisit | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [retroOpen, setRetroOpen] = useState(false);
-  const [contactOpen, setContactOpen] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
   const [activeTab, setActiveTab] = useState('itineraries');
 
   const displayName = user.name || 'Seu nome';
@@ -94,10 +73,15 @@ export function UserProfileScreen({
             Perfil
           </h1>
         </div>
-        <button onClick={onChatClick} className="btn-icon relative">
-          <Icon name="chat_bubble_left" size={20} />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full border-[1.5px] border-white" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={onChatClick} className="btn-icon relative" aria-label="Mensagens">
+            <Icon name="chat_bubble_left" size={20} />
+            <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full border-[1.5px] border-white" />
+          </button>
+          <button onClick={onSettings} className="btn-icon" aria-label="Configurações">
+            <Icon name="settings" size={20} />
+          </button>
+        </div>
       </div>
 
       {/* Profile Card */}
@@ -291,61 +275,8 @@ export function UserProfileScreen({
         </Tabs>
       </div>
 
-      {/* Settings below tabs */}
-      <div className="mt-6">
-        <div className="h-2" style={{ background: 'hsl(var(--divider))' }} />
-        {[
-          { title: 'Carteira', items: walletItems },
-          { title: 'Conta', items: accountItems },
-          { title: 'Suporte', items: supportItems },
-        ].map((section) => (
-          <div key={section.title} className="px-5 mt-5">
-            <h2 className="text-foreground mb-2" style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-weight-bold)' }}>
-              {section.title}
-            </h2>
-            {section.items.map((item, idx) => (
-              <button
-                key={item.label}
-                onClick={() => {
-                  if ((item as any).isToggle) return;
-                  if (item.key === 'contact-us') {
-                    setContactOpen(true);
-                  } else if (onNavigateToSetting) {
-                    onNavigateToSetting(item.key);
-                  }
-                }}
-                className="w-full flex items-center justify-between py-3 text-left"
-                style={{ borderBottom: idx < section.items.length - 1 ? '1px solid hsl(var(--divider))' : 'none' }}
-              >
-                <div className="flex items-center gap-3">
-                  <Icon name={item.icon} size={20} className="text-muted-foreground text-xs" />
-                  <span className="text-foreground" style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-weight-medium)' }}>
-                    {item.label}
-                  </span>
-                </div>
-                {(item as any).isToggle ? (
-                  <div
-                    onClick={(e) => { e.stopPropagation(); setDarkMode(!darkMode); }}
-                    className="relative w-11 h-6 rounded-full cursor-pointer transition-colors"
-                    style={{ background: darkMode ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground) / 0.25)' }}
-                  >
-                    <div
-                      className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform"
-                      style={{ transform: darkMode ? 'translateX(22px)' : 'translateX(2px)' }}
-                    />
-                  </div>
-                ) : (
-                  <Icon name="chevron_right" size={18} className="text-muted-foreground text-xs" />
-                )}
-              </button>
-            ))}
-          </div>
-        ))}
-      </div>
-
       <CountryDetailSheet country={selectedCountry} open={sheetOpen} onOpenChange={setSheetOpen} onUpdatePhotos={handleUpdatePhotos} onDeleteCountry={handleDeleteCountry} />
       <TravelRetrospective countries={countries} open={retroOpen} onClose={() => setRetroOpen(false)} />
-      <ContactUsSheet isOpen={contactOpen} onClose={() => setContactOpen(false)} />
     </div>
   );
 }

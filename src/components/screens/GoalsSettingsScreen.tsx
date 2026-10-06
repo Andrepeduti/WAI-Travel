@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Check } from 'lucide-react';
 import { toast } from 'sonner';
@@ -6,6 +7,7 @@ import { BackButton } from '@/components/ui/BackButton';
 import { GOAL_OPTIONS } from '@/components/auth/OnboardingFlow';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { USER_GOALS_QUERY_KEY } from '@/hooks/useUserGoals';
 import { cn } from '@/lib/utils';
 
 interface GoalsSettingsScreenProps {
@@ -14,6 +16,7 @@ interface GoalsSettingsScreenProps {
 
 export function GoalsSettingsScreen({ onBack }: GoalsSettingsScreenProps) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [selected, setSelected] = useState<string[]>([]);
   const [initial, setInitial] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,6 +60,7 @@ export function GoalsSettingsScreen({ onBack }: GoalsSettingsScreenProps) {
       return;
     }
     setInitial(selected);
+    queryClient.invalidateQueries({ queryKey: [USER_GOALS_QUERY_KEY] });
     toast.success('Objetivos atualizados');
     onBack();
   };

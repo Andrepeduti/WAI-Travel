@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useBackHandler } from '@/lib/backStack';
 import { getPlaceFullDetails, PlaceFullDetails, getPhotoSignature } from '@/lib/placeDetails';
 import { openGoogleMapsDirections } from '@/lib/navigationMaps';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -89,6 +90,8 @@ const FALLBACK_PHOTOS_GENERAL = [
 ];
 
 export function ActivityDetailScreen({ activity, onBack, onOpenMap }: ActivityDetailScreenProps) {
+  // Arrastar da borda esquerda executa o mesmo que a seta de voltar.
+  useBackHandler(onBack);
   const [details, setDetails] = useState<PlaceFullDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'sobre' | 'informacoes'>('sobre');

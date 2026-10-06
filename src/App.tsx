@@ -10,6 +10,7 @@ import { FavoritesProvider } from "./contexts/FavoritesContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { RequireOnboarding } from "./components/auth/RequireOnboarding";
 import { GuidedTourProvider } from "./components/tour/GuidedTourProvider";
+import { SwipeBackGesture } from "./components/navigation/SwipeBackGesture";
 
 const Index = lazy(() => import("./pages/Index"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -39,6 +40,7 @@ const App = () => (
             <Toaster />
             <Sonner />
             <BrowserRouter>
+              <SwipeBackGesture />
               <GuidedTourProvider>
                 <Suspense fallback={<RouteFallback />}>
                   <Routes>

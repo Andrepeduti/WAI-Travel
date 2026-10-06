@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useBackHandler } from '@/lib/backStack';
 import { differenceInDays } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import { Icon } from '@/components/ui/Icon';
@@ -105,6 +106,8 @@ interface SearchScreenProps {
 }
 
 export function SearchScreen({ initialFilters, initialQuery = '', onClose, onItineraryClick, onPublicUserItineraryClick }: SearchScreenProps) {
+  // Arrastar da borda esquerda executa o mesmo que a seta de voltar.
+  useBackHandler(onClose);
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [submittedQuery, setSubmittedQuery] = useState(initialQuery);
   const [recent, setRecent] = useState<string[]>(() => getRecentSearches());

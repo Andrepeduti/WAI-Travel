@@ -2,65 +2,44 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, useMotionValue, useTransform, PanInfo, animate } from 'framer-motion';
 import { Icon } from '../ui/Icon';
-import { ShoppingBag, Star, Heart, Mic, SlidersHorizontal, Plus, Trash2, LogOut } from 'lucide-react';
+import { SlidersHorizontal, Plus } from 'lucide-react';
 import { format, differenceInDays, differenceInCalendarDays } from 'date-fns';
 import { parseLocalDate } from '@/lib/localDate';
-import { ptBR } from 'date-fns/locale';
-import { resolveTripThumbnailImages, GENERIC_TRAVEL_PLACEHOLDER } from '@/lib/coverImageResolver';
+import { resolveTripThumbnailImages } from '@/lib/coverImageResolver';
 import { useMyItineraries } from '@/hooks/use-my-itineraries';
-import { type UserItinerary, fetchItineraryMemberAvatars, leaveItinerary, ITINERARIES_CHANGED_EVENT } from '@/lib/itinerariesApi';
+import { type UserItinerary, fetchItineraryMemberAvatars, leaveItinerary } from '@/lib/itinerariesApi';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { PURCHASES_CHANGED_EVENT } from '@/lib/purchasesApi';
 import { ItineraryListSkeleton } from '@/components/ui/LoadingShimmers';
 import { TripsFilterScreen } from '@/components/screens/TripsFilterScreen';
-import { EmptyItinerariesIllustration } from '@/components/travel/EmptyItinerariesIllustration';
 import { DeleteConfirmSheet } from '@/components/travel/DeleteConfirmSheet';
+import { TripThumbnail } from '@/components/travel/TripThumbnail';
 
 export type { UserItinerary };
 
-type TabType = 'private' | 'public' | 'favorites';
 type SortOption = 'az' | 'za' | 'days-asc' | 'days-desc' | 'recent' | 'oldest';
 type OriginFilter = 'all' | 'mine' | 'shared' | 'purchased';
 
 
 let cachedMemberAvatars: Record<string, any[]> = {};
 
-// Referências estáveis para quando as consultas ainda não retornaram.
-const EMPTY_SALES_COUNTS: Record<string, number> = {};
+// Referência estável para quando a consulta ainda não retornou.
 const EMPTY_PURCHASED_IDS: Set<string> = new Set();
-const EMPTY_LISTINGS: Record<string, { status: string; priceCents: number | null; title: string | null }> = {};
 
 interface TripsScreenProps {
   onItineraryClick: (id: number) => void;
   onPrivateItineraryClick?: (id: number) => void;
   onUserItineraryClick?: (itinerary: UserItinerary) => void;
-  /** Open a user-published itinerary inside the marketplace ("for sale") view. */
-  onUserPublicItineraryClick?: (itinerary: UserItinerary) => void;
   /** Triggered from the empty state or + button */
   onCreateItinerary?: (type?: 'personal' | 'seller') => void;
   onBecomeCreator?: () => void;
   onUpgrade?: () => void;
   itineraryUsedCount?: number;
   itineraryLimit?: number;
-  defaultTab?: TabType;
-  onOpenCreateSheet?: () => void;
-}
-
-// Single cover image thumbnail (Figma: width 95px, height 117px, border-radius 8px)
-function TripThumbnail({ images, className }: { images: string[], className?: string }) {
-  const cover = images.find((image) => image && !image.startsWith('blob:')) || GENERIC_TRAVEL_PLACEHOLDER;
-  return (
-    <div className={`rounded-[8px] overflow-hidden flex-shrink-0 bg-muted ${className || "w-[95px] h-[117px] min-w-[95px] min-h-[117px]"}`}>
-      <img
-        src={cover}
-        alt=""
-        className="w-full h-full object-cover"
-        loading="lazy"
-      />
-    </div>
-  );
+  onDeleteSuccess?: () => void;
+  onLeaveSuccess?: () => void;
 }
 
 interface ParticipantItem {
@@ -112,16 +91,10 @@ export function TripsScreen({
   onItineraryClick,
   onPrivateItineraryClick,
   onUserItineraryClick,
-  onUserPublicItineraryClick,
   onCreateItinerary,
-  onOpenCreateSheet,
-  defaultTab = 'private',
   onDeleteSuccess,
   onLeaveSuccess,
 }: TripsScreenProps) {
-  const [activeTab, setActiveTab] = useState<'private' | 'public'>(
-    defaultTab === 'public' ? 'public' : 'private'
-  );
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('recent');
   const [originFilter, setOriginFilter] = useState<OriginFilter>('all');
@@ -137,73 +110,25 @@ export function TripsScreen({
   const queryClient = useQueryClient();
   const userId = authUser?.id ?? null;
 
-  // Vendas (como vendedor) e compras (como comprador) numa única consulta.
-  const { data: salesData } = useQuery({
+  // Roteiros comprados pelo usuário.
+  const { data: purchasedData } = useQuery({
     queryKey: ['trips-sales', userId],
     enabled: !!userId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('itinerary_sales')
-        .select('itinerary_id, seller_id, buyer_id')
-        .or(`seller_id.eq.${userId},buyer_id.eq.${userId}`);
+        .select('itinerary_id')
+        .eq('buyer_id', userId!);
       if (error) throw error;
-      const counts: Record<string, number> = {};
-      const purchased = new Set<string>();
-      for (const row of (data ?? []) as { itinerary_id: string; seller_id: string; buyer_id: string }[]) {
-        if (row.seller_id === userId) counts[row.itinerary_id] = (counts[row.itinerary_id] ?? 0) + 1;
-        if (row.buyer_id === userId) purchased.add(row.itinerary_id);
-      }
-      return { counts, purchased };
+      return new Set((data ?? []).map((row: { itinerary_id: string }) => row.itinerary_id));
     },
   });
-  const salesByItinerary = salesData?.counts ?? EMPTY_SALES_COUNTS;
-  const purchasedItineraryIds = salesData?.purchased ?? EMPTY_PURCHASED_IDS;
+  const purchasedItineraryIds = purchasedData ?? EMPTY_PURCHASED_IDS;
 
   useEffect(() => {
     const handler = () => queryClient.invalidateQueries({ queryKey: ['trips-sales'] });
     window.addEventListener(PURCHASES_CHANGED_EVENT, handler);
     return () => window.removeEventListener(PURCHASES_CHANGED_EVENT, handler);
-  }, [queryClient]);
-
-  // Listings da loja do próprio vendedor. Roteiros pessoais publicados na loja
-  // continuam com is_personal = true; o que os identifica é o listing.
-  const { data: listingsData } = useQuery({
-    queryKey: ['trips-listings', userId],
-    enabled: !!userId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('itinerary_store_listing')
-        .select('itinerary_id, status, price_cents, listed_title')
-        .eq('seller_id', userId!);
-      if (error) throw error;
-      const map: Record<string, { status: string; priceCents: number | null; title: string | null }> = {};
-      for (const row of (data ?? []) as any[]) {
-        map[row.itinerary_id] = {
-          status: row.status,
-          priceCents: row.price_cents ?? null,
-          title: row.listed_title ?? null,
-        };
-      }
-      return map;
-    },
-  });
-  const listingsByItinerary = listingsData ?? EMPTY_LISTINGS;
-
-  // Agrupa rajadas de eventos (cada save do planner emite um) num único refetch.
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const handler = () => {
-      if (timer) return;
-      timer = setTimeout(() => {
-        timer = null;
-        queryClient.invalidateQueries({ queryKey: ['trips-listings'] });
-      }, 300);
-    };
-    window.addEventListener(ITINERARIES_CHANGED_EVENT, handler);
-    return () => {
-      window.removeEventListener(ITINERARIES_CHANGED_EVENT, handler);
-      if (timer) clearTimeout(timer);
-    };
   }, [queryClient]);
 
   // Avatares reais por roteiro
@@ -313,44 +238,6 @@ export function TripsScreen({
     return userCards;
   }, [userItineraries, purchasedItineraryIds, authUser?.id, memberAvatarsByItin]);
 
-  // Roteiros publicados ou rascunhos de venda (apenas roteiros do próprio autor logado)
-  const mergedPublicItineraries = useMemo(() => {
-    const userPublicCards = userItineraries
-      .filter(
-        (ui) =>
-          ui.userId === authUser?.id &&
-          !ui.deletedAt &&
-          (ui.isPersonal === false || !!listingsByItinerary[ui.id]),
-      )
-      .map((ui) => {
-        const validImages = ui.images.filter((image) => image && !image.startsWith('blob:'));
-        const images = validImages.length > 0 ? validImages : resolveTripThumbnailImages(ui.destinations);
-        const salesCount = salesByItinerary[ui.id] ?? 0;
-        const listing = listingsByItinerary[ui.id];
-
-        let status: 'Ativo' | 'Rascunho' | 'Pausado' = 'Ativo';
-        if (ui.status === 'suspended' || ui.isPaused || (listing && listing.status !== 'active')) {
-          status = 'Pausado';
-        } else if (ui.status === 'draft' && !listing) {
-          status = 'Rascunho';
-        }
-
-        return {
-          id: ui.id as string | number,
-          title: listing?.title || ui.title,
-          images,
-          priceCents: listing?.priceCents ?? ui.priceCents,
-          salesCount,
-          rating: 0,
-          likesCount: 0,
-          status,
-          _userItinerary: ui,
-        };
-      });
-
-    return userPublicCards;
-  }, [userItineraries, salesByItinerary, listingsByItinerary, authUser?.id]);
-
   // Filtro e busca
   const filteredPersonalList = useMemo(() => {
     let list = mergedPrivateItineraries;
@@ -459,21 +346,6 @@ export function TripsScreen({
     return sorted;
   }, [mergedPrivateItineraries, originFilter, searchQuery, sortBy]);
 
-  const filteredPublicList = useMemo(() => {
-    let list = mergedPublicItineraries;
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      list = list.filter(
-        (item) =>
-          item.title?.toLowerCase().includes(q) ||
-          item._userItinerary?.destinations?.some((d: string) => d.toLowerCase().includes(q))
-      );
-    }
-
-    return list;
-  }, [mergedPublicItineraries, searchQuery]);
-
   // Swipe & Exclusão
   const [swipedItemId, setSwipedItemId] = useState<string | number | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{
@@ -560,62 +432,23 @@ export function TripsScreen({
         className="px-6 pb-8 flex items-center justify-between"
         style={{ paddingTop: 'calc(max(24px, env(safe-area-inset-top) + 16px))' }}
       >
-        <h1 className="text-[26px] font-bold text-[#1A1C40] tracking-tight">Roteiros</h1>
+        <h1 className="text-[26px] font-bold text-[#1A1C40] tracking-tight">Minhas viagens</h1>
         <button
-          onClick={() => onOpenCreateSheet ? onOpenCreateSheet() : onCreateItinerary?.()}
-          aria-label="Criar novo roteiro"
+          onClick={() => onCreateItinerary?.('personal')}
+          aria-label="Criar nova viagem"
           className="w-10 h-10 rounded-full flex items-center justify-center bg-[#9ecc3b] text-[#1A1C40] hover:opacity-90 active:scale-95 transition-all shadow-sm flex-shrink-0"
         >
           <Plus className="w-6 h-6 stroke-[2.5]" />
         </button>
       </header>
 
-      {/* Tabs */}
-      <div className="border-b border-[#F0F0F0]">
-        <div className="flex w-full px-6">
-          <button
-            onClick={() => {
-              setActiveTab('private');
-              setSearchQuery('');
-            }}
-            className={`flex-1 pb-3 text-center text-[15px] transition-all relative whitespace-nowrap ${activeTab === 'private' ? 'font-semibold text-[#1A1C40]' : 'font-medium text-[#8E8E93] hover:text-[#1A1C40]'
-              }`}
-          >
-            Minhas viagens
-            {activeTab === 'private' && (
-              <motion.div
-                layoutId="activeTabUnderline"
-                className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-[#1A1C40] rounded-full"
-              />
-            )}
-          </button>
-
-          <button
-            onClick={() => {
-              setActiveTab('public');
-              setSearchQuery('');
-            }}
-            className={`flex-1 pb-3 text-center text-[15px] transition-all relative whitespace-nowrap ${activeTab === 'public' ? 'font-semibold text-[#1A1C40]' : 'font-medium text-[#8E8E93] hover:text-[#1A1C40]'
-              }`}
-          >
-            Minha loja
-            {activeTab === 'public' && (
-              <motion.div
-                layoutId="activeTabUnderline"
-                className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-[#1A1C40] rounded-full"
-              />
-            )}
-          </button>
-        </div>
-      </div>
-
       {/* Search and Filters Bar */}
       {(
-        (activeTab === 'private' ? mergedPrivateItineraries.length > 0 : mergedPublicItineraries.length > 0) ||
+        mergedPrivateItineraries.length > 0 ||
         searchQuery ||
         originFilter !== 'all'
       ) && (
-          <div className="px-6 pt-5 pb-3">
+          <div className="px-6 pb-3">
             <div className="flex items-center gap-3">
               <div className="flex-1 flex items-center bg-field border border-transparent rounded-[10px] px-3.5 py-2.5 transition-colors focus-within:border-primary">
                 <Icon name="search" size={18} className="text-[#8E8E93] mr-2.5 flex-shrink-0" />
@@ -654,9 +487,7 @@ export function TripsScreen({
       <main className="px-6 pt-2">
         {isTripsScreenLoading ? (
           <ItineraryListSkeleton count={3} />
-        ) : activeTab === 'private' ? (
-          /* Aba: Minhas viagens */
-          filteredPersonalList.length === 0 ? (
+        ) : filteredPersonalList.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               {searchQuery ? (
                 <>
@@ -730,78 +561,7 @@ export function TripsScreen({
                 />
               ))}
             </div>
-          )
-        ) : (
-          /* Aba: Roteiros Publicados */
-          filteredPublicList.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              {searchQuery ? (
-                <>
-                  <div className="w-16 h-16 rounded-full bg-[#F4F4F5] flex items-center justify-center mb-3 text-[#8E8E93]">
-                    <ShoppingBag className="w-7 h-7" />
-                  </div>
-                  <h3 className="text-[16px] font-bold text-[#1A1C40] mb-1">
-                    Nenhum roteiro encontrado
-                  </h3>
-                  <p className="text-[13px] text-[#8E8E93] max-w-xs mb-5">
-                    Tente buscar por outro termo ou limpe os filtros.
-                  </p>
-                </>
-              ) : (
-                <div className="flex flex-col items-center gap-6 mt-6">
-                  {/* Image container */}
-                  <div className="flex items-center justify-center">
-                    <img src="/empty-store.png" alt="Nenhum roteiro" className="w-[126px] h-[168px] object-contain scale-x-[-1]" />
-                  </div>
-
-                  {/* Text & Button Group */}
-                  <div className="flex flex-col items-center gap-4">
-                    {/* Texts */}
-                    <div className="flex flex-col items-center gap-2">
-                      <h3 className="text-[18px] font-semibold text-[#141530] leading-[22px]">
-                        Você ainda não tem roteiros à venda
-                      </h3>
-                      <p className="text-[14px] font-medium text-[#7F7F7F] max-w-[249px] text-center leading-[16px]">
-                        Crie um roteiro para sua loja e publique quando estiver pronto para vender.
-                      </p>
-                    </div>
-
-                    {/* Button */}
-                    <button
-                      onClick={() => onCreateItinerary?.('seller')}
-                      className="flex flex-row justify-center items-center px-4 py-3 gap-2 min-w-[141px] h-[48px] rounded-[12px] border border-[#141530] text-[#141530] text-[16px] font-bold leading-[19px] hover:bg-[#141530]/5 active:scale-95 transition-all shadow-none"
-                    >
-                      Criar roteiro pra venda
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              {filteredPublicList.map((item) => (
-                <PublishedItineraryCard
-                  key={item.id}
-                  item={item}
-                  onClick={() => {
-                    if (!item._userItinerary) return;
-                    if (item._userItinerary.status === 'draft') {
-                      if (onUserItineraryClick) {
-                        onUserItineraryClick(item._userItinerary);
-                      }
-                    } else {
-                      if (onUserPublicItineraryClick) {
-                        onUserPublicItineraryClick(item._userItinerary);
-                      } else if (onUserItineraryClick) {
-                        onUserItineraryClick(item._userItinerary);
-                      }
-                    }
-                  }}
-                />
-              ))}
-            </div>
-          )
-        )}
+          )}
       </main>
 
       {/* Delete Confirmation Sheet */}
@@ -824,7 +584,6 @@ export function TripsScreen({
       {showSortSheet && (
         <TripsFilterScreen
           onClose={() => setShowSortSheet(false)}
-          activeTab={activeTab}
           initialSortBy={sortBy}
           initialOriginFilter={originFilter}
           onApply={(newSortBy, newOriginFilter) => {
@@ -946,86 +705,6 @@ function PersonalItineraryCard({
           </div>
         </div>
       </motion.div>
-    </div>
-  );
-}
-
-// Card do Roteiro Publicado (Figma)
-function PublishedItineraryCard({
-  item,
-  onClick,
-}: {
-  item: any;
-  onClick: () => void;
-}) {
-  const getStatusBadge = (status: 'Ativo' | 'Rascunho' | 'Pausado') => {
-    switch (status) {
-      case 'Ativo':
-        return (
-          <span className="inline-flex items-center justify-center h-[24px] px-[12px] py-[4px] rounded-[9px] border border-[#3C8622] text-[#3C8622] bg-white text-[12px] font-medium leading-[14px]">
-            Ativo
-          </span>
-        );
-      case 'Rascunho':
-        return (
-          <span className="inline-flex items-center justify-center h-[24px] px-[12px] py-[4px] rounded-[9px] border border-[#646464] text-[#646464] bg-white text-[12px] font-medium leading-[14px]">
-            Rascunho
-          </span>
-        );
-      case 'Pausado':
-        return (
-          <span className="inline-flex items-center justify-center h-[24px] px-[12px] py-[4px] rounded-[9px] border border-[#D8911E] text-[#D8911E] bg-white text-[12px] font-medium leading-[14px]">
-            Pausado
-          </span>
-        );
-    }
-  };
-
-  const salesStr = (item.salesCount === 0 || item.salesCount == null) ? '-' : `${item.salesCount} vendas`;
-  const ratingStr = (item.rating === 0 || item.rating == null) ? '-' : String(item.rating).replace('.', ',');
-  const likesStr = (item.likesCount === 0 || item.likesCount == null) ? '-' : item.likesCount;
-
-  const formattedPrice = item.priceCents
-    ? `R$ ${(item.priceCents / 100).toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`
-    : '-';
-
-  return (
-    <div
-      onClick={onClick}
-      className="flex gap-[16px] items-center bg-white pb-[24px] border-b border-[#F2F2F2] last:border-b-0 active:scale-[0.99] transition-transform cursor-pointer w-full"
-    >
-      <TripThumbnail images={item.images} className="w-[95px] h-[94px] min-w-[95px] min-h-[94px]" />
-
-      <div className="flex-1 min-w-0 flex flex-col justify-center h-[94px] gap-[16px]">
-        <div className="flex flex-col gap-[12px]">
-          <h3 className="font-semibold text-[16px] leading-[19px] text-[#1A1C40] truncate">
-            {item.title}
-          </h3>
-
-          <div className="flex items-center gap-[16px]">
-            <div className="flex items-center gap-1">
-              <Star className="w-[17px] h-[17px] text-[#FDAC2A] stroke-[1.5]" />
-              <span className="text-[14px] font-medium text-[#646464] leading-[17px] font-['Urbanist',sans-serif]">{ratingStr}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Heart className="w-[17px] h-[17px] text-[#DA501F] stroke-[1.5]" />
-              <span className="text-[14px] font-medium text-[#646464] leading-[17px] font-['Urbanist',sans-serif]">{likesStr}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <ShoppingBag className="w-[16px] h-[16px] text-[#141530] stroke-[1.5]" />
-              <span className="text-[14px] font-medium text-[#646464] leading-[17px] font-['Urbanist',sans-serif]">{salesStr}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-[12px]">
-          <span className="text-[14px] font-medium text-[#141530] font-['Urbanist',sans-serif]">{formattedPrice}</span>
-          {getStatusBadge(item.status)}
-        </div>
-      </div>
     </div>
   );
 }

@@ -95,6 +95,10 @@ import {
   QrCodeIcon,
   ComputerDesktopIcon,
   TicketIcon,
+  EnvelopeIcon,
+  NoSymbolIcon,
+  QuestionMarkCircleIcon,
+  ShieldCheckIcon,
 } from '@heroicons/react/24/outline';
 
 // Lucide icons for transport (not available in Heroicons)
@@ -308,6 +312,10 @@ const iconMap: Record<string, [React.ComponentType<React.SVGProps<SVGSVGElement>
 
   // Settings
   settings: [Cog6ToothIcon],
+  mail: [EnvelopeIcon],
+  block: [NoSymbolIcon],
+  help: [QuestionMarkCircleIcon],
+  privacy_tip: [ShieldCheckIcon],
   mic: [MicrophoneIcon],
   history: [ClockIcon],
   arrow_upward: [ChevronUpIcon],

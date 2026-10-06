@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useBackHandler } from '@/lib/backStack';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Sparkles, Users, DollarSign, ShieldCheck, Star, TrendingUp, Plus, FolderOpen, ChevronRight, X } from 'lucide-react';
 import { useMyItineraries } from '@/hooks/use-my-itineraries';
@@ -20,6 +21,8 @@ interface CreatorProgramScreenProps {
  *   2) Publicar um roteiro existente (seleção entre os roteiros do usuário)
  */
 export function CreatorProgramScreen({ onBack, onStartCreating, onPublishExisting }: CreatorProgramScreenProps) {
+  // Arrastar da borda esquerda executa o mesmo que a seta de voltar.
+  useBackHandler(onBack);
   const [showChoice, setShowChoice] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const { session } = useAuth();

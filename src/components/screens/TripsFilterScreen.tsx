@@ -1,4 +1,5 @@
 import { Icon } from '@/components/ui/Icon';
+import { useBackHandler } from '@/lib/backStack';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
@@ -7,7 +8,6 @@ type OriginFilter = 'all' | 'mine' | 'shared' | 'purchased';
 
 interface TripsFilterScreenProps {
   onClose: () => void;
-  activeTab: 'private' | 'public';
   initialSortBy: SortOption;
   initialOriginFilter: OriginFilter;
   onApply: (sortBy: SortOption, originFilter: OriginFilter) => void;
@@ -29,7 +29,9 @@ const sortOptions: { id: SortOption; label: string }[] = [
   { id: 'za', label: 'Ordem alfabética (Z–A)' },
 ];
 
-export function TripsFilterScreen({ onClose, activeTab, initialSortBy, initialOriginFilter, onApply }: TripsFilterScreenProps) {
+export function TripsFilterScreen({ onClose, initialSortBy, initialOriginFilter, onApply }: TripsFilterScreenProps) {
+  // Arrastar da borda esquerda executa o mesmo que a seta de voltar.
+  useBackHandler(onClose);
   const [originFilter, setOriginFilter] = useState<OriginFilter>(initialOriginFilter);
   const [sortBy, setSortBy] = useState<SortOption>(initialSortBy);
 
@@ -66,8 +68,7 @@ export function TripsFilterScreen({ onClose, activeTab, initialSortBy, initialOr
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4 pb-32 flex flex-col gap-6">
-        {activeTab === 'private' && (
-          <div className="bg-white rounded-[16px] p-4 flex flex-col gap-4">
+        <div className="bg-white rounded-[16px] p-4 flex flex-col gap-4">
             <h2 className="text-[16px] font-semibold text-[#141530] leading-[19px] font-['Urbanist'] mb-2">Mostrar</h2>
             <div className="flex flex-col">
               {originOptions.map((opt, index) => (
@@ -83,7 +84,6 @@ export function TripsFilterScreen({ onClose, activeTab, initialSortBy, initialOr
               ))}
             </div>
           </div>
-        )}
 
         <div className="bg-white rounded-[16px] p-4 flex flex-col gap-4">
           <h2 className="text-[16px] font-semibold text-[#141530] leading-[19px] font-['Urbanist'] mb-2">Ordenar por</h2>

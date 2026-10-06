@@ -1,5 +1,7 @@
+import { useRef } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/utils';
+import { useBackHandler } from '@/lib/backStack';
 
 interface BackButtonProps {
   onClick: () => void;
@@ -16,8 +18,13 @@ interface BackButtonProps {
  * Use this in every screen header to keep navigation consistent.
  */
 export function BackButton({ onClick, className, ariaLabel = 'Voltar' }: BackButtonProps) {
+  const ref = useRef<HTMLButtonElement>(null);
+  // O gesto de arrastar da borda esquerda executa o mesmo `onClick` da seta.
+  useBackHandler(onClick, true, () => ref.current);
+
   return (
     <button
+      ref={ref}
       type="button"
       onClick={onClick}
       aria-label={ariaLabel}

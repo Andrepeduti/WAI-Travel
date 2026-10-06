@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { clearNavStackPersistence } from '@/hooks/useNavStack';
 
 interface AuthContextValue {
   session: Session | null;
@@ -96,6 +97,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!session?.user?.id) {
       setOnboardingCompleted(null);
+      // Sem sessão: descarta o histórico de telas guardado para não vazar para a próxima conta.
+      clearNavStackPersistence();
       return;
     }
     fetchOnboardingStatus(session.user.id);

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useBackHandler } from '@/lib/backStack';
 import { format, subDays, startOfDay, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -61,6 +62,8 @@ export function CreatorItineraryDashboardScreen({
   onUnpublished,
   onDelete,
 }: CreatorItineraryDashboardScreenProps) {
+  // Arrastar da borda esquerda executa o mesmo que a seta de voltar.
+  useBackHandler(onBack);
   const { user } = useAuth();
   const [sales, setSales] = useState<SaleRow[]>([]);
   const [buyers, setBuyers] = useState<Record<string, BuyerProfile>>({});

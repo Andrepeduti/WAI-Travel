@@ -76,6 +76,24 @@ export const unblockProfile = async (profileUserId: string) => {
   if (error) throw error;
 };
 
+/** Lista as pessoas que o usuário logado bloqueou (mais recentes primeiro). */
+export const getBlockedProfiles = async (): Promise<FollowListEntry[]> => {
+  const currentUserId = await getAuthUserId();
+  if (!currentUserId) return [];
+  const { data: rows, error } = await db.from('profile_blocks')
+    .select('blocked_id')
+    .eq('blocker_id', currentUserId)
+    .order('created_at', { ascending: false });
+  if (error) { console.error('[social] getBlockedProfiles', error); return []; }
+  const ids = (rows || []).map((r: any) => r.blocked_id).filter(Boolean);
+  if (ids.length === 0) return [];
+  const { data: profs } = await db.from('profiles_public')
+    .select('user_id, name, username, avatar_url, location, bio')
+    .in('user_id', ids);
+  const byId = new Map<string, any>((profs || []).map((p: any) => [p.user_id, p]));
+  return ids.map((id: string) => byId.get(id)).filter(Boolean).map(profileRowToEntry);
+};
+
 export const reportProfile = async (
   profileUserId: string,
   reason = 'Perfil denunciado',

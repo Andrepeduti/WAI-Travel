@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useBackHandler } from '@/lib/backStack';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { ItineraryPlace, ItineraryDay } from '@/data/itineraries';
@@ -103,6 +104,8 @@ export function ItineraryMapScreen({
   onSwitchToItinerary,
   onSelectPlaceDetails,
 }: ItineraryMapScreenProps) {
+  // Arrastar da borda esquerda executa o mesmo que a seta de voltar.
+  useBackHandler(onBack);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [selectedUid, setSelectedUid] = useState<string | null>(null);
   const [isDayDropdownOpen, setIsDayDropdownOpen] = useState(false);

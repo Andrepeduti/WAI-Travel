@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useIsSeller } from '@/hooks/useUserGoals';
 import { Camera, MoreHorizontal, UserPlus, ChevronRight, Trash2, Star, Check, X, Search, Clock, Target, ChevronDown } from 'lucide-react';
 import { BackButton } from '@/components/ui/BackButton';
 import { format, differenceInDays } from 'date-fns';
@@ -75,6 +76,7 @@ export function ManageItineraryScreen({
   initialMembers = [],
   isAutoCover = false,
 }: ManageItineraryScreenProps) {
+  const isSeller = useIsSeller();
   const defaultCover = 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=600';
   
   // Local state for edits
@@ -655,7 +657,7 @@ export function ManageItineraryScreen({
           <h3 className="font-semibold text-[16px] text-[#171F2C]">Ferramentas</h3>
           <div className="flex flex-col gap-6">
             
-            {canEdit && (
+            {canEdit && isSeller && (
               <div className="flex flex-col gap-4">
                 <button onClick={onPublish} className="flex items-center justify-between group text-left">
                   <div className="flex items-center gap-3">

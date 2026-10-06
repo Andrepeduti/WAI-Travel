@@ -1,11 +1,13 @@
 import React, { useEffect } from 'react';
 import { motion, LayoutGroup } from 'framer-motion';
 
-export type TabType = 'home' | 'create' | 'trips' | 'ai' | 'profile';
+export type TabType = 'home' | 'create' | 'store' | 'trips' | 'ai' | 'profile';
 
 interface BottomNavigationProps {
   activeTab: TabType;
   onTabChange: (tab: TabType) => void;
+  /** Mostra o item "Minha loja" (usuários que querem publicar e vender roteiros). */
+  showStore?: boolean;
 }
 
 const navItems: {
@@ -31,8 +33,28 @@ const navItems: {
     ),
   },
   {
+    id: 'store',
+    label: 'Minha loja',
+    renderIcon: (isActive) => (
+      <svg
+        className="w-[22px] h-[22px] flex-shrink-0"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={isActive ? '2.3' : '1.8'}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M3 9l1.5-5h15L21 9" />
+        <path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0" />
+        <path d="M5 12v8h14v-8" />
+        <path d="M10 20v-4h4v4" />
+      </svg>
+    ),
+  },
+  {
     id: 'trips',
-    label: 'Roteiros',
+    label: 'Viagens',
     renderIcon: (isActive) => (
       <svg
         className="w-[22px] h-[22px] flex-shrink-0"
@@ -70,7 +92,9 @@ const navItems: {
   },
 ];
 
-export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationProps) {
+export function BottomNavigation({ activeTab, onTabChange, showStore = false }: BottomNavigationProps) {
+  const visibleItems = showStore ? navItems : navItems.filter((item) => item.id !== 'store');
+
   useEffect(() => {
     // Set global CSS variable for toast offset (93px = 64px height + 29px bottom spacing)
     document.documentElement.style.setProperty('--toast-bottom-offset', '93px');
@@ -91,7 +115,7 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
             borderRadius: '32px',
           }}
         >
-          {navItems.map((item) => {
+          {visibleItems.map((item) => {
             const isActive = activeTab === item.id;
 
             return (

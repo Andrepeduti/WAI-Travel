@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
 import { useNavStack } from '@/hooks/useNavStack';
 import { useCurrentUser } from '@/hooks/use-current-user';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useNavigationType } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { BottomNavigation, TabType } from '@/components/travel/BottomNavigation';
 import { HomeScreen } from '@/components/screens/HomeScreen';
@@ -21,6 +21,7 @@ import type { CreatorProfileData } from '@/components/screens/CreatorProfileScre
 import type { ItineraryListItem } from '@/components/screens/ItineraryListScreen';
 
 // Heavy/secondary screens — loaded on demand to keep the initial bundle small.
+const StoreScreen = lazy(() => import('@/components/screens/StoreScreen').then(m => ({ default: m.StoreScreen })));
 const TripsScreen = lazy(() => import('@/components/screens/TripsScreen').then(m => ({ default: m.TripsScreen })));
 const AIAssistantScreen = lazy(() => import('@/components/screens/AIAssistantScreen').then(m => ({ default: m.AIAssistantScreen })));
 const AIHistoryScreen = lazy(() => import('@/components/screens/AIHistoryScreen').then(m => ({ default: m.AIHistoryScreen })));
@@ -50,6 +51,9 @@ const FindPeopleScreen = lazy(() => import('@/components/screens/FindPeopleScree
 const SimilarTravelersScreen = lazy(() => import('@/components/screens/SimilarTravelersScreen').then(m => ({ default: m.SimilarTravelersScreen })));
 const TopCreatorsScreen = lazy(() => import('@/components/screens/TopCreatorsScreen').then(m => ({ default: m.TopCreatorsScreen })));
 const ItineraryListScreen = lazy(() => import('@/components/screens/ItineraryListScreen').then(m => ({ default: m.ItineraryListScreen })));
+const SettingsScreen = lazy(() => import('@/components/screens/SettingsScreen').then(m => ({ default: m.SettingsScreen })));
+const AccountSettingsScreen = lazy(() => import('@/components/screens/AccountSettingsScreen').then(m => ({ default: m.AccountSettingsScreen })));
+const BlockedUsersScreen = lazy(() => import('@/components/screens/BlockedUsersScreen').then(m => ({ default: m.BlockedUsersScreen })));
 const PersonalInfoScreen = lazy(() => import('@/components/screens/PersonalInfoScreen').then(m => ({ default: m.PersonalInfoScreen })));
 const LoginSecurityScreen = lazy(() => import('@/components/screens/LoginSecurityScreen').then(m => ({ default: m.LoginSecurityScreen })));
 const PaymentSettingsScreen = lazy(() => import('@/components/screens/PaymentSettingsScreen').then(m => ({ default: m.PaymentSettingsScreen })));
@@ -61,6 +65,7 @@ const PurchasesScreen = lazy(() => import('@/components/screens/PurchasesScreen'
 const SubscriptionScreen = lazy(() => import('@/components/screens/SubscriptionScreen').then(m => ({ default: m.SubscriptionScreen })));
 const GoalsSettingsScreen = lazy(() => import('@/components/screens/GoalsSettingsScreen').then(m => ({ default: m.GoalsSettingsScreen })));
 
+import { useIsSeller } from '@/hooks/useUserGoals';
 import { addOptimisticItinerary, buildOptimisticItinerary, removeOptimisticItinerary, replaceOptimisticItinerary, useMyItineraries } from '@/hooks/use-my-itineraries';
 import { type UserItinerary } from '@/components/screens/TripsScreen';
 import { createItinerary, updateItinerary, deleteItinerary, getUserItineraryById } from '@/lib/itinerariesApi';
@@ -84,11 +89,12 @@ const ScreenFallback = () => (
   </div>
 );
 
-type ProfileSubScreen = 'main' | 'profile' | 'user' | 'creator' | 'friend' | 'creator-program' | 'edit' | 'achievements' | 'sales' | 'find-people' | 'top-creators' | 'personal-info' | 'login-security' | 'payment-settings' | 'notification-settings' | 'language' | 'help-center' | 'purchases' | 'subscription' | 'goals';
+type ProfileSubScreen = 'main' | 'profile' | 'user' | 'creator' | 'friend' | 'creator-program' | 'edit' | 'achievements' | 'sales' | 'find-people' | 'top-creators' | 'settings' | 'account' | 'blocked-users' | 'personal-info' | 'login-security' | 'payment-settings' | 'notification-settings' | 'language' | 'help-center' | 'purchases' | 'subscription' | 'goals';
 
 const Index = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const navigationType = useNavigationType();
   const { session, loading: authLoading } = useAuth();
   const { user: currentUser } = useCurrentUser();
 
@@ -133,6 +139,8 @@ const Index = () => {
   const [createItineraryInitialType, setCreateItineraryInitialType] = useState<'personal' | 'seller' | undefined>();
   const [showPlanLimitSheet, setShowPlanLimitSheet] = useState(false);
   const { itineraries: myItinerariesForLimit } = useMyItineraries();
+  // "Minha loja" aparece só para vendedores.
+  const showStoreTab = useIsSeller();
   const FREE_PLAN_ITINERARY_LIMIT = Infinity;
   // Conta apenas roteiros originais criados pelo próprio usuário.
   // Exclui: comprados (sourceDatasetId != null) e compartilhados (userId != auth user).
@@ -295,7 +303,6 @@ const Index = () => {
   const [showDeleteSuccessToast, setShowDeleteSuccessToast] = useState(false);
   const [showLeaveSuccessToast, setShowLeaveSuccessToast] = useState(false);
   const [showDuplicateSuccessToast, setShowDuplicateSuccessToast] = useState(false);
-  const [returnToPublic, setReturnToPublic] = useState(false);
   const [purchasedItineraryId, setPurchasedItineraryId] = useState<number | null>(null);
   const [selectedCreator, setSelectedCreator] = useState<CreatorProfileData | null>(null);
   const [selectedFriend, setSelectedFriend] = useState<FriendProfileData | null>(null);
@@ -330,98 +337,117 @@ const Index = () => {
       showPromoDetail ? 'promo' : '',
       showSimilarTravelers ? 'similar' : '',
       newItineraryData ? 'new-it' : '',
+      itineraryList ? `list:${itineraryList.title}` : '',
+      creatorEditingItinerary ? `edit:${creatorEditingItinerary.id}` : '',
+      activeUserItineraryReadOnlyMode ? 'ro' : '',
     ].filter(Boolean).join('|');
   }, [
     activeTab, profileSubScreen, selectedCreator, selectedFriend, selectedItinerary,
     activeUserItineraryId, activeUserItineraryRole, creatorDashboardItinerary,
     selectedExperienceId, destinationList, showSearch, showChat, showNotifications,
     showAIAssistant, showAIHistory, showCart, showTripReminders, showPromoDetail,
-    showSimilarTravelers, newItineraryData,
+    showSimilarTravelers, newItineraryData, itineraryList, creatorEditingItinerary,
+    activeUserItineraryReadOnlyMode,
   ]);
 
-  // Snapshot dos setters de tela: ao restaurar, reaplica todos os valores
-  // capturados no momento em que a tela foi aberta.
-  const captureRestore = useCallback(() => {
-    const snap = {
-      activeTab,
-      profileSubScreen,
-      selectedCreator,
-      selectedFriend,
-      selectedItinerary,
-      activeUserItineraryId,
-      activeUserItineraryDataset,
-      activeUserItineraryRole,
-      creatorDashboardItinerary,
-      selectedExperienceId,
-      destinationList,
-      showSearch,
-      showChat,
-      showNotifications,
-      showAIAssistant,
-      showAIHistory,
-      showCart,
-      showTripReminders,
-      showPromoDetail,
-      showSimilarTravelers,
-      newItineraryData,
-      injectedMarketplaceDataset,
-      ownedPublicUserItinerary,
-      purchasedItineraryId,
-      navigatedFromNotifications,
-      navigatedFromFriendProfile,
-      navigatedFromPurchases,
-      returnToPublic,
-      chatInitialContact,
-    };
-    return () => {
-      setActiveTab(snap.activeTab);
-      setProfileSubScreen(snap.profileSubScreen);
-      setSelectedCreator(snap.selectedCreator);
-      setSelectedFriend(snap.selectedFriend);
-      setSelectedItinerary(snap.selectedItinerary);
-      setActiveUserItineraryId(snap.activeUserItineraryId);
-      setActiveUserItineraryDataset(snap.activeUserItineraryDataset);
-      setActiveUserItineraryRole(snap.activeUserItineraryRole);
-      setCreatorDashboardItinerary(snap.creatorDashboardItinerary);
-      setSelectedExperienceId(snap.selectedExperienceId);
-      setDestinationList(snap.destinationList);
-      setShowSearch(snap.showSearch);
-      setShowChat(snap.showChat);
-      setShowNotifications(snap.showNotifications);
-      setShowAIAssistant(snap.showAIAssistant);
-      setShowAIHistory(snap.showAIHistory);
-      setShowCart(snap.showCart);
-      setShowTripReminders(snap.showTripReminders);
-      setShowPromoDetail(snap.showPromoDetail);
-      setShowSimilarTravelers(snap.showSimilarTravelers);
-      setNewItineraryData(snap.newItineraryData);
-      setInjectedMarketplaceDataset(snap.injectedMarketplaceDataset);
-      setOwnedPublicUserItinerary(snap.ownedPublicUserItinerary);
-      setPurchasedItineraryId(snap.purchasedItineraryId);
-      setNavigatedFromNotifications(snap.navigatedFromNotifications);
-      setNavigatedFromFriendProfile(snap.navigatedFromFriendProfile);
-      setNavigatedFromPurchases(snap.navigatedFromPurchases);
-      setReturnToPublic(snap.returnToPublic);
-      setChatInitialContact(snap.chatInitialContact);
-    };
-  }, [
-    activeTab, profileSubScreen, selectedCreator, selectedFriend, selectedItinerary,
-    activeUserItineraryId, activeUserItineraryDataset, activeUserItineraryRole, creatorDashboardItinerary,
-    selectedExperienceId, destinationList, showSearch, showChat,
-    showNotifications, showAIAssistant, showAIHistory, showCart, showTripReminders,
-    showPromoDetail, showSimilarTravelers, newItineraryData, injectedMarketplaceDataset,
-    ownedPublicUserItinerary, purchasedItineraryId, navigatedFromNotifications,
-    navigatedFromFriendProfile, navigatedFromPurchases, returnToPublic, chatInitialContact,
-  ]);
+  // Snapshot (dados) de tudo que define "em qual tela o usuário está". Quando o
+  // usuário volta, o snapshot da tela anterior é reaplicado por `applyNavSnapshot`.
+  // Se algum estado novo influenciar qual tela aparece, ele precisa entrar aqui.
+  const navSnapshot = {
+    activeTab,
+    profileSubScreen,
+    selectedCreator,
+    selectedFriend,
+    selectedItinerary,
+    activeUserItineraryId,
+    activeUserItineraryDataset,
+    activeUserItineraryRole,
+    activeUserItineraryReadOnlyMode,
+    activeUserItineraryIsPurchased,
+    plannerInitialDay,
+    creatorDashboardItinerary,
+    creatorEditingItinerary,
+    selectedExperienceId,
+    destinationList,
+    itineraryList,
+    showSearch,
+    searchInitialFilters,
+    searchInitialQuery,
+    showChat,
+    showNotifications,
+    showAIAssistant,
+    showAIHistory,
+    showCart,
+    showTripReminders,
+    showPromoDetail,
+    showSimilarTravelers,
+    newItineraryData,
+    injectedMarketplaceDataset,
+    ownedPublicUserItinerary,
+    purchasedItineraryId,
+    resumeCheckoutId,
+    creatorProgramOrigin,
+    subscriptionOrigin,
+    navigatedFromNotifications,
+    navigatedFromFriendProfile,
+    navigatedFromStandaloneProfile,
+    navigatedFromPurchases,
+    chatInitialContact,
+  };
+  type NavSnapshot = typeof navSnapshot;
 
-  const { wrapBack, resetStack } = useNavStack(navSignature, captureRestore());
+  // Os setters do useState são estáveis, então esta função nunca muda.
+  const applyNavSnapshot = useCallback((snap: NavSnapshot) => {
+    setActiveTab(snap.activeTab);
+    setProfileSubScreen(snap.profileSubScreen);
+    setSelectedCreator(snap.selectedCreator);
+    setSelectedFriend(snap.selectedFriend);
+    setSelectedItinerary(snap.selectedItinerary);
+    setActiveUserItineraryId(snap.activeUserItineraryId);
+    setActiveUserItineraryDataset(snap.activeUserItineraryDataset);
+    setActiveUserItineraryRole(snap.activeUserItineraryRole);
+    setActiveUserItineraryReadOnlyMode(snap.activeUserItineraryReadOnlyMode);
+    setActiveUserItineraryIsPurchased(snap.activeUserItineraryIsPurchased);
+    setPlannerInitialDay(snap.plannerInitialDay);
+    setCreatorDashboardItinerary(snap.creatorDashboardItinerary);
+    setCreatorEditingItinerary(snap.creatorEditingItinerary);
+    setSelectedExperienceId(snap.selectedExperienceId);
+    setDestinationList(snap.destinationList);
+    setItineraryList(snap.itineraryList);
+    setShowSearch(snap.showSearch);
+    setSearchInitialFilters(snap.searchInitialFilters);
+    setSearchInitialQuery(snap.searchInitialQuery);
+    setShowChat(snap.showChat);
+    setShowNotifications(snap.showNotifications);
+    setShowAIAssistant(snap.showAIAssistant);
+    setShowAIHistory(snap.showAIHistory);
+    setShowCart(snap.showCart);
+    setShowTripReminders(snap.showTripReminders);
+    setShowPromoDetail(snap.showPromoDetail);
+    setShowSimilarTravelers(snap.showSimilarTravelers);
+    setNewItineraryData(snap.newItineraryData);
+    setInjectedMarketplaceDataset(snap.injectedMarketplaceDataset);
+    setOwnedPublicUserItinerary(snap.ownedPublicUserItinerary);
+    setPurchasedItineraryId(snap.purchasedItineraryId);
+    setResumeCheckoutId(snap.resumeCheckoutId);
+    setCreatorProgramOrigin(snap.creatorProgramOrigin);
+    setSubscriptionOrigin(snap.subscriptionOrigin);
+    setNavigatedFromNotifications(snap.navigatedFromNotifications);
+    setNavigatedFromFriendProfile(snap.navigatedFromFriendProfile);
+    setNavigatedFromStandaloneProfile(snap.navigatedFromStandaloneProfile);
+    setNavigatedFromPurchases(snap.navigatedFromPurchases);
+    setChatInitialContact(snap.chatInitialContact);
+    // Nunca reabre o fluxo de publicação automaticamente ao voltar para o planner.
+    setAutoOpenPublishFlow(false);
+  }, []);
 
-  // Reset return flags when leaving the trips tab so subsequent visits start clean.
-  useEffect(() => {
-    if (activeTab !== 'trips') {
-      if (returnToPublic) setReturnToPublic(false);
-    }
-  }, [activeTab, returnToPublic]);
+  const { wrapBack, resetStack } = useNavStack(
+    navSignature,
+    navSnapshot,
+    applyNavSnapshot,
+    location.key,
+    navigationType === 'POP',
+  );
 
   const handleTabChange = (tab: TabType) => {
     if (tab === 'create') {
@@ -429,9 +455,12 @@ const Index = () => {
     } else if (tab === 'ai') {
       setShowAIAssistant(true);
     } else if (tab === 'profile') {
+      // Aba raiz: começa um histórico novo (só zera se a tela realmente mudar).
+      if (activeTab !== 'home' || profileSubScreen !== 'user') resetStack();
       setActiveTab('home');
       setProfileSubScreen('user');
     } else {
+      if (activeTab !== tab || (tab === 'home' && profileSubScreen !== 'main')) resetStack();
       setActiveTab(tab);
       if (tab === 'home') {
         setProfileSubScreen('main');
@@ -549,11 +578,8 @@ const Index = () => {
 
     replaceOptimisticItinerary(tempId, created);
 
-    if (data.isPublic) {
-      setReturnToPublic(true);
-    } else {
-      setReturnToPublic(false);
-    }
+    // Roteiro de venda nasce (e volta) na aba Minha loja.
+    if (data.isPublic) setActiveTab('store');
 
     setNewItineraryData({
       ...data,
@@ -1033,7 +1059,7 @@ const Index = () => {
                 setNavigatedFromStandaloneProfile(false);
                 navigate(-1);
               }
-            })}
+            }, { skipStack: navigatedFromStandaloneProfile })}
             onPreview={() => {
               const it = creatorDashboardItinerary;
               setCreatorDashboardItinerary(null);
@@ -1142,7 +1168,7 @@ const Index = () => {
                   handleItineraryBack();
                 }
               }}
-              onBack={wrapBack(() => handleItineraryBack())}
+              onBack={wrapBack(() => handleItineraryBack(), { skipStack: navigatedFromStandaloneProfile })}
               authorOverride={navigatedFromFriendProfile && selectedFriend ? selectedFriend.name : undefined}
               authorImageOverride={navigatedFromFriendProfile && selectedFriend ? selectedFriend.avatar : undefined}
               onViewPurchasedItinerary={(id, newStartDate, newEndDate) => {
@@ -1163,6 +1189,9 @@ const Index = () => {
                     type: 'planner',
                     participants: [],
                   };
+                  // Compra concluída: o checkout/marketplace não é mais um destino
+                  // de "voltar". Do roteiro comprado, voltar leva para "Viagens".
+                  resetStack();
                   setPurchasedItineraryId(id);
                   setSelectedItinerary(plannerDataset);
                 }
@@ -1177,7 +1206,8 @@ const Index = () => {
                 } else {
                   const author = selectedItinerary.author || 'Autor';
                   const authorImage = selectedItinerary.authorImage || '';
-                  setSelectedItinerary(null);
+                  // Não limpa `selectedItinerary`: ao voltar do perfil (/profile), o
+                  // Index é restaurado exatamente nesta tela do roteiro.
                   navigate('/profile', {
                     state: {
                       friend: {
@@ -1218,11 +1248,12 @@ const Index = () => {
               // A cópia editável do comprador já é criada por `recordPurchase` (ensureBuyerCopy)
               // no momento do checkout — não recriamos aqui para evitar duplicatas.
               handleItineraryBack(true);
-            })}
+            }, { skipStack: navigatedFromStandaloneProfile })}
             onDelete={async () => {
               if (selectedItinerary?.id && typeof selectedItinerary.id === 'string') {
                 await deleteItinerary(selectedItinerary.id);
               }
+              resetStack();
               setSelectedItinerary(null);
               setPurchasedItineraryId(null);
               setActiveTab('trips');
@@ -1247,11 +1278,12 @@ const Index = () => {
             }}
 
             onNavigateToAI={() => { setSelectedItinerary(null); setPurchasedItineraryId(null); setShowAIAssistant(true); }}
-            onNavigateToSales={() => { setSelectedItinerary(null); setPurchasedItineraryId(null); setReturnToPublic(true); setActiveTab('trips'); }}
+            onNavigateToSales={() => { resetStack(); setSelectedItinerary(null); setPurchasedItineraryId(null); setActiveTab('store'); }}
             onOpenItinerary={(dataset) => {
               setSelectedItinerary(dataset);
             }}
             onDuplicateSuccess={() => {
+              resetStack();
               setSelectedItinerary(null);
               setPurchasedItineraryId(null);
               setActiveTab('trips');
@@ -1294,7 +1326,7 @@ const Index = () => {
                 setCreatorDashboardItinerary(it);
                 return;
               }
-              setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryRole(null); setActiveUserItineraryIsPurchased(false); setActiveUserItineraryReadOnlyMode(false); setActiveTab('trips');
+              setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryRole(null); setActiveUserItineraryIsPurchased(false); setActiveUserItineraryReadOnlyMode(false); setActiveTab(activeTab === 'store' ? 'store' : 'trips');
             })}
             onSaveCreatorEdit={() => {
               const it = creatorEditingItinerary;
@@ -1306,6 +1338,7 @@ const Index = () => {
               if (activeUserItineraryId && !activeUserItineraryId.startsWith('pending-itinerary-')) {
                 await deleteItinerary(activeUserItineraryId);
               }
+              resetStack();
               setNewItineraryData(null);
               setActiveUserItineraryId(null);
               setActiveUserItineraryDataset(null);
@@ -1313,16 +1346,17 @@ const Index = () => {
               setActiveUserItineraryIsPurchased(false);
               setActiveUserItineraryReadOnlyMode(false);
               setCreatorEditingItinerary(null);
-              setActiveTab('trips');
+              setActiveTab(activeTab === 'store' ? 'store' : 'trips');
               setShowDeleteSuccessToast(true);
             }}
             onUpdate={handleItineraryUpdate}
             onDuplicateSuccess={() => {
+              resetStack();
               setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryRole(null); setActiveUserItineraryIsPurchased(false); setActiveUserItineraryReadOnlyMode(false); setActiveTab('trips');
               setShowDuplicateSuccessToast(true);
             }}
             onNavigateToAI={() => { setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryRole(null); setActiveUserItineraryIsPurchased(false); setActiveUserItineraryReadOnlyMode(false); setShowAIAssistant(true); }}
-            onNavigateToSales={() => { setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryRole(null); setActiveUserItineraryIsPurchased(false); setActiveUserItineraryReadOnlyMode(false); setCreatorEditingItinerary(null); setReturnToPublic(true); setActiveTab('trips'); }}
+            onNavigateToSales={() => { resetStack(); setNewItineraryData(null); setActiveUserItineraryId(null); setActiveUserItineraryDataset(null); setActiveUserItineraryRole(null); setActiveUserItineraryIsPurchased(false); setActiveUserItineraryReadOnlyMode(false); setCreatorEditingItinerary(null); setActiveTab('store'); }}
             onUpgrade={() => {
               setNewItineraryData(null);
               setActiveUserItineraryId(null);
@@ -1543,7 +1577,7 @@ const Index = () => {
           <SearchScreen
             initialFilters={searchInitialFilters}
             initialQuery={searchInitialQuery}
-            onClose={handleSearchClose}
+            onClose={wrapBack(handleSearchClose)}
             onItineraryClick={handleItineraryClick}
             onPublicUserItineraryClick={(it) => { setShowSearch(false); handleUserPublicItineraryClick(it); }}
           />
@@ -1564,7 +1598,7 @@ const Index = () => {
               onViewCreatorProgram={() => { setCreatorProgramOrigin('profile'); setProfileSubScreen('creator-program'); }}
               onChatClick={() => setShowChat(true)}
               onFindPeople={() => setProfileSubScreen('find-people')}
-              onNavigateToSetting={(setting) => { if (setting === 'subscription') setSubscriptionOrigin('profile'); setProfileSubScreen(setting as ProfileSubScreen); }}
+              onSettings={() => setProfileSubScreen('settings')}
               onPublicItineraryClick={(it) => { setProfileSubScreen('main'); setCreatorDashboardItinerary(it); }}
             />
           </div>
@@ -1689,21 +1723,36 @@ const Index = () => {
     }
     // Settings sub-screens
     const settingsScreenMap: Record<string, { component: React.ReactNode }> = {
-      'personal-info': { component: <PersonalInfoScreen onBack={wrapBack(() => setProfileSubScreen('user'))} /> },
+      'settings': {
+        component: <SettingsScreen
+          onBack={wrapBack(() => setProfileSubScreen('user'))}
+          onEditProfile={() => setProfileSubScreen('edit')}
+          onNavigate={(key) => { if (key === 'subscription') setSubscriptionOrigin('profile'); setProfileSubScreen(key as ProfileSubScreen); }}
+        />
+      },
+      'account': {
+        component: <AccountSettingsScreen
+          onBack={wrapBack(() => setProfileSubScreen('settings'))}
+          onPersonalInfo={() => setProfileSubScreen('personal-info')}
+          onBlockedUsers={() => setProfileSubScreen('blocked-users')}
+        />
+      },
+      'blocked-users': { component: <BlockedUsersScreen onBack={wrapBack(() => setProfileSubScreen('account'))} /> },
+      'personal-info': { component: <PersonalInfoScreen onBack={wrapBack(() => setProfileSubScreen('account'))} /> },
       'goals': { component: <GoalsSettingsScreen onBack={wrapBack(() => setProfileSubScreen('user'))} /> },
       'login-security': { component: <LoginSecurityScreen onBack={wrapBack(() => setProfileSubScreen('user'))} /> },
-      'payment-settings': { component: <PaymentSettingsScreen onBack={wrapBack(() => setProfileSubScreen('user'))} /> },
-      'notification-settings': { component: <NotificationSettingsScreen onBack={wrapBack(() => setProfileSubScreen('user'))} /> },
+      'payment-settings': { component: <PaymentSettingsScreen onBack={wrapBack(() => setProfileSubScreen('settings'))} /> },
+      'notification-settings': { component: <NotificationSettingsScreen onBack={wrapBack(() => setProfileSubScreen('settings'))} /> },
       'language': { component: <LanguageScreen onBack={wrapBack(() => setProfileSubScreen('user'))} /> },
       'help-center': { component: <HelpCenterScreen onBack={wrapBack(() => setProfileSubScreen('user'))} /> },
-      'purchases': { component: <PurchasesScreen onBack={wrapBack(() => setProfileSubScreen('user'))} onNavigateToItinerary={(id) => { setProfileSubScreen('main'); handleItineraryClick(id); setNavigatedFromPurchases(true); }} onResumeCheckout={(id) => { setResumeCheckoutId(id); handleItineraryClick(id); setNavigatedFromPurchases(true); }} /> },
+      'purchases': { component: <PurchasesScreen onBack={wrapBack(() => setProfileSubScreen('settings'))} onNavigateToItinerary={(id) => { setProfileSubScreen('main'); handleItineraryClick(id); setNavigatedFromPurchases(true); }} onResumeCheckout={(id) => { setResumeCheckoutId(id); handleItineraryClick(id); setNavigatedFromPurchases(true); }} /> },
       'subscription': {
         component: <SubscriptionScreen onBack={wrapBack(() => {
           if (subscriptionOrigin === 'trips') {
             setProfileSubScreen('main');
             setActiveTab('trips');
           } else {
-            setProfileSubScreen('user');
+            setProfileSubScreen('settings');
           }
         })} />
       },
@@ -1741,26 +1790,31 @@ const Index = () => {
             const owned = myItinerariesForLimit.find((it) => it.id === id);
             if (owned) setCreatorDashboardItinerary(owned);
           }}
-          onSeeAllMySales={() => { setReturnToPublic(true); setActiveTab('trips'); }}
+          onSeeAllMySales={() => { setActiveTab('store'); }}
           // TODO: fluxo de impulsionamento ainda não existe — conectar aqui (recebe o roteiro centralizado).
           onBoostListing={undefined}
         />
       )}
-      {activeTab === 'trips' && (
+      {activeTab === 'store' && (
         <Suspense fallback={<ScreenFallback />}>
-          <TripsScreen
-            key={returnToPublic ? 'public' : 'default'}
-            onItineraryClick={handleItineraryClick}
-            onPrivateItineraryClick={handleItineraryClick}
+          <StoreScreen
             onUserItineraryClick={handleUserItineraryClick}
             onUserPublicItineraryClick={(it) => setCreatorDashboardItinerary(it)}
             onCreateItinerary={(type) => tryOpenItinerarySheet(type)}
-            onOpenCreateSheet={() => tryOpenItinerarySheet()}
+          />
+        </Suspense>
+      )}
+      {activeTab === 'trips' && (
+        <Suspense fallback={<ScreenFallback />}>
+          <TripsScreen
+            onItineraryClick={handleItineraryClick}
+            onPrivateItineraryClick={handleItineraryClick}
+            onUserItineraryClick={handleUserItineraryClick}
+            onCreateItinerary={(type) => tryOpenItinerarySheet(type)}
             onBecomeCreator={() => { setCreatorProgramOrigin('trips'); setActiveTab('home'); setProfileSubScreen('creator-program'); }}
             onUpgrade={() => { setSubscriptionOrigin('trips'); setActiveTab('home'); setProfileSubScreen('subscription'); }}
             itineraryUsedCount={ownCreatedCount}
             itineraryLimit={FREE_PLAN_ITINERARY_LIMIT}
-            defaultTab={returnToPublic ? 'public' : 'private'}
             onDeleteSuccess={() => setShowDeleteSuccessToast(true)}
             onLeaveSuccess={() => setShowLeaveSuccessToast(true)}
           />
@@ -1771,6 +1825,7 @@ const Index = () => {
       <BottomNavigation
         activeTab={activeTab === 'home' && profileSubScreen !== 'main' ? 'profile' : activeTab}
         onTabChange={handleTabChange}
+        showStore={showStoreTab}
       />
 
       <CreateBottomSheet

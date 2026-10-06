@@ -3,9 +3,11 @@ import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { ChatScreen } from '@/components/screens/ChatScreen';
 import { FriendProfileScreen, FriendProfileData } from '@/components/screens/FriendProfileScreen';
 import { getProfileByUsername, getProfileByUserId } from '@/lib/profilesApi';
+import { useSafeBack } from '@/hooks/useSafeBack';
 
 const FriendProfilePage = () => {
   const navigate = useNavigate();
+  const goBack = useSafeBack();
   const location = useLocation();
   const params = useParams<{ username?: string }>();
   const [showChat, setShowChat] = useState(false);
@@ -105,7 +107,7 @@ const FriendProfilePage = () => {
       <div className="w-full bg-background min-h-screen overflow-x-clip">
         <FriendProfileScreen
           friend={friend}
-          onBack={() => navigate(-1)}
+          onBack={goBack}
           onChat={() => setShowChat(true)}
           onItineraryClick={(id, userItinerary) => {
             if (userItinerary) {

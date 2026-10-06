@@ -4,6 +4,7 @@ import { FollowListScreen } from '@/components/screens/FollowListScreen';
 import { BackButton } from '@/components/ui/BackButton';
 import { getProfileByUsername, getProfileByUserId } from '@/lib/profilesApi';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSafeBack } from '@/hooks/useSafeBack';
 
 interface FollowListPageProps {
   initialTab: 'followers' | 'following';
@@ -11,6 +12,7 @@ interface FollowListPageProps {
 
 const FollowListPage = ({ initialTab }: FollowListPageProps) => {
   const navigate = useNavigate();
+  const goBack = useSafeBack();
   const location = useLocation();
   const { user } = useAuth();
   const params = useParams<{ username?: string }>();
@@ -60,7 +62,7 @@ const FollowListPage = ({ initialTab }: FollowListPageProps) => {
       <div className="min-h-screen bg-background w-full">
         <div className="w-full bg-background min-h-screen flex flex-col" style={{ minHeight: '100dvh' }}>
           <div className="sticky z-20 bg-background border-b border-border px-4 flex items-center gap-3" style={{ paddingTop: 'calc(max(16px, env(safe-area-inset-top)) + 12px)' }}>
-            <BackButton onClick={() => navigate(-1)} />
+            <BackButton onClick={goBack} />
             <div className="flex-1 min-w-0">
               <p className="text-foreground truncate" style={{ fontSize: 15, fontWeight: 700 }}></p>
             </div>
@@ -91,7 +93,7 @@ const FollowListPage = ({ initialTab }: FollowListPageProps) => {
       initialTab={initialTab}
       initialFollowersCount={passed?.followers}
       initialFollowingCount={passed?.following}
-      onBack={() => navigate(-1)}
+      onBack={goBack}
     />
   );
 };

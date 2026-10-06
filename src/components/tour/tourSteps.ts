@@ -37,15 +37,15 @@ export const TOUR_STEPS: TourStep[] = [
   {
     id: 'trips',
     target: '[data-tour-id="nav-trips"]',
-    title: 'Seus roteiros e coleções',
-    body: 'Acesse aqui suas viagens, coleções salvas e os roteiros que você publicou à venda.',
+    title: 'Suas viagens',
+    body: 'Acesse aqui seus roteiros pessoais, compartilhados e comprados.',
     placement: 'top',
     ensureTab: 'home',
   },
   {
     id: 'publish',
     title: 'Colocar um roteiro à venda',
-    body: 'Abra um roteiro seu em Roteiros e use o menu de opções para publicá-lo no marketplace e começar a monetizar.',
+    body: 'Abra um roteiro seu em Viagens e use o menu de opções para publicá-lo no marketplace e começar a monetizar. Quem vende tem a aba Minha loja para acompanhar tudo.',
     placement: 'center',
   },
   {
