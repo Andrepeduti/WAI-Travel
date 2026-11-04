@@ -249,7 +249,7 @@ function LoginCard({
       </div>
 
       <h2 className="font-bold text-[#0A0A0A] text-[26px] leading-[1.1] tracking-[-0.02em]">
-        Bem-vindo de volta.
+        Bem-vindo de volta
       </h2>
       <p className="mt-1.5 text-[14px] text-[#0A0A0A]/55">Entre para continuar planejando.</p>
 
